@@ -4,7 +4,6 @@ namespace Spacevors.Domain.Systems;
 
 public class PhysicsSystem : GameSystem
 {
-    private const float LinearDamping = 0.98f;
     private const float AngularDamping = 0.95f;
 
     public override void Update(EntityManager em, float deltaTime)
@@ -28,14 +27,6 @@ public class PhysicsSystem : GameSystem
 
                 var newVel = currentVel + accel.Value * deltaTime;
                 em.AddComponent(entity, new Velocity(newVel));
-            }
-
-            // Apply linear damping
-            if (em.HasComponent<Velocity>(entity))
-            {
-                var vel = em.GetComponent<Velocity>(entity);
-                var damped = vel.Value * LinearDamping;
-                em.AddComponent(entity, new Velocity(damped));
             }
 
             // Update position from velocity

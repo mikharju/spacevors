@@ -23,11 +23,27 @@ em.AddComponent(cameraEntity, new Camera(new Vector2(0f, 0f)));
 
 // Spawn asteroids around the player
 Random rand = new Random(42);
-for (int i = 0; i < 15; i++)
+
+// 5 close asteroids within initial view range
+for (int i = 0; i < 5; i++)
 {
     var asteroid = em.CreateEntity();
     float angle = (float)(rand.NextDouble() * Math.PI * 2f);
-    float dist = 200f + (float)rand.NextDouble() * 600f;
+    float dist = 150f + (float)rand.NextDouble() * 400f;
+    float ax = (float)Math.Cos(angle) * dist;
+    float ay = (float)Math.Sin(angle) * dist;
+    float aw = 40f + (float)rand.NextDouble() * 60f;
+    float ah = 30f + (float)rand.NextDouble() * 50f;
+    em.AddComponent(asteroid, new Position(new Vector2(ax, ay)));
+    em.AddComponent(asteroid, new Asteroid(aw, ah));
+}
+
+// Remaining asteroids in a larger area (~5 screens away)
+for (int i = 5; i < 105; i++)
+{
+    var asteroid = em.CreateEntity();
+    float angle = (float)(rand.NextDouble() * Math.PI * 2f);
+    float dist = 1000f + (float)rand.NextDouble() * 4000f;
     float ax = (float)Math.Cos(angle) * dist;
     float ay = (float)Math.Sin(angle) * dist;
     float aw = 40f + (float)rand.NextDouble() * 60f;
@@ -115,10 +131,21 @@ while (!Raylib.WindowShouldClose())
         float angle = shipRot.Angle;
         float size = 20f;
 
-        // Triangle vertices (pointing forward, which is -Y in local space)
-        var tip = new System.Numerics.Vector2((float)Math.Sin(angle) * size, -(float)Math.Cos(angle) * size);
-        var left = new System.Numerics.Vector2(-(float)Math.Cos(angle + Math.PI / 6) * size * 0.7f, (float)Math.Sin(angle + Math.PI / 6) * size * 0.7f);
-        var right = new System.Numerics.Vector2((float)Math.Cos(angle - Math.PI / 6) * size * 0.7f, -(float)Math.Sin(angle - Math.PI / 6) * size * 0.7f);
+        // Triangle vertices: apply rotation matrix to local-space points
+        float cos = (float)Math.Cos(angle);
+        float sin = (float)Math.Sin(angle);
+
+        // Tip in local space: (0, -size), pointing forward (-Y)
+        var tipLocal = new System.Numerics.Vector2(0f, -size);
+        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+
+        // Left base corner in local space: bottom-left of ship
+        var leftLocal = new System.Numerics.Vector2(-size * 0.4f, size * 0.6f);
+        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+
+        // Right base corner in local space: bottom-right of ship
+        var rightLocal = new System.Numerics.Vector2(size * 0.4f, size * 0.6f);
+        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
 
         // Apply camera offset and center
         float tx1 = (float)shipPos.Value.X + tip.X - camX + WindowWidth / 2f;
