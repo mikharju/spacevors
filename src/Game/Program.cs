@@ -127,13 +127,34 @@ while (!Raylib.WindowShouldClose())
     Raylib.BeginDrawing();
     Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
-    // Draw asteroids as gray rectangles
+    // Draw asteroids as rotated gray rectangles
     foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
     {
         var pos = em.GetComponent<Position>(entity);
-        float rx = (float)pos.Value.X - camX - asteroid.Width / 2f + WindowWidth / 2f;
-        float ry = (float)pos.Value.Y - camY - asteroid.Height / 2f + WindowHeight / 2f;
-        Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+
+        // Debug: draw AABB collision bounds in red
+        Raylib.DrawRectangle((int)(cx - asteroid.Width / 2f), (int)(cy - asteroid.Height / 2f), (int)asteroid.Width, (int)asteroid.Height, new Color(255, 0, 0, 60));
+
+        if (em.HasComponent<Rotation>(entity))
+        {
+            var rot = em.GetComponent<Rotation>(entity);
+
+            float angleDeg = rot.Angle * 180f / MathF.PI;
+            Raylib.DrawRectanglePro(
+                new Rectangle((int)(cx - asteroid.Width / 2f), (int)(cy - asteroid.Height / 2f), (int)asteroid.Width, (int)asteroid.Height),
+                new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
+                angleDeg,
+                new Color(200, 200, 210, 255)
+            );
+        }
+        else
+        {
+            float rx = cx - asteroid.Width / 2f;
+            float ry = cy - asteroid.Height / 2f;
+            Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+        }
     }
 
     // Draw player ship as a light blue triangle
@@ -173,6 +194,11 @@ while (!Raylib.WindowShouldClose())
             new System.Numerics.Vector2(tx3, ty3),
             new Color(100, 200, 255, 255)
         );
+
+        // Debug: draw player collision circle in green (radius = 18f)
+        float shipCx = (float)shipPos.Value.X - camX + WindowWidth / 2f;
+        float shipCy = (float)shipPos.Value.Y - camY + WindowHeight / 2f;
+        Raylib.DrawCircle((int)shipCx, (int)shipCy, 18, new Color(0, 255, 0, 60));
     }
 
     Raylib.EndDrawing();
