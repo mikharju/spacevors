@@ -34,8 +34,14 @@ for (int i = 0; i < 5; i++)
     float ay = (float)Math.Sin(angle) * dist;
     float aw = 40f + (float)rand.NextDouble() * 60f;
     float ah = 30f + (float)rand.NextDouble() * 50f;
+    float ar = Math.Max(aw, ah) / 2f;
+    float aSpeed = 15f + (float)rand.NextDouble() * 35f;
+    float aAngle = (float)(rand.NextDouble() * Math.PI * 2);
     em.AddComponent(asteroid, new Position(new Vector2(ax, ay)));
-    em.AddComponent(asteroid, new Asteroid(aw, ah));
+    em.AddComponent(asteroid, new Velocity(new Vector2((float)Math.Cos(aAngle) * aSpeed, (float)Math.Sin(aAngle) * aSpeed)));
+    em.AddComponent(asteroid, new Rotation((float)(rand.NextDouble() * Math.PI * 2)));
+    em.AddComponent(asteroid, new AngularVelocity((float)(rand.NextDouble() - 0.5) * 1.5f));
+    em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
 }
 
 // Remaining asteroids in a larger area (~5 screens away)
@@ -48,11 +54,17 @@ for (int i = 5; i < 105; i++)
     float ay = (float)Math.Sin(angle) * dist;
     float aw = 40f + (float)rand.NextDouble() * 60f;
     float ah = 30f + (float)rand.NextDouble() * 50f;
+    float ar = Math.Max(aw, ah) / 2f;
+    float aSpeed = 10f + (float)rand.NextDouble() * 25f;
+    float aAngle = (float)(rand.NextDouble() * Math.PI * 2);
     em.AddComponent(asteroid, new Position(new Vector2(ax, ay)));
-    em.AddComponent(asteroid, new Asteroid(aw, ah));
+    em.AddComponent(asteroid, new Velocity(new Vector2((float)Math.Cos(aAngle) * aSpeed, (float)Math.Sin(aAngle) * aSpeed)));
+    em.AddComponent(asteroid, new Rotation((float)(rand.NextDouble() * Math.PI * 2)));
+    em.AddComponent(asteroid, new AngularVelocity((float)(rand.NextDouble() - 0.5f) * 1.5f));
+    em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
 }
 
-var systems = new GameSystem[] { new PhysicsSystem(), new CameraSystem() };
+var systems = new GameSystem[] { new PhysicsSystem(), new CollisionSystem(), new CameraSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
