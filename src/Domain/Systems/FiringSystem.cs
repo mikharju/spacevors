@@ -8,18 +8,27 @@ public class FiringSystem : GameSystem
     {
         foreach (var (entity, weapon, rotation) in em.GetEntitiesWithComponents<Weapon, Rotation>())
         {
-            if (!em.HasComponent<WantsToFire>(entity)) continue;
-
             var cooldown = GetCooldown(em, entity);
-            cooldown -= deltaTime;
 
-            while (cooldown <= 0f)
+            if (cooldown < 0f)
             {
+                // Ready to fire: spawn ammo and start cooldown
                 FireAmmo(em, entity, weapon, rotation);
-                cooldown += 1f / weapon.FireRate;
+                SetCooldown(em, entity, 1f / weapon.FireRate);
             }
-
-            SetCooldown(em, entity, cooldown);
+            else if (cooldown > 0f)
+            {
+                // Decrement active cooldown
+                var newCooldown = cooldown - deltaTime;
+                if (newCooldown <= 0f)
+                {
+                    SetCooldown(em, entity, 0f);
+                }
+                else
+                {
+                    SetCooldown(em, entity, newCooldown);
+                }
+            }
         }
     }
 

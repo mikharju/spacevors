@@ -109,10 +109,16 @@ while (!Raylib.WindowShouldClose())
         em.AddComponent(playerEntity, new AngularVelocity(angVel.Value + 5f * frameTime));
     }
 
-    // Firing: Space key signals intent to fire
+    // Firing: Space key sets negative cooldown to signal "ready to fire"
     if (Raylib.IsKeyDown(KeyboardKey.Space))
     {
-        em.AddComponent(playerEntity, new WantsToFire());
+        var hasCooldown = em.HasComponent<FireCooldown>(playerEntity);
+        var currentCooldown = hasCooldown ? em.GetComponent<FireCooldown>(playerEntity).Timer : -1f;
+
+        if (!hasCooldown || currentCooldown <= 0f)
+        {
+            em.AddComponent(playerEntity, new FireCooldown(-1f));
+        }
     }
 
     // Fixed timestep simulation
