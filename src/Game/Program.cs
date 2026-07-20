@@ -134,8 +134,8 @@ while (!Raylib.WindowShouldClose())
         float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
         float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
 
-        // Debug: draw AABB collision bounds in red
-        Raylib.DrawRectangle((int)(cx - asteroid.Width / 2f), (int)(cy - asteroid.Height / 2f), (int)asteroid.Width, (int)asteroid.Height, new Color(255, 0, 0, 60));
+        // Debug: draw circle collision bounds in red
+        Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
         if (em.HasComponent<Rotation>(entity))
         {
@@ -195,10 +195,10 @@ while (!Raylib.WindowShouldClose())
             new Color(100, 200, 255, 255)
         );
 
-        // Debug: draw player collision circle in green (radius = 18f)
+        // Debug: draw player collision circle in green
         float shipCx = (float)shipPos.Value.X - camX + WindowWidth / 2f;
         float shipCy = (float)shipPos.Value.Y - camY + WindowHeight / 2f;
-        Raylib.DrawCircle((int)shipCx, (int)shipCy, 18, new Color(0, 255, 0, 60));
+        Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)playerStats.Radius, new Color(0, 255, 0, 60));
     }
 
     Raylib.EndDrawing();

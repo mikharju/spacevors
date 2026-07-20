@@ -21,7 +21,7 @@ public class CollisionSystem : GameSystem
         {
             foreach (var (entity, asteroid) in asteroids)
             {
-                ResolveAABBvsCircle(em, entity, asteroid, playerEntity);
+                ResolveCircleVsCircle(em, entity, asteroid, playerEntity);
             }
         }
 
@@ -31,61 +31,54 @@ public class CollisionSystem : GameSystem
             {
                 var (aEntity, aAsteroid) = asteroids[i];
                 var (bEntity, bAsteroid) = asteroids[j];
-                ResolveAABBvsAABB(em, aEntity, aAsteroid, bEntity, bAsteroid);
+                ResolveCircleVsCircle(em, aEntity, aAsteroid, bEntity, bAsteroid);
             }
         }
     }
 
-    private void ResolveAABBvsAABB(
+    private void ResolveCircleVsCircle(
         EntityManager em,
         Entity aEntity,
         Asteroid aAst,
         Entity bEntity,
-        Asteroid bAst)
+        Asteroid? bAst = null)
     {
         var aPos = em.GetComponent<Position>(aEntity);
         var bPos = em.GetComponent<Position>(bEntity);
 
-        float aHalfW = aAst.Width / 2f;
-        float aHalfH = aAst.Height / 2f;
-        float bHalfW = bAst.Width / 2f;
-        float bHalfH = bAst.Height / 2f;
+        float aRadius;
+        float bRadius;
+        bool isAsteroidVsAsteroid;
 
-        // AABB bounds (center-based)
-        float aMinX = (float)aPos.Value.X - aHalfW;
-        float aMaxX = (float)aPos.Value.X + aHalfW;
-        float aMinY = (float)aPos.Value.Y - aHalfH;
-        float aMaxY = (float)aPos.Value.Y + aHalfH;
-
-        float bMinX = (float)bPos.Value.X - bHalfW;
-        float bMaxX = (float)bPos.Value.X + bHalfW;
-        float bMinY = (float)bPos.Value.Y - bHalfH;
-        float bMaxY = (float)bPos.Value.Y + bHalfH;
-
-        // Check AABB overlap on both axes
-        float overlapX = Math.Min(aMaxX, bMaxX) - Math.Max(aMinX, bMinX);
-        float overlapY = Math.Min(aMaxY, bMaxY) - Math.Max(aMinY, bMinY);
-
-        if (overlapX <= 0f || overlapY <= 0f) return;
-
-        // Minimum translation direction: axis with smallest overlap
-        Vector2 normal;
-        float penetration;
-        if (overlapX < overlapY)
+        if (bAst != null)
         {
-            penetration = overlapX;
-            var diff = bPos.Value - aPos.Value;
-            normal = Math.Abs(diff.X) > 0.001f ? new Vector2(Math.Sign(diff.X), 0f) : new Vector2(1, 0);
+            // Asteroid vs asteroid
+            aRadius = aAst.Radius;
+            bRadius = bAst.Value.Radius;
+            isAsteroidVsAsteroid = true;
         }
         else
         {
-            penetration = overlapY;
-            var diff = bPos.Value - aPos.Value;
-            normal = Math.Abs(diff.Y) > 0.001f ? new Vector2(0f, Math.Sign(diff.Y)) : new Vector2(0, 1);
+            // Player vs asteroid (bEntity is player)
+            aRadius = aAst.Radius;
+            var playerComp = em.GetComponent<Player>(bEntity);
+            bRadius = playerComp.Radius;
+            isAsteroidVsAsteroid = false;
         }
 
-        float aMass = aAst.Width * aAst.Height;
-        float bMass = bAst.Width * bAst.Height;
+        var diff = bPos.Value - aPos.Value;
+        float distSq = diff.X * diff.X + diff.Y * diff.Y;
+        float radiusSum = aRadius + bRadius;
+
+        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+
+        float dist = (float)Math.Sqrt(distSq);
+        var normal = diff / dist;
+
+        float penetration = radiusSum - dist;
+
+        float aMass = MathF.PI * aRadius * aRadius;
+        float bMass = isAsteroidVsAsteroid ? MathF.PI * bRadius * bRadius : MathF.PI * bRadius * bRadius;
         float invMassA = 1f / aMass;
         float invMassB = 1f / bMass;
         float totalInvMass = invMassA + invMassB;
@@ -111,7 +104,8 @@ public class CollisionSystem : GameSystem
 
         if (velAlongNormal > 0f) return;
 
-        float j = -(1 + AsteroidAsteroidRestitution) * velAlongNormal / totalInvMass;
+        float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
+        float j = -(1 + restitution) * velAlongNormal / totalInvMass;
         var impulse = normal * j;
 
         aVel -= impulse * invMassA;
@@ -136,95 +130,6 @@ public class CollisionSystem : GameSystem
         {
             var bAngVel = em.GetComponent<AngularVelocity>(bEntity);
             em.AddComponent(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor));
-        }
-    }
-
-    private void ResolveAABBvsCircle(
-        EntityManager em,
-        Entity aEntity,
-        Asteroid aAst,
-        Entity playerEntity)
-    {
-        var aPos = em.GetComponent<Position>(aEntity);
-        var bPos = em.GetComponent<Position>(playerEntity);
-
-        float aHalfW = aAst.Width / 2f;
-        float aHalfH = aAst.Height / 2f;
-
-        // AABB bounds (center-based)
-        float aMinX = (float)aPos.Value.X - aHalfW;
-        float aMaxX = (float)aPos.Value.X + aHalfW;
-        float aMinY = (float)aPos.Value.Y - aHalfH;
-        float aMaxY = (float)aPos.Value.Y + aHalfH;
-
-        // Find closest point on AABB to circle center
-        float closestX = Math.Max(aMinX, Math.Min((float)bPos.Value.X, aMaxX));
-        float closestY = Math.Max(aMinY, Math.Min((float)bPos.Value.Y, aMaxY));
-
-        var diff = bPos.Value - new Vector2(closestX, closestY);
-        float distSq = diff.X * diff.X + diff.Y * diff.Y;
-        float radius = 18f;
-
-        if (distSq >= radius * radius || distSq < 0.001f) return;
-
-        float dist = (float)Math.Sqrt(distSq);
-        var normal = diff / dist;
-
-        // Penetration: how far the circle overlaps the AABB edge
-        float penetration = radius - dist;
-
-        float aMass = aAst.Width * aAst.Height;
-        float bMass = 18f * 18f;
-        float invMassA = 1f / aMass;
-        float invMassB = 1f / bMass;
-        float totalInvMass = invMassA + invMassB;
-
-        Vector2 aVel = em.HasComponent<Velocity>(aEntity)
-            ? em.GetComponent<Velocity>(aEntity).Value
-            : Vector2.Zero;
-        Vector2 bVel = em.HasComponent<Velocity>(playerEntity)
-            ? em.GetComponent<Velocity>(playerEntity).Value
-            : Vector2.Zero;
-
-        var relVel = bVel - aVel;
-        float velAlongNormal = Vector2.Dot(relVel, normal);
-
-        // Positional correction
-        float correctionMagnitude = Math.Max(penetration - Slop, 0f) * CorrectionPercent;
-        if (correctionMagnitude > 0f && totalInvMass > 0f)
-        {
-            var correctionPerInvMass = normal * (correctionMagnitude / totalInvMass);
-            em.AddComponent(aEntity, new Position(aPos.Value - correctionPerInvMass * invMassA));
-            em.AddComponent(playerEntity, new Position(bPos.Value + correctionPerInvMass * invMassB));
-        }
-
-        if (velAlongNormal > 0f) return;
-
-        float j = -(1 + PlayerRestitution) * velAlongNormal / totalInvMass;
-        var impulse = normal * j;
-
-        aVel -= impulse * invMassA;
-        bVel += impulse * invMassB;
-
-        em.AddComponent(aEntity, new Velocity(aVel));
-        em.AddComponent(playerEntity, new Velocity(bVel));
-
-        // Spin from tangential component
-        var correctedRelVel = bVel - aVel;
-        var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
-        var tangentVel = correctedRelVel - normal * velNormalComponent;
-        float tangentSpeed = tangentVel.Magnitude;
-
-        if (em.HasComponent<AngularVelocity>(aEntity))
-        {
-            var aAngVel = em.GetComponent<AngularVelocity>(aEntity);
-            em.AddComponent(aEntity, new AngularVelocity(aAngVel.Value + tangentSpeed * RotationFactor));
-        }
-
-        if (em.HasComponent<AngularVelocity>(playerEntity))
-        {
-            var bAngVel = em.GetComponent<AngularVelocity>(playerEntity);
-            em.AddComponent(playerEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor));
         }
     }
 }
