@@ -143,8 +143,8 @@ while (!Raylib.WindowShouldClose())
 
             float angleDeg = rot.Angle * 180f / MathF.PI;
             Raylib.DrawRectanglePro(
-                new Rectangle((int)(cx - asteroid.Width / 2f), (int)(cy - asteroid.Height / 2f), (int)asteroid.Width, (int)asteroid.Height),
-                new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
+                new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height), // do not try to set origin to middle here, next line covers it
+                new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f), // Only set origin here
                 angleDeg,
                 new Color(200, 200, 210, 255)
             );
