@@ -8,13 +8,10 @@ public class CameraSystem : GameSystem
 
     public override void Update(EntityManager em, float deltaTime)
     {
-        var playerPositions = em.GetEntitiesWithComponents<Position>()
-            .Where(p => em.HasComponent<Player>(p.Entity))
-            .ToList();
+        var playerTuple = em.GetEntitiesWithComponents<Position, Player>().FirstOrDefault();
+        if (playerTuple.Entity.Value < 0) return;
 
-        if (playerPositions.Count == 0) return;
-
-        var targetPos = playerPositions.First().Value.Value;
+        var targetPos = playerTuple.Value1.Value;
 
         foreach (var (entity, camera) in em.GetEntitiesWithComponents<Camera>())
         {

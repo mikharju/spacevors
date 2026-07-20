@@ -42,6 +42,10 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
         _activeIds.Remove(entity.Value);
     }
 
+    public override int Count => _activeIds.Count;
+
+    public override IEnumerable<int> GetEntityIds() => _activeIds;
+
     public IEnumerator<(Entity Entity, T Value)> GetEnumerator()
     {
         foreach (var id in _activeIds.OrderBy(x => x))

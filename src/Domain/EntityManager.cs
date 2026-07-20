@@ -77,6 +77,72 @@ public class EntityManager
         }
     }
 
+    private ComponentStorageBase FindSmallest(params ComponentStorageBase[] storages)
+        => storages.OrderBy(s => s.Count).First();
+
+    public IEnumerable<(Entity Entity, T1 Value1, T2 Value2)> GetEntitiesWithComponents<T1, T2>()
+        where T1 : notnull where T2 : notnull
+    {
+        if (!_storages.TryGetValue(typeof(T1), out var s1) || !_storages.TryGetValue(typeof(T2), out var s2))
+            yield break;
+
+        var storage1 = (ComponentStorage<T1>)s1;
+        var storage2 = (ComponentStorage<T2>)s2;
+        var smallest = FindSmallest(storage1, storage2);
+
+        foreach (var id in smallest.GetEntityIds())
+        {
+            var entity = new Entity(id);
+            if (!storage1.Has(entity)) continue;
+            if (!storage2.Has(entity)) continue;
+            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity));
+        }
+    }
+
+    public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3)> GetEntitiesWithComponents<T1, T2, T3>()
+        where T1 : notnull where T2 : notnull where T3 : notnull
+    {
+        if (!_storages.TryGetValue(typeof(T1), out var s1) || !_storages.TryGetValue(typeof(T2), out var s2) || !_storages.TryGetValue(typeof(T3), out var s3))
+            yield break;
+
+        var storage1 = (ComponentStorage<T1>)s1;
+        var storage2 = (ComponentStorage<T2>)s2;
+        var storage3 = (ComponentStorage<T3>)s3;
+        var smallest = FindSmallest(storage1, storage2, storage3);
+
+        foreach (var id in smallest.GetEntityIds())
+        {
+            var entity = new Entity(id);
+            if (!storage1.Has(entity)) continue;
+            if (!storage2.Has(entity)) continue;
+            if (!storage3.Has(entity)) continue;
+            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity), GetComponent<T3>(entity));
+        }
+    }
+
+    public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3, T4 Value4)> GetEntitiesWithComponents<T1, T2, T3, T4>()
+        where T1 : notnull where T2 : notnull where T3 : notnull where T4 : notnull
+    {
+        if (!_storages.TryGetValue(typeof(T1), out var s1) || !_storages.TryGetValue(typeof(T2), out var s2) || !_storages.TryGetValue(typeof(T3), out var s3) || !_storages.TryGetValue(typeof(T4), out var s4))
+            yield break;
+
+        var storage1 = (ComponentStorage<T1>)s1;
+        var storage2 = (ComponentStorage<T2>)s2;
+        var storage3 = (ComponentStorage<T3>)s3;
+        var storage4 = (ComponentStorage<T4>)s4;
+        var smallest = FindSmallest(storage1, storage2, storage3, storage4);
+
+        foreach (var id in smallest.GetEntityIds())
+        {
+            var entity = new Entity(id);
+            if (!storage1.Has(entity)) continue;
+            if (!storage2.Has(entity)) continue;
+            if (!storage3.Has(entity)) continue;
+            if (!storage4.Has(entity)) continue;
+            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity), GetComponent<T3>(entity), GetComponent<T4>(entity));
+        }
+    }
+
     public void Clear()
     {
         _nextId = 0;
@@ -87,4 +153,6 @@ public class EntityManager
 public abstract class ComponentStorageBase
 {
     public abstract void Remove(Entity entity);
+    public abstract int Count { get; }
+    public abstract IEnumerable<int> GetEntityIds();
 }
