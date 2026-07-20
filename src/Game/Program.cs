@@ -127,8 +127,8 @@ while (!Raylib.WindowShouldClose())
     Raylib.BeginDrawing();
     Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
-    // Draw asteroids as rotated gray rectangles
-    foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
+    // Draw asteroids with rotation as rotated gray rectangles
+    foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
     {
         var pos = em.GetComponent<Position>(entity);
         float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
@@ -137,24 +137,30 @@ while (!Raylib.WindowShouldClose())
         // Debug: draw circle collision bounds in red
         Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-        if (em.HasComponent<Rotation>(entity))
-        {
-            var rot = em.GetComponent<Rotation>(entity);
+        float angleDeg = rot.Angle * 180f / MathF.PI;
+        Raylib.DrawRectanglePro(
+            new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height),
+            new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
+            angleDeg,
+            new Color(200, 200, 210, 255)
+        );
+    }
 
-            float angleDeg = rot.Angle * 180f / MathF.PI;
-            Raylib.DrawRectanglePro(
-                new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height), // do not try to set origin to middle here, next line covers it
-                new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f), // Only set origin here
-                angleDeg,
-                new Color(200, 200, 210, 255)
-            );
-        }
-        else
-        {
-            float rx = cx - asteroid.Width / 2f;
-            float ry = cy - asteroid.Height / 2f;
-            Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
-        }
+    // Draw asteroids without rotation as unrotated gray rectangles
+    foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
+    {
+        if (em.HasComponent<Rotation>(entity)) continue;
+
+        var pos = em.GetComponent<Position>(entity);
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+
+        // Debug: draw circle collision bounds in red
+        Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
+
+        float rx = cx - asteroid.Width / 2f;
+        float ry = cy - asteroid.Height / 2f;
+        Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
     }
 
     // Draw player ship as a light blue triangle
