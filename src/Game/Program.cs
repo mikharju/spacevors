@@ -16,6 +16,7 @@ em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
 em.AddComponent(playerEntity, new Rotation(0f));
 em.AddComponent(playerEntity, new AngularVelocity(0f));
 em.AddComponent(playerEntity, new Player(Thrust: 400f, Boost: 2.5f));
+em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
 
 // Create camera
 var cameraEntity = em.CreateEntity();
@@ -64,7 +65,7 @@ for (int i = 5; i < 105; i++)
     em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
 }
 
-var systems = new GameSystem[] { new PhysicsSystem(), new CollisionSystem(), new CameraSystem() };
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new CameraSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
@@ -106,6 +107,12 @@ while (!Raylib.WindowShouldClose())
     {
         var angVel = em.GetComponent<AngularVelocity>(playerEntity);
         em.AddComponent(playerEntity, new AngularVelocity(angVel.Value + 5f * frameTime));
+    }
+
+    // Firing: Space key signals intent to fire
+    if (Raylib.IsKeyDown(KeyboardKey.Space))
+    {
+        em.AddComponent(playerEntity, new WantsToFire());
     }
 
     // Fixed timestep simulation
@@ -161,6 +168,15 @@ while (!Raylib.WindowShouldClose())
         float rx = cx - asteroid.Width / 2f;
         float ry = cy - asteroid.Height / 2f;
         Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+    }
+
+    // Draw ammo as small yellow circles
+    foreach (var (entity, ammo) in em.GetEntitiesWithComponents<Ammo>())
+    {
+        var pos = em.GetComponent<Position>(entity);
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+        Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, new Color(255, 230, 100, 255));
     }
 
     // Draw player ship as a light blue triangle

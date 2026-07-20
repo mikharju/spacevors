@@ -6,9 +6,11 @@ public class CollisionSystem : GameSystem
 {
     private const float PlayerRestitution = 0.2f;
     private const float AsteroidAsteroidRestitution = 0.4f;
+    private const float AmmoRestitution = 0.15f;
     private const float RotationFactor = 0.03f;
     private const float CorrectionPercent = 0.8f;
     private const float Slop = 0.01f;
+    private const float AmmoMass = 1f;
 
     public override void Update(EntityManager em, float deltaTime)
     {
@@ -34,6 +36,34 @@ public class CollisionSystem : GameSystem
                 ResolveCircleVsCircle(em, aEntity, aAsteroid, bEntity, bAsteroid);
             }
         }
+
+        var ammoList = em.GetEntitiesWithComponents<Ammo>().ToList();
+        var entitiesToDestroy = new List<Entity>();
+
+        foreach (var (ammoEntity, ammo) in ammoList)
+        {
+            var ammoPos = em.GetComponent<Position>(ammoEntity);
+            float ammoRadius = ammo.Radius;
+
+            foreach (var (asteroidEntity, asteroid) in asteroids)
+            {
+                var asteroidPos = em.GetComponent<Position>(asteroidEntity);
+                var diff = asteroidPos.Value - ammoPos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                float radiusSum = ammoRadius + asteroid.Radius;
+
+                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+                ResolveAmmoVsAsteroid(em, ammoEntity, ammo, asteroidEntity, asteroid);
+                entitiesToDestroy.Add(ammoEntity);
+                break;
+            }
+        }
+
+        foreach (var entity in entitiesToDestroy.Distinct())
+        {
+            em.DestroyEntity(entity);
+        }
     }
 
     private void ResolveCircleVsCircle(
@@ -52,14 +82,12 @@ public class CollisionSystem : GameSystem
 
         if (bAst != null)
         {
-            // Asteroid vs asteroid
             aRadius = aAst.Radius;
             bRadius = bAst.Value.Radius;
             isAsteroidVsAsteroid = true;
         }
         else
         {
-            // Player vs asteroid (bEntity is player)
             aRadius = aAst.Radius;
             var playerComp = em.GetComponent<Player>(bEntity);
             bRadius = playerComp.Radius;
@@ -93,7 +121,6 @@ public class CollisionSystem : GameSystem
         var relVel = bVel - aVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
 
-        // Positional correction
         float correctionMagnitude = Math.Max(penetration - Slop, 0f) * CorrectionPercent;
         if (correctionMagnitude > 0f && totalInvMass > 0f)
         {
@@ -114,7 +141,6 @@ public class CollisionSystem : GameSystem
         em.AddComponent(aEntity, new Velocity(aVel));
         em.AddComponent(bEntity, new Velocity(bVel));
 
-        // Spin from tangential component
         var correctedRelVel = bVel - aVel;
         var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
         var tangentVel = correctedRelVel - normal * velNormalComponent;
@@ -130,6 +156,49 @@ public class CollisionSystem : GameSystem
         {
             var bAngVel = em.GetComponent<AngularVelocity>(bEntity);
             em.AddComponent(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor));
+        }
+    }
+
+    private void ResolveAmmoVsAsteroid(
+        EntityManager em,
+        Entity ammoEntity,
+        Ammo ammo,
+        Entity asteroidEntity,
+        Asteroid asteroid)
+    {
+        var ammoPos = em.GetComponent<Position>(ammoEntity);
+        var asteroidPos = em.GetComponent<Position>(asteroidEntity);
+
+        var diff = asteroidPos.Value - ammoPos.Value;
+        float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
+        var normal = diff / dist;
+
+        // Small impulse: ammo mass is negligible compared to asteroid
+        Vector2 ammoVel = ammo.Velocity;
+        Vector2 asteroidVel = em.HasComponent<Velocity>(asteroidEntity)
+            ? em.GetComponent<Velocity>(asteroidEntity).Value
+            : Vector2.Zero;
+
+        var relVel = ammoVel - asteroidVel;
+        float velAlongNormal = Vector2.Dot(relVel, normal);
+        if (velAlongNormal > 0f) return;
+
+        float asteroidMass = MathF.PI * asteroid.Radius * asteroid.Radius;
+        float totalInvMass = 1f / AmmoMass + 1f / asteroidMass;
+
+        float j = -(1 + AmmoRestitution) * velAlongNormal / totalInvMass;
+        var impulse = normal * j;
+
+        // Apply tiny push to asteroid (much smaller than player crash due to mass difference)
+        asteroidVel += impulse * (1f / asteroidMass);
+        em.AddComponent(asteroidEntity, new Velocity(asteroidVel));
+
+        // Add small spin from impact
+        if (em.HasComponent<AngularVelocity>(asteroidEntity))
+        {
+            var tangentSpeed = relVel.Magnitude - Math.Abs(velAlongNormal);
+            var angVel = em.GetComponent<AngularVelocity>(asteroidEntity);
+            em.AddComponent(asteroidEntity, new AngularVelocity(angVel.Value + tangentSpeed * 0.01f));
         }
     }
 }
