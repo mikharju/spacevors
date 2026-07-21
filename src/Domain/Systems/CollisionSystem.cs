@@ -39,6 +39,7 @@ public class CollisionSystem : GameSystem
 
         var ammoList = em.GetEntitiesWithComponents<Ammo>().ToList();
         var entitiesToDestroy = new List<Entity>();
+        var effectsToSpawn = new List<(Vector2 Position, bool IsMine)>();
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
@@ -57,6 +58,7 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ResolveAmmoVsAsteroid(em, ammoEntity, ammo, asteroidEntity, asteroid);
+                effectsToSpawn.Add((ammoPos.Value, false));
                 entitiesToDestroy.Add(ammoEntity);
                 break;
             }
@@ -74,7 +76,11 @@ public class CollisionSystem : GameSystem
             foreach (var (mineEntity, mine) in mines)
             {
                 if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
-                ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
+                bool collided = ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
+                if (collided)
+                {
+                    effectsToSpawn.Add((em.GetComponent<Position>(mineEntity).Value, true));
+                }
             }
         }
 
@@ -106,6 +112,7 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ammoToMineHits.Add((ammoEntity, mineEntity));
+                effectsToSpawn.Add((minePos.Value, true));
                 break;
             }
         }
@@ -185,6 +192,7 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ammoToEnemyShipHits.Add((ammoEntity, enemyShipEntity));
+                effectsToSpawn.Add((shipPos.Value, false));
                 break;
             }
         }
@@ -233,6 +241,7 @@ public class CollisionSystem : GameSystem
             if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
             ammoToPlayerHits.Add(ammoEntity);
+            effectsToSpawn.Add((playerPos.Value, false));
         }
 
         foreach (var ammoEntity in ammoToPlayerHits.Distinct())
@@ -256,6 +265,35 @@ public class CollisionSystem : GameSystem
                 em.DestroyEntity(entity);
             }
         }
+
+        foreach (var (position, isMine) in effectsToSpawn.Distinct())
+        {
+            SpawnExplosion(em, position, isMine);
+            int sparkCount = isMine ? 7 : 3;
+            for (int i = 0; i < sparkCount; i++)
+            {
+                SpawnSpark(em, position);
+            }
+        }
+    }
+
+    private void SpawnExplosion(EntityManager em, Vector2 position, bool isMine)
+    {
+        var explosionEntity = em.CreateEntity();
+        em.AddComponent(explosionEntity, new Position(position));
+        float radius = isMine ? 30f : 15f;
+        em.AddComponent(explosionEntity, new Explosion(radius, 0.25f));
+    }
+
+    private void SpawnSpark(EntityManager em, Vector2 position)
+    {
+        var sparkEntity = em.CreateEntity();
+        float angle = (float)(new Random().NextDouble() * MathF.PI * 2f);
+        float speed = 50f + (float)new Random().NextDouble() * 100f;
+        Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
+        em.AddComponent(sparkEntity, new Position(position));
+        em.AddComponent(sparkEntity, new Velocity(velocity));
+        em.AddComponent(sparkEntity, new Spark(0.4f + (float)new Random().NextDouble() * 0.3f));
     }
 
     private void ResolveCircleVsCircle(
@@ -421,7 +459,7 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private void ResolveMineVsPlayer(EntityManager em, Entity mineEntity, EnemyMine mine, Entity playerEntity)
+    private bool ResolveMineVsPlayer(EntityManager em, Entity mineEntity, EnemyMine mine, Entity playerEntity)
     {
         var minePos = em.GetComponent<Position>(mineEntity);
         var playerPos = em.GetComponent<Position>(playerEntity);
@@ -430,7 +468,7 @@ public class CollisionSystem : GameSystem
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
         float radiusSum = mine.Radius + 18f;
 
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return false;
 
         em.DestroyEntity(mineEntity);
 
@@ -443,6 +481,8 @@ public class CollisionSystem : GameSystem
         {
             em.AddComponent(playerEntity, new Health(playerHealth.Current - 3));
         }
+
+        return true;
     }
 
     private void ResolveEnemyShipVsPlayer(

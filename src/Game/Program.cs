@@ -152,7 +152,7 @@ em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
 em.AddComponent(turretEntity, new Rotation(0f));
     em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f, IsEnemy: false));
 
-var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem() };
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
@@ -278,6 +278,37 @@ while (!Raylib.WindowShouldClose())
         float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
         float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
         Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, new Color(255, 230, 100, 255));
+    }
+
+    // Draw explosions as growing yellow circles with fading alpha
+    foreach (var (entity, explosion) in em.GetEntitiesWithComponents<Explosion>())
+    {
+        var pos = em.GetComponent<Position>(entity);
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+
+        float lifeRatio = explosion.Lifetime / 0.25f;
+        float currentRadius = explosion.Radius * (1f - lifeRatio);
+        int alpha = (int)(255f * lifeRatio);
+
+        Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), new Color(255, 230, 50, alpha));
+    }
+
+    // Draw sparks as small colored circles that fade from orange to red to black
+    foreach (var (entity, spark) in em.GetEntitiesWithComponents<Spark>())
+    {
+        var pos = em.GetComponent<Position>(entity);
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+
+        float lifeRatio = spark.Lifetime / 0.7f;
+        int size = (int)Math.Max(lifeRatio * 5f, 1f);
+        int r = (int)(lifeRatio * 255);
+        int g = (int)(lifeRatio * lifeRatio * 80);
+        int b = 0;
+        int alpha = (int)(lifeRatio * 255);
+
+        Raylib.DrawCircle((int)cx, (int)cy, size, new Color(r, g, b, alpha));
     }
 
     // Draw player ship as a light blue triangle
