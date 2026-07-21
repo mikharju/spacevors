@@ -42,18 +42,21 @@ public class EnemyShipSystem : GameSystem
                 em.AddComponent(shipEntity, new Rotation(currentRot.Angle + Math.Sign(angleDiff) * maxTurn));
             }
 
-            // Blend velocity toward player direction
-            var currentVel = em.HasComponent<Velocity>(shipEntity)
-                ? em.GetComponent<Velocity>(shipEntity).Value
-                : Vector2.Zero;
+            // Approach phase: accelerate toward player (outside firing range)
+            if (dist > ship.FiringRange)
+            {
+                var currentVel = em.HasComponent<Velocity>(shipEntity)
+                    ? em.GetComponent<Velocity>(shipEntity).Value
+                    : Vector2.Zero;
 
-            float targetSpeed = ship.Speed;
-            var targetVel = toPlayerDir * targetSpeed;
+                float targetSpeed = ship.Speed;
+                var targetVel = toPlayerDir * targetSpeed;
 
-            float blendFactor = 1f - MathF.Exp(-1.5f * deltaTime);
-            var newVel = currentVel + (targetVel - currentVel) * blendFactor;
+                float blendFactor = 1f - MathF.Exp(-1.5f * deltaTime);
+                var newVel = currentVel + (targetVel - currentVel) * blendFactor;
 
-            em.AddComponent(shipEntity, new Velocity(newVel));
+                em.AddComponent(shipEntity, new Velocity(newVel));
+            }
         }
     }
 

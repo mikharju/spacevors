@@ -116,13 +116,14 @@ public class TurretFiringSystem : GameSystem
             var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
-            if (playerEntity.Value >= 0)
+            if (playerEntity.Value >= 0 && em.HasComponent<EnemyShip>(turretEntity))
             {
+                var ship = em.GetComponent<EnemyShip>(turretEntity);
                 var playerPos = em.GetComponent<Position>(playerEntity);
                 var toPlayer = playerPos.Value - turretPos.Value;
                 float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
 
-                if (distSq <= rangeSq && distSq > 0.001f)
+                if (distSq <= ship.FiringRange * ship.FiringRange && distSq > 0.001f)
                 {
                     float dist = (float)Math.Sqrt(distSq);
                     var toPlayerDir = toPlayer / dist;

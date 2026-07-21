@@ -51,13 +51,14 @@ public class EnemyShipSpawnSystem : GameSystem
         em.AddComponent(shipEntity, new AngularVelocity(0f));
 
         float detectionRange = 240f;
+        float firingRange = 300f;
         em.AddComponent(shipEntity, new EnemyShip(
             Radius: 20f,
             Speed: 35f,
             TurnRate: 3.5f,
             Health: 3,
             DetectionRange: detectionRange,
-            TurretRange: detectionRange,
+            FiringRange: firingRange,
             TurretFireRate: 1.5f,
             TurretAmmoSpeed: 200f));
         em.AddComponent(shipEntity, new Turret(
