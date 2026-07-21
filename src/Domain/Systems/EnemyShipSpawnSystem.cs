@@ -45,31 +45,7 @@ public class EnemyShipSpawnSystem : GameSystem
         float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
 
         var shipEntity = em.CreateEntity();
-        em.AddComponent(shipEntity, new Position(new Vector2(sx, sy)));
-        em.AddComponent(shipEntity, new Velocity(Vector2.Zero));
-        em.AddComponent(shipEntity, new Rotation((float)(rand.NextDouble() * Math.PI * 2f)));
-        em.AddComponent(shipEntity, new AngularVelocity(0f));
-
-        float detectionRange = 1200f;
-        float firingRange = 300f;
-        em.AddComponent(shipEntity, new EnemyShip(
-            Radius: 20f,
-            Speed: 35f,
-            TurnRate: 1.0f,
-            Health: 3,
-            DetectionRange: detectionRange,
-            FiringRange: firingRange,
-            TurretFireRate: 1.5f,
-            TurretAmmoSpeed: 200f,
-            Acceleration: 9.0f));
-        em.AddComponent(shipEntity, new Turret(
-            FireRate: 1.5f,
-            AmmoSpeed: 200f,
-            KickbackForce: 0f,
-            ArcAngle: MathF.PI / 8f,
-            Range: detectionRange,
-            IsEnemy: true));
-        em.AddComponent(shipEntity, new Health(3));
+        EnemyShipFactory.AddEnemyShipComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
 
         _timer = MinInterval + (float)rand.NextDouble() * (MaxInterval - MinInterval);
     }

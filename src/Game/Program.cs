@@ -35,16 +35,9 @@ for (int i = 0; i < 5; i++)
     float dist = 150f + (float)rand.NextDouble() * 400f;
     float ax = (float)Math.Cos(angle) * dist;
     float ay = (float)Math.Sin(angle) * dist;
-    float aw = 40f + (float)rand.NextDouble() * 60f;
-    float ah = 30f + (float)rand.NextDouble() * 50f;
-    float ar = Math.Max(aw, ah) / 2f;
     float aSpeed = 15f + (float)rand.NextDouble() * 35f;
     float aAngle = (float)(rand.NextDouble() * Math.PI * 2);
-    em.AddComponent(asteroid, new Position(new Vector2(ax, ay)));
-    em.AddComponent(asteroid, new Velocity(new Vector2((float)Math.Cos(aAngle) * aSpeed, (float)Math.Sin(aAngle) * aSpeed)));
-    em.AddComponent(asteroid, new Rotation((float)(rand.NextDouble() * Math.PI * 2)));
-    em.AddComponent(asteroid, new AngularVelocity((float)(rand.NextDouble() - 0.5) * 1.5f));
-    em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
+    AsteroidFactory.AddAsteroidComponents(em, asteroid, new Vector2(ax, ay), aSpeed, aAngle, rand);
 }
 
 // Remaining asteroids in a larger area (~5 screens away)
@@ -55,16 +48,9 @@ for (int i = 5; i < 105; i++)
     float dist = 1000f + (float)rand.NextDouble() * 4000f;
     float ax = (float)Math.Cos(angle) * dist;
     float ay = (float)Math.Sin(angle) * dist;
-    float aw = 40f + (float)rand.NextDouble() * 60f;
-    float ah = 30f + (float)rand.NextDouble() * 50f;
-    float ar = Math.Max(aw, ah) / 2f;
     float aSpeed = 10f + (float)rand.NextDouble() * 25f;
     float aAngle = (float)(rand.NextDouble() * Math.PI * 2);
-    em.AddComponent(asteroid, new Position(new Vector2(ax, ay)));
-    em.AddComponent(asteroid, new Velocity(new Vector2((float)Math.Cos(aAngle) * aSpeed, (float)Math.Sin(aAngle) * aSpeed)));
-    em.AddComponent(asteroid, new Rotation((float)(rand.NextDouble() * Math.PI * 2)));
-    em.AddComponent(asteroid, new AngularVelocity((float)(rand.NextDouble() - 0.5f) * 1.5f));
-    em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
+    AsteroidFactory.AddAsteroidComponents(em, asteroid, new Vector2(ax, ay), aSpeed, aAngle, rand);
 }
 
 // Spawn enemy mines around the player
@@ -92,28 +78,7 @@ for (int i = 0; i < 4; i++)
     float sy = (float)Math.Sin(angle) * dist;
     float sSpeed = 20f + (float)rand.NextDouble() * 15f;
     float sAngle = (float)(rand.NextDouble() * Math.PI * 2);
-    em.AddComponent(ship, new Position(new Vector2(sx, sy)));
-    em.AddComponent(ship, new Velocity(new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed)));
-    em.AddComponent(ship, new Rotation(sAngle));
-    em.AddComponent(ship, new AngularVelocity((float)(rand.NextDouble() - 0.5f) * 1f));
-    em.AddComponent(ship, new EnemyShip(
-        Radius: 20f,
-        Speed: 35f,
-        TurnRate: 1.0f,
-        Health: 3,
-        DetectionRange: 1200f,
-        FiringRange: 300f,
-        TurretFireRate: 1.5f,
-        TurretAmmoSpeed: 200f,
-        Acceleration: 9.0f));
-    em.AddComponent(ship, new Turret(
-        FireRate: 1.5f,
-        AmmoSpeed: 200f,
-        KickbackForce: 0f,
-        ArcAngle: MathF.PI / 8f,
-        Range: 1200f,
-        IsEnemy: true));
-    em.AddComponent(ship, new Health(3));
+    EnemyShipFactory.AddEnemyShipComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f);
 }
 
 // Spawn two enemy ships at screen edges just inside view range
@@ -123,28 +88,7 @@ for (int side = -1; side <= 1; side += 2)
     float ex = side * 900f;
     float ey = 150f * side;
     float eAngle = (float)(Math.PI / 4f * side);
-    em.AddComponent(edgeShip, new Position(new Vector2(ex, ey)));
-    em.AddComponent(edgeShip, new Velocity(Vector2.Zero));
-    em.AddComponent(edgeShip, new Rotation(eAngle + MathF.PI));
-    em.AddComponent(edgeShip, new AngularVelocity(0f));
-    em.AddComponent(edgeShip, new EnemyShip(
-        Radius: 20f,
-        Speed: 35f,
-        TurnRate: 1.0f,
-        Health: 3,
-        DetectionRange: 1200f,
-        FiringRange: 300f,
-        TurretFireRate: 1.5f,
-        TurretAmmoSpeed: 200f,
-        Acceleration: 9.0f));
-    em.AddComponent(edgeShip, new Turret(
-        FireRate: 1.5f,
-        AmmoSpeed: 200f,
-        KickbackForce: 0f,
-        ArcAngle: MathF.PI / 8f,
-        Range: 1200f,
-        IsEnemy: true));
-    em.AddComponent(edgeShip, new Health(3));
+    EnemyShipFactory.AddEnemyShipComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f);
 }
 
 bool gameOver = false;
