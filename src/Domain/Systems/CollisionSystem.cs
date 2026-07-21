@@ -254,6 +254,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var ammoEntity in ammoToPlayerHits.Distinct())
         {
+            if (!em.HasComponent<Health>(playerEntity)) continue;
             var playerHealth = em.GetComponent<Health>(playerEntity);
             if (playerHealth.Current <= 1)
             {
@@ -268,7 +269,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var entity in entitiesToDestroy.Distinct())
         {
-            if (!ammoToPlayerHits.Contains(entity) && !ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) && !ammoToMineHits.Any(h => h.ammoEntity == entity))
+            if (ammoToPlayerHits.Contains(entity) || ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) || ammoToMineHits.Any(h => h.ammoEntity == entity))
             {
                 em.DestroyEntity(entity);
             }

@@ -99,18 +99,19 @@ for (int i = 0; i < 4; i++)
     em.AddComponent(ship, new EnemyShip(
         Radius: 20f,
         Speed: 35f,
-        TurnRate: 3.5f,
+        TurnRate: 1.0f,
         Health: 3,
-        DetectionRange: WindowHeight / 2f * 2f / 3f,
-        FiringRange: 600f,
+        DetectionRange: 1200f,
+        FiringRange: 300f,
         TurretFireRate: 1.5f,
-        TurretAmmoSpeed: 200f));
+        TurretAmmoSpeed: 200f,
+        Acceleration: 3.0f));
     em.AddComponent(ship, new Turret(
         FireRate: 1.5f,
         AmmoSpeed: 200f,
         KickbackForce: 0f,
         ArcAngle: MathF.PI / 8f,
-        Range: WindowHeight / 2f * 2f / 3f,
+        Range: 1200f,
         IsEnemy: true));
     em.AddComponent(ship, new Health(3));
 }
@@ -119,8 +120,8 @@ for (int i = 0; i < 4; i++)
 for (int side = -1; side <= 1; side += 2)
 {
     var edgeShip = em.CreateEntity();
-    float ex = side * (WindowWidth / 2f - 50f);
-    float ey = 80f * side;
+    float ex = side * 900f;
+    float ey = 150f * side;
     float eAngle = (float)(Math.PI / 4f * side);
     em.AddComponent(edgeShip, new Position(new Vector2(ex, ey)));
     em.AddComponent(edgeShip, new Velocity(Vector2.Zero));
@@ -129,18 +130,19 @@ for (int side = -1; side <= 1; side += 2)
     em.AddComponent(edgeShip, new EnemyShip(
         Radius: 20f,
         Speed: 35f,
-        TurnRate: 3.5f,
+        TurnRate: 1.0f,
         Health: 3,
-        DetectionRange: WindowHeight / 2f * 2f / 3f,
-        FiringRange: 600f,
+        DetectionRange: 1200f,
+        FiringRange: 300f,
         TurretFireRate: 1.5f,
-        TurretAmmoSpeed: 200f));
+        TurretAmmoSpeed: 200f,
+        Acceleration: 3.0f));
     em.AddComponent(edgeShip, new Turret(
         FireRate: 1.5f,
         AmmoSpeed: 200f,
         KickbackForce: 0f,
         ArcAngle: MathF.PI / 8f,
-        Range: WindowHeight / 2f * 2f / 3f,
+        Range: 1200f,
         IsEnemy: true));
     em.AddComponent(edgeShip, new Health(3));
 }

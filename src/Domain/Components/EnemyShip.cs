@@ -8,4 +8,5 @@ public readonly record struct EnemyShip(
     float DetectionRange,
     float FiringRange,
     float TurretFireRate,
-    float TurretAmmoSpeed);
+    float TurretAmmoSpeed,
+    float Acceleration);

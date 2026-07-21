@@ -65,26 +65,26 @@ public class TurretFiringSystem : GameSystem
                     nearestDistSq = distSq;
                 }
             }
-        }
 
-        foreach (var (asteroidEntity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
-        {
-            var asteroidPos = em.GetComponent<Position>(asteroidEntity);
-            var toEnemy = asteroidPos.Value - turretPos.Value;
-            float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
-
-            if (distSq > rangeSq || distSq < 0.001f) continue;
-
-            float dist = (float)Math.Sqrt(distSq);
-            var toEnemyDir = toEnemy / dist;
-
-            float dot = Vector2.Dot(forwardDir, toEnemyDir);
-            if (dot < cosHalfArc) continue;
-
-            if (distSq < nearestDistSq)
+            foreach (var (asteroidEntity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
             {
-                nearestTarget = (asteroidPos.Value, asteroid.Radius);
-                nearestDistSq = distSq;
+                var asteroidPos = em.GetComponent<Position>(asteroidEntity);
+                var toEnemy = asteroidPos.Value - turretPos.Value;
+                float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
+
+                if (distSq > rangeSq || distSq < 0.001f) continue;
+
+                float dist = (float)Math.Sqrt(distSq);
+                var toEnemyDir = toEnemy / dist;
+
+                float dot = Vector2.Dot(forwardDir, toEnemyDir);
+                if (dot < cosHalfArc) continue;
+
+                if (distSq < nearestDistSq)
+                {
+                    nearestTarget = (asteroidPos.Value, asteroid.Radius);
+                    nearestDistSq = distSq;
+                }
             }
         }
 
