@@ -122,7 +122,7 @@ em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
 em.AddComponent(turretEntity, new Rotation(0f));
     em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f, IsEnemy: false));
 
-var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem() };
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
