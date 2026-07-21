@@ -146,4 +146,128 @@ public class EntityManagerTests
 
         Assert.False(_em.HasComponent<Position>(entity));
     }
+
+    [Fact]
+    public void DestroyMiddleEntity_CompactsCorrectly()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+        var e3 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 1f));
+        _em.AddComponent(e2, new Position(2f, 2f));
+        _em.AddComponent(e3, new Position(3f, 3f));
+
+        _em.DestroyEntity(e2);
+
+        Assert.Equal(2, _em.GetEntitiesWith<Position>().Count());
+        Assert.True(_em.HasComponent<Position>(e1));
+        Assert.False(_em.HasComponent<Position>(e2));
+        Assert.True(_em.HasComponent<Position>(e3));
+
+        var pos1 = _em.GetComponent<Position>(e1);
+        Assert.Equal(1f, pos1.X);
+        Assert.Equal(1f, pos1.Y);
+
+        var pos3 = _em.GetComponent<Position>(e3);
+        Assert.Equal(3f, pos3.X);
+        Assert.Equal(3f, pos3.Y);
+    }
+
+    [Fact]
+    public void IterateAfterMixedAddsAndDeletes_ReturnsCorrectPairs()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+        var e3 = _em.CreateEntity();
+        var e4 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 1f));
+        _em.AddComponent(e2, new Position(2f, 2f));
+        _em.AddComponent(e3, new Position(3f, 3f));
+        _em.AddComponent(e4, new Position(4f, 4f));
+
+        _em.DestroyEntity(e2);
+        _em.DestroyEntity(e3);
+
+        var results = _em.GetEntitiesWithComponents<Position>().ToList();
+        Assert.Equal(2, results.Count);
+
+        var entities = results.Select(r => r.Entity).ToList();
+        Assert.Contains(e1, entities);
+        Assert.Contains(e4, entities);
+    }
+
+    [Fact]
+    public void ReAddAfterDestroy_Works()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 1f));
+        _em.DestroyEntity(entity);
+
+        Assert.False(_em.HasComponent<Position>(entity));
+
+        _em.AddComponent(entity, new Position(5f, 6f));
+        Assert.True(_em.HasComponent<Position>(entity));
+
+        var pos = _em.GetComponent<Position>(entity);
+        Assert.Equal(5f, pos.X);
+        Assert.Equal(6f, pos.Y);
+    }
+
+    [Fact]
+    public void DestroyLastEntity_CompactsCorrectly()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+        var e3 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 1f));
+        _em.AddComponent(e2, new Position(2f, 2f));
+        _em.AddComponent(e3, new Position(3f, 3f));
+
+        _em.DestroyEntity(e3);
+
+        Assert.Equal(2, _em.GetEntitiesWith<Position>().Count());
+        Assert.True(_em.HasComponent<Position>(e1));
+        Assert.True(_em.HasComponent<Position>(e2));
+    }
+
+    [Fact]
+    public void DestroyAllEntities_EmptyStorage()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 1f));
+        _em.AddComponent(e2, new Position(2f, 2f));
+
+        _em.DestroyEntity(e1);
+        _em.DestroyEntity(e2);
+
+        Assert.Empty(_em.GetEntitiesWith<Position>());
+    }
+
+    [Fact]
+    public void MultiComponentQuery_AfterDestroy_WorksCorrectly()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+        var e3 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 1f));
+        _em.AddComponent(e1, new Velocity(1f, 1f));
+
+        _em.AddComponent(e2, new Position(2f, 2f));
+        _em.AddComponent(e2, new Velocity(2f, 2f));
+
+        _em.AddComponent(e3, new Position(3f, 3f));
+        // e3 has no velocity
+
+        _em.DestroyEntity(e1);
+
+        var results = _em.GetEntitiesWithComponents<Position, Velocity>().ToList();
+        Assert.Single(results);
+        Assert.Equal(e2, results[0].Entity);
+    }
 }

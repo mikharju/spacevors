@@ -77,8 +77,14 @@ public class EntityManager
         }
     }
 
-    private ComponentStorageBase FindSmallest(params ComponentStorageBase[] storages)
-        => storages.OrderBy(s => s.Count).First();
+    private static ComponentStorageBase FindSmallest(ComponentStorageBase first, params ComponentStorageBase[] rest)
+    {
+        var smallest = first;
+        foreach (var s in rest)
+            if (s.Count < smallest.Count)
+                smallest = s;
+        return smallest;
+    }
 
     public IEnumerable<(Entity Entity, T1 Value1, T2 Value2)> GetEntitiesWithComponents<T1, T2>()
         where T1 : notnull where T2 : notnull

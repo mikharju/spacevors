@@ -262,7 +262,10 @@ while (!Raylib.WindowShouldClose())
     {
         foreach (var system in systems)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             system.Update(em, FixedDeltaTime);
+            sw.Stop();
+            DiagnosticLogger.LogSystem(system.GetType().Name, sw.ElapsedTicks);
         }
         accumulator -= FixedDeltaTime;
     }
