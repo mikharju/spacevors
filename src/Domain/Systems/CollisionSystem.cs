@@ -361,7 +361,8 @@ public class CollisionSystem : GameSystem
         Entity bEntity,
         float aRadius,
         float bRadius,
-        bool isAsteroidVsAsteroid)
+        bool isAsteroidVsAsteroid,
+        float? aOverrideMass = null)
     {
         var diff = bPos.Value - aPos.Value;
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -374,8 +375,8 @@ public class CollisionSystem : GameSystem
 
         float penetration = radiusSum - dist;
 
-        float aMass = MathF.PI * aRadius * aRadius;
-        float bMass = isAsteroidVsAsteroid ? MathF.PI * bRadius * bRadius : MathF.PI * bRadius * bRadius;
+        float aMass = aOverrideMass ?? (MathF.PI * aRadius * aRadius);
+        float bMass = MathF.PI * bRadius * bRadius;
         float invMassA = 1f / aMass;
         float invMassB = 1f / bMass;
         float totalInvMass = invMassA + invMassB;
@@ -521,7 +522,7 @@ public class CollisionSystem : GameSystem
         float aRadius = aShip.Radius;
         float bRadius = em.GetComponent<Player>(bEntity).Radius;
 
-        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, false);
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, false, 3000f);
     }
 
     private void ResolveEnemyShipVsAsteroid(
@@ -537,7 +538,7 @@ public class CollisionSystem : GameSystem
         float aRadius = aShip.Radius;
         float bRadius = bAst.Radius;
 
-        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, true, 3000f);
     }
 
     private void ResolveEnemyShipVsEnemyShip(
@@ -553,7 +554,7 @@ public class CollisionSystem : GameSystem
         float aRadius = aShip.Radius;
         float bRadius = bShip.Radius;
 
-        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, true, 3000f);
     }
 
     private void ResolveEnemyShipVsMine(
@@ -569,83 +570,7 @@ public class CollisionSystem : GameSystem
         float aRadius = aShip.Radius;
         float bRadius = bMine.Radius;
 
-        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
-    }
-
-    private void ResolveCollisionWithMass(
-        EntityManager em,
-        Position aPos,
-        Position bPos,
-        Entity aEntity,
-        Entity bEntity,
-        float aRadius,
-        float bRadius,
-        float? aOverrideMass = null,
-        bool isAsteroidVsAsteroid = false)
-    {
-        var diff = bPos.Value - aPos.Value;
-        float distSq = diff.X * diff.X + diff.Y * diff.Y;
-        float radiusSum = aRadius + bRadius;
-
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
-
-        float dist = (float)Math.Sqrt(distSq);
-        var normal = diff / dist;
-
-        float penetration = radiusSum - dist;
-
-        float aMass = aOverrideMass ?? (MathF.PI * aRadius * aRadius);
-        float bMass = isAsteroidVsAsteroid ? MathF.PI * bRadius * bRadius : MathF.PI * bRadius * bRadius;
-        float invMassA = 1f / aMass;
-        float invMassB = 1f / bMass;
-        float totalInvMass = invMassA + invMassB;
-
-        Vector2 aVel = em.HasComponent<Velocity>(aEntity)
-            ? em.GetComponent<Velocity>(aEntity).Value
-            : Vector2.Zero;
-        Vector2 bVel = em.HasComponent<Velocity>(bEntity)
-            ? em.GetComponent<Velocity>(bEntity).Value
-            : Vector2.Zero;
-
-        var relVel = bVel - aVel;
-        float velAlongNormal = Vector2.Dot(relVel, normal);
-
-        float correctionMagnitude = Math.Max(penetration - Slop, 0f) * CorrectionPercent;
-        if (correctionMagnitude > 0f && totalInvMass > 0f)
-        {
-            var correctionPerInvMass = normal * (correctionMagnitude / totalInvMass);
-            em.AddComponent(aEntity, new Position(aPos.Value - correctionPerInvMass * invMassA));
-            em.AddComponent(bEntity, new Position(bPos.Value + correctionPerInvMass * invMassB));
-        }
-
-        if (velAlongNormal > 0f) return;
-
-        float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
-        float j = -(1 + restitution) * velAlongNormal / totalInvMass;
-        var impulse = normal * j;
-
-        aVel -= impulse * invMassA;
-        bVel += impulse * invMassB;
-
-        em.AddComponent(aEntity, new Velocity(aVel));
-        em.AddComponent(bEntity, new Velocity(bVel));
-
-        var correctedRelVel = bVel - aVel;
-        var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
-        var tangentVel = correctedRelVel - normal * velNormalComponent;
-        float tangentSpeed = tangentVel.Magnitude;
-
-        if (em.HasComponent<AngularVelocity>(aEntity))
-        {
-            var aAngVel = em.GetComponent<AngularVelocity>(aEntity);
-            em.AddComponent(aEntity, new AngularVelocity(aAngVel.Value + tangentSpeed * RotationFactor));
-        }
-
-        if (em.HasComponent<AngularVelocity>(bEntity))
-        {
-            var bAngVel = em.GetComponent<AngularVelocity>(bEntity);
-            em.AddComponent(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor));
-        }
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, true, 3000f);
     }
 }
 
