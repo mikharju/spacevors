@@ -43,24 +43,27 @@ public class TurretFiringSystem : GameSystem
         (Vector2 Position, float Radius)? nearestTarget = null;
         float nearestDistSq = float.MaxValue;
 
-        foreach (var (mineEntity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
+        if (!turret.IsEnemy)
         {
-            var minePos = em.GetComponent<Position>(mineEntity);
-            var toEnemy = minePos.Value - turretPos.Value;
-            float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
-
-            if (distSq > rangeSq || distSq < 0.001f) continue;
-
-            float dist = (float)Math.Sqrt(distSq);
-            var toEnemyDir = toEnemy / dist;
-
-            float dot = Vector2.Dot(forwardDir, toEnemyDir);
-            if (dot < cosHalfArc) continue;
-
-            if (distSq < nearestDistSq)
+            foreach (var (mineEntity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
             {
-                nearestTarget = (minePos.Value, mine.Radius);
-                nearestDistSq = distSq;
+                var minePos = em.GetComponent<Position>(mineEntity);
+                var toEnemy = minePos.Value - turretPos.Value;
+                float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
+
+                if (distSq > rangeSq || distSq < 0.001f) continue;
+
+                float dist = (float)Math.Sqrt(distSq);
+                var toEnemyDir = toEnemy / dist;
+
+                float dot = Vector2.Dot(forwardDir, toEnemyDir);
+                if (dot < cosHalfArc) continue;
+
+                if (distSq < nearestDistSq)
+                {
+                    nearestTarget = (minePos.Value, mine.Radius);
+                    nearestDistSq = distSq;
+                }
             }
         }
 
@@ -85,6 +88,76 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
+        if (!turret.IsEnemy)
+        {
+            foreach (var (enemyShipEntity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
+            {
+                var shipPos = em.GetComponent<Position>(enemyShipEntity);
+                var toTarget = shipPos.Value - turretPos.Value;
+                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+
+                if (distSq > rangeSq || distSq < 0.001f) continue;
+
+                float dist = (float)Math.Sqrt(distSq);
+                var toTargetDir = toTarget / dist;
+
+                float dot = Vector2.Dot(forwardDir, toTargetDir);
+                if (dot < cosHalfArc) continue;
+
+                if (distSq < nearestDistSq)
+                {
+                    nearestTarget = (shipPos.Value, enemyShip.Radius);
+                    nearestDistSq = distSq;
+                }
+            }
+        }
+        else
+        {
+            var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+            Entity playerEntity = playerTuple.Entity;
+
+            if (playerEntity.Value >= 0)
+            {
+                var playerPos = em.GetComponent<Position>(playerEntity);
+                var toPlayer = playerPos.Value - turretPos.Value;
+                float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
+
+                if (distSq <= rangeSq && distSq > 0.001f)
+                {
+                    float dist = (float)Math.Sqrt(distSq);
+                    var toPlayerDir = toPlayer / dist;
+
+                    float dot = Vector2.Dot(forwardDir, toPlayerDir);
+                    if (dot >= cosHalfArc)
+                    {
+                        nearestTarget = (playerPos.Value, em.GetComponent<Player>(playerEntity).Radius);
+                        nearestDistSq = distSq;
+                    }
+                }
+            }
+
+            foreach (var (mineEntity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
+            {
+                var minePos = em.GetComponent<Position>(mineEntity);
+                var toTarget = minePos.Value - turretPos.Value;
+                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+
+                if (distSq > rangeSq || distSq < 0.001f) continue;
+
+                float dist = (float)Math.Sqrt(distSq);
+                var toTargetDir = toTarget / dist;
+
+                float dot = Vector2.Dot(forwardDir, toTargetDir);
+                if (dot < cosHalfArc) continue;
+
+                if (distSq < nearestDistSq)
+                {
+                    nearestTarget = (minePos.Value, mine.Radius);
+                    nearestDistSq = distSq;
+                }
+            }
+        }
+
         return nearestTarget;
     }
 
@@ -105,14 +178,17 @@ public class TurretFiringSystem : GameSystem
         em.AddComponent(ammoEntity, new Velocity(ammoVel));
         em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f));
 
-        Vector2 kickbackDir = new Vector2(-ammoDir.X, -ammoDir.Y);
-        var playerTuples = em.GetEntitiesWithComponents<Player>().ToList();
-        foreach (var (playerEntity, _) in playerTuples)
+        if (turret.KickbackForce > 0)
         {
-            if (em.HasComponent<Velocity>(playerEntity))
+            Vector2 kickbackDir = new Vector2(-ammoDir.X, -ammoDir.Y);
+            var playerTuples = em.GetEntitiesWithComponents<Player>().ToList();
+            foreach (var (playerEntity, _) in playerTuples)
             {
-                var currentVel = em.GetComponent<Velocity>(playerEntity).Value;
-                em.AddComponent(playerEntity, new Velocity(currentVel + kickbackDir * turret.KickbackForce));
+                if (em.HasComponent<Velocity>(playerEntity))
+                {
+                    var currentVel = em.GetComponent<Velocity>(playerEntity).Value;
+                    em.AddComponent(playerEntity, new Velocity(currentVel + kickbackDir * turret.KickbackForce));
+                }
             }
         }
     }

@@ -82,14 +82,47 @@ for (int i = 0; i < 15; i++)
     em.AddComponent(mine, new Health(2));
 }
 
+// Spawn enemy ships around the player
+for (int i = 0; i < 4; i++)
+{
+    var ship = em.CreateEntity();
+    float angle = (float)(rand.NextDouble() * Math.PI * 2f);
+    float dist = 1500f + (float)rand.NextDouble() * 2000f;
+    float sx = (float)Math.Cos(angle) * dist;
+    float sy = (float)Math.Sin(angle) * dist;
+    float sSpeed = 20f + (float)rand.NextDouble() * 15f;
+    float sAngle = (float)(rand.NextDouble() * Math.PI * 2);
+    em.AddComponent(ship, new Position(new Vector2(sx, sy)));
+    em.AddComponent(ship, new Velocity(new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed)));
+    em.AddComponent(ship, new Rotation(sAngle));
+    em.AddComponent(ship, new AngularVelocity((float)(rand.NextDouble() - 0.5f) * 1f));
+    em.AddComponent(ship, new EnemyShip(
+        Radius: 20f,
+        Speed: 35f,
+        TurnRate: 3.5f,
+        Health: 3,
+        DetectionRange: WindowHeight / 2f * 2f / 3f,
+        TurretRange: WindowHeight / 2f * 2f / 3f,
+        TurretFireRate: 1.5f,
+        TurretAmmoSpeed: 200f));
+    em.AddComponent(ship, new Turret(
+        FireRate: 1.5f,
+        AmmoSpeed: 200f,
+        KickbackForce: 0f,
+        ArcAngle: MathF.PI / 8f,
+        Range: WindowHeight / 2f * 2f / 3f,
+        IsEnemy: true));
+    em.AddComponent(ship, new Health(3));
+}
+
 bool gameOver = false;
 
 var turretEntity = em.CreateEntity();
 em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
 em.AddComponent(turretEntity, new Rotation(0f));
-em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f));
+    em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f, IsEnemy: false));
 
-var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new CameraSystem(), new TurretFiringSystem() };
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
@@ -269,6 +302,59 @@ while (!Raylib.WindowShouldClose())
             (int)turretSize,
             new Color(255, 180, 50, 255)
         );
+    }
+
+    // Draw enemy ships as red triangles pointing opposite to player ship
+    foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
+    {
+        var shipPos = em.GetComponent<Position>(entity);
+        var shipRot = em.GetComponent<Rotation>(entity);
+        float angle = shipRot.Angle;
+        float size = 20f;
+
+        float cos = (float)Math.Cos(angle);
+        float sin = (float)Math.Sin(angle);
+
+        // Tip in local space: (0, size), pointing backward (+Y) — opposite to player
+        var tipLocal = new System.Numerics.Vector2(0f, size);
+        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+
+        // Left base corner in local space: bottom-left of ship
+        var leftLocal = new System.Numerics.Vector2(-size * 0.4f, -size * 0.6f);
+        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+
+        // Right base corner in local space: bottom-right of ship
+        var rightLocal = new System.Numerics.Vector2(size * 0.4f, -size * 0.6f);
+        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
+
+        float tx1 = (float)shipPos.Value.X + tip.X - camX + WindowWidth / 2f;
+        float ty1 = (float)shipPos.Value.Y + tip.Y - camY + WindowHeight / 2f;
+        float tx2 = (float)shipPos.Value.X + left.X - camX + WindowWidth / 2f;
+        float ty2 = (float)shipPos.Value.Y + left.Y - camY + WindowHeight / 2f;
+        float tx3 = (float)shipPos.Value.X + right.X - camX + WindowWidth / 2f;
+        float ty3 = (float)shipPos.Value.Y + right.Y - camY + WindowHeight / 2f;
+
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(tx1, ty1),
+            new System.Numerics.Vector2(tx2, ty2),
+            new System.Numerics.Vector2(tx3, ty3),
+            new Color(255, 80, 80, 255)
+        );
+
+        // Draw enemy turret as small orange rectangle at ship center
+        float cx = (float)shipPos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)shipPos.Value.Y - camY + WindowHeight / 2f;
+        float enemyTurretSize = 8f;
+        Raylib.DrawRectangle(
+            (int)(cx - enemyTurretSize / 2f),
+            (int)(cy - enemyTurretSize / 2f),
+            (int)enemyTurretSize,
+            (int)enemyTurretSize,
+            new Color(255, 140, 30, 255)
+        );
+
+        // Debug: draw enemy ship collision circle in orange
+        Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
     }
 
     // Draw enemy mines as red circles with pulsing effect

@@ -42,6 +42,8 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+
             var ammoPos = em.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
 
@@ -71,12 +73,14 @@ public class CollisionSystem : GameSystem
         {
             foreach (var (mineEntity, mine) in mines)
             {
+                if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
                 ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
             }
         }
 
         foreach (var (mineEntity, mine) in mines)
         {
+            if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
             foreach (var (asteroidEntity, asteroid) in asteroids)
             {
                 ResolveCircleVsCircle(em, mineEntity, mine, asteroidEntity, asteroid);
@@ -87,7 +91,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
-            if (entitiesToDestroy.Contains(ammoEntity)) continue;
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
 
             var ammoPos = em.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
@@ -117,12 +121,136 @@ public class CollisionSystem : GameSystem
             {
                 em.AddComponent(mineEntity, new Health(health.Current - 1));
             }
-            em.DestroyEntity(ammoEntity);
+            entitiesToDestroy.Add(ammoEntity);
         }
 
         foreach (var entity in entitiesToDestroy.Distinct())
         {
             if (!ammoToMineHits.Any(h => h.ammoEntity == entity))
+            {
+                em.DestroyEntity(entity);
+            }
+        }
+
+        var enemyShips = em.GetEntitiesWithComponents<EnemyShip>().ToList();
+
+        foreach (var (enemyShipEntity, enemyShip) in enemyShips)
+        {
+            if (!em.HasComponent<EnemyShip>(enemyShipEntity)) continue;
+            if (hasPlayer)
+            {
+                ResolveEnemyShipVsPlayer(em, enemyShipEntity, enemyShip, playerEntity);
+            }
+        }
+
+        for (int i = 0; i < enemyShips.Count; i++)
+        {
+            var (aEntity, aShip) = enemyShips[i];
+            if (!em.HasComponent<EnemyShip>(aEntity)) continue;
+            foreach (var (asteroidEntity, asteroid) in asteroids)
+            {
+                ResolveEnemyShipVsAsteroid(em, aEntity, aShip, asteroidEntity, asteroid);
+            }
+
+            for (int j = i + 1; j < enemyShips.Count; j++)
+            {
+                var (bEntity, bShip) = enemyShips[j];
+                if (!em.HasComponent<EnemyShip>(bEntity)) continue;
+                ResolveEnemyShipVsEnemyShip(em, aEntity, aShip, bEntity, bShip);
+            }
+
+            foreach (var (mineEntity, mine) in mines)
+            {
+                if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
+                ResolveEnemyShipVsMine(em, aEntity, aShip, mineEntity, mine);
+            }
+        }
+
+        var ammoToEnemyShipHits = new List<(Entity ammoEntity, Entity enemyShipEntity)>();
+
+        foreach (var (ammoEntity, ammo) in ammoList)
+        {
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+
+            var ammoPos = em.GetComponent<Position>(ammoEntity);
+            float ammoRadius = ammo.Radius;
+
+            foreach (var (enemyShipEntity, enemyShip) in enemyShips)
+            {
+                var shipPos = em.GetComponent<Position>(enemyShipEntity);
+                var diff = shipPos.Value - ammoPos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                float radiusSum = ammoRadius + enemyShip.Radius;
+
+                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+                ammoToEnemyShipHits.Add((ammoEntity, enemyShipEntity));
+                break;
+            }
+        }
+
+        foreach (var (ammoEntity, enemyShipEntity) in ammoToEnemyShipHits)
+        {
+            var health = em.GetComponent<Health>(enemyShipEntity);
+            if (health.Current <= 1)
+            {
+                em.DestroyEntity(enemyShipEntity);
+            }
+            else
+            {
+                em.AddComponent(enemyShipEntity, new Health(health.Current - 1));
+            }
+            entitiesToDestroy.Add(ammoEntity);
+        }
+
+        foreach (var entity in entitiesToDestroy.Distinct())
+        {
+            if (!ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) && !ammoToMineHits.Any(h => h.ammoEntity == entity))
+            {
+                em.DestroyEntity(entity);
+            }
+        }
+
+        var ammoToPlayerHits = new List<Entity>();
+
+        foreach (var (ammoEntity, ammo) in ammoList)
+        {
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            if (ammoToEnemyShipHits.Any(h => h.ammoEntity == ammoEntity)) continue;
+            if (ammoToMineHits.Any(h => h.ammoEntity == ammoEntity)) continue;
+
+            var ammoPos = em.GetComponent<Position>(ammoEntity);
+            float ammoRadius = ammo.Radius;
+
+            if (!hasPlayer) continue;
+
+            var playerPos = em.GetComponent<Position>(playerEntity);
+            var diff = playerPos.Value - ammoPos.Value;
+            float distSq = diff.X * diff.X + diff.Y * diff.Y;
+            float radiusSum = ammoRadius + 18f;
+
+            if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+            ammoToPlayerHits.Add(ammoEntity);
+        }
+
+        foreach (var ammoEntity in ammoToPlayerHits.Distinct())
+        {
+            var playerHealth = em.GetComponent<Health>(playerEntity);
+            if (playerHealth.Current <= 1)
+            {
+                em.AddComponent(playerEntity, new Dead());
+            }
+            else
+            {
+                em.AddComponent(playerEntity, new Health(playerHealth.Current - 1));
+            }
+            entitiesToDestroy.Add(ammoEntity);
+        }
+
+        foreach (var entity in entitiesToDestroy.Distinct())
+        {
+            if (!ammoToPlayerHits.Contains(entity) && !ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) && !ammoToMineHits.Any(h => h.ammoEntity == entity))
             {
                 em.DestroyEntity(entity);
             }
@@ -313,6 +441,145 @@ public class CollisionSystem : GameSystem
         else
         {
             em.AddComponent(playerEntity, new Health(playerHealth.Current - 1));
+        }
+    }
+
+    private void ResolveEnemyShipVsPlayer(
+        EntityManager em,
+        Entity aEntity,
+        EnemyShip aShip,
+        Entity bEntity)
+    {
+        var aPos = em.GetComponent<Position>(aEntity);
+        var bPos = em.GetComponent<Position>(bEntity);
+
+        float aRadius = aShip.Radius;
+        float bRadius = em.GetComponent<Player>(bEntity).Radius;
+
+        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, false);
+    }
+
+    private void ResolveEnemyShipVsAsteroid(
+        EntityManager em,
+        Entity aEntity,
+        EnemyShip aShip,
+        Entity bEntity,
+        Asteroid bAst)
+    {
+        var aPos = em.GetComponent<Position>(aEntity);
+        var bPos = em.GetComponent<Position>(bEntity);
+
+        float aRadius = aShip.Radius;
+        float bRadius = bAst.Radius;
+
+        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
+    }
+
+    private void ResolveEnemyShipVsEnemyShip(
+        EntityManager em,
+        Entity aEntity,
+        EnemyShip aShip,
+        Entity bEntity,
+        EnemyShip bShip)
+    {
+        var aPos = em.GetComponent<Position>(aEntity);
+        var bPos = em.GetComponent<Position>(bEntity);
+
+        float aRadius = aShip.Radius;
+        float bRadius = bShip.Radius;
+
+        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
+    }
+
+    private void ResolveEnemyShipVsMine(
+        EntityManager em,
+        Entity aEntity,
+        EnemyShip aShip,
+        Entity bEntity,
+        EnemyMine bMine)
+    {
+        var aPos = em.GetComponent<Position>(aEntity);
+        var bPos = em.GetComponent<Position>(bEntity);
+
+        float aRadius = aShip.Radius;
+        float bRadius = bMine.Radius;
+
+        ResolveCollisionWithMass(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, 3000f, true);
+    }
+
+    private void ResolveCollisionWithMass(
+        EntityManager em,
+        Position aPos,
+        Position bPos,
+        Entity aEntity,
+        Entity bEntity,
+        float aRadius,
+        float bRadius,
+        float? aOverrideMass = null,
+        bool isAsteroidVsAsteroid = false)
+    {
+        var diff = bPos.Value - aPos.Value;
+        float distSq = diff.X * diff.X + diff.Y * diff.Y;
+        float radiusSum = aRadius + bRadius;
+
+        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+
+        float dist = (float)Math.Sqrt(distSq);
+        var normal = diff / dist;
+
+        float penetration = radiusSum - dist;
+
+        float aMass = aOverrideMass ?? (MathF.PI * aRadius * aRadius);
+        float bMass = isAsteroidVsAsteroid ? MathF.PI * bRadius * bRadius : MathF.PI * bRadius * bRadius;
+        float invMassA = 1f / aMass;
+        float invMassB = 1f / bMass;
+        float totalInvMass = invMassA + invMassB;
+
+        Vector2 aVel = em.HasComponent<Velocity>(aEntity)
+            ? em.GetComponent<Velocity>(aEntity).Value
+            : Vector2.Zero;
+        Vector2 bVel = em.HasComponent<Velocity>(bEntity)
+            ? em.GetComponent<Velocity>(bEntity).Value
+            : Vector2.Zero;
+
+        var relVel = bVel - aVel;
+        float velAlongNormal = Vector2.Dot(relVel, normal);
+
+        float correctionMagnitude = Math.Max(penetration - Slop, 0f) * CorrectionPercent;
+        if (correctionMagnitude > 0f && totalInvMass > 0f)
+        {
+            var correctionPerInvMass = normal * (correctionMagnitude / totalInvMass);
+            em.AddComponent(aEntity, new Position(aPos.Value - correctionPerInvMass * invMassA));
+            em.AddComponent(bEntity, new Position(bPos.Value + correctionPerInvMass * invMassB));
+        }
+
+        if (velAlongNormal > 0f) return;
+
+        float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
+        float j = -(1 + restitution) * velAlongNormal / totalInvMass;
+        var impulse = normal * j;
+
+        aVel -= impulse * invMassA;
+        bVel += impulse * invMassB;
+
+        em.AddComponent(aEntity, new Velocity(aVel));
+        em.AddComponent(bEntity, new Velocity(bVel));
+
+        var correctedRelVel = bVel - aVel;
+        var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
+        var tangentVel = correctedRelVel - normal * velNormalComponent;
+        float tangentSpeed = tangentVel.Magnitude;
+
+        if (em.HasComponent<AngularVelocity>(aEntity))
+        {
+            var aAngVel = em.GetComponent<AngularVelocity>(aEntity);
+            em.AddComponent(aEntity, new AngularVelocity(aAngVel.Value + tangentSpeed * RotationFactor));
+        }
+
+        if (em.HasComponent<AngularVelocity>(bEntity))
+        {
+            var bAngVel = em.GetComponent<AngularVelocity>(bEntity);
+            em.AddComponent(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor));
         }
     }
 }

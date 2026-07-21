@@ -1,3 +1,9 @@
 namespace Spacevors.Domain.Components;
 
-public readonly record struct Turret(float FireRate, float AmmoSpeed, float KickbackForce, float ArcAngle, float Range);
+public readonly record struct Turret(
+    float FireRate,
+    float AmmoSpeed,
+    float KickbackForce = 0f,
+    float ArcAngle = MathF.PI / 2f,
+    float Range = 360f,
+    bool IsEnemy = false);
