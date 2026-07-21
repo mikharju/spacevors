@@ -84,7 +84,12 @@ for (int i = 0; i < 15; i++)
 
 bool gameOver = false;
 
-var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new CameraSystem() };
+var turretEntity = em.CreateEntity();
+em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
+em.AddComponent(turretEntity, new Rotation(0f));
+em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f));
+
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new CameraSystem(), new TurretFiringSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
@@ -139,6 +144,9 @@ while (!Raylib.WindowShouldClose())
             em.AddComponent(playerEntity, new FireCooldown(-1f));
         }
     }
+
+    em.AddComponent(turretEntity, new Position(playerPos.Value));
+    em.AddComponent(turretEntity, new Rotation(playerRot.Angle));
 
     // Fixed timestep simulation
     while (accumulator >= FixedDeltaTime)
@@ -251,6 +259,16 @@ while (!Raylib.WindowShouldClose())
         float shipCx = (float)shipPos.Value.X - camX + WindowWidth / 2f;
         float shipCy = (float)shipPos.Value.Y - camY + WindowHeight / 2f;
         Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)playerStats.Radius, new Color(0, 255, 0, 60));
+
+        // Draw turret as a small rectangle at ship center
+        float turretSize = 8f;
+        Raylib.DrawRectangle(
+            (int)(shipCx - turretSize / 2f),
+            (int)(shipCy - turretSize / 2f),
+            (int)turretSize,
+            (int)turretSize,
+            new Color(255, 180, 50, 255)
+        );
     }
 
     // Draw enemy mines as red circles with pulsing effect

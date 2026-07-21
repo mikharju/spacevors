@@ -100,7 +100,6 @@ Progression.
 Game feel.
 
 - particles
-- screen shake
 - sound
 - UI
 - balancing
