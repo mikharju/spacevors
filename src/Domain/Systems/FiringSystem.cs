@@ -8,25 +8,23 @@ public class FiringSystem : GameSystem
     {
         foreach (var (entity, weapon, rotation) in em.GetEntitiesWithComponents<Weapon, Rotation>())
         {
-            var cooldown = GetCooldown(em, entity);
+            var cooldown = CooldownHelper.GetCooldown(em, entity);
 
             if (cooldown < 0f)
             {
-                // Ready to fire: spawn ammo and start cooldown
                 FireAmmo(em, entity, weapon, rotation);
-                SetCooldown(em, entity, 1f / weapon.FireRate);
+                CooldownHelper.SetCooldown(em, entity, 1f / weapon.FireRate);
             }
             else if (cooldown > 0f)
             {
-                // Decrement active cooldown
                 var newCooldown = cooldown - deltaTime;
                 if (newCooldown <= 0f)
                 {
-                    SetCooldown(em, entity, 0f);
+                    CooldownHelper.SetCooldown(em, entity, 0f);
                 }
                 else
                 {
-                    SetCooldown(em, entity, newCooldown);
+                    CooldownHelper.SetCooldown(em, entity, newCooldown);
                 }
             }
         }
@@ -56,19 +54,5 @@ public class FiringSystem : GameSystem
             var currentVel = em.GetComponent<Velocity>(shooterEntity).Value;
             em.AddComponent(shooterEntity, new Velocity(currentVel + kickback));
         }
-    }
-
-    private static float GetCooldown(EntityManager em, Entity entity)
-    {
-        if (em.HasComponent<FireCooldown>(entity))
-        {
-            return em.GetComponent<FireCooldown>(entity).Timer;
-        }
-        return 0f;
-    }
-
-    private static void SetCooldown(EntityManager em, Entity entity, float value)
-    {
-        em.AddComponent(entity, new FireCooldown(value));
     }
 }

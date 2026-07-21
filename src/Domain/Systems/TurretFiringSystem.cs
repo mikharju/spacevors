@@ -10,7 +10,7 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (turretEntity, turret) in turrets)
         {
-            var cooldown = GetCooldown(em, turretEntity);
+            var cooldown = CooldownHelper.GetCooldown(em, turretEntity);
 
             if (cooldown <= 0f)
             {
@@ -19,13 +19,13 @@ public class TurretFiringSystem : GameSystem
                 if (target.HasValue)
                 {
                     FireAtTarget(em, turretEntity, turret, target.Value);
-                    SetCooldown(em, turretEntity, 1f / turret.FireRate);
+                    CooldownHelper.SetCooldown(em, turretEntity, 1f / turret.FireRate);
                 }
             }
             else if (cooldown > 0f)
             {
                 var newCooldown = cooldown - deltaTime;
-                SetCooldown(em, turretEntity, Math.Max(newCooldown, 0f));
+                CooldownHelper.SetCooldown(em, turretEntity, Math.Max(newCooldown, 0f));
             }
         }
     }
@@ -45,47 +45,8 @@ public class TurretFiringSystem : GameSystem
 
         if (!turret.IsEnemy)
         {
-            foreach (var (mineEntity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
-            {
-                var minePos = em.GetComponent<Position>(mineEntity);
-                var toEnemy = minePos.Value - turretPos.Value;
-                float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
-
-                if (distSq > rangeSq || distSq < 0.001f) continue;
-
-                float dist = (float)Math.Sqrt(distSq);
-                var toEnemyDir = toEnemy / dist;
-
-                float dot = Vector2.Dot(forwardDir, toEnemyDir);
-                if (dot < cosHalfArc) continue;
-
-                if (distSq < nearestDistSq)
-                {
-                    nearestTarget = (minePos.Value, mine.Radius);
-                    nearestDistSq = distSq;
-                }
-            }
-
-            foreach (var (asteroidEntity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
-            {
-                var asteroidPos = em.GetComponent<Position>(asteroidEntity);
-                var toEnemy = asteroidPos.Value - turretPos.Value;
-                float distSq = toEnemy.X * toEnemy.X + toEnemy.Y * toEnemy.Y;
-
-                if (distSq > rangeSq || distSq < 0.001f) continue;
-
-                float dist = (float)Math.Sqrt(distSq);
-                var toEnemyDir = toEnemy / dist;
-
-                float dot = Vector2.Dot(forwardDir, toEnemyDir);
-                if (dot < cosHalfArc) continue;
-
-                if (distSq < nearestDistSq)
-                {
-                    nearestTarget = (asteroidPos.Value, asteroid.Radius);
-                    nearestDistSq = distSq;
-                }
-            }
+            CheckTargets(em.GetEntitiesWithComponents<EnemyMine>(), m => m.Radius, rangeSq);
+            CheckTargets(em.GetEntitiesWithComponents<Asteroid>(), a => a.Radius, rangeSq);
         }
 
         if (!turret.IsEnemy)
@@ -139,29 +100,32 @@ public class TurretFiringSystem : GameSystem
                 }
             }
 
-            foreach (var (mineEntity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
-            {
-                var minePos = em.GetComponent<Position>(mineEntity);
-                var toTarget = minePos.Value - turretPos.Value;
-                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+            CheckTargets(em.GetEntitiesWithComponents<EnemyMine>(), m => m.Radius, firingRangeSq);
+        }
 
-                if (distSq > firingRangeSq || distSq < 0.001f) continue;
+        return nearestTarget;
+
+        void CheckTargets<T>(IEnumerable<(Entity Entity, T Value)> candidates, Func<T, float> getRadius, float checkRangeSq)
+        {
+            foreach (var (candidateEntity, value) in candidates)
+            {
+                var pos = em.GetComponent<Position>(candidateEntity);
+                var diff = pos.Value - turretPos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+
+                if (distSq > checkRangeSq || distSq < 0.001f) continue;
 
                 float dist = (float)Math.Sqrt(distSq);
-                var toTargetDir = toTarget / dist;
-
-                float dot = Vector2.Dot(forwardDir, toTargetDir);
-                if (dot < cosHalfArc) continue;
+                var dir = diff / dist;
+                if (Vector2.Dot(forwardDir, dir) < cosHalfArc) continue;
 
                 if (distSq < nearestDistSq)
                 {
-                    nearestTarget = (minePos.Value, mine.Radius);
+                    nearestTarget = (pos.Value, getRadius(value));
                     nearestDistSq = distSq;
                 }
             }
         }
-
-        return nearestTarget;
     }
 
     private void FireAtTarget(EntityManager em, Entity turretEntity, Turret turret, (Vector2 Position, float Radius) target)
@@ -196,17 +160,4 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
-    private static float GetCooldown(EntityManager em, Entity entity)
-    {
-        if (em.HasComponent<FireCooldown>(entity))
-        {
-            return em.GetComponent<FireCooldown>(entity).Timer;
-        }
-        return 0f;
-    }
-
-    private static void SetCooldown(EntityManager em, Entity entity, float value)
-    {
-        em.AddComponent(entity, new FireCooldown(value));
-    }
 }
