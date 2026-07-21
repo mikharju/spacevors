@@ -61,7 +61,7 @@ public class EnemyShipSpawnSystem : GameSystem
             FiringRange: firingRange,
             TurretFireRate: 1.5f,
             TurretAmmoSpeed: 200f,
-            Acceleration: 3.0f));
+            Acceleration: 9.0f));
         em.AddComponent(shipEntity, new Turret(
             FireRate: 1.5f,
             AmmoSpeed: 200f,

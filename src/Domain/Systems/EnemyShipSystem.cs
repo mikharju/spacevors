@@ -4,8 +4,6 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSystem : GameSystem
 {
-    private const float AlignmentThreshold = 5f * MathF.PI / 180f;
-
     public override void Update(EntityManager em, float deltaTime)
     {
         var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
@@ -47,26 +45,13 @@ public class EnemyShipSystem : GameSystem
             // Phase 3: Inside firing range - only track player, no acceleration
             if (dist <= ship.FiringRange) continue;
 
-            // Phase 2: Chase phase - accelerate toward player when aligned
+            // Phase 2: Chase phase - accelerate toward player
             var currentVel = em.HasComponent<Velocity>(shipEntity)
                 ? em.GetComponent<Velocity>(shipEntity).Value
                 : Vector2.Zero;
 
-            float currentSpeed = currentVel.Magnitude;
-
-            if (Math.Abs(angleDiff) <= AlignmentThreshold && currentSpeed < ship.Speed)
-            {
-                var accel = em.HasComponent<Acceleration>(shipEntity)
-                    ? em.GetComponent<Acceleration>(shipEntity).Value
-                    : Vector2.Zero;
-
-                var targetAccel = toPlayerDir * ship.Acceleration;
-                em.AddComponent(shipEntity, new Acceleration(targetAccel));
-            }
-            else
-            {
-                em.AddComponent(shipEntity, new Acceleration(Vector2.Zero));
-            }
+            var targetAccel = toPlayerDir * ship.Acceleration;
+            em.AddComponent(shipEntity, new Acceleration(targetAccel));
 
             // Integrate acceleration into velocity
             if (em.HasComponent<Acceleration>(shipEntity))
