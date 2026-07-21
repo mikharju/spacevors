@@ -40,7 +40,7 @@ public class CollisionSystem : GameSystem
 
         var ammoList = em.GetEntitiesWithComponents<Ammo>().ToList();
         var entitiesToDestroy = new List<Entity>();
-        var effectsToSpawn = new List<(Vector2 Position, bool IsMine)>();
+        var effectsToSpawn = new List<(Vector2 Position, MineSize Size)>();
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
@@ -59,7 +59,7 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ResolveAmmoVsAsteroid(em, ammoEntity, ammo, asteroidEntity, asteroid);
-                effectsToSpawn.Add((ammoPos.Value, false));
+                effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
                 entitiesToDestroy.Add(ammoEntity);
                 break;
             }
@@ -80,10 +80,6 @@ public class CollisionSystem : GameSystem
                 ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
             }
 
-            foreach (var pos in _mineCollisionPositions)
-            {
-                effectsToSpawn.Add((pos, true));
-            }
             _mineCollisionPositions.Clear();
         }
 
@@ -117,13 +113,14 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ammoToMineHits.Add((ammoEntity, mineEntity));
-                effectsToSpawn.Add((minePos.Value, true));
+                effectsToSpawn.Add((minePos.Value, mine.Size));
                 break;
             }
         }
 
         foreach (var (ammoEntity, mineEntity) in ammoToMineHits)
         {
+            if (!em.HasComponent<Health>(mineEntity)) continue;
             var health = em.GetComponent<Health>(mineEntity);
             if (health.Current <= 1)
             {
@@ -202,13 +199,14 @@ public class CollisionSystem : GameSystem
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
                 ammoToEnemyShipHits.Add((ammoEntity, enemyShipEntity));
-                effectsToSpawn.Add((shipPos.Value, false));
+                effectsToSpawn.Add((shipPos.Value, MineSize.Small));
                 break;
             }
         }
 
         foreach (var (ammoEntity, enemyShipEntity) in ammoToEnemyShipHits)
         {
+            if (!em.HasComponent<Health>(enemyShipEntity)) continue;
             var health = em.GetComponent<Health>(enemyShipEntity);
             if (health.Current <= 1)
             {
@@ -251,7 +249,7 @@ public class CollisionSystem : GameSystem
             if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
             ammoToPlayerHits.Add(ammoEntity);
-            effectsToSpawn.Add((playerPos.Value, false));
+            effectsToSpawn.Add((playerPos.Value, MineSize.Small));
         }
 
         foreach (var ammoEntity in ammoToPlayerHits.Distinct())
@@ -276,10 +274,10 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        foreach (var (position, isMine) in effectsToSpawn.Distinct())
+        foreach (var (position, mineSize) in effectsToSpawn.Distinct())
         {
-            SpawnExplosion(em, position, isMine);
-            int sparkCount = isMine ? 7 : 3;
+            SpawnExplosion(em, position, mineSize);
+            int sparkCount = mineSize == MineSize.Large ? 7 : 3;
             for (int i = 0; i < sparkCount; i++)
             {
                 SpawnSpark(em, position);
@@ -287,12 +285,12 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private void SpawnExplosion(EntityManager em, Vector2 position, bool isMine)
+    private void SpawnExplosion(EntityManager em, Vector2 position, MineSize mineSize)
     {
         var explosionEntity = em.CreateEntity();
         em.AddComponent(explosionEntity, new Position(position));
-        float radius = isMine ? 30f : 15f;
-        em.AddComponent(explosionEntity, new Explosion(radius, 0.25f));
+        float radius = mineSize == MineSize.Large ? 30f : 15f;
+        em.AddComponent(explosionEntity, new Explosion(radius, 0.5f));
     }
 
     private void SpawnSpark(EntityManager em, Vector2 position)
@@ -303,7 +301,7 @@ public class CollisionSystem : GameSystem
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
         em.AddComponent(sparkEntity, new Position(position));
         em.AddComponent(sparkEntity, new Velocity(velocity));
-        em.AddComponent(sparkEntity, new Spark(0.4f + (float)new Random().NextDouble() * 0.3f));
+        em.AddComponent(sparkEntity, new Spark(0.8f + (float)new Random().NextDouble() * 0.6f));
     }
 
     private void ResolveCircleVsCircle(
@@ -480,6 +478,8 @@ public class CollisionSystem : GameSystem
 
         if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
 
+        _mineCollisionPositions.Add(minePos.Value);
+
         em.DestroyEntity(mineEntity);
 
         var playerHealth = em.GetComponent<Health>(playerEntity);
@@ -492,7 +492,20 @@ public class CollisionSystem : GameSystem
             em.AddComponent(playerEntity, new Health(playerHealth.Current - 3));
         }
 
-        _mineCollisionPositions.Add(minePos.Value);
+        var normal = diff / (float)Math.Sqrt(distSq);
+        float explosionForce = mine.Size == MineSize.Large ? 240f : 120f;
+        Vector2 playerVel = em.HasComponent<Velocity>(playerEntity)
+            ? em.GetComponent<Velocity>(playerEntity).Value
+            : Vector2.Zero;
+        playerVel += normal * explosionForce;
+
+        em.AddComponent(playerEntity, new Velocity(playerVel));
+
+        int sparkCount = mine.Size == MineSize.Large ? 10 : 5;
+        for (int i = 0; i < sparkCount; i++)
+        {
+            SpawnSpark(em, minePos.Value);
+        }
     }
 
     private void ResolveEnemyShipVsPlayer(

@@ -75,10 +75,10 @@ for (int i = 0; i < 15; i++)
     float dist = 300f + (float)rand.NextDouble() * 3000f;
     float mx = (float)Math.Cos(angle) * dist;
     float my = (float)Math.Sin(angle) * dist;
-    float mRadius = 15f + (float)rand.NextDouble() * 10f;
+    MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
     em.AddComponent(mine, new Position(new Vector2(mx, my)));
     em.AddComponent(mine, new Velocity(Vector2.Zero));
-    em.AddComponent(mine, new EnemyMine(mRadius, 30f + (float)rand.NextDouble() * 20f, angle));
+    em.AddComponent(mine, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, angle));
     em.AddComponent(mine, new Health(2));
 }
 
@@ -287,7 +287,7 @@ while (!Raylib.WindowShouldClose())
         float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
         float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
 
-        float lifeRatio = explosion.Lifetime / 0.25f;
+        float lifeRatio = explosion.Lifetime / 0.5f;
         float currentRadius = explosion.Radius * (1f - lifeRatio);
         int alpha = (int)(255f * lifeRatio);
 
@@ -301,7 +301,7 @@ while (!Raylib.WindowShouldClose())
         float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
         float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
 
-        float lifeRatio = spark.Lifetime / 0.7f;
+        float lifeRatio = spark.Lifetime / 1.4f;
         int size = (int)Math.Max(lifeRatio * 5f, 1f);
         int r = (int)(lifeRatio * 255);
         int g = (int)(lifeRatio * lifeRatio * 80);
