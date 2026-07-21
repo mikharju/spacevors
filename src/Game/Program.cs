@@ -329,10 +329,10 @@ while (!Raylib.WindowShouldClose())
 
         float tx1 = (float)shipPos.Value.X + tip.X - camX + WindowWidth / 2f;
         float ty1 = (float)shipPos.Value.Y + tip.Y - camY + WindowHeight / 2f;
-        float tx2 = (float)shipPos.Value.X + left.X - camX + WindowWidth / 2f;
-        float ty2 = (float)shipPos.Value.Y + left.Y - camY + WindowHeight / 2f;
-        float tx3 = (float)shipPos.Value.X + right.X - camX + WindowWidth / 2f;
-        float ty3 = (float)shipPos.Value.Y + right.Y - camY + WindowHeight / 2f;
+        float tx2 = (float)shipPos.Value.X + right.X - camX + WindowWidth / 2f;
+        float ty2 = (float)shipPos.Value.Y + right.Y - camY + WindowHeight / 2f;
+        float tx3 = (float)shipPos.Value.X + left.X - camX + WindowWidth / 2f;
+        float ty3 = (float)shipPos.Value.Y + left.Y - camY + WindowHeight / 2f;
 
         Raylib.DrawTriangle(
             new System.Numerics.Vector2(tx1, ty1),
