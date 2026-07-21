@@ -154,6 +154,50 @@ em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
 em.AddComponent(turretEntity, new Rotation(0f));
     em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: WindowHeight / 2f, IsEnemy: false));
 
+// Background starfield with parallax layers
+var stars = new List<(Vector2 Position, float Size, Color Color, float Parallax)>();
+
+for (int layer = 0; layer < 3; layer++)
+{
+    int count = layer == 0 ? 150 : layer == 1 ? 100 : 50;
+    float parallax = layer switch { 0 => 0.2f, 1 => 0.5f, _ => 1.0f };
+    float sizeMin = layer switch { 0 => 0.5f, 1 => 1f, _ => 1.5f };
+    float sizeMax = layer switch { 0 => 1f, 1 => 1.5f, _ => 2f };
+
+    for (int i = 0; i < count; i++)
+    {
+        float x = (float)rand.NextDouble() * 6000f - 3000f;
+        float y = (float)rand.NextDouble() * 6000f - 3000f;
+        float size = sizeMin + (float)rand.NextDouble() * (sizeMax - sizeMin);
+
+        Color color;
+        float roll = (float)rand.NextDouble();
+        if (roll < 0.5f) color = new Color(140, 130, 100, 160);
+        else if (roll < 0.75f) color = new Color(160, 90, 70, 160);
+        else color = new Color(80, 100, 140, 160);
+
+        stars.Add((new Vector2(x, y), size, color, parallax));
+    }
+}
+
+// Stationary clutter fixed to world coordinates
+var clutter = new List<(Vector2 Position, float Width, float Height, Color Color)>();
+
+for (int i = 0; i < 40; i++)
+{
+    float x = (float)rand.NextDouble() * 6000f - 3000f;
+    float y = (float)rand.NextDouble() * 6000f - 3000f;
+    float w = 5f + (float)rand.NextDouble() * 20f;
+    float h = 3f + (float)rand.NextDouble() * 12f;
+
+    Color color;
+    float roll = (float)rand.NextDouble();
+    if (roll < 0.6f) color = new Color(35, 35, 38, 140);
+    else color = new Color(55, 45, 32, 140);
+
+    clutter.Add((new Vector2(x, y), w, h, color));
+}
+
 var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
@@ -236,6 +280,29 @@ while (!Raylib.WindowShouldClose())
     // Render
     Raylib.BeginDrawing();
     Raylib.ClearBackground(new Color(15, 15, 25, 255));
+
+    // Draw parallax starfield
+    foreach (var (pos, size, color, parallax) in stars)
+    {
+        float cx = pos.X - camX * parallax + WindowWidth / 2f;
+        float cy = pos.Y - camY * parallax + WindowHeight / 2f;
+
+        cx = ((cx % WindowWidth) + WindowWidth) % WindowWidth;
+        cy = ((cy % WindowHeight) + WindowHeight) % WindowHeight;
+
+        Raylib.DrawCircle((int)cx, (int)cy, (int)size, color);
+    }
+
+    // Draw stationary clutter
+    foreach (var (pos, width, height, color) in clutter)
+    {
+        float cx = pos.X - camX + WindowWidth / 2f;
+        float cy = pos.Y - camY + WindowHeight / 2f;
+
+        if (cx < -width || cx > WindowWidth + width || cy < -height || cy > WindowHeight + height) continue;
+
+        Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - height / 2f), (int)width, (int)height, color);
+    }
 
     // Draw asteroids with rotation as rotated gray rectangles
     foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
