@@ -64,6 +64,69 @@ public class CollisionSystem : GameSystem
         {
             em.DestroyEntity(entity);
         }
+
+        var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();
+
+        if (hasPlayer)
+        {
+            foreach (var (mineEntity, mine) in mines)
+            {
+                ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
+            }
+        }
+
+        foreach (var (mineEntity, mine) in mines)
+        {
+            foreach (var (asteroidEntity, asteroid) in asteroids)
+            {
+                ResolveCircleVsCircle(em, mineEntity, mine, asteroidEntity, asteroid);
+            }
+        }
+
+        var ammoToMineHits = new List<(Entity ammoEntity, Entity mineEntity)>();
+
+        foreach (var (ammoEntity, ammo) in ammoList)
+        {
+            if (entitiesToDestroy.Contains(ammoEntity)) continue;
+
+            var ammoPos = em.GetComponent<Position>(ammoEntity);
+            float ammoRadius = ammo.Radius;
+
+            foreach (var (mineEntity, mine) in mines)
+            {
+                var minePos = em.GetComponent<Position>(mineEntity);
+                var diff = minePos.Value - ammoPos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                float radiusSum = ammoRadius + mine.Radius;
+
+                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+                ammoToMineHits.Add((ammoEntity, mineEntity));
+                break;
+            }
+        }
+
+        foreach (var (ammoEntity, mineEntity) in ammoToMineHits)
+        {
+            var health = em.GetComponent<Health>(mineEntity);
+            if (health.Current <= 1)
+            {
+                em.DestroyEntity(mineEntity);
+            }
+            else
+            {
+                em.AddComponent(mineEntity, new Health(health.Current - 1));
+            }
+            em.DestroyEntity(ammoEntity);
+        }
+
+        foreach (var entity in entitiesToDestroy.Distinct())
+        {
+            if (!ammoToMineHits.Any(h => h.ammoEntity == entity))
+            {
+                em.DestroyEntity(entity);
+            }
+        }
     }
 
     private void ResolveCircleVsCircle(
@@ -94,6 +157,36 @@ public class CollisionSystem : GameSystem
             isAsteroidVsAsteroid = false;
         }
 
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, isAsteroidVsAsteroid);
+    }
+
+    private void ResolveCircleVsCircle(
+        EntityManager em,
+        Entity aEntity,
+        EnemyMine aMine,
+        Entity bEntity,
+        Asteroid bAst)
+    {
+        var aPos = em.GetComponent<Position>(aEntity);
+        var bPos = em.GetComponent<Position>(bEntity);
+
+        float aRadius = aMine.Radius;
+        float bRadius = bAst.Radius;
+        bool isAsteroidVsAsteroid = true;
+
+        ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, isAsteroidVsAsteroid);
+    }
+
+    private void ResolveCollision(
+        EntityManager em,
+        Position aPos,
+        Position bPos,
+        Entity aEntity,
+        Entity bEntity,
+        float aRadius,
+        float bRadius,
+        bool isAsteroidVsAsteroid)
+    {
         var diff = bPos.Value - aPos.Value;
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
         float radiusSum = aRadius + bRadius;
@@ -173,7 +266,6 @@ public class CollisionSystem : GameSystem
         float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
         var normal = diff / dist;
 
-        // Small impulse: ammo mass is negligible compared to asteroid
         Vector2 ammoVel = ammo.Velocity;
         Vector2 asteroidVel = em.HasComponent<Velocity>(asteroidEntity)
             ? em.GetComponent<Velocity>(asteroidEntity).Value
@@ -189,11 +281,9 @@ public class CollisionSystem : GameSystem
         float j = -(1 + AmmoRestitution) * velAlongNormal / totalInvMass;
         var impulse = normal * j;
 
-        // Apply tiny push to asteroid (much smaller than player crash due to mass difference)
         asteroidVel += impulse * (1f / asteroidMass);
         em.AddComponent(asteroidEntity, new Velocity(asteroidVel));
 
-        // Add small spin from impact
         if (em.HasComponent<AngularVelocity>(asteroidEntity))
         {
             var tangentSpeed = relVel.Magnitude - Math.Abs(velAlongNormal);
@@ -201,4 +291,30 @@ public class CollisionSystem : GameSystem
             em.AddComponent(asteroidEntity, new AngularVelocity(angVel.Value + tangentSpeed * 0.01f));
         }
     }
+
+    private void ResolveMineVsPlayer(EntityManager em, Entity mineEntity, EnemyMine mine, Entity playerEntity)
+    {
+        var minePos = em.GetComponent<Position>(mineEntity);
+        var playerPos = em.GetComponent<Position>(playerEntity);
+
+        var diff = playerPos.Value - minePos.Value;
+        float distSq = diff.X * diff.X + diff.Y * diff.Y;
+        float radiusSum = mine.Radius + 18f;
+
+        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+
+        em.DestroyEntity(mineEntity);
+
+        var playerHealth = em.GetComponent<Health>(playerEntity);
+        if (playerHealth.Current <= 1)
+        {
+            em.AddComponent(playerEntity, new Dead());
+        }
+        else
+        {
+            em.AddComponent(playerEntity, new Health(playerHealth.Current - 1));
+        }
+    }
 }
+
+public readonly record struct Dead();

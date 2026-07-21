@@ -6,6 +6,7 @@ using Spacevors.Domain.Systems;
 const float FixedDeltaTime = 1f / 60f;
 const int WindowWidth = 1280;
 const int WindowHeight = 720;
+const int PlayerMaxHealth = 3;
 
 var em = new EntityManager();
 
@@ -17,6 +18,7 @@ em.AddComponent(playerEntity, new Rotation(0f));
 em.AddComponent(playerEntity, new AngularVelocity(0f));
 em.AddComponent(playerEntity, new Player(Thrust: 400f, Boost: 2.5f));
 em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
+em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 
 // Create camera
 var cameraEntity = em.CreateEntity();
@@ -65,7 +67,24 @@ for (int i = 5; i < 105; i++)
     em.AddComponent(asteroid, new Asteroid(aw, ah, ar));
 }
 
-var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new CameraSystem() };
+// Spawn enemy mines around the player
+for (int i = 0; i < 15; i++)
+{
+    var mine = em.CreateEntity();
+    float angle = (float)(rand.NextDouble() * Math.PI * 2f);
+    float dist = 300f + (float)rand.NextDouble() * 3000f;
+    float mx = (float)Math.Cos(angle) * dist;
+    float my = (float)Math.Sin(angle) * dist;
+    float mRadius = 15f + (float)rand.NextDouble() * 10f;
+    em.AddComponent(mine, new Position(new Vector2(mx, my)));
+    em.AddComponent(mine, new Velocity(Vector2.Zero));
+    em.AddComponent(mine, new EnemyMine(mRadius, 30f + (float)rand.NextDouble() * 20f, angle));
+    em.AddComponent(mine, new Health(2));
+}
+
+bool gameOver = false;
+
+var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new CameraSystem() };
 
 Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
@@ -129,6 +148,11 @@ while (!Raylib.WindowShouldClose())
             system.Update(em, FixedDeltaTime);
         }
         accumulator -= FixedDeltaTime;
+    }
+
+    if (!gameOver && em.HasComponent<Dead>(playerEntity))
+    {
+        gameOver = true;
     }
 
     // Get camera offset for rendering
@@ -227,6 +251,33 @@ while (!Raylib.WindowShouldClose())
         float shipCx = (float)shipPos.Value.X - camX + WindowWidth / 2f;
         float shipCy = (float)shipPos.Value.Y - camY + WindowHeight / 2f;
         Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)playerStats.Radius, new Color(0, 255, 0, 60));
+    }
+
+    // Draw enemy mines as red circles with pulsing effect
+    foreach (var (entity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
+    {
+        var pos = em.GetComponent<Position>(entity);
+        float cx = (float)pos.Value.X - camX + WindowWidth / 2f;
+        float cy = (float)pos.Value.Y - camY + WindowHeight / 2f;
+
+        if (em.HasComponent<Health>(entity))
+        {
+            var health = em.GetComponent<Health>(entity);
+            int alpha = health.Current >= 2 ? 180 : 255;
+            Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 60, 60, alpha));
+        }
+        else
+        {
+            Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 100, 100, 200));
+        }
+
+        // Draw inner core
+        Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+    }
+
+    if (gameOver)
+    {
+        Raylib.DrawText("GAME OVER", WindowWidth / 2 - 80, WindowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
     }
 
     Raylib.EndDrawing();
