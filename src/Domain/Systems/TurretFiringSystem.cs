@@ -116,14 +116,16 @@ public class TurretFiringSystem : GameSystem
             var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
+            EnemyShip enemyShip = em.HasComponent<EnemyShip>(turretEntity) ? em.GetComponent<EnemyShip>(turretEntity) : new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0);
+            float firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
+
             if (playerEntity.Value >= 0 && em.HasComponent<EnemyShip>(turretEntity))
             {
-                var ship = em.GetComponent<EnemyShip>(turretEntity);
                 var playerPos = em.GetComponent<Position>(playerEntity);
                 var toPlayer = playerPos.Value - turretPos.Value;
                 float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
 
-                if (distSq <= ship.FiringRange * ship.FiringRange && distSq > 0.001f)
+                if (distSq <= firingRangeSq && distSq > 0.001f)
                 {
                     float dist = (float)Math.Sqrt(distSq);
                     var toPlayerDir = toPlayer / dist;
@@ -143,7 +145,7 @@ public class TurretFiringSystem : GameSystem
                 var toTarget = minePos.Value - turretPos.Value;
                 float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
-                if (distSq > rangeSq || distSq < 0.001f) continue;
+                if (distSq > firingRangeSq || distSq < 0.001f) continue;
 
                 float dist = (float)Math.Sqrt(distSq);
                 var toTargetDir = toTarget / dist;
