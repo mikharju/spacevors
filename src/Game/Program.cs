@@ -102,7 +102,7 @@ for (int i = 0; i < 4; i++)
         TurnRate: 3.5f,
         Health: 3,
         DetectionRange: WindowHeight / 2f * 2f / 3f,
-        FiringRange: 300f,
+        FiringRange: 600f,
         TurretFireRate: 1.5f,
         TurretAmmoSpeed: 200f));
     em.AddComponent(ship, new Turret(
@@ -132,7 +132,7 @@ for (int side = -1; side <= 1; side += 2)
         TurnRate: 3.5f,
         Health: 3,
         DetectionRange: WindowHeight / 2f * 2f / 3f,
-        FiringRange: 300f,
+        FiringRange: 600f,
         TurretFireRate: 1.5f,
         TurretAmmoSpeed: 200f));
     em.AddComponent(edgeShip, new Turret(

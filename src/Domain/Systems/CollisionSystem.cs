@@ -11,6 +11,7 @@ public class CollisionSystem : GameSystem
     private const float CorrectionPercent = 0.8f;
     private const float Slop = 0.01f;
     private const float AmmoMass = 1f;
+    private readonly List<Vector2> _mineCollisionPositions = new();
 
     public override void Update(EntityManager em, float deltaTime)
     {
@@ -76,17 +77,20 @@ public class CollisionSystem : GameSystem
             foreach (var (mineEntity, mine) in mines)
             {
                 if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
-                bool collided = ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
-                if (collided)
-                {
-                    effectsToSpawn.Add((em.GetComponent<Position>(mineEntity).Value, true));
-                }
+                ResolveMineVsPlayer(em, mineEntity, mine, playerEntity);
             }
+
+            foreach (var pos in _mineCollisionPositions)
+            {
+                effectsToSpawn.Add((pos, true));
+            }
+            _mineCollisionPositions.Clear();
         }
 
         foreach (var (mineEntity, mine) in mines)
         {
             if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
+            if (!em.HasComponent<Position>(mineEntity)) continue;
             foreach (var (asteroidEntity, asteroid) in asteroids)
             {
                 ResolveCircleVsCircle(em, mineEntity, mine, asteroidEntity, asteroid);
@@ -104,6 +108,7 @@ public class CollisionSystem : GameSystem
 
             foreach (var (mineEntity, mine) in mines)
             {
+                if (!em.HasComponent<Position>(mineEntity)) continue;
                 var minePos = em.GetComponent<Position>(mineEntity);
                 var diff = minePos.Value - ammoPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -144,6 +149,7 @@ public class CollisionSystem : GameSystem
         foreach (var (enemyShipEntity, enemyShip) in enemyShips)
         {
             if (!em.HasComponent<EnemyShip>(enemyShipEntity)) continue;
+            if (!em.HasComponent<Position>(enemyShipEntity)) continue;
             if (hasPlayer)
             {
                 ResolveEnemyShipVsPlayer(em, enemyShipEntity, enemyShip, playerEntity);
@@ -154,6 +160,7 @@ public class CollisionSystem : GameSystem
         {
             var (aEntity, aShip) = enemyShips[i];
             if (!em.HasComponent<EnemyShip>(aEntity)) continue;
+            if (!em.HasComponent<Position>(aEntity)) continue;
             foreach (var (asteroidEntity, asteroid) in asteroids)
             {
                 ResolveEnemyShipVsAsteroid(em, aEntity, aShip, asteroidEntity, asteroid);
@@ -163,12 +170,14 @@ public class CollisionSystem : GameSystem
             {
                 var (bEntity, bShip) = enemyShips[j];
                 if (!em.HasComponent<EnemyShip>(bEntity)) continue;
+                if (!em.HasComponent<Position>(bEntity)) continue;
                 ResolveEnemyShipVsEnemyShip(em, aEntity, aShip, bEntity, bShip);
             }
 
             foreach (var (mineEntity, mine) in mines)
             {
                 if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
+                if (!em.HasComponent<Position>(mineEntity)) continue;
                 ResolveEnemyShipVsMine(em, aEntity, aShip, mineEntity, mine);
             }
         }
@@ -184,6 +193,7 @@ public class CollisionSystem : GameSystem
 
             foreach (var (enemyShipEntity, enemyShip) in enemyShips)
             {
+                if (!em.HasComponent<Position>(enemyShipEntity)) continue;
                 var shipPos = em.GetComponent<Position>(enemyShipEntity);
                 var diff = shipPos.Value - ammoPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -459,7 +469,7 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private bool ResolveMineVsPlayer(EntityManager em, Entity mineEntity, EnemyMine mine, Entity playerEntity)
+    private void ResolveMineVsPlayer(EntityManager em, Entity mineEntity, EnemyMine mine, Entity playerEntity)
     {
         var minePos = em.GetComponent<Position>(mineEntity);
         var playerPos = em.GetComponent<Position>(playerEntity);
@@ -468,7 +478,7 @@ public class CollisionSystem : GameSystem
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
         float radiusSum = mine.Radius + 18f;
 
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return false;
+        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
 
         em.DestroyEntity(mineEntity);
 
@@ -482,7 +492,7 @@ public class CollisionSystem : GameSystem
             em.AddComponent(playerEntity, new Health(playerHealth.Current - 3));
         }
 
-        return true;
+        _mineCollisionPositions.Add(minePos.Value);
     }
 
     private void ResolveEnemyShipVsPlayer(
