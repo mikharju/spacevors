@@ -13,7 +13,7 @@ public class FiringSystem : GameSystem
             if (cooldown < 0f)
             {
                 FireAmmo(em, entity, weapon, rotation);
-                CooldownHelper.SetCooldown(em, entity, 1f / weapon.FireRate);
+                CooldownHelper.SetCooldown(em, entity, 1f / weapon.EffectiveFireRate);
             }
             else if (cooldown > 0f)
             {
@@ -41,7 +41,7 @@ public class FiringSystem : GameSystem
         float spawnDist = 20f;
         var spawnPos = pos.Value + ammoDir * spawnDist;
 
-        Vector2 ammoVel = ammoDir * weapon.AmmoSpeed;
+        Vector2 ammoVel = ammoDir * weapon.EffectiveAmmoSpeed;
 
         var ammoEntity = em.CreateEntity();
         em.AddComponent(ammoEntity, new Position(spawnPos));

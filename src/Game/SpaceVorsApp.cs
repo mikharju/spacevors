@@ -17,7 +17,7 @@ public static class SpaceVorsApp
 
         bool gameOver = false;
 
-        var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
+        var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new CollisionSystem(), new UpgradePickupSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
 
         Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 

@@ -143,6 +143,19 @@ public static class GameInitializer
             clutter.Add((new Vector2(x, y), w, h, color));
         }
 
+        // Spawn two weapon upgrades near player start
+        UpgradeType[] allTypes = { UpgradeType.FireRate, UpgradeType.ProjectileSpeed };
+        int idx1 = rand.Next(allTypes.Length);
+        int idx2 = (idx1 + 1) % allTypes.Length;
+
+        var upgradeBelow = em.CreateEntity();
+        em.AddComponent(upgradeBelow, new Position(new Vector2(0f, -300f)));
+        em.AddComponent(upgradeBelow, new Upgrade(allTypes[idx1]));
+
+        var upgradeAbove = em.CreateEntity();
+        em.AddComponent(upgradeAbove, new Position(new Vector2(0f, 300f)));
+        em.AddComponent(upgradeAbove, new Upgrade(allTypes[idx2]));
+
         return (em, playerEntity, cameraEntity, turretEntity, stars, clutter);
     }
 }

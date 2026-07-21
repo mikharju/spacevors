@@ -28,6 +28,7 @@ public static class Renderer
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight);
         DrawEnemyShips(em, camX, camY, windowWidth, windowHeight);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
+        DrawUpgrades(em, camX, camY, windowWidth, windowHeight);
         DrawHealthBar(em, playerEntity, playerMaxHealth, windowWidth, windowHeight);
 
         if (gameOver)
@@ -271,6 +272,27 @@ public static class Renderer
             }
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+        }
+    }
+
+    private static void DrawUpgrades(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, upgrade) in em.GetEntitiesWithComponents<Upgrade>())
+        {
+            if (!em.HasComponent<Position>(entity)) continue;
+
+            var pos = em.GetComponent<Position>(entity);
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            int width = 18;
+            int topHeight = 5;
+            int midHeight = 10;
+            int bottomHeight = 5;
+
+            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - topHeight - midHeight - bottomHeight / 2f), width, topHeight, new Color(60, 60, 65, 255));
+            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - midHeight / 2f), width, midHeight, new Color(50, 150, 255, 255));
+            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy + midHeight / 2f), width, bottomHeight, new Color(60, 60, 65, 255));
         }
     }
 
