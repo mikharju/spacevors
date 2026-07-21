@@ -216,6 +216,7 @@ public class CollisionSystem : GameSystem
         foreach (var (ammoEntity, ammo) in ammoList)
         {
             if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            if (!ammo.IsEnemy) continue;
             if (ammoToEnemyShipHits.Any(h => h.ammoEntity == ammoEntity)) continue;
             if (ammoToMineHits.Any(h => h.ammoEntity == ammoEntity)) continue;
 
@@ -434,13 +435,13 @@ public class CollisionSystem : GameSystem
         em.DestroyEntity(mineEntity);
 
         var playerHealth = em.GetComponent<Health>(playerEntity);
-        if (playerHealth.Current <= 1)
+        if (playerHealth.Current <= 3)
         {
             em.AddComponent(playerEntity, new Dead());
         }
         else
         {
-            em.AddComponent(playerEntity, new Health(playerHealth.Current - 1));
+            em.AddComponent(playerEntity, new Health(playerHealth.Current - 3));
         }
     }
 

@@ -16,7 +16,7 @@ public class AmmoLifetimeSystem : GameSystem
             }
             else
             {
-                em.AddComponent(entity, new Ammo(ammo.Velocity, ammo.Radius, ammo.Lifetime - deltaTime));
+                em.AddComponent(entity, new Ammo(ammo.Velocity, ammo.Radius, ammo.Lifetime - deltaTime, ammo.IsEnemy));
             }
         }
     }

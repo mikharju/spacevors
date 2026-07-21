@@ -176,7 +176,7 @@ public class TurretFiringSystem : GameSystem
         var ammoEntity = em.CreateEntity();
         em.AddComponent(ammoEntity, new Position(spawnPos));
         em.AddComponent(ammoEntity, new Velocity(ammoVel));
-        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f));
+        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, turret.IsEnemy));
 
         if (turret.KickbackForce > 0)
         {

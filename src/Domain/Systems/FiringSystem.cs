@@ -48,7 +48,7 @@ public class FiringSystem : GameSystem
         var ammoEntity = em.CreateEntity();
         em.AddComponent(ammoEntity, new Position(spawnPos));
         em.AddComponent(ammoEntity, new Velocity(ammoVel));
-        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f));
+        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, IsEnemy: false));
 
         Vector2 kickback = new Vector2(-sin, cos) * weapon.KickbackForce;
         if (em.HasComponent<Velocity>(shooterEntity))

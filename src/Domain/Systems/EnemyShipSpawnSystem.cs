@@ -29,14 +29,20 @@ public class EnemyShipSpawnSystem : GameSystem
         if (velMagnitude < 0.1f) return;
 
         Vector2 velocityDir = playerVel / velMagnitude;
-        float angleToPlayer = (float)Math.Atan2(velocityDir.X, -velocityDir.Y);
 
         Random rand = new Random();
-        float randomAngle = angleToPlayer + (float)(rand.NextDouble() * MathF.PI / 2f - MathF.PI / 4f);
+        float randomAngle = (float)(rand.NextDouble() * MathF.PI / 2f - MathF.PI / 4f);
+
+        float cosA = (float)Math.Cos(randomAngle);
+        float sinA = (float)Math.Sin(randomAngle);
+        Vector2 spawnDir = new Vector2(
+            velocityDir.X * cosA - velocityDir.Y * sinA,
+            velocityDir.X * sinA + velocityDir.Y * cosA
+        );
 
         float spawnDist = 500f;
-        float sx = playerPos.Value.X + (float)Math.Cos(randomAngle) * spawnDist;
-        float sy = playerPos.Value.Y + (float)Math.Sin(randomAngle) * spawnDist;
+        float sx = playerPos.Value.X + spawnDir.X * spawnDist;
+        float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
 
         var shipEntity = em.CreateEntity();
         em.AddComponent(shipEntity, new Position(new Vector2(sx, sy)));

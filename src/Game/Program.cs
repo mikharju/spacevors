@@ -6,7 +6,7 @@ using Spacevors.Domain.Systems;
 const float FixedDeltaTime = 1f / 60f;
 const int WindowWidth = 1280;
 const int WindowHeight = 720;
-const int PlayerMaxHealth = 3;
+const int PlayerMaxHealth = 10;
 
 var em = new EntityManager();
 
@@ -377,6 +377,25 @@ while (!Raylib.WindowShouldClose())
 
         // Draw inner core
         Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+    }
+
+    // Draw player health bar at top left
+    {
+        var playerHealth = em.GetComponent<Health>(playerEntity);
+        int barWidth = 160;
+        int barHeight = 14;
+        int padding = 16;
+        float healthPercent = (float)playerHealth.Current / PlayerMaxHealth;
+
+        Raylib.DrawRectangle(padding, padding, barWidth, barHeight, new Color(50, 50, 50, 255));
+        int filledWidth = (int)(barWidth * Math.Max(healthPercent, 0f));
+        Color healthColor = filledWidth > barWidth / 3 ? new Color(80, 255, 80, 255) : new Color(255, 60, 60, 255);
+        Raylib.DrawRectangle(padding, padding, filledWidth, barHeight, healthColor);
+        Raylib.DrawRectangleLines(padding, padding, barWidth, barHeight, new Color(180, 180, 180, 255));
+
+        string text = $"{playerHealth.Current}/{PlayerMaxHealth}";
+        int textWidth = Raylib.MeasureText(text, 14);
+        Raylib.DrawText(text, padding + (barWidth - textWidth) / 2, padding + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
     }
 
     if (gameOver)
