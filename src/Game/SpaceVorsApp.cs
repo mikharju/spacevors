@@ -157,13 +157,37 @@ public static class SpaceVorsApp
                     {
                         var weapon = em.GetComponent<Weapon>(playerEntity);
                         em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.UpgradeFireRateMultiplier * 1.1f, weapon.UpgradeProjectileSpeedMultiplier));
+                            weapon.UpgradeFireRateMultiplier * 1.15f, weapon.UpgradeProjectileSpeedMultiplier));
+
+                        foreach (var turretEntity in turretEntities)
+                        {
+                            var turret = em.GetComponent<Turret>(turretEntity);
+                            em.AddComponent(turretEntity, new Turret(
+                                turret.FireRate * 1.15f,
+                                turret.AmmoSpeed,
+                                turret.KickbackForce,
+                                turret.ArcAngle,
+                                turret.Range,
+                                turret.IsEnemy));
+                        }
                     }
                     else if (pressed2 && !pressed1)
                     {
                         var weapon = em.GetComponent<Weapon>(playerEntity);
                         em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.UpgradeFireRateMultiplier, weapon.UpgradeProjectileSpeedMultiplier * 1.2f));
+                            weapon.UpgradeFireRateMultiplier, weapon.UpgradeProjectileSpeedMultiplier * 1.3f));
+
+                        foreach (var turretEntity in turretEntities)
+                        {
+                            var turret = em.GetComponent<Turret>(turretEntity);
+                            em.AddComponent(turretEntity, new Turret(
+                                turret.FireRate,
+                                turret.AmmoSpeed * 1.3f,
+                                turret.KickbackForce,
+                                turret.ArcAngle,
+                                turret.Range,
+                                turret.IsEnemy));
+                        }
                     }
 
                     if (pressed1 || pressed2)

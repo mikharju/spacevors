@@ -375,8 +375,8 @@ public static class Renderer
         int startX = (windowWidth - totalW) / 2;
         int startY = windowHeight / 2 - cardH / 2;
 
-        DrawCard(startX, startY, "Fire Rate", "+10%", new Color(50, 150, 255, 255), "1");
-        DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+20%", new Color(50, 150, 255, 255), "2");
+        DrawCard(startX, startY, "Fire Rate", "+15%", new Color(50, 150, 255, 255), "1");
+        DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+30%", new Color(50, 150, 255, 255), "2");
 
         Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
