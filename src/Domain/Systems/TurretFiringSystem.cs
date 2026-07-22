@@ -131,19 +131,33 @@ public class TurretFiringSystem : GameSystem
     private void FireAtTarget(EntityManager em, Entity turretEntity, Turret turret, (Vector2 Position, float Radius) target)
     {
         var turretPos = em.GetComponent<Position>(turretEntity);
-        var turretRot = em.GetComponent<Rotation>(turretEntity);
 
         Vector2 dirToTarget = target.Position - turretPos.Value;
         float dist = (float)Math.Sqrt(dirToTarget.X * dirToTarget.X + dirToTarget.Y * dirToTarget.Y);
         Vector2 ammoDir = dirToTarget / dist;
 
-        var spawnPos = turretPos.Value + ammoDir * 20f;
-        Vector2 ammoVel = ammoDir * turret.AmmoSpeed;
+        int pelletCount = turret.PelletCount;
+        float scatterAngle = pelletCount > 1 ? 0.1f : 0.033f;
 
-        var ammoEntity = em.CreateEntity();
-        em.AddComponent(ammoEntity, new Position(spawnPos));
-        em.AddComponent(ammoEntity, new Velocity(ammoVel));
-        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, turret.IsEnemy));
+        for (int i = 0; i < pelletCount; i++)
+        {
+            float angleOffset = (i - (pelletCount - 1) / 2f) * scatterAngle;
+            float cosOff = (float)Math.Cos(angleOffset);
+            float sinOff = (float)Math.Sin(angleOffset);
+
+            Vector2 pelletDir = new Vector2(
+                ammoDir.X * cosOff - ammoDir.Y * sinOff,
+                ammoDir.X * sinOff + ammoDir.Y * cosOff
+            );
+
+            var spawnPos = turretPos.Value + pelletDir * 20f;
+            Vector2 ammoVel = pelletDir * turret.AmmoSpeed;
+
+            var ammoEntity = em.CreateEntity();
+            em.AddComponent(ammoEntity, new Position(spawnPos));
+            em.AddComponent(ammoEntity, new Velocity(ammoVel));
+            em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, turret.IsEnemy));
+        }
 
         if (turret.KickbackForce > 0)
         {

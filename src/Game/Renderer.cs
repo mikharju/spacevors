@@ -412,7 +412,7 @@ public static class Renderer
             new Color(50, 150, 255, 255), "1");
 
         DrawLoadoutCard(startX + cardW + spacing, startY, "Broadside", 
-            "2 turrets · 90° each side\nFire Rate: 6 · Ammo Speed: 350",
+            "2 turrets · Shotgun · 3 pellets\nFire Rate: 2 · Ammo Speed: 350",
             new Color(50, 150, 255, 255), "2");
 
         Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));

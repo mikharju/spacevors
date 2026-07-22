@@ -157,25 +157,29 @@ public static class SpaceVorsApp
                     {
                         var weapon = em.GetComponent<Weapon>(playerEntity);
                         em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.UpgradeFireRateMultiplier * 1.15f, weapon.UpgradeProjectileSpeedMultiplier));
+                            weapon.PelletCount, weapon.UpgradeFireRateMultiplier * 1.15f, weapon.UpgradeProjectileSpeedMultiplier));
 
                         foreach (var turretEntity in turretEntities)
                         {
                             var turret = em.GetComponent<Turret>(turretEntity);
+                            int newPelletCount = turret.PelletCount > 1 ? turret.PelletCount + 1 : turret.PelletCount;
+                            float newFireRate = turret.PelletCount == 1 ? turret.FireRate * 1.15f : turret.FireRate;
+
                             em.AddComponent(turretEntity, new Turret(
-                                turret.FireRate * 1.15f,
+                                newFireRate,
                                 turret.AmmoSpeed,
-                                turret.KickbackForce,
-                                turret.ArcAngle,
-                                turret.Range,
-                                turret.IsEnemy));
+                                KickbackForce: turret.KickbackForce,
+                                PelletCount: newPelletCount,
+                                ArcAngle: turret.ArcAngle,
+                                Range: turret.Range,
+                                IsEnemy: turret.IsEnemy));
                         }
                     }
                     else if (pressed2 && !pressed1)
                     {
                         var weapon = em.GetComponent<Weapon>(playerEntity);
                         em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.UpgradeFireRateMultiplier, weapon.UpgradeProjectileSpeedMultiplier * 1.3f));
+                            weapon.PelletCount, weapon.UpgradeFireRateMultiplier, weapon.UpgradeProjectileSpeedMultiplier * 1.3f));
 
                         foreach (var turretEntity in turretEntities)
                         {
@@ -183,10 +187,11 @@ public static class SpaceVorsApp
                             em.AddComponent(turretEntity, new Turret(
                                 turret.FireRate,
                                 turret.AmmoSpeed * 1.3f,
-                                turret.KickbackForce,
-                                turret.ArcAngle,
-                                turret.Range,
-                                turret.IsEnemy));
+                                KickbackForce: turret.KickbackForce,
+                                PelletCount: turret.PelletCount,
+                                ArcAngle: turret.ArcAngle,
+                                Range: turret.Range,
+                                IsEnemy: turret.IsEnemy));
                         }
                     }
 

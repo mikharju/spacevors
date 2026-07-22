@@ -41,12 +41,27 @@ public class FiringSystem : GameSystem
         float spawnDist = 20f;
         var spawnPos = pos.Value + ammoDir * spawnDist;
 
-        Vector2 ammoVel = ammoDir * weapon.EffectiveAmmoSpeed;
+        int pelletCount = weapon.PelletCount;
+        float scatterAngle = pelletCount > 1 ? 0.1f : 0.033f;
 
-        var ammoEntity = em.CreateEntity();
-        em.AddComponent(ammoEntity, new Position(spawnPos));
-        em.AddComponent(ammoEntity, new Velocity(ammoVel));
-        em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, IsEnemy: false));
+        for (int i = 0; i < pelletCount; i++)
+        {
+            float angleOffset = (i - (pelletCount - 1) / 2f) * scatterAngle;
+            float cosOff = (float)Math.Cos(angleOffset);
+            float sinOff = (float)Math.Sin(angleOffset);
+
+            Vector2 pelletDir = new Vector2(
+                ammoDir.X * cosOff - ammoDir.Y * sinOff,
+                ammoDir.X * sinOff + ammoDir.Y * cosOff
+            );
+
+            Vector2 ammoVel = pelletDir * weapon.EffectiveAmmoSpeed;
+
+            var ammoEntity = em.CreateEntity();
+            em.AddComponent(ammoEntity, new Position(spawnPos));
+            em.AddComponent(ammoEntity, new Velocity(ammoVel));
+            em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, IsEnemy: false));
+        }
 
         Vector2 kickback = new Vector2(-sin, cos) * weapon.KickbackForce;
         if (em.HasComponent<Velocity>(shooterEntity))

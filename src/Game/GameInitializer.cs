@@ -101,7 +101,7 @@ public static class GameInitializer
             var turretEntity = em.CreateEntity();
             em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
             em.AddComponent(turretEntity, new Rotation(0f));
-            em.AddComponent(turretEntity, new Turret(FireRate: 8f, AmmoSpeed: 420f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(turretEntity, new Turret(FireRate: 8f, AmmoSpeed: 420f, KickbackForce: 10f, PelletCount: 1, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
             em.AddComponent(turretEntity, new TurretOffset(Vector2.Zero));
             em.AddComponent(turretEntity, new ArcOffset(0f));
 
@@ -112,14 +112,14 @@ public static class GameInitializer
             var leftTurret = em.CreateEntity();
             em.AddComponent(leftTurret, new Position(new Vector2(0f, 0f)));
             em.AddComponent(leftTurret, new Rotation(-MathF.PI / 2f));
-            em.AddComponent(leftTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 2.5f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(leftTurret, new Turret(FireRate: 2f, AmmoSpeed: 350f, KickbackForce: 2.5f, PelletCount: 3, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
             em.AddComponent(leftTurret, new TurretOffset(new Vector2(-12f, 0f)));
             em.AddComponent(leftTurret, new ArcOffset(-MathF.PI / 2f));
 
             var rightTurret = em.CreateEntity();
             em.AddComponent(rightTurret, new Position(new Vector2(0f, 0f)));
             em.AddComponent(rightTurret, new Rotation(MathF.PI / 2f));
-            em.AddComponent(rightTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 2.5f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(rightTurret, new Turret(FireRate: 2f, AmmoSpeed: 350f, KickbackForce: 2.5f, PelletCount: 3, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
             em.AddComponent(rightTurret, new TurretOffset(new Vector2(12f, 0f)));
             em.AddComponent(rightTurret, new ArcOffset(MathF.PI / 2f));
 

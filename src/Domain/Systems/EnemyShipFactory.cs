@@ -22,7 +22,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
         em.AddComponent(entity, new EnemyShip(Radius, Speed, TurnRate, Health, DetectionRange, FiringRange, TurretFireRate, TurretAmmoSpeed, Acceleration));
-        em.AddComponent(entity, new Turret(TurretFireRate, TurretAmmoSpeed, 0f, MathF.PI / 8f, DetectionRange, IsEnemy: true));
+        em.AddComponent(entity, new Turret(TurretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
         em.AddComponent(entity, new Health(Health));
     }
 }
