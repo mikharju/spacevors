@@ -58,6 +58,12 @@ public class FiringSystem : GameSystem
             float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.15f;
             Vector2 ammoVel = pelletDir * weapon.EffectiveAmmoSpeed * speedVariation;
 
+            if (em.HasComponent<Velocity>(shooterEntity))
+            {
+                var shooterVel = em.GetComponent<Velocity>(shooterEntity).Value;
+                ammoVel += shooterVel;
+            }
+
             var ammoEntity = em.CreateEntity();
             em.AddComponent(ammoEntity, new Position(spawnPos));
             em.AddComponent(ammoEntity, new Velocity(ammoVel));

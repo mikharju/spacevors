@@ -154,6 +154,12 @@ public class TurretFiringSystem : GameSystem
             var spawnPos = turretPos.Value + pelletDir * 20f;
             Vector2 ammoVel = pelletDir * turret.AmmoSpeed * speedVariation;
 
+            if (em.HasComponent<Velocity>(turretEntity))
+            {
+                var turretVel = em.GetComponent<Velocity>(turretEntity).Value;
+                ammoVel += turretVel;
+            }
+
             var ammoEntity = em.CreateEntity();
             em.AddComponent(ammoEntity, new Position(spawnPos));
             em.AddComponent(ammoEntity, new Velocity(ammoVel));

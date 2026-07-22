@@ -92,11 +92,16 @@ Player
 Projectile
 Lifetime
 Experience
+Loadout TurretOffset ArcOffset PendingChoice BlueSpark UpgradeExplosion
 ```
 
 ## Main loop
 
 ```
+Loadout selection (before game starts)
+
+↓
+
 Input
 
 ↓
@@ -107,6 +112,12 @@ Simulation
 
 Rendering
 ```
+
+Loadout selection is shown before the game loop begins.
+
+Player chooses Forward or Broadside configuration.
+
+Game pauses during upgrade choice; resumes after selection.
 
 Simulation uses a fixed timestep.
 
@@ -141,11 +152,13 @@ Examples:
 src/
 
     Game/
-        Program.cs
+        SpaceVorsApp.cs      -- game loop + input handling
+        GameInitializer.cs   -- entity setup + world generation
+        Renderer.cs          -- rendering logic
 
     Domain/
-        Components/
-        Systems/
+        Components/          -- Loadout, TurretOffset, ArcOffset, PendingChoice, etc.
+        Systems/             -- BlueSparkHomeSystem, UpgradePickupSystem, etc.
         Events/
         Math/
 
@@ -165,3 +178,11 @@ Dependencies point inward.
 Domain never references infrastructure.
 
 Keep systems small and deterministic.
+
+## Performance
+
+ComponentStorage<T> uses compact arrays with swap-pop deletion for O(1) removal.
+
+Iteration is O(count) instead of O(N log N).
+
+Entity IDs remain stable across compaction.
