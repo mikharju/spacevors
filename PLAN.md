@@ -95,14 +95,14 @@ Progression.
 - upgrades
 - enemy spawning
 
-## Phase 5
+## Phase 4b
 
-Game feel.
+Difficulty scaling.
 
-- particles
-- sound
-- UI
-- balancing
+- shared elapsed time tracking across systems
+- enemy ship spawn rate increases over 3 minutes (10s→4s intervals)
+- mine respawn system with increasing frequency
+- max 100 active enemy ships, ~23 mines cap
 
 ## Phase 6
 
