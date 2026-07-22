@@ -112,15 +112,15 @@ public static class GameInitializer
             var leftTurret = em.CreateEntity();
             em.AddComponent(leftTurret, new Position(new Vector2(0f, 0f)));
             em.AddComponent(leftTurret, new Rotation(-MathF.PI / 2f));
-            em.AddComponent(leftTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
-            em.AddComponent(leftTurret, new TurretOffset(new Vector2(-35f, 0f)));
+            em.AddComponent(leftTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 2.5f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(leftTurret, new TurretOffset(new Vector2(-12f, 0f)));
             em.AddComponent(leftTurret, new ArcOffset(-MathF.PI / 2f));
 
             var rightTurret = em.CreateEntity();
             em.AddComponent(rightTurret, new Position(new Vector2(0f, 0f)));
             em.AddComponent(rightTurret, new Rotation(MathF.PI / 2f));
-            em.AddComponent(rightTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
-            em.AddComponent(rightTurret, new TurretOffset(new Vector2(35f, 0f)));
+            em.AddComponent(rightTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 2.5f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(rightTurret, new TurretOffset(new Vector2(12f, 0f)));
             em.AddComponent(rightTurret, new ArcOffset(MathF.PI / 2f));
 
             turretEntities.Add(leftTurret);
