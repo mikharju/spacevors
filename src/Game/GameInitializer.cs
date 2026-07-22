@@ -9,7 +9,7 @@ public static class GameInitializer
 {
     public const int PlayerMaxHealth = 10;
 
-    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, Entity turretEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize()
+    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(Loadout loadout)
     {
         var em = new EntityManager();
 
@@ -93,11 +93,39 @@ public static class GameInitializer
             EnemyShipFactory.AddEnemyShipComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f);
         }
 
-        // Turret entity
-        var turretEntity = em.CreateEntity();
-        em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(turretEntity, new Rotation(0f));
-        em.AddComponent(turretEntity, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+        // Turret entities based on loadout choice
+        var turretEntities = new List<Entity>();
+
+        if (loadout == Loadout.Forward)
+        {
+            var turretEntity = em.CreateEntity();
+            em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
+            em.AddComponent(turretEntity, new Rotation(0f));
+            em.AddComponent(turretEntity, new Turret(FireRate: 8f, AmmoSpeed: 420f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(turretEntity, new TurretOffset(Vector2.Zero));
+            em.AddComponent(turretEntity, new ArcOffset(0f));
+
+            turretEntities.Add(turretEntity);
+        }
+        else
+        {
+            var leftTurret = em.CreateEntity();
+            em.AddComponent(leftTurret, new Position(new Vector2(0f, 0f)));
+            em.AddComponent(leftTurret, new Rotation(-MathF.PI / 2f));
+            em.AddComponent(leftTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(leftTurret, new TurretOffset(new Vector2(-35f, 0f)));
+            em.AddComponent(leftTurret, new ArcOffset(-MathF.PI / 2f));
+
+            var rightTurret = em.CreateEntity();
+            em.AddComponent(rightTurret, new Position(new Vector2(0f, 0f)));
+            em.AddComponent(rightTurret, new Rotation(MathF.PI / 2f));
+            em.AddComponent(rightTurret, new Turret(FireRate: 6f, AmmoSpeed: 350f, KickbackForce: 10f, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
+            em.AddComponent(rightTurret, new TurretOffset(new Vector2(35f, 0f)));
+            em.AddComponent(rightTurret, new ArcOffset(MathF.PI / 2f));
+
+            turretEntities.Add(leftTurret);
+            turretEntities.Add(rightTurret);
+        }
 
         // Background starfield with parallax layers
         var stars = new List<(Vector2 Position, float Size, Color Color, float Parallax)>();
@@ -156,6 +184,6 @@ public static class GameInitializer
         em.AddComponent(upgradeAbove, new Position(new Vector2(0f, 300f)));
         em.AddComponent(upgradeAbove, new Upgrade(allTypes[idx2]));
 
-        return (em, playerEntity, cameraEntity, turretEntity, stars, clutter);
+        return (em, playerEntity, cameraEntity, turretEntities, stars, clutter);
     }
 }
