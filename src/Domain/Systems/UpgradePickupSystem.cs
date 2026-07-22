@@ -36,33 +36,13 @@ public class UpgradePickupSystem : GameSystem
 
             if (dist < playerRadius + upgrade.Radius)
             {
-                // Apply upgrade to player's weapon
-                var currentWeapon = em.GetComponent<Weapon>(playerEntity);
-                switch (upgrade.Type)
-                {
-                    case UpgradeType.FireRate:
-                        currentWeapon = new Weapon(
-                            currentWeapon.FireRate,
-                            currentWeapon.AmmoSpeed,
-                            currentWeapon.KickbackForce,
-                            currentWeapon.UpgradeFireRateMultiplier * 1.5f,
-                            currentWeapon.UpgradeProjectileSpeedMultiplier);
-                        break;
-                    case UpgradeType.ProjectileSpeed:
-                        currentWeapon = new Weapon(
-                            currentWeapon.FireRate,
-                            currentWeapon.AmmoSpeed,
-                            currentWeapon.KickbackForce,
-                            currentWeapon.UpgradeFireRateMultiplier,
-                            currentWeapon.UpgradeProjectileSpeedMultiplier * 1.5f);
-                        break;
-                }
-                em.AddComponent(playerEntity, currentWeapon);
-
                 SpawnUpgradeExplosion(em, upgradePos.Value);
                 SpawnUpgradeSparks(em, upgradePos.Value, playerPos.Value);
 
-                // Remove upgrade pickup
+                var choiceEntity = em.CreateEntity();
+                em.AddComponent(choiceEntity, new Position(upgradePos.Value));
+                em.AddComponent(choiceEntity, new PendingChoice());
+
                 em.DestroyEntity(upgradeEntity);
             }
             else

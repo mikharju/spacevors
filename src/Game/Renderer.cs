@@ -350,4 +350,36 @@ public static class Renderer
         int textWidth = Raylib.MeasureText(text, 14);
         Raylib.DrawText(text, padding + (barWidth - textWidth) / 2, padding + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
     }
+
+    public static void DrawUpgradeCards(int windowWidth, int windowHeight)
+    {
+        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
+
+        int cardW = 220;
+        int cardH = 140;
+        int spacing = 60;
+        int totalW = cardW * 2 + spacing;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        DrawCard(startX, startY, "Fire Rate", "+10%", new Color(50, 150, 255, 255), "1");
+        DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+20%", new Color(50, 150, 255, 255), "2");
+
+        Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+    }
+
+    private static void DrawCard(int x, int y, string title, string value, Color borderColor, string key)
+    {
+        Raylib.DrawRectangle(x, y, 220, 140, new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, 220, 140, borderColor);
+
+        int keyWidth = Raylib.MeasureText(key, 18);
+        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
+
+        int titleWidth = Raylib.MeasureText(title, 24);
+        Raylib.DrawText(title, x + 110 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+
+        int valueWidth = Raylib.MeasureText(value, 36);
+        Raylib.DrawText(value, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
+    }
 }
