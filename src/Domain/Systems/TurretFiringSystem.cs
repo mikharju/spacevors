@@ -150,8 +150,9 @@ public class TurretFiringSystem : GameSystem
                 ammoDir.X * sinOff + ammoDir.Y * cosOff
             );
 
+            float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.15f;
             var spawnPos = turretPos.Value + pelletDir * 20f;
-            Vector2 ammoVel = pelletDir * turret.AmmoSpeed;
+            Vector2 ammoVel = pelletDir * turret.AmmoSpeed * speedVariation;
 
             var ammoEntity = em.CreateEntity();
             em.AddComponent(ammoEntity, new Position(spawnPos));

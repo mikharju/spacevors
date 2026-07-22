@@ -55,7 +55,8 @@ public class FiringSystem : GameSystem
                 ammoDir.X * sinOff + ammoDir.Y * cosOff
             );
 
-            Vector2 ammoVel = pelletDir * weapon.EffectiveAmmoSpeed;
+            float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.15f;
+            Vector2 ammoVel = pelletDir * weapon.EffectiveAmmoSpeed * speedVariation;
 
             var ammoEntity = em.CreateEntity();
             em.AddComponent(ammoEntity, new Position(spawnPos));
