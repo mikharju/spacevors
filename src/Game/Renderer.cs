@@ -25,12 +25,12 @@ public static class Renderer
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawSparks(em, camX, camY, windowWidth, windowHeight);
+        DrawGreenSparks(em, camX, camY, windowWidth, windowHeight);
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight);
         DrawEnemyShips(em, camX, camY, windowWidth, windowHeight);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
-        DrawUpgradeExplosions(em, camX, camY, windowWidth, windowHeight);
-        DrawBlueSparks(em, camX, camY, windowWidth, windowHeight);
-        DrawUpgrades(em, camX, camY, windowWidth, windowHeight);
+        DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
+        DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
         DrawHealthBar(em, playerEntity, playerMaxHealth, windowWidth, windowHeight);
 
@@ -290,25 +290,38 @@ public static class Renderer
         }
     }
 
-    private static void DrawUpgradeExplosions(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawXpPickups(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, explosion) in em.GetEntitiesWithComponents<UpgradeExplosion>())
+        foreach (var (entity, pickup) in em.GetEntitiesWithComponents<XpPickup>())
         {
+            if (!em.HasComponent<Position>(entity)) continue;
+
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            float lifeRatio = explosion.Lifetime / 0.5f;
-            float currentRadius = explosion.Radius * (1f - lifeRatio);
-            int alpha = (int)(255f * lifeRatio);
-
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), new Color(50, 150, 255, alpha));
+            int alpha = pickup.Chased ? 255 : 180;
+            Raylib.DrawCircle((int)cx, (int)cy, (int)pickup.Radius, new Color(50, 150, 255, alpha));
         }
     }
 
-    private static void DrawBlueSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawHealthOrbs(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, spark) in em.GetEntitiesWithComponents<BlueSpark>())
+        foreach (var (entity, orb) in em.GetEntitiesWithComponents<HealthOrb>())
+        {
+            if (!em.HasComponent<Position>(entity)) continue;
+
+            var pos = em.GetComponent<Position>(entity);
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            Raylib.DrawCircle((int)cx, (int)cy, (int)orb.Radius, new Color(50, 255, 100, 200));
+        }
+    }
+
+    private static void DrawGreenSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, spark) in em.GetEntitiesWithComponents<GreenSpark>())
         {
             if (!em.HasComponent<Position>(entity)) continue;
 
@@ -320,28 +333,7 @@ public static class Renderer
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
             int alpha = (int)(lifeRatio * 255);
 
-            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 150, 255, alpha));
-        }
-    }
-
-    private static void DrawUpgrades(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
-    {
-        foreach (var (entity, upgrade) in em.GetEntitiesWithComponents<Upgrade>())
-        {
-            if (!em.HasComponent<Position>(entity)) continue;
-
-            var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
-
-            int width = 18;
-            int topHeight = 5;
-            int midHeight = 10;
-            int bottomHeight = 5;
-
-            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - topHeight - midHeight - bottomHeight / 2f), width, topHeight, new Color(60, 60, 65, 255));
-            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - midHeight / 2f), width, midHeight, new Color(50, 150, 255, 255));
-            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy + midHeight / 2f), width, bottomHeight, new Color(60, 60, 65, 255));
+            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
         }
     }
 
@@ -364,7 +356,7 @@ public static class Renderer
         Raylib.DrawText(text, padding + (barWidth - textWidth) / 2, padding + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
     }
 
-    public static void DrawUpgradeCards(int windowWidth, int windowHeight)
+    public static void DrawUpgradeCards(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
 
@@ -375,11 +367,37 @@ public static class Renderer
         int startX = (windowWidth - totalW) / 2;
         int startY = windowHeight / 2 - cardH / 2;
 
-        DrawCard(startX, startY, "Fire Rate", "+15%", new Color(50, 150, 255, 255), "1");
-        DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+30%", new Color(50, 150, 255, 255), "2");
+        if (options.HasValue)
+        {
+            var optA = options.Value.OptionA;
+            var optB = options.Value.OptionB;
+            DrawCard(startX, startY, GetUpgradeTitle(optA), GetUpgradeValue(optA), new Color(50, 150, 255, 255), "1");
+            DrawCard(startX + cardW + spacing, startY, GetUpgradeTitle(optB), GetUpgradeValue(optB), new Color(50, 150, 255, 255), "2");
+        }
+        else
+        {
+            DrawCard(startX, startY, "Fire Rate", "+15%", new Color(50, 150, 255, 255), "1");
+            DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+30%", new Color(50, 150, 255, 255), "2");
+        }
 
         Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
+
+    private static string GetUpgradeTitle(UpgradeOption option) => option switch
+    {
+        UpgradeOption.FireRate => "Fire Rate",
+        UpgradeOption.ProjectileSpeed => "Projectile Speed",
+        UpgradeOption.PickupRadius => "Pickup Radius",
+        _ => "Unknown"
+    };
+
+    private static string GetUpgradeValue(UpgradeOption option) => option switch
+    {
+        UpgradeOption.FireRate => "+15%",
+        UpgradeOption.ProjectileSpeed => "+30%",
+        UpgradeOption.PickupRadius => "+20%",
+        _ => "?"
+    };
 
     private static void DrawCard(int x, int y, string title, string value, Color borderColor, string key)
     {

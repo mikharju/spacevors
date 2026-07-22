@@ -19,7 +19,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
-        em.AddComponent(playerEntity, new Player(Thrust: 400f, Boost: 2.5f));
+        em.AddComponent(playerEntity, new Player(Thrust: 400f, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
         em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
         em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 
@@ -170,19 +170,6 @@ public static class GameInitializer
 
             clutter.Add((new Vector2(x, y), w, h, color));
         }
-
-        // Spawn two weapon upgrades near player start
-        UpgradeType[] allTypes = { UpgradeType.FireRate, UpgradeType.ProjectileSpeed };
-        int idx1 = rand.Next(allTypes.Length);
-        int idx2 = (idx1 + 1) % allTypes.Length;
-
-        var upgradeBelow = em.CreateEntity();
-        em.AddComponent(upgradeBelow, new Position(new Vector2(0f, -300f)));
-        em.AddComponent(upgradeBelow, new Upgrade(allTypes[idx1]));
-
-        var upgradeAbove = em.CreateEntity();
-        em.AddComponent(upgradeAbove, new Position(new Vector2(0f, 300f)));
-        em.AddComponent(upgradeAbove, new Upgrade(allTypes[idx2]));
 
         return (em, playerEntity, cameraEntity, turretEntities, stars, clutter);
     }

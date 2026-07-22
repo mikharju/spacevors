@@ -38,19 +38,19 @@ public class EffectSystem : GameSystem
             }
         }
 
-        var upgradeExplosions = em.GetEntitiesWithComponents<UpgradeExplosion>().ToList();
-        foreach (var (entity, explosion) in upgradeExplosions)
+        var greenSparks = em.GetEntitiesWithComponents<GreenSpark>().ToList();
+        foreach (var (entity, spark) in greenSparks)
         {
-            if (!em.HasComponent<UpgradeExplosion>(entity)) continue;
+            if (!em.HasComponent<GreenSpark>(entity)) continue;
 
-            var newLifetime = explosion.Lifetime - deltaTime;
+            var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
                 em.DestroyEntity(entity);
             }
             else
             {
-                em.AddComponent(entity, new UpgradeExplosion(explosion.Radius, newLifetime));
+                em.AddComponent(entity, new GreenSpark(newLifetime));
             }
         }
 

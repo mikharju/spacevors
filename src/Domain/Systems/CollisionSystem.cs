@@ -124,6 +124,11 @@ public class CollisionSystem : GameSystem
             var health = em.GetComponent<Health>(mineEntity);
             if (health.Current <= 1)
             {
+                if (!em.HasComponent<Position>(mineEntity)) continue;
+                var minePos = em.GetComponent<Position>(mineEntity);
+                if (!em.HasComponent<EnemyMine>(mineEntity)) continue;
+                var mine = em.GetComponent<EnemyMine>(mineEntity);
+                SpawnLootOnDeath(em, minePos.Value, mine.Size);
                 em.DestroyEntity(mineEntity);
             }
             else
@@ -210,6 +215,9 @@ public class CollisionSystem : GameSystem
             var health = em.GetComponent<Health>(enemyShipEntity);
             if (health.Current <= 1)
             {
+                if (!em.HasComponent<Position>(enemyShipEntity)) continue;
+                var shipPos = em.GetComponent<Position>(enemyShipEntity);
+                SpawnShipLootOnDeath(em, shipPos.Value);
                 em.DestroyEntity(enemyShipEntity);
             }
             else
@@ -571,6 +579,37 @@ public class CollisionSystem : GameSystem
         float bRadius = bMine.Radius;
 
         ResolveCollision(em, aPos, bPos, aEntity, bEntity, aRadius, bRadius, true, 3000f);
+    }
+
+    private void SpawnLootOnDeath(EntityManager em, Vector2 position, MineSize mineSize)
+    {
+        int xpAmount = mineSize == MineSize.Small ? 1 : 2;
+        float xpRadius = mineSize == MineSize.Small ? 6f : 9f;
+
+        var xpEntity = em.CreateEntity();
+        em.AddComponent(xpEntity, new Position(position));
+        em.AddComponent(xpEntity, new XpPickup(xpAmount, Radius: xpRadius));
+
+        if (Random.Shared.NextDouble() < 0.05)
+        {
+            var healthEntity = em.CreateEntity();
+            em.AddComponent(healthEntity, new Position(position));
+            em.AddComponent(healthEntity, new HealthOrb(Radius: xpRadius + 2f));
+        }
+    }
+
+    private void SpawnShipLootOnDeath(EntityManager em, Vector2 position)
+    {
+        var xpEntity = em.CreateEntity();
+        em.AddComponent(xpEntity, new Position(position));
+        em.AddComponent(xpEntity, new XpPickup(3, Radius: 18f));
+
+        if (Random.Shared.NextDouble() < 0.05)
+        {
+            var healthEntity = em.CreateEntity();
+            em.AddComponent(healthEntity, new Position(position));
+            em.AddComponent(healthEntity, new HealthOrb(Radius: 20f));
+        }
     }
 }
 

@@ -45,7 +45,7 @@ public static class SpaceVorsApp
 
             bool gameOver = false;
 
-            var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new BlueSparkHomeSystem(), new CollisionSystem(), new UpgradePickupSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
+            var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new BlueSparkHomeSystem(), new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
 
             float accumulator = 0f;
 
@@ -153,52 +153,29 @@ public static class SpaceVorsApp
                     bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
                     bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
 
-                    if (pressed1 && !pressed2)
-                    {
-                        var weapon = em.GetComponent<Weapon>(playerEntity);
-                        em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.PelletCount, weapon.UpgradeFireRateMultiplier * 1.15f, weapon.UpgradeProjectileSpeedMultiplier));
-
-                        foreach (var turretEntity in turretEntities)
-                        {
-                            var turret = em.GetComponent<Turret>(turretEntity);
-                            int newPelletCount = turret.PelletCount > 1 ? turret.PelletCount + 1 : turret.PelletCount;
-                            float newFireRate = turret.PelletCount == 1 ? turret.FireRate * 1.15f : turret.FireRate;
-
-                            em.AddComponent(turretEntity, new Turret(
-                                newFireRate,
-                                turret.AmmoSpeed,
-                                KickbackForce: turret.KickbackForce,
-                                PelletCount: newPelletCount,
-                                ArcAngle: turret.ArcAngle,
-                                Range: turret.Range,
-                                IsEnemy: turret.IsEnemy));
-                        }
-                    }
-                    else if (pressed2 && !pressed1)
-                    {
-                        var weapon = em.GetComponent<Weapon>(playerEntity);
-                        em.AddComponent(playerEntity, new Weapon(weapon.FireRate, weapon.AmmoSpeed, weapon.KickbackForce,
-                            weapon.PelletCount, weapon.UpgradeFireRateMultiplier, weapon.UpgradeProjectileSpeedMultiplier * 1.3f));
-
-                        foreach (var turretEntity in turretEntities)
-                        {
-                            var turret = em.GetComponent<Turret>(turretEntity);
-                            em.AddComponent(turretEntity, new Turret(
-                                turret.FireRate,
-                                turret.AmmoSpeed * 1.3f,
-                                KickbackForce: turret.KickbackForce,
-                                PelletCount: turret.PelletCount,
-                                ArcAngle: turret.ArcAngle,
-                                Range: turret.Range,
-                                IsEnemy: turret.IsEnemy));
-                        }
-                    }
-
                     if (pressed1 || pressed2)
                     {
+                        var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                        Entity choiceEntity = choiceTuple.Entity;
+
+                        if (choiceEntity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceEntity))
+                        {
+                            var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
+                            int selectedIndex = pressed1 ? 0 : 1;
+                            UpgradeOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
+
+                            ApplyUpgrade(em, playerEntity, turretEntities, selected);
+                        }
+
                         foreach (var (entity, _) in em.GetEntitiesWithComponents<PendingChoice>().ToList())
                             em.DestroyEntity(entity);
+                    }
+
+                    var pendingTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                    PendingUpgradeOptions? upgradeOptions = null;
+                    if (pendingTuple.Entity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(pendingTuple.Entity))
+                    {
+                        upgradeOptions = em.GetComponent<PendingUpgradeOptions>(pendingTuple.Entity);
                     }
 
                     var cam = em.GetComponent<Camera>(cameraEntity);
@@ -206,11 +183,80 @@ public static class SpaceVorsApp
                     float camY = (float)cam.Target.Y;
 
                     Renderer.Render(em, camX, camY, WindowWidth, WindowHeight, false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
-                    Renderer.DrawUpgradeCards(WindowWidth, WindowHeight);
+                    Renderer.DrawUpgradeCards(WindowWidth, WindowHeight, upgradeOptions);
                 }
             }
         }
 
         Raylib.CloseWindow();
+    }
+
+    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, List<Entity> turretEntities, UpgradeOption upgrade)
+    {
+        var playerStats = em.GetComponent<Player>(playerEntity);
+
+        switch (upgrade)
+        {
+            case UpgradeOption.FireRate:
+                var weapon = em.GetComponent<Weapon>(playerEntity);
+                em.AddComponent(playerEntity, new Weapon(
+                    weapon.FireRate,
+                    weapon.AmmoSpeed,
+                    weapon.KickbackForce,
+                    weapon.PelletCount,
+                    weapon.UpgradeFireRateMultiplier * 1.15f,
+                    weapon.UpgradeProjectileSpeedMultiplier));
+
+                foreach (var turretEntity in turretEntities)
+                {
+                    var turret = em.GetComponent<Turret>(turretEntity);
+                    int newPelletCount = turret.PelletCount > 1 ? turret.PelletCount + 1 : turret.PelletCount;
+                    float newFireRate = turret.PelletCount == 1 ? turret.FireRate * 1.15f : turret.FireRate;
+
+                    em.AddComponent(turretEntity, new Turret(
+                        newFireRate,
+                        turret.AmmoSpeed,
+                        KickbackForce: turret.KickbackForce,
+                        PelletCount: newPelletCount,
+                        ArcAngle: turret.ArcAngle,
+                        Range: turret.Range,
+                        IsEnemy: turret.IsEnemy));
+                }
+                break;
+
+            case UpgradeOption.ProjectileSpeed:
+                var weapon2 = em.GetComponent<Weapon>(playerEntity);
+                em.AddComponent(playerEntity, new Weapon(
+                    weapon2.FireRate,
+                    weapon2.AmmoSpeed,
+                    weapon2.KickbackForce,
+                    weapon2.PelletCount,
+                    weapon2.UpgradeFireRateMultiplier,
+                    weapon2.UpgradeProjectileSpeedMultiplier * 1.3f));
+
+                foreach (var turretEntity in turretEntities)
+                {
+                    var turret = em.GetComponent<Turret>(turretEntity);
+                    em.AddComponent(turretEntity, new Turret(
+                        turret.FireRate,
+                        turret.AmmoSpeed * 1.3f,
+                        KickbackForce: turret.KickbackForce,
+                        PelletCount: turret.PelletCount,
+                        ArcAngle: turret.ArcAngle,
+                        Range: turret.Range,
+                        IsEnemy: turret.IsEnemy));
+                }
+                break;
+
+            case UpgradeOption.PickupRadius:
+                em.AddComponent(playerEntity, new Player(
+                    playerStats.Thrust,
+                    playerStats.Boost,
+                    playerStats.Radius,
+                    playerStats.Xp,
+                    playerStats.Level,
+                    playerStats.PickupRadius * 1.2f));
+                break;
+        }
     }
 }
