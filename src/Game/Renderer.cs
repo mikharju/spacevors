@@ -28,6 +28,8 @@ public static class Renderer
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight);
         DrawEnemyShips(em, camX, camY, windowWidth, windowHeight);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
+        DrawUpgradeExplosions(em, camX, camY, windowWidth, windowHeight);
+        DrawBlueSparks(em, camX, camY, windowWidth, windowHeight);
         DrawUpgrades(em, camX, camY, windowWidth, windowHeight);
         DrawHealthBar(em, playerEntity, playerMaxHealth, windowWidth, windowHeight);
 
@@ -272,6 +274,40 @@ public static class Renderer
             }
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+        }
+    }
+
+    private static void DrawUpgradeExplosions(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, explosion) in em.GetEntitiesWithComponents<UpgradeExplosion>())
+        {
+            var pos = em.GetComponent<Position>(entity);
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            float lifeRatio = explosion.Lifetime / 0.5f;
+            float currentRadius = explosion.Radius * (1f - lifeRatio);
+            int alpha = (int)(255f * lifeRatio);
+
+            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), new Color(50, 150, 255, alpha));
+        }
+    }
+
+    private static void DrawBlueSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, spark) in em.GetEntitiesWithComponents<BlueSpark>())
+        {
+            if (!em.HasComponent<Position>(entity)) continue;
+
+            var pos = em.GetComponent<Position>(entity);
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            float lifeRatio = spark.Lifetime / 0.6f;
+            int size = (int)Math.Max(lifeRatio * 5f, 1f);
+            int alpha = (int)(lifeRatio * 255);
+
+            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 150, 255, alpha));
         }
     }
 
