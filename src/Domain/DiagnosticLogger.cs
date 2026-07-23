@@ -5,6 +5,28 @@ public static class DiagnosticLogger
     private static readonly bool _enabled = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
     private static readonly object _lock = new();
 
+    private static int _frameCount;
+    private static double _fpsTimer;
+    private static int _currentFps;
+
+    public static void UpdateFps(float frameTime)
+    {
+        if (!_enabled) return;
+
+        _frameCount++;
+        _fpsTimer += frameTime;
+        if (_fpsTimer >= 1.0)
+        {
+            _currentFps = (int)(_frameCount / _fpsTimer);
+            lock (_lock)
+            {
+                Console.WriteLine($"[FPS] {_currentFps}");
+            }
+            _frameCount = 0;
+            _fpsTimer = 0.0;
+        }
+    }
+
     public static void LogSystem(string systemName, long elapsedTicks)
     {
         if (!_enabled) return;

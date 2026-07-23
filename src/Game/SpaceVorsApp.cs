@@ -31,8 +31,8 @@ public static class SpaceVorsApp
                 else if (pressed2) chosenEngine = EngineLayout.Maneuverable;
                 else if (pressed3) chosenEngine = EngineLayout.Pursuit;
 
-                bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
-                if (clicked)
+                bool engineSelected = pressed1 || pressed2 || pressed3;
+                if (!engineSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
                 {
                     int mouseX = Raylib.GetMouseX();
                     int mouseY = Raylib.GetMouseY();
@@ -42,6 +42,7 @@ public static class SpaceVorsApp
                         if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                         {
                             chosenEngine = i switch { 0 => EngineLayout.Balanced, 1 => EngineLayout.Maneuverable, _ => EngineLayout.Pursuit };
+                            engineSelected = true;
                             break;
                         }
                     }
@@ -52,7 +53,7 @@ public static class SpaceVorsApp
                 Renderer.DrawEngineCards(WindowWidth, WindowHeight);
                 Raylib.EndDrawing();
 
-                if (pressed1 || pressed2 || pressed3)
+                if (engineSelected)
                     showingEngineScreen = false;
 
                 continue;
@@ -70,8 +71,8 @@ public static class SpaceVorsApp
                     if (pressed4) chosenWeapon = WeaponLoadout.MachineGun;
                     else if (pressed5) chosenWeapon = WeaponLoadout.Shotgun;
 
-                    bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
-                    if (clicked)
+                    bool weaponSelected = pressed4 || pressed5;
+                    if (!weaponSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
                     {
                         int mouseX = Raylib.GetMouseX();
                         int mouseY = Raylib.GetMouseY();
@@ -81,6 +82,7 @@ public static class SpaceVorsApp
                             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                             {
                                 chosenWeapon = i == 0 ? WeaponLoadout.MachineGun : WeaponLoadout.Shotgun;
+                                weaponSelected = true;
                                 break;
                             }
                         }
@@ -91,7 +93,7 @@ public static class SpaceVorsApp
                     Renderer.DrawLoadoutCards(WindowWidth, WindowHeight);
                     Raylib.EndDrawing();
 
-                    if (pressed4 || pressed5)
+                    if (weaponSelected)
                         showingWeaponScreen = false;
 
                     continue;
@@ -113,6 +115,7 @@ public static class SpaceVorsApp
             while (!Raylib.WindowShouldClose())
             {
                 float frameTime = (float)Raylib.GetFrameTime();
+                DiagnosticLogger.UpdateFps(frameTime);
 
                 bool hasPendingChoice = em.GetEntitiesWithComponents<PendingChoice>().Any();
 
