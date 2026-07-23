@@ -27,7 +27,8 @@ public class LevelUpSystem : GameSystem
                 Radius: playerStats.Radius,
                 Xp: playerStats.Xp,
                 Level: playerStats.Level + 1,
-                PickupRadius: playerStats.PickupRadius));
+                PickupRadius: playerStats.PickupRadius,
+                RotationSpeed: playerStats.RotationSpeed));
         }
     }
 

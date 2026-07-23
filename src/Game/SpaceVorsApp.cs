@@ -31,6 +31,22 @@ public static class SpaceVorsApp
                 else if (pressed2) chosenEngine = EngineLayout.Maneuverable;
                 else if (pressed3) chosenEngine = EngineLayout.Pursuit;
 
+                bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
+                if (clicked)
+                {
+                    int mouseX = Raylib.GetMouseX();
+                    int mouseY = Raylib.GetMouseY();
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var (topLeft, w, h) = Renderer.GetEngineCardRect(i, WindowWidth, WindowHeight);
+                        if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                        {
+                            chosenEngine = i switch { 0 => EngineLayout.Balanced, 1 => EngineLayout.Maneuverable, _ => EngineLayout.Pursuit };
+                            break;
+                        }
+                    }
+                }
+
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
                 Renderer.DrawEngineCards(WindowWidth, WindowHeight);
@@ -53,6 +69,22 @@ public static class SpaceVorsApp
 
                     if (pressed4) chosenWeapon = WeaponLoadout.MachineGun;
                     else if (pressed5) chosenWeapon = WeaponLoadout.Shotgun;
+
+                    bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
+                    if (clicked)
+                    {
+                        int mouseX = Raylib.GetMouseX();
+                        int mouseY = Raylib.GetMouseY();
+                        for (int i = 0; i < 2; i++)
+                        {
+                            var (topLeft, w, h) = Renderer.GetLoadoutCardRect(i, WindowWidth, WindowHeight);
+                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                            {
+                                chosenWeapon = i == 0 ? WeaponLoadout.MachineGun : WeaponLoadout.Shotgun;
+                                break;
+                            }
+                        }
+                    }
 
                     Raylib.BeginDrawing();
                     Raylib.ClearBackground(new Color(15, 15, 25, 255));
@@ -92,6 +124,21 @@ public static class SpaceVorsApp
                     var playerPos = em.GetComponent<Position>(playerEntity);
                     var playerRot = em.GetComponent<Rotation>(playerEntity);
                     var playerStats = em.GetComponent<Player>(playerEntity);
+                    var angVel = em.GetComponent<AngularVelocity>(playerEntity);
+
+                    float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - WindowWidth / 2f);
+                    float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - WindowHeight / 2f);
+                    Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
+                    float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
+                    float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
+
+                    DiagnosticLogger.LogMouse(
+                        Raylib.GetMouseX(),
+                        Raylib.GetMouseY(),
+                        Raylib.IsMouseButtonDown(MouseButton.Left),
+                        Raylib.IsMouseButtonDown(MouseButton.Right),
+                        Raylib.IsMouseButtonDown(MouseButton.Middle));
+                    Console.WriteLine($"[ROTATION] playerRot:{playerRot.Angle:F3} targetAngle:{targetAngle:F3} angleDiff:{(targetAngle - playerRot.Angle):F3} angVel:{angVel.Value:F3}");
 
                     float cos = (float)Math.Cos(playerRot.Angle);
                     float sin = (float)Math.Sin(playerRot.Angle);
@@ -126,16 +173,17 @@ public static class SpaceVorsApp
 
                     em.AddComponent(playerEntity, new Acceleration(thrustAccel));
 
-                    // Rotation: Q/E changes angular velocity
-                    if (Raylib.IsKeyDown(KeyboardKey.Q))
+                    // Mouse aiming: set angular velocity toward cursor (rad/s)
+                    if (distToMouse > 1f)
                     {
-                        var angVel = em.GetComponent<AngularVelocity>(playerEntity);
-                        em.AddComponent(playerEntity, new AngularVelocity(angVel.Value - 5f * frameTime));
-                    }
-                    else if (Raylib.IsKeyDown(KeyboardKey.E))
-                    {
-                        var angVel = em.GetComponent<AngularVelocity>(playerEntity);
-                        em.AddComponent(playerEntity, new AngularVelocity(angVel.Value + 5f * frameTime));
+                        float currentAngle = playerRot.Angle;
+                        float angleDiff = targetAngle - currentAngle;
+
+                        while (angleDiff > MathF.PI) angleDiff -= MathF.PI * 2f;
+                        while (angleDiff < -MathF.PI) angleDiff += MathF.PI * 2f;
+
+                        float newAngVel = Math.Clamp(angleDiff / FixedDeltaTime, -playerStats.RotationSpeed, playerStats.RotationSpeed);
+                        em.AddComponent(playerEntity, new AngularVelocity(newAngVel));
                     }
 
                     // Sync turret positions and rotations to player ship
@@ -174,11 +222,8 @@ public static class SpaceVorsApp
                         gameOver = true;
                     }
 
-                    var cam = em.GetComponent<Camera>(cameraEntity);
-                    float camX = (float)cam.Target.X;
-                    float camY = (float)cam.Target.Y;
-
-                    Renderer.Render(em, camX, camY, WindowWidth, WindowHeight, gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    var renderCam = em.GetComponent<Camera>(cameraEntity);
+                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, WindowWidth, WindowHeight, gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
                 }
                 else
                 {
@@ -186,7 +231,27 @@ public static class SpaceVorsApp
                     bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
                     bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
 
-                    if (pressed1 || pressed2)
+                    int selectedIndex = -1;
+                    if (pressed1) selectedIndex = 0;
+                    else if (pressed2) selectedIndex = 1;
+
+                    bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
+                    if (clicked && selectedIndex < 0)
+                    {
+                        int mouseX = Raylib.GetMouseX();
+                        int mouseY = Raylib.GetMouseY();
+                        for (int i = 0; i < 2; i++)
+                        {
+                            var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, WindowWidth, WindowHeight);
+                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                            {
+                                selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (selectedIndex >= 0)
                     {
                         var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
                         Entity choiceEntity = choiceTuple.Entity;
@@ -194,7 +259,6 @@ public static class SpaceVorsApp
                         if (choiceEntity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceEntity))
                         {
                             var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
-                            int selectedIndex = pressed1 ? 0 : 1;
                             UpgradeOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
 
                             ApplyUpgrade(em, playerEntity, turretEntities, selected);
@@ -211,11 +275,11 @@ public static class SpaceVorsApp
                         upgradeOptions = em.GetComponent<PendingUpgradeOptions>(pendingTuple.Entity);
                     }
 
-                    var cam = em.GetComponent<Camera>(cameraEntity);
-                    float camX = (float)cam.Target.X;
-                    float camY = (float)cam.Target.Y;
+                    var upgradeCam = em.GetComponent<Camera>(cameraEntity);
+                    float upgradeCamX = (float)upgradeCam.Target.X;
+                    float upgradeCamY = (float)upgradeCam.Target.Y;
 
-                    Renderer.Render(em, camX, camY, WindowWidth, WindowHeight, false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    Renderer.Render(em, upgradeCamX, upgradeCamY, WindowWidth, WindowHeight, false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
                     Renderer.DrawUpgradeCards(WindowWidth, WindowHeight, upgradeOptions);
                 }
             }
@@ -266,7 +330,8 @@ public static class SpaceVorsApp
                     playerStats.Radius,
                     playerStats.Xp,
                     playerStats.Level,
-                    playerStats.PickupRadius * 1.2f));
+                    playerStats.PickupRadius * 1.2f,
+                    playerStats.RotationSpeed));
                 break;
         }
     }

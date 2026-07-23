@@ -137,7 +137,8 @@ public class PickupMagnetSystem : GameSystem
             Radius: playerStats.Radius,
             Xp: playerStats.Xp + xpAmount,
             Level: playerStats.Level,
-            PickupRadius: playerStats.PickupRadius));
+            PickupRadius: playerStats.PickupRadius,
+            RotationSpeed: playerStats.RotationSpeed));
     }
 
     private void ApplyHealth(EntityManager em, Entity playerEntity)

@@ -21,7 +21,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new AngularVelocity(0f));
         var engine = choice.Engine;
 
-        em.AddComponent(playerEntity, new Player(Thrust: engine.ForwardThrust, SideThrust: engine.SideThrust, BackThrust: engine.BackThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
+        em.AddComponent(playerEntity, new Player(Thrust: engine.ForwardThrust, SideThrust: engine.SideThrust, BackThrust: engine.BackThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
         em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 
         // Create camera

@@ -409,7 +409,46 @@ public static class Renderer
             DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+30%", new Color(50, 150, 255, 255), "2");
         }
 
-        Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText("Click a card or press 1, 2", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+    }
+
+    public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int windowWidth, int windowHeight)
+    {
+        int cardW = 220;
+        int cardH = 140;
+        int spacing = 60;
+        int totalW = cardW * 2 + spacing;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        int x = index == 0 ? startX : startX + cardW + spacing;
+        return (new Vector2(x, startY), cardW, cardH);
+    }
+
+    public static (Vector2 topLeft, int Width, int Height) GetEngineCardRect(int index, int windowWidth, int windowHeight)
+    {
+        int cardW = 340;
+        int cardH = 160;
+        int spacing = 60;
+        int totalW = cardW * 3 + spacing * 2;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        int x = startX + index * (cardW + spacing);
+        return (new Vector2(x, startY), cardW, cardH);
+    }
+
+    public static (Vector2 topLeft, int Width, int Height) GetLoadoutCardRect(int index, int windowWidth, int windowHeight)
+    {
+        int cardW = 340;
+        int cardH = 160;
+        int spacing = 60;
+        int totalW = cardW * 2 + spacing;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        int x = index == 0 ? startX : startX + cardW + spacing;
+        return (new Vector2(x, startY), cardW, cardH);
     }
 
     private static string GetUpgradeTitle(UpgradeOption option) => option switch
@@ -466,7 +505,7 @@ public static class Renderer
             "Forward: 400 · Side: 7 · Back: 350\nFull forward, very strong reverse",
             new Color(200, 150, 50, 255), "3");
 
-        Raylib.DrawText("Press 1, 2 or 3 to choose", windowWidth / 2 - 110, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText("Click a card or press 1, 2, 3", windowWidth / 2 - 140, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
     private static void DrawEngineCard(int x, int y, string title, string details, Color borderColor, string key)
@@ -518,7 +557,7 @@ public static class Renderer
             DrawLoadoutCard(startX + i * (cardW + spacing), startY, loadout.Name, details, new Color(50, 150, 255, 255), $"{i + 4}");
         }
 
-        Raylib.DrawText("Press 4 or 5 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText("Click a card or press 4, 5", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
     private static void DrawLoadoutCard(int x, int y, string title, string details, Color borderColor, string key)

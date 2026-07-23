@@ -25,4 +25,14 @@ public static class DiagnosticLogger
             Console.Error.WriteLine($"[WARNING] {message}");
         }
     }
+
+    public static void LogMouse(int x, int y, bool leftDown, bool rightDown, bool middleDown)
+    {
+        if (!_enabled) return;
+
+        lock (_lock)
+        {
+            Console.WriteLine($"[MOUSE] X:{x} Y:{y} L:{leftDown} R:{rightDown} M:{middleDown}");
+        }
+    }
 }

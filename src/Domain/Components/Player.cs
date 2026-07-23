@@ -8,5 +8,6 @@ public readonly record struct Player(
     float Radius = 18f,
     int Xp = 0,
     int Level = 1,
-    float PickupRadius = 60f);
+    float PickupRadius = 60f,
+    float RotationSpeed = 5f);
 
