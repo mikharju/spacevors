@@ -492,6 +492,7 @@ public static class Renderer
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
 
+        var loadouts = new[] { WeaponLoadout.MachineGun, WeaponLoadout.Shotgun };
         int cardW = 340;
         int cardH = 160;
         int spacing = 60;
@@ -499,13 +500,23 @@ public static class Renderer
         int startX = (windowWidth - totalW) / 2;
         int startY = windowHeight / 2 - cardH / 2;
 
-        DrawLoadoutCard(startX, startY, "Forward", 
-            "1 turret · 90° forward arc\nFire Rate: 8 · Ammo Speed: 420",
-            new Color(50, 150, 255, 255), "4");
+        for (int i = 0; i < loadouts.Length; i++)
+        {
+            var loadout = loadouts[i];
+            string turretInfo = $"{loadout.Turrets.Count} turret{(loadout.Turrets.Count > 1 ? "s" : "")}";
+            foreach (var t in loadout.Turrets)
+            {
+                if (t.ArcAngle < MathF.PI / 2f)
+                    turretInfo += $" · {(int)(t.ArcAngle * 180f / MathF.PI)}° arc";
+            }
+            var primaryWeapon = loadout.Turrets[0].Weapon.Stats;
+            string weaponInfo = $"{loadout.Turrets[0].Weapon.Name}";
+            if (primaryWeapon.PelletCount > 1)
+                weaponInfo += $" · {primaryWeapon.PelletCount} pellets";
+            string details = $"{turretInfo}\nFire Rate: {(int)primaryWeapon.FireRate} · Ammo Speed: {(int)primaryWeapon.AmmoSpeed}";
 
-        DrawLoadoutCard(startX + cardW + spacing, startY, "Broadside", 
-            "2 turrets · Shotgun · 3 pellets\nFire Rate: 2 · Ammo Speed: 350",
-            new Color(50, 150, 255, 255), "5");
+            DrawLoadoutCard(startX + i * (cardW + spacing), startY, loadout.Name, details, new Color(50, 150, 255, 255), $"{i + 4}");
+        }
 
         Raylib.DrawText("Press 4 or 5 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }

@@ -19,16 +19,9 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
-        var (thrust, sideThrust, backThrust) = choice.Engine switch
-        {
-            EngineLayout.Balanced => (400f, 80f, 80f),
-            EngineLayout.Maneuverable => (250f, 20f, 200f),
-            EngineLayout.Pursuit => (400f, 7f, 350f),
-            _ => (400f, 80f, 80f)
-        };
+        var engine = choice.Engine;
 
-        em.AddComponent(playerEntity, new Player(Thrust: thrust, SideThrust: sideThrust, BackThrust: backThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
-        em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
+        em.AddComponent(playerEntity, new Player(Thrust: engine.ForwardThrust, SideThrust: engine.SideThrust, BackThrust: engine.BackThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
         em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 
         // Create camera
@@ -127,38 +120,19 @@ public static class GameInitializer
             }
         }
 
-        // Turret entities based on loadout choice
+        // Turret entities based on weapon loadout choice
         var turretEntities = new List<Entity>();
 
-        if (choice.Weapon == Loadout.Forward)
+        foreach (var def in choice.Weapon.Turrets)
         {
             var turretEntity = em.CreateEntity();
             em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
-            em.AddComponent(turretEntity, new Rotation(0f));
-            em.AddComponent(turretEntity, new Turret(FireRate: 8f, AmmoSpeed: 420f, KickbackForce: 10f, PelletCount: 1, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
-            em.AddComponent(turretEntity, new TurretOffset(Vector2.Zero));
-            em.AddComponent(turretEntity, new ArcOffset(0f));
+            em.AddComponent(turretEntity, new Rotation(def.ArcOffset));
+            em.AddComponent(turretEntity, new Turret(Weapon: def.Weapon.Stats, ArcAngle: def.ArcAngle, Range: def.Range));
+            em.AddComponent(turretEntity, new TurretOffset(def.Offset));
+            em.AddComponent(turretEntity, new ArcOffset(def.ArcOffset));
 
             turretEntities.Add(turretEntity);
-        }
-        else
-        {
-            var leftTurret = em.CreateEntity();
-            em.AddComponent(leftTurret, new Position(new Vector2(0f, 0f)));
-            em.AddComponent(leftTurret, new Rotation(-MathF.PI / 2f));
-            em.AddComponent(leftTurret, new Turret(FireRate: 2f, AmmoSpeed: 350f, KickbackForce: 2.5f, PelletCount: 3, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
-            em.AddComponent(leftTurret, new TurretOffset(new Vector2(-12f, 0f)));
-            em.AddComponent(leftTurret, new ArcOffset(-MathF.PI / 2f));
-
-            var rightTurret = em.CreateEntity();
-            em.AddComponent(rightTurret, new Position(new Vector2(0f, 0f)));
-            em.AddComponent(rightTurret, new Rotation(MathF.PI / 2f));
-            em.AddComponent(rightTurret, new Turret(FireRate: 2f, AmmoSpeed: 350f, KickbackForce: 2.5f, PelletCount: 3, ArcAngle: MathF.PI / 4f, Range: 360f, IsEnemy: false));
-            em.AddComponent(rightTurret, new TurretOffset(new Vector2(12f, 0f)));
-            em.AddComponent(rightTurret, new ArcOffset(MathF.PI / 2f));
-
-            turretEntities.Add(leftTurret);
-            turretEntities.Add(rightTurret);
         }
 
         // Background starfield with parallax layers

@@ -16,7 +16,7 @@ public static class SpaceVorsApp
         Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
         EngineLayout chosenEngine = EngineLayout.Balanced;
-        Loadout chosenWeapon = Loadout.Forward;
+        WeaponLoadout chosenWeapon = WeaponLoadout.MachineGun;
         bool showingEngineScreen = true;
 
         while (!Raylib.WindowShouldClose())
@@ -51,8 +51,8 @@ public static class SpaceVorsApp
                     bool pressed4 = Raylib.IsKeyPressed(KeyboardKey.Four);
                     bool pressed5 = Raylib.IsKeyPressed(KeyboardKey.Five);
 
-                    if (pressed4) chosenWeapon = Loadout.Forward;
-                    else if (pressed5) chosenWeapon = Loadout.Broadside;
+                    if (pressed4) chosenWeapon = WeaponLoadout.MachineGun;
+                    else if (pressed5) chosenWeapon = WeaponLoadout.Shotgun;
 
                     Raylib.BeginDrawing();
                     Raylib.ClearBackground(new Color(15, 15, 25, 255));
@@ -136,18 +136,6 @@ public static class SpaceVorsApp
                     {
                         var angVel = em.GetComponent<AngularVelocity>(playerEntity);
                         em.AddComponent(playerEntity, new AngularVelocity(angVel.Value + 5f * frameTime));
-                    }
-
-                    // Firing: Space key sets negative cooldown to signal "ready to fire"
-                    if (Raylib.IsKeyDown(KeyboardKey.Space))
-                    {
-                        var hasCooldown = em.HasComponent<FireCooldown>(playerEntity);
-                        var currentCooldown = hasCooldown ? em.GetComponent<FireCooldown>(playerEntity).Timer : -1f;
-
-                        if (!hasCooldown || currentCooldown <= 0f)
-                        {
-                            em.AddComponent(playerEntity, new FireCooldown(-1f));
-                        }
                     }
 
                     // Sync turret positions and rotations to player ship
@@ -243,26 +231,14 @@ public static class SpaceVorsApp
         switch (upgrade)
         {
             case UpgradeOption.FireRate:
-                var weapon = em.GetComponent<Weapon>(playerEntity);
-                em.AddComponent(playerEntity, new Weapon(
-                    weapon.FireRate,
-                    weapon.AmmoSpeed,
-                    weapon.KickbackForce,
-                    weapon.PelletCount,
-                    weapon.UpgradeFireRateMultiplier * 1.15f,
-                    weapon.UpgradeProjectileSpeedMultiplier));
-
                 foreach (var turretEntity in turretEntities)
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
-                    int newPelletCount = turret.PelletCount > 1 ? turret.PelletCount + 1 : turret.PelletCount;
-                    float newFireRate = turret.PelletCount == 1 ? turret.FireRate * 1.15f : turret.FireRate;
+                    int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
+                    float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * 1.15f : turret.Weapon.FireRate;
 
                     em.AddComponent(turretEntity, new Turret(
-                        newFireRate,
-                        turret.AmmoSpeed,
-                        KickbackForce: turret.KickbackForce,
-                        PelletCount: newPelletCount,
+                        Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter),
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
                         IsEnemy: turret.IsEnemy));
@@ -270,23 +246,11 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.ProjectileSpeed:
-                var weapon2 = em.GetComponent<Weapon>(playerEntity);
-                em.AddComponent(playerEntity, new Weapon(
-                    weapon2.FireRate,
-                    weapon2.AmmoSpeed,
-                    weapon2.KickbackForce,
-                    weapon2.PelletCount,
-                    weapon2.UpgradeFireRateMultiplier,
-                    weapon2.UpgradeProjectileSpeedMultiplier * 1.3f));
-
                 foreach (var turretEntity in turretEntities)
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
-                        turret.FireRate,
-                        turret.AmmoSpeed * 1.3f,
-                        KickbackForce: turret.KickbackForce,
-                        PelletCount: turret.PelletCount,
+                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter),
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
                         IsEnemy: turret.IsEnemy));

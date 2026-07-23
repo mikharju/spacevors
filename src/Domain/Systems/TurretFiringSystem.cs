@@ -19,7 +19,7 @@ public class TurretFiringSystem : GameSystem
                 if (target.HasValue)
                 {
                     FireAtTarget(em, turretEntity, turret, target.Value);
-                    CooldownHelper.SetCooldown(em, turretEntity, 1f / turret.FireRate);
+                    CooldownHelper.SetCooldown(em, turretEntity, 1f / turret.Weapon.FireRate);
                 }
             }
             else if (cooldown > 0f)
@@ -137,8 +137,8 @@ public class TurretFiringSystem : GameSystem
         float dist = (float)Math.Sqrt(dirToTarget.X * dirToTarget.X + dirToTarget.Y * dirToTarget.Y);
         Vector2 ammoDir = dirToTarget / dist;
 
-        int pelletCount = turret.PelletCount;
-        float scatterAngle = pelletCount > 1 ? 0.1f : 0.033f;
+        int pelletCount = turret.Weapon.PelletCount;
+        float scatterAngle = turret.Weapon.Scatter;
 
         for (int i = 0; i < pelletCount; i++)
         {
@@ -163,7 +163,7 @@ public class TurretFiringSystem : GameSystem
             }
 
             var spawnPos = turretPos.Value + spawnOffset;
-            Vector2 ammoVel = pelletDir * turret.AmmoSpeed * speedVariation;
+            Vector2 ammoVel = pelletDir * turret.Weapon.AmmoSpeed * speedVariation;
 
             if (em.HasComponent<Velocity>(turretEntity))
             {
@@ -180,7 +180,7 @@ public class TurretFiringSystem : GameSystem
             em.AddComponent(ammoEntity, new Ammo(ammoVel, ammoRadius, 3f, turret.IsEnemy, damage));
         }
 
-        if (turret.KickbackForce > 0)
+        if (turret.Weapon.KickbackForce > 0)
         {
             Vector2 kickbackDir = new Vector2(-ammoDir.X, -ammoDir.Y);
             var playerTuples = em.GetEntitiesWithComponents<Player>().ToList();
@@ -189,7 +189,7 @@ public class TurretFiringSystem : GameSystem
                 if (em.HasComponent<Velocity>(playerEntity))
                 {
                     var currentVel = em.GetComponent<Velocity>(playerEntity).Value;
-                    em.AddComponent(playerEntity, new Velocity(currentVel + kickbackDir * turret.KickbackForce));
+                    em.AddComponent(playerEntity, new Velocity(currentVel + kickbackDir * turret.Weapon.KickbackForce));
                 }
             }
         }
