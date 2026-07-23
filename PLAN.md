@@ -37,9 +37,12 @@ Goal:
 
 ## Controls
 
-- W: thrust
-- A/D: rotate
-- Shift: boost
+- W: forward thrust
+- S: backward thrust (20% of forward)
+- A: left sideways thrust (20% of forward)
+- D: right sideways thrust (20% of forward)
+- Q/E: rotate
+- Shift: boost (forward only, 2.5x)
 - Mouse: aim (optional)
 - Space: brake (optional)
 

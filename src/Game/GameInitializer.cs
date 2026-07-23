@@ -19,7 +19,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
-        em.AddComponent(playerEntity, new Player(Thrust: 400f, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
+        em.AddComponent(playerEntity, new Player(Thrust: 400f, SideThrust: 80f, BackThrust: 80f, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
         em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
         em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 

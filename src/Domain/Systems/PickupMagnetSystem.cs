@@ -131,11 +131,13 @@ public class PickupMagnetSystem : GameSystem
         var playerStats = em.GetComponent<Player>(playerEntity);
         em.AddComponent(playerEntity, new Player(
             playerStats.Thrust,
+            playerStats.SideThrust,
+            playerStats.BackThrust,
             playerStats.Boost,
-            playerStats.Radius,
-            playerStats.Xp + xpAmount,
-            playerStats.Level,
-            playerStats.PickupRadius));
+            Radius: playerStats.Radius,
+            Xp: playerStats.Xp + xpAmount,
+            Level: playerStats.Level,
+            PickupRadius: playerStats.PickupRadius));
     }
 
     private void ApplyHealth(EntityManager em, Entity playerEntity)

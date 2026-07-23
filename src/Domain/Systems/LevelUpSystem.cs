@@ -21,11 +21,13 @@ public class LevelUpSystem : GameSystem
             SpawnLevelUpChoice(em, playerEntity, playerPos.Value);
             em.AddComponent(playerEntity, new Player(
                 playerStats.Thrust,
+                playerStats.SideThrust,
+                playerStats.BackThrust,
                 playerStats.Boost,
-                playerStats.Radius,
-                playerStats.Xp,
-                playerStats.Level + 1,
-                playerStats.PickupRadius));
+                Radius: playerStats.Radius,
+                Xp: playerStats.Xp,
+                Level: playerStats.Level + 1,
+                PickupRadius: playerStats.PickupRadius));
         }
     }
 

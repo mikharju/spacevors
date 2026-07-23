@@ -64,30 +64,47 @@ public static class SpaceVorsApp
                     var playerPos = em.GetComponent<Position>(playerEntity);
                     var playerRot = em.GetComponent<Rotation>(playerEntity);
                     var playerStats = em.GetComponent<Player>(playerEntity);
-                    float thrustForce = playerStats.Thrust;
-                    if (Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift))
-                        thrustForce *= playerStats.Boost;
 
-                    // Thrust: apply acceleration in direction of ship rotation
+                    float cos = (float)Math.Cos(playerRot.Angle);
+                    float sin = (float)Math.Sin(playerRot.Angle);
+                    Vector2 thrustAccel = Vector2.Zero;
+
+                    // Forward thrust (W) — boost applies only to forward
                     if (Raylib.IsKeyDown(KeyboardKey.W))
                     {
-                        float cos = (float)Math.Cos(playerRot.Angle);
-                        float sin = (float)Math.Sin(playerRot.Angle);
-                        var thrustAccel = new Vector2(sin * thrustForce, -cos * thrustForce);
-                        em.AddComponent(playerEntity, new Acceleration(thrustAccel));
-                    }
-                    else
-                    {
-                        em.AddComponent(playerEntity, new Acceleration(Vector2.Zero));
+                        float forwardForce = playerStats.Thrust;
+                        if (Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift))
+                            forwardForce *= playerStats.Boost;
+                        thrustAccel += new Vector2(sin * forwardForce, -cos * forwardForce);
                     }
 
-                    // Rotation: A/D changes angular velocity
+                    // Backward thrust (S)
+                    if (Raylib.IsKeyDown(KeyboardKey.S))
+                    {
+                        thrustAccel += new Vector2(-sin * playerStats.BackThrust, cos * playerStats.BackThrust);
+                    }
+
+                    // Left sideways thrust (A)
                     if (Raylib.IsKeyDown(KeyboardKey.A))
+                    {
+                        thrustAccel += new Vector2(-cos * playerStats.SideThrust, -sin * playerStats.SideThrust);
+                    }
+
+                    // Right sideways thrust (D)
+                    if (Raylib.IsKeyDown(KeyboardKey.D))
+                    {
+                        thrustAccel += new Vector2(cos * playerStats.SideThrust, sin * playerStats.SideThrust);
+                    }
+
+                    em.AddComponent(playerEntity, new Acceleration(thrustAccel));
+
+                    // Rotation: Q/E changes angular velocity
+                    if (Raylib.IsKeyDown(KeyboardKey.Q))
                     {
                         var angVel = em.GetComponent<AngularVelocity>(playerEntity);
                         em.AddComponent(playerEntity, new AngularVelocity(angVel.Value - 5f * frameTime));
                     }
-                    else if (Raylib.IsKeyDown(KeyboardKey.D))
+                    else if (Raylib.IsKeyDown(KeyboardKey.E))
                     {
                         var angVel = em.GetComponent<AngularVelocity>(playerEntity);
                         em.AddComponent(playerEntity, new AngularVelocity(angVel.Value + 5f * frameTime));
@@ -111,8 +128,6 @@ public static class SpaceVorsApp
                         var offset = em.GetComponent<TurretOffset>(turretEntity);
                         var arcOffset = em.GetComponent<ArcOffset>(turretEntity);
 
-                        float cos = (float)Math.Cos(playerRot.Angle);
-                        float sin = (float)Math.Sin(playerRot.Angle);
                         var rotatedOffset = new Vector2(
                             offset.Value.X * cos - offset.Value.Y * sin,
                             offset.Value.X * sin + offset.Value.Y * cos
@@ -253,6 +268,8 @@ public static class SpaceVorsApp
             case UpgradeOption.PickupRadius:
                 em.AddComponent(playerEntity, new Player(
                     playerStats.Thrust,
+                    playerStats.SideThrust,
+                    playerStats.BackThrust,
                     playerStats.Boost,
                     playerStats.Radius,
                     playerStats.Xp,
