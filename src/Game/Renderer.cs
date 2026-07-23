@@ -443,6 +443,51 @@ public static class Renderer
         Raylib.DrawText(value, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
     }
 
+    public static void DrawEngineCards(int windowWidth, int windowHeight)
+    {
+        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
+
+        int cardW = 340;
+        int cardH = 160;
+        int spacing = 60;
+        int totalW = cardW * 3 + spacing * 2;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        DrawEngineCard(startX, startY, "Balanced", 
+            "Forward: 400 · Side: 80 · Back: 80\nWell-rounded thrust in all directions",
+            new Color(50, 150, 255, 255), "1");
+
+        DrawEngineCard(startX + cardW + spacing, startY, "Maneuverable", 
+            "Forward: 250 · Side: 20 · Back: 200\nStrong reverse, weak forward and sideways",
+            new Color(80, 200, 100, 255), "2");
+
+        DrawEngineCard(startX + (cardW + spacing) * 2, startY, "Pursuit", 
+            "Forward: 400 · Side: 7 · Back: 350\nFull forward, very strong reverse",
+            new Color(200, 150, 50, 255), "3");
+
+        Raylib.DrawText("Press 1, 2 or 3 to choose", windowWidth / 2 - 110, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+    }
+
+    private static void DrawEngineCard(int x, int y, string title, string details, Color borderColor, string key)
+    {
+        Raylib.DrawRectangle(x, y, 340, 160, new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, 340, 160, borderColor);
+
+        int keyWidth = Raylib.MeasureText(key, 18);
+        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
+
+        int titleWidth = Raylib.MeasureText(title, 24);
+        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+
+        string[] lines = details.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            int lineW = Raylib.MeasureText(lines[i], 16);
+            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
+        }
+    }
+
     public static void DrawLoadoutCards(int windowWidth, int windowHeight)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
@@ -456,13 +501,13 @@ public static class Renderer
 
         DrawLoadoutCard(startX, startY, "Forward", 
             "1 turret · 90° forward arc\nFire Rate: 8 · Ammo Speed: 420",
-            new Color(50, 150, 255, 255), "1");
+            new Color(50, 150, 255, 255), "4");
 
         DrawLoadoutCard(startX + cardW + spacing, startY, "Broadside", 
             "2 turrets · Shotgun · 3 pellets\nFire Rate: 2 · Ammo Speed: 350",
-            new Color(50, 150, 255, 255), "2");
+            new Color(50, 150, 255, 255), "5");
 
-        Raylib.DrawText("Press 1 or 2 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText("Press 4 or 5 to choose", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
     private static void DrawLoadoutCard(int x, int y, string title, string details, Color borderColor, string key)

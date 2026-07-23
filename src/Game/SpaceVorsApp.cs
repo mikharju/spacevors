@@ -15,33 +15,61 @@ public static class SpaceVorsApp
     {
         Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
 
-        Loadout chosenLoadout = Loadout.Forward;
-        bool showingLoadoutScreen = true;
+        EngineLayout chosenEngine = EngineLayout.Balanced;
+        Loadout chosenWeapon = Loadout.Forward;
+        bool showingEngineScreen = true;
 
         while (!Raylib.WindowShouldClose())
         {
-            if (showingLoadoutScreen)
+            if (showingEngineScreen)
             {
                 bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
                 bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
+                bool pressed3 = Raylib.IsKeyPressed(KeyboardKey.Three);
 
-                if (pressed1 && !pressed2)
-                    chosenLoadout = Loadout.Forward;
-                else if (pressed2 && !pressed1)
-                    chosenLoadout = Loadout.Broadside;
+                if (pressed1) chosenEngine = EngineLayout.Balanced;
+                else if (pressed2) chosenEngine = EngineLayout.Maneuverable;
+                else if (pressed3) chosenEngine = EngineLayout.Pursuit;
 
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                Renderer.DrawLoadoutCards(WindowWidth, WindowHeight);
+                Renderer.DrawEngineCards(WindowWidth, WindowHeight);
                 Raylib.EndDrawing();
 
-                if (pressed1 || pressed2)
-                    showingLoadoutScreen = false;
+                if (pressed1 || pressed2 || pressed3)
+                    showingEngineScreen = false;
 
                 continue;
             }
 
-            var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(chosenLoadout);
+            bool showingWeaponScreen = true;
+
+            while (!Raylib.WindowShouldClose())
+            {
+                if (showingWeaponScreen)
+                {
+                    bool pressed4 = Raylib.IsKeyPressed(KeyboardKey.Four);
+                    bool pressed5 = Raylib.IsKeyPressed(KeyboardKey.Five);
+
+                    if (pressed4) chosenWeapon = Loadout.Forward;
+                    else if (pressed5) chosenWeapon = Loadout.Broadside;
+
+                    Raylib.BeginDrawing();
+                    Raylib.ClearBackground(new Color(15, 15, 25, 255));
+                    Renderer.DrawLoadoutCards(WindowWidth, WindowHeight);
+                    Raylib.EndDrawing();
+
+                    if (pressed4 || pressed5)
+                        showingWeaponScreen = false;
+
+                    continue;
+                }
+
+                break;
+            }
+
+            var gameChoice = new GameChoice(chosenEngine, chosenWeapon);
+            var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(gameChoice);
 
             bool gameOver = false;
 

@@ -37,10 +37,17 @@ Goal:
 
 ## Controls
 
+### Engine selection (start)
+- 1/2/3: choose engine layout
+
+### Weapon selection (after engine)
+- 4/5: choose weapon layout
+
+### In-game
 - W: forward thrust
-- S: backward thrust (20% of forward)
-- A: left sideways thrust (20% of forward)
-- D: right sideways thrust (20% of forward)
+- S: backward thrust
+- A: left sideways thrust
+- D: right sideways thrust
 - Q/E: rotate
 - Shift: boost (forward only, 2.5x)
 - Mouse: aim (optional)

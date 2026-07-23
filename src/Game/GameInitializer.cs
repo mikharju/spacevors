@@ -9,7 +9,7 @@ public static class GameInitializer
 {
     public const int PlayerMaxHealth = 10;
 
-    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(Loadout loadout)
+    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(GameChoice choice)
     {
         var em = new EntityManager();
 
@@ -19,7 +19,15 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
-        em.AddComponent(playerEntity, new Player(Thrust: 400f, SideThrust: 80f, BackThrust: 80f, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
+        var (thrust, sideThrust, backThrust) = choice.Engine switch
+        {
+            EngineLayout.Balanced => (400f, 80f, 80f),
+            EngineLayout.Maneuverable => (250f, 20f, 200f),
+            EngineLayout.Pursuit => (400f, 7f, 350f),
+            _ => (400f, 80f, 80f)
+        };
+
+        em.AddComponent(playerEntity, new Player(Thrust: thrust, SideThrust: sideThrust, BackThrust: backThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f));
         em.AddComponent(playerEntity, new Weapon(FireRate: 8f, AmmoSpeed: 350f, KickbackForce: 15f));
         em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
 
@@ -122,7 +130,7 @@ public static class GameInitializer
         // Turret entities based on loadout choice
         var turretEntities = new List<Entity>();
 
-        if (loadout == Loadout.Forward)
+        if (choice.Weapon == Loadout.Forward)
         {
             var turretEntity = em.CreateEntity();
             em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
