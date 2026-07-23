@@ -104,6 +104,15 @@ Difficulty scaling.
 - mine respawn system with increasing frequency
 - max 100 active enemy ships, ~23 mines cap
 
+## Phase 4c
+
+Enemy variants.
+
+- Interceptor: smaller (15px), purple, faster acceleration (15), low fire rate (0.6/s)
+- Heavy Cannon: larger (28px), dark red-gray, 2 damage ammo, slower fire rate (0.8/s)
+- Standard: unchanged (20px), red, baseline stats
+- All three spawn equally (~33% each)
+
 ## Phase 6
 
 Content.

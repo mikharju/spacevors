@@ -77,7 +77,7 @@ public class TurretFiringSystem : GameSystem
             var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
-            EnemyShip enemyShip = em.HasComponent<EnemyShip>(turretEntity) ? em.GetComponent<EnemyShip>(turretEntity) : new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0);
+            EnemyShip enemyShip = em.HasComponent<EnemyShip>(turretEntity) ? em.GetComponent<EnemyShip>(turretEntity) : new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0, 0);
             float firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
 
             if (playerEntity.Value >= 0 && em.HasComponent<EnemyShip>(turretEntity))
@@ -131,6 +131,7 @@ public class TurretFiringSystem : GameSystem
     private void FireAtTarget(EntityManager em, Entity turretEntity, Turret turret, (Vector2 Position, float Radius) target)
     {
         var turretPos = em.GetComponent<Position>(turretEntity);
+        var turretRot = em.GetComponent<Rotation>(turretEntity);
 
         Vector2 dirToTarget = target.Position - turretPos.Value;
         float dist = (float)Math.Sqrt(dirToTarget.X * dirToTarget.X + dirToTarget.Y * dirToTarget.Y);
@@ -151,7 +152,17 @@ public class TurretFiringSystem : GameSystem
             );
 
             float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.15f;
-            var spawnPos = turretPos.Value + pelletDir * 20f;
+
+            Vector2 spawnOffset = pelletDir * 20f;
+            if (turret.IsEnemy && em.HasComponent<EnemyShip>(turretEntity))
+            {
+                var ship = em.GetComponent<EnemyShip>(turretEntity);
+                float forwardOffset = ship.Radius + 5f;
+                Vector2 forwardDir = new Vector2((float)Math.Sin(turretRot.Angle), -(float)Math.Cos(turretRot.Angle));
+                spawnOffset += forwardDir * forwardOffset;
+            }
+
+            var spawnPos = turretPos.Value + spawnOffset;
             Vector2 ammoVel = pelletDir * turret.AmmoSpeed * speedVariation;
 
             if (em.HasComponent<Velocity>(turretEntity))
@@ -160,10 +171,13 @@ public class TurretFiringSystem : GameSystem
                 ammoVel += turretVel;
             }
 
+            float ammoRadius = turret.IsEnemy ? (em.HasComponent<EnemyShip>(turretEntity) ? em.GetComponent<EnemyShip>(turretEntity).Damage > 1 ? 4f : 2.5f : 2.5f) : 2.5f;
+            int damage = turret.IsEnemy && em.HasComponent<EnemyShip>(turretEntity) ? em.GetComponent<EnemyShip>(turretEntity).Damage : 1;
+
             var ammoEntity = em.CreateEntity();
             em.AddComponent(ammoEntity, new Position(spawnPos));
             em.AddComponent(ammoEntity, new Velocity(ammoVel));
-            em.AddComponent(ammoEntity, new Ammo(ammoVel, 2.5f, 3f, turret.IsEnemy));
+            em.AddComponent(ammoEntity, new Ammo(ammoVel, ammoRadius, 3f, turret.IsEnemy, damage));
         }
 
         if (turret.KickbackForce > 0)

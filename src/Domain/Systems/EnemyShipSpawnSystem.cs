@@ -8,6 +8,7 @@ public class EnemyShipSpawnSystem : GameSystem
     private const float MinInterval = 2f;
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
+    private const float MinSpawnDistance = 300f;
 
     public override void Update(EntityManager em, float deltaTime)
     {
@@ -48,8 +49,23 @@ public class EnemyShipSpawnSystem : GameSystem
         float sx = playerPos.Value.X + spawnDir.X * spawnDist;
         float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
 
+        if (!IsSpawnClear(em, new Vector2(sx, sy))) return;
+
         var shipEntity = em.CreateEntity();
-        EnemyShipFactory.AddEnemyShipComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+        float variantRoll = (float)rand.NextDouble();
+
+        if (variantRoll < 0.333f)
+        {
+            EnemyShipFactory.AddInterceptorComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+        }
+        else if (variantRoll < 0.666f)
+        {
+            EnemyShipFactory.AddHeavyCannonComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+        }
+        else
+        {
+            EnemyShipFactory.AddEnemyShipComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+        }
 
         float elapsed = ElapsedTime;
         float rampDuration = 180f;
@@ -58,5 +74,19 @@ public class EnemyShipSpawnSystem : GameSystem
         float currentMaxInterval = MaxInterval + (10f - MaxInterval) * (1f - progress);
 
         _timer = currentMinInterval + (float)rand.NextDouble() * (currentMaxInterval - currentMinInterval);
+    }
+
+    private bool IsSpawnClear(EntityManager em, Vector2 spawnPos)
+    {
+        foreach (var (shipEntity, ship) in em.GetEntitiesWithComponents<EnemyShip>())
+        {
+            var pos = em.GetComponent<Position>(shipEntity);
+            float dx = pos.Value.X - spawnPos.X;
+            float dy = pos.Value.Y - spawnPos.Y;
+            float distSq = dx * dx + dy * dy;
+            float minDist = ship.Radius + MinSpawnDistance;
+            if (distSq < minDist * minDist) return false;
+        }
+        return true;
     }
 }

@@ -115,7 +115,22 @@ public static class Renderer
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
-            Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, new Color(255, 230, 100, 255));
+
+            Color color;
+            if (ammo.IsEnemy && ammo.Damage > 1)
+            {
+                color = new Color(255, 80, 80, 255);
+            }
+            else if (ammo.IsEnemy)
+            {
+                color = new Color(255, 230, 100, 255);
+            }
+            else
+            {
+                color = new Color(255, 230, 100, 255);
+            }
+
+            Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, color);
         }
     }
 
@@ -224,7 +239,7 @@ public static class Renderer
             var shipRot = em.GetComponent<Rotation>(entity);
 
             float angle = shipRot.Angle;
-            float size = 20f;
+            float size = enemyShip.Radius;
 
             float cos = (float)Math.Cos(angle);
             float sin = (float)Math.Sin(angle);
@@ -245,11 +260,25 @@ public static class Renderer
             float tx3 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
             float ty3 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
 
+            Color color;
+            if (enemyShip.Damage > 1)
+            {
+                color = new Color(180, 60, 60, 255);
+            }
+            else if (enemyShip.Radius < 18f)
+            {
+                color = new Color(180, 80, 255, 255);
+            }
+            else
+            {
+                color = new Color(255, 80, 80, 255);
+            }
+
             Raylib.DrawTriangle(
                 new System.Numerics.Vector2(tx1, ty1),
                 new System.Numerics.Vector2(tx2, ty2),
                 new System.Numerics.Vector2(tx3, ty3),
-                new Color(255, 80, 80, 255)
+                color
             );
 
             float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;

@@ -98,6 +98,7 @@ public class CollisionSystem : GameSystem
         foreach (var (ammoEntity, ammo) in ammoList)
         {
             if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            if (ammo.IsEnemy) continue;
 
             var ammoPos = em.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
@@ -189,6 +190,7 @@ public class CollisionSystem : GameSystem
         foreach (var (ammoEntity, ammo) in ammoList)
         {
             if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            if (ammo.IsEnemy) continue;
 
             var ammoPos = em.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
@@ -262,15 +264,18 @@ public class CollisionSystem : GameSystem
 
         foreach (var ammoEntity in ammoToPlayerHits.Distinct())
         {
+            var ammo = em.GetComponent<Ammo>(ammoEntity);
+            int damage = ammo.Damage;
+
             if (!em.HasComponent<Health>(playerEntity)) continue;
             var playerHealth = em.GetComponent<Health>(playerEntity);
-            if (playerHealth.Current <= 1)
+            if (playerHealth.Current <= damage)
             {
                 em.AddComponent(playerEntity, new Dead());
             }
             else
             {
-                em.AddComponent(playerEntity, new Health(playerHealth.Current - 1));
+                em.AddComponent(playerEntity, new Health(playerHealth.Current - damage));
             }
             entitiesToDestroy.Add(ammoEntity);
         }
