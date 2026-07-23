@@ -34,6 +34,11 @@ public static class Renderer
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
         DrawHealthBar(em, playerEntity, playerMaxHealth, windowWidth, windowHeight);
 
+        if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
+        {
+            DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
+        }
+
         if (gameOver)
         {
             Raylib.DrawText("GAME OVER", windowWidth / 2 - 80, windowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
@@ -383,6 +388,22 @@ public static class Renderer
         string text = $"{playerHealth.Current}/{playerMaxHealth}";
         int textWidth = Raylib.MeasureText(text, 14);
         Raylib.DrawText(text, padding + (barWidth - textWidth) / 2, padding + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
+    }
+
+    private static void DrawDebugMarkers(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, marker) in em.GetEntitiesWithComponents<DebugMarker>())
+        {
+            var pos = em.GetComponent<Position>(entity);
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            float lifeRatio = marker.Lifetime / 0.5f;
+            int alpha = (int)(255f * lifeRatio);
+            int boxSize = 16;
+
+            Raylib.DrawRectangleLines((int)cx - boxSize / 2, (int)cy - boxSize / 2, boxSize, boxSize, new Color(0, 255, 0, alpha));
+        }
     }
 
     public static void DrawUpgradeCards(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null)

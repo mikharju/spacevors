@@ -69,5 +69,21 @@ public class EffectSystem : GameSystem
                 em.AddComponent(entity, new BlueSpark(newLifetime));
             }
         }
+
+        var debugMarkers = em.GetEntitiesWithComponents<DebugMarker>().ToList();
+        foreach (var (entity, marker) in debugMarkers)
+        {
+            if (!em.HasComponent<DebugMarker>(entity)) continue;
+
+            var newLifetime = marker.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                em.DestroyEntity(entity);
+            }
+            else
+            {
+                em.AddComponent(entity, new DebugMarker(newLifetime));
+            }
+        }
     }
 }

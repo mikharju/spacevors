@@ -7,7 +7,9 @@ namespace Spacevors.Game;
 
 public static class SpaceVorsApp
 {
-    const float FixedDeltaTime = 1f / 60f;
+    public const int MaxFps = 120;
+    const float FixedDeltaTime = 1f / MaxFps;
+    const float MaxFrameTime = 1f / MaxFps;
     public const int WindowWidth = 1280;
     const int WindowHeight = 720;
 
@@ -48,10 +50,17 @@ public static class SpaceVorsApp
                     }
                 }
 
+                var frameStart = Raylib.GetTime();
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
                 Renderer.DrawEngineCards(WindowWidth, WindowHeight);
                 Raylib.EndDrawing();
+
+                float frameElapsed = (float)(Raylib.GetTime() - frameStart);
+                if (frameElapsed < MaxFrameTime)
+                {
+                    Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
+                }
 
                 if (engineSelected)
                     showingEngineScreen = false;
@@ -226,7 +235,14 @@ public static class SpaceVorsApp
                     }
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
+                    var gameFrameStart = Raylib.GetTime();
                     Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, WindowWidth, WindowHeight, gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+
+                    float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
+                    if (frameElapsed < MaxFrameTime)
+                    {
+                        Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
+                    }
                 }
                 else
                 {
@@ -282,8 +298,15 @@ public static class SpaceVorsApp
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
+                    var pauseFrameStart = Raylib.GetTime();
                     Renderer.Render(em, upgradeCamX, upgradeCamY, WindowWidth, WindowHeight, false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
                     Renderer.DrawUpgradeCards(WindowWidth, WindowHeight, upgradeOptions);
+
+                    float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
+                    if (frameElapsed2 < MaxFrameTime)
+                    {
+                        Thread.Sleep((int)((MaxFrameTime - frameElapsed2) * 1000));
+                    }
                 }
             }
         }
