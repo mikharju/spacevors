@@ -24,7 +24,7 @@ public class TurretFiringSystem : GameSystem
                     if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
                     {
                         var markerEntity = em.CreateEntity();
-                        em.AddComponent(markerEntity, new Position(target.Value.Position));
+                        em.AddComponent(markerEntity, new Position(target.Value.PredictedPosition));
                         em.AddComponent(markerEntity, new DebugMarker(0.5f));
                     }
                 }
@@ -37,7 +37,7 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
-    private (Vector2 Position, float Radius)? FindTarget(EntityManager em, Turret turret, Entity turretEntity)
+    private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(EntityManager em, Turret turret, Entity turretEntity)
     {
         var turretPos = em.GetComponent<Position>(turretEntity);
         var turretRot = em.GetComponent<Rotation>(turretEntity);
@@ -47,7 +47,7 @@ public class TurretFiringSystem : GameSystem
         float cosHalfArc = (float)Math.Cos(turret.ArcAngle / 2f);
         float rangeSq = turret.Range * turret.Range;
 
-        (Vector2 Position, float Radius)? nearestTarget = null;
+        (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget = null;
         float nearestDistSq = float.MaxValue;
 
         if (!turret.IsEnemy)
@@ -68,29 +68,33 @@ public class TurretFiringSystem : GameSystem
             foreach (var (enemyShipEntity, enemyShip, velocity) in em.GetEntitiesWithComponents<EnemyShip, Velocity>())
             {
                 var shipPos = em.GetComponent<Position>(enemyShipEntity);
-                var toTarget = shipPos.Value - turretPos.Value;
-                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+                Vector2 relPos = shipPos.Value - turretPos.Value;
+                float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
                 if (distSq > rangeSq || distSq < 0.001f) continue;
 
-                float dist = (float)Math.Sqrt(distSq);
-                Vector2 aimDir = toTarget / dist;
-                Vector2 effectiveBulletVel = aimDir * turret.Weapon.AmmoSpeed + playerVelocity;
-                float effectiveSpeed = (float)Math.Sqrt(effectiveBulletVel.X * effectiveBulletVel.X + effectiveBulletVel.Y * effectiveBulletVel.Y);
-                float travelTime = dist / effectiveSpeed;
+                Vector2 relVel = velocity.Value - playerVelocity;
+                float ammoSpeed = turret.Weapon.AmmoSpeed;
+                float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
+                float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
+                float c = -distSq;
+
+                float travelTime = SolveQuadratic(a, b, c);
+                if (travelTime <= 0f) continue;
+
                 Vector2 predictedPos = shipPos.Value + velocity.Value * travelTime;
                 var toPredicted = predictedPos - turretPos.Value;
                 float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
 
-                float distToPredicted = (float)Math.Sqrt(distToPredictedSq);
-                var predictedDir = toPredicted / distToPredicted;
+                if (distToPredictedSq > rangeSq) continue;
 
-                float dot = Vector2.Dot(forwardDir, predictedDir);
+                Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (turret.Weapon.AmmoSpeed * travelTime);
+                float dot = Vector2.Dot(forwardDir, aimDir);
                 if (dot < cosHalfArc) continue;
 
                 if (distSq < nearestDistSq)
                 {
-                    nearestTarget = (predictedPos, enemyShip.Radius);
+                    nearestTarget = (aimDir, predictedPos, enemyShip.Radius);
                     nearestDistSq = distSq;
                 }
             }
@@ -113,7 +117,7 @@ public class TurretFiringSystem : GameSystem
 
                     if (distSq < nearestDistSq)
                     {
-                        nearestTarget = (shipPos.Value, enemyShip.Radius);
+                        nearestTarget = (toTargetDir, shipPos.Value, enemyShip.Radius);
                         nearestDistSq = distSq;
                     }
                 }
@@ -138,27 +142,31 @@ public class TurretFiringSystem : GameSystem
                 foreach (var (_, _, playerVel) in em.GetEntitiesWithComponents<Player, Velocity>())
                 {
                     var playerPos = em.GetComponent<Position>(playerEntity);
-                    var toPlayer = playerPos.Value - turretPos.Value;
-                    float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
+                    Vector2 relPos = playerPos.Value - turretPos.Value;
+                    float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
                     if (distSq > firingRangeSq || distSq < 0.001f) continue;
 
-                    float dist = (float)Math.Sqrt(distSq);
-                    Vector2 aimDir = toPlayer / dist;
-                    Vector2 effectiveBulletVel = aimDir * enemyShip.TurretAmmoSpeed + enemyVelocity;
-                    float effectiveSpeed = (float)Math.Sqrt(effectiveBulletVel.X * effectiveBulletVel.X + effectiveBulletVel.Y * effectiveBulletVel.Y);
-                    float travelTime = dist / effectiveSpeed;
+                    Vector2 relVel = playerVel.Value - enemyVelocity;
+                    float ammoSpeed = enemyShip.TurretAmmoSpeed;
+                    float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
+                    float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
+                    float c = -distSq;
+
+                    float travelTime = SolveQuadratic(a, b, c);
+                    if (travelTime <= 0f) continue;
+
                     Vector2 predictedPos = playerPos.Value + playerVel.Value * travelTime;
                     var toPredicted = predictedPos - turretPos.Value;
                     float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
 
-                    float distToPredicted = (float)Math.Sqrt(distToPredictedSq);
-                    var predictedDir = toPredicted / distToPredicted;
+                    if (distToPredictedSq > firingRangeSq) continue;
 
-                    float dot = Vector2.Dot(forwardDir, predictedDir);
+                    Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (enemyShip.TurretAmmoSpeed * travelTime);
+                    float dot = Vector2.Dot(forwardDir, aimDir);
                     if (dot < cosHalfArc) continue;
 
-                    nearestTarget = (predictedPos, 10f);
+                    nearestTarget = (aimDir, predictedPos, 10f);
                     nearestDistSq = distSq;
                 }
             }
@@ -167,6 +175,27 @@ public class TurretFiringSystem : GameSystem
         }
 
         return nearestTarget;
+
+        static float SolveQuadratic(float a, float b, float c)
+        {
+            if (Math.Abs(a) < 1e-6f)
+            {
+                if (Math.Abs(b) < 1e-6f) return -1f;
+                return -c / b;
+            }
+
+            float discriminant = b * b - 4f * a * c;
+            if (discriminant < 0f) return -1f;
+
+            float sqrtD = (float)Math.Sqrt(discriminant);
+            float t1 = (-b + sqrtD) / (2f * a);
+            float t2 = (-b - sqrtD) / (2f * a);
+
+            if (t1 > 0f && t2 > 0f) return Math.Min(t1, t2);
+            if (t1 > 0f) return t1;
+            if (t2 > 0f) return t2;
+            return -1f;
+        }
 
         void CheckTargets<T>(IEnumerable<(Entity Entity, T Value)> candidates, Func<T, float> getRadius, float checkRangeSq)
         {
@@ -184,21 +213,19 @@ public class TurretFiringSystem : GameSystem
 
                 if (distSq < nearestDistSq)
                 {
-                    nearestTarget = (pos.Value, getRadius(value));
+                    nearestTarget = (dir, pos.Value, getRadius(value));
                     nearestDistSq = distSq;
                 }
             }
         }
     }
 
-    private void FireAtTarget(EntityManager em, Entity turretEntity, Turret turret, (Vector2 Position, float Radius) target)
+    private void FireAtTarget(EntityManager em, Entity turretEntity, Turret turret, (Vector2 AimDirection, Vector2 PredictedPosition, float Radius) target)
     {
         var turretPos = em.GetComponent<Position>(turretEntity);
         var turretRot = em.GetComponent<Rotation>(turretEntity);
 
-        Vector2 dirToTarget = target.Position - turretPos.Value;
-        float dist = (float)Math.Sqrt(dirToTarget.X * dirToTarget.X + dirToTarget.Y * dirToTarget.Y);
-        Vector2 ammoDir = dirToTarget / dist;
+        Vector2 ammoDir = target.AimDirection;
 
         int pelletCount = turret.Weapon.PelletCount;
         float scatterAngle = turret.Weapon.Scatter;
