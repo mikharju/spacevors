@@ -10,12 +10,16 @@ public static class SpaceVorsApp
     public const int MaxFps = 120;
     const float FixedDeltaTime = 1f / MaxFps;
     const float MaxFrameTime = 1f / MaxFps;
-    public const int WindowWidth = 1280;
-    const int WindowHeight = 720;
+    const int DefaultWindowWidth = 1280;
+    const int DefaultWindowHeight = 720;
 
     public static void Main()
     {
-        Raylib.InitWindow(WindowWidth, WindowHeight, "SpaceVors");
+        Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
+        Raylib.InitWindow(DefaultWindowWidth, DefaultWindowHeight, "SpaceVors");
+
+        int GetW() => Raylib.GetScreenWidth();
+        int GetH() => Raylib.GetScreenHeight();
 
         EngineLayout chosenEngine = EngineLayout.Balanced;
         WeaponLoadout chosenWeapon = WeaponLoadout.MachineGun;
@@ -40,7 +44,7 @@ public static class SpaceVorsApp
                     int mouseY = Raylib.GetMouseY();
                     for (int i = 0; i < 3; i++)
                     {
-                        var (topLeft, w, h) = Renderer.GetEngineCardRect(i, WindowWidth, WindowHeight);
+                        var (topLeft, w, h) = Renderer.GetEngineCardRect(i, GetW(), GetH());
                         if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                         {
                             chosenEngine = i switch { 0 => EngineLayout.Balanced, 1 => EngineLayout.Maneuverable, _ => EngineLayout.Pursuit };
@@ -50,10 +54,13 @@ public static class SpaceVorsApp
                     }
                 }
 
+                if (Raylib.IsKeyPressed(KeyboardKey.F11))
+                    Raylib.ToggleFullscreen();
+
                 var frameStart = Raylib.GetTime();
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                Renderer.DrawEngineCards(WindowWidth, WindowHeight);
+                Renderer.DrawEngineCards(GetW(), GetH());
                 Raylib.EndDrawing();
 
                 float frameElapsed = (float)(Raylib.GetTime() - frameStart);
@@ -74,6 +81,9 @@ public static class SpaceVorsApp
             {
                 if (showingWeaponScreen)
                 {
+                    if (Raylib.IsKeyPressed(KeyboardKey.F11))
+                        Raylib.ToggleFullscreen();
+
                     bool pressed4 = Raylib.IsKeyPressed(KeyboardKey.Four);
                     bool pressed5 = Raylib.IsKeyPressed(KeyboardKey.Five);
 
@@ -87,7 +97,7 @@ public static class SpaceVorsApp
                         int mouseY = Raylib.GetMouseY();
                         for (int i = 0; i < 2; i++)
                         {
-                            var (topLeft, w, h) = Renderer.GetLoadoutCardRect(i, WindowWidth, WindowHeight);
+                            var (topLeft, w, h) = Renderer.GetLoadoutCardRect(i, GetW(), GetH());
                             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                             {
                                 chosenWeapon = i == 0 ? WeaponLoadout.MachineGun : WeaponLoadout.Shotgun;
@@ -99,7 +109,7 @@ public static class SpaceVorsApp
 
                     Raylib.BeginDrawing();
                     Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                    Renderer.DrawLoadoutCards(WindowWidth, WindowHeight);
+                    Renderer.DrawLoadoutCards(GetW(), GetH());
                     Raylib.EndDrawing();
 
                     if (weaponSelected)
@@ -123,6 +133,9 @@ public static class SpaceVorsApp
 
             while (!Raylib.WindowShouldClose())
             {
+                if (Raylib.IsKeyPressed(KeyboardKey.F11))
+                    Raylib.ToggleFullscreen();
+
                 float frameTime = (float)Raylib.GetFrameTime();
                 DiagnosticLogger.UpdateFps(frameTime);
 
@@ -138,8 +151,8 @@ public static class SpaceVorsApp
                     var playerStats = em.GetComponent<Player>(playerEntity);
                     var angVel = em.GetComponent<AngularVelocity>(playerEntity);
 
-                    float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - WindowWidth / 2f);
-                    float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - WindowHeight / 2f);
+                    float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - GetW() / 2f);
+                    float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - GetH() / 2f);
                     Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
                     float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
                     float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
@@ -236,7 +249,7 @@ public static class SpaceVorsApp
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
                     var gameFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, WindowWidth, WindowHeight, gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
 
                     float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
                     if (frameElapsed < MaxFrameTime)
@@ -261,7 +274,7 @@ public static class SpaceVorsApp
                         int mouseY = Raylib.GetMouseY();
                         for (int i = 0; i < 2; i++)
                         {
-                            var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, WindowWidth, WindowHeight);
+                            var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, GetW(), GetH());
                             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                             {
                                 selectedIndex = i;
@@ -299,8 +312,8 @@ public static class SpaceVorsApp
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
                     var pauseFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, upgradeCamX, upgradeCamY, WindowWidth, WindowHeight, false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
-                    Renderer.DrawUpgradeCards(WindowWidth, WindowHeight, upgradeOptions);
+                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions);
 
                     float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
                     if (frameElapsed2 < MaxFrameTime)

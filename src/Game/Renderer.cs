@@ -374,20 +374,21 @@ public static class Renderer
     private static void DrawHealthBar(EntityManager em, Entity playerEntity, int playerMaxHealth, int windowWidth, int windowHeight)
     {
         var playerHealth = em.GetComponent<Health>(playerEntity);
-        int barWidth = 160;
+        int barWidth = (int)(windowWidth * 0.12f);
         int barHeight = 14;
-        int padding = 16;
+        int paddingX = (int)(windowWidth * 0.015f);
+        int paddingY = (int)(windowHeight * 0.02f);
         float healthPercent = (float)playerHealth.Current / playerMaxHealth;
 
-        Raylib.DrawRectangle(padding, padding, barWidth, barHeight, new Color(50, 50, 50, 255));
+        Raylib.DrawRectangle(paddingX, paddingY, barWidth, barHeight, new Color(50, 50, 50, 255));
         int filledWidth = (int)(barWidth * Math.Max(healthPercent, 0f));
         Color healthColor = filledWidth > barWidth / 3 ? new Color(80, 255, 80, 255) : new Color(255, 60, 60, 255);
-        Raylib.DrawRectangle(padding, padding, filledWidth, barHeight, healthColor);
-        Raylib.DrawRectangleLines(padding, padding, barWidth, barHeight, new Color(180, 180, 180, 255));
+        Raylib.DrawRectangle(paddingX, paddingY, filledWidth, barHeight, healthColor);
+        Raylib.DrawRectangleLines(paddingX, paddingY, barWidth, barHeight, new Color(180, 180, 180, 255));
 
         string text = $"{playerHealth.Current}/{playerMaxHealth}";
         int textWidth = Raylib.MeasureText(text, 14);
-        Raylib.DrawText(text, padding + (barWidth - textWidth) / 2, padding + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
+        Raylib.DrawText(text, paddingX + (barWidth - textWidth) / 2, paddingY + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
     }
 
     private static void DrawDebugMarkers(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
