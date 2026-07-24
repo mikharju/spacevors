@@ -23,7 +23,7 @@ public readonly record struct WeaponType(
     WeaponStats Stats)
 {
     public static WeaponType MachineGun { get; } = new("MachineGun", new(8f, 420f, 10f, 1, Scatter: 0.033f));
-    public static WeaponType Shotgun { get; } = new("Shotgun", new(2f, 350f, 2.5f, 3, Scatter: 0.1f));
+    public static WeaponType Shotgun { get; } = new("Shotgun", new(2f, 350f, 2.5f, 3, Scatter: 0.04f));
 }
 
 public readonly record struct TurretDefinition(

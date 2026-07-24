@@ -42,7 +42,7 @@ public class FiringSystem : GameSystem
         var spawnPos = pos.Value + ammoDir * spawnDist;
 
         int pelletCount = weapon.PelletCount;
-        float scatterAngle = pelletCount > 1 ? 0.1f : 0.033f;
+        float scatterAngle = pelletCount > 1 ? 0.06f : 0.033f;
 
         for (int i = 0; i < pelletCount; i++)
         {
@@ -55,7 +55,7 @@ public class FiringSystem : GameSystem
                 ammoDir.X * sinOff + ammoDir.Y * cosOff
             );
 
-            float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.15f;
+            float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.3f;
             Vector2 ammoVel = pelletDir * weapon.EffectiveAmmoSpeed * speedVariation;
 
             if (em.HasComponent<Velocity>(shooterEntity))
