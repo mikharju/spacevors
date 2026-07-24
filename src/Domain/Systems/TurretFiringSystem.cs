@@ -52,17 +52,45 @@ public class TurretFiringSystem : GameSystem
 
         if (!turret.IsEnemy)
         {
-            CheckTargets(em.GetEntitiesWithComponents<EnemyMine>(), m => m.Radius, rangeSq);
-            CheckTargets(em.GetEntitiesWithComponents<Asteroid>(), a => a.Radius, rangeSq);
-        }
-
-        if (!turret.IsEnemy)
-        {
             Vector2 playerVelocity = Vector2.Zero;
             foreach (var (_, _, vel) in em.GetEntitiesWithComponents<Player, Velocity>())
             {
                 playerVelocity = vel.Value;
                 break;
+            }
+
+            foreach (var (mineEntity, mine, velocity) in em.GetEntitiesWithComponents<EnemyMine, Velocity>())
+            {
+                var minePos = em.GetComponent<Position>(mineEntity);
+                Vector2 relPos = minePos.Value - turretPos.Value;
+                float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
+
+                if (distSq > rangeSq || distSq < 0.001f) continue;
+
+                Vector2 relVel = velocity.Value - playerVelocity;
+                float ammoSpeed = turret.Weapon.AmmoSpeed;
+                float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
+                float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
+                float c = -distSq;
+
+                float travelTime = SolveQuadratic(a, b, c);
+                if (travelTime <= 0f) continue;
+
+                Vector2 predictedPos = minePos.Value + velocity.Value * travelTime;
+                var toPredicted = predictedPos - turretPos.Value;
+                float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
+
+                if (distToPredictedSq > rangeSq) continue;
+
+                Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (turret.Weapon.AmmoSpeed * travelTime);
+                float dot = Vector2.Dot(forwardDir, aimDir);
+                if (dot < cosHalfArc) continue;
+
+                if (distSq < nearestDistSq)
+                {
+                    nearestTarget = (aimDir, predictedPos, mine.Radius);
+                    nearestDistSq = distSq;
+                }
             }
 
             foreach (var (enemyShipEntity, enemyShip, velocity) in em.GetEntitiesWithComponents<EnemyShip, Velocity>())
@@ -122,6 +150,8 @@ public class TurretFiringSystem : GameSystem
                     }
                 }
             }
+
+            CheckTargets(em.GetEntitiesWithComponents<Asteroid>(), a => a.Radius, rangeSq);
         }
         else
         {
