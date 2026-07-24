@@ -34,12 +34,30 @@ public class LevelUpSystem : GameSystem
 
     private void SpawnLevelUpChoice(EntityManager em, Entity playerEntity, Vector2 position)
     {
-        var allOptions = new[] { UpgradeOption.FireRate, UpgradeOption.ProjectileSpeed, UpgradeOption.PickupRadius };
+        var turrets = em.GetEntitiesWithComponents<Turret>()
+            .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+            .ToList();
+
+        if (turrets.Count == 0) return;
+
+        var weaponNames = turrets.Select(t => em.GetComponent<Turret>(t.Entity).WeaponName).Distinct().ToList();
+        var allOptions = new List<UpgradableOption>();
+
+        foreach (var weapon in weaponNames)
+        {
+            allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
+            allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
+        }
+
+        var firstWeapon = weaponNames[0];
+        allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
+
         var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
+        int count = Math.Min(2, shuffled.Length);
 
         var choiceEntity = em.CreateEntity();
         em.AddComponent(choiceEntity, new Position(position));
         em.AddComponent(choiceEntity, new PendingChoice());
-        em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[0], shuffled[1]));
+        em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[0], shuffled[count - 1]));
     }
 }

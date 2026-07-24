@@ -7,9 +7,7 @@ namespace Spacevors.Game;
 
 public static class GameInitializer
 {
-    public const int PlayerMaxHealth = 10;
-
-    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(GameChoice choice)
+    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType)
     {
         var em = new EntityManager();
 
@@ -19,10 +17,9 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
-        var engine = choice.Engine;
 
-        em.AddComponent(playerEntity, new Player(Thrust: engine.ForwardThrust, SideThrust: engine.SideThrust, BackThrust: engine.BackThrust, Boost: 2.5f, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
-        em.AddComponent(playerEntity, new Health(PlayerMaxHealth));
+        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
+        em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
 
         // Create camera
         var cameraEntity = em.CreateEntity();
@@ -123,12 +120,12 @@ public static class GameInitializer
         // Turret entities based on weapon loadout choice
         var turretEntities = new List<Entity>();
 
-        foreach (var def in choice.Weapon.Turrets)
+        foreach (var def in shipType.Weapon.Turrets)
         {
             var turretEntity = em.CreateEntity();
             em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
             em.AddComponent(turretEntity, new Rotation(def.ArcOffset));
-            em.AddComponent(turretEntity, new Turret(Weapon: def.Weapon.Stats, ArcAngle: def.ArcAngle, Range: def.Range));
+            em.AddComponent(turretEntity, new Turret(Weapon: def.Weapon.Stats, WeaponName: def.Weapon.Name, ArcAngle: def.ArcAngle, Range: def.Range));
             em.AddComponent(turretEntity, new TurretOffset(def.Offset));
             em.AddComponent(turretEntity, new ArcOffset(def.ArcOffset));
 

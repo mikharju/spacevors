@@ -22,7 +22,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
         em.AddComponent(entity, new EnemyShip(Radius, Speed, TurnRate, Health, DetectionRange, FiringRange, TurretFireRate, TurretAmmoSpeed, Acceleration, Damage: 1));
-        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(TurretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
+        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(TurretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
         em.AddComponent(entity, new Health(Health));
     }
 
@@ -39,7 +39,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
         em.AddComponent(entity, new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, TurretAmmoSpeed, acceleration, Damage: 1));
-        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(turretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
+        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(turretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
         em.AddComponent(entity, new Health(health));
     }
 
@@ -56,7 +56,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
         em.AddComponent(entity, new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, turretAmmoSpeed, Acceleration, Damage: 2));
-        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(turretFireRate, turretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
+        em.AddComponent(entity, new Turret(Weapon: new WeaponStats(turretFireRate, turretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true));
         em.AddComponent(entity, new Health(health));
     }
 }

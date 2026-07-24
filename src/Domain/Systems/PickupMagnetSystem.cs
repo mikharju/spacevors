@@ -63,15 +63,7 @@ public class PickupMagnetSystem : GameSystem
             }
 
             var normalizedDir = diff / dist;
-            var currentVel = em.HasComponent<Velocity>(pickupEntity) ? em.GetComponent<Velocity>(pickupEntity).Value : Vector2.Zero;
-            var accel = normalizedDir * MagnetAcceleration;
-            var newVel = currentVel + accel * deltaTime;
-            float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
-
-            if (speed > MaxMagnetSpeed)
-            {
-                newVel = newVel / speed * MaxMagnetSpeed;
-            }
+            var newVel = normalizedDir * MaxMagnetSpeed;
 
             var newPos = pos.Value + newVel * deltaTime;
             em.AddComponent(pickupEntity, new Position(newPos));

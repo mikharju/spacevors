@@ -14,7 +14,7 @@ public static class Renderer
         List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
         List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
         Entity playerEntity,
-        int playerMaxHealth)
+        ShipType shipType)
     {
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
@@ -26,13 +26,13 @@ public static class Renderer
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawSparks(em, camX, camY, windowWidth, windowHeight);
         DrawGreenSparks(em, camX, camY, windowWidth, windowHeight);
-        DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight);
+        DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType);
         DrawEnemyShips(em, camX, camY, windowWidth, windowHeight);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
-        DrawHealthBar(em, playerEntity, playerMaxHealth, windowWidth, windowHeight);
+        DrawHealthBar(em, playerEntity, shipType.MaxHealth, windowWidth, windowHeight);
 
         if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
         {
@@ -172,47 +172,6 @@ public static class Renderer
 
             Raylib.DrawCircle((int)cx, (int)cy, size, new Color(r, g, b, alpha));
         }
-    }
-
-    private static void DrawPlayerShip(
-        EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight)
-    {
-        var shipPos = em.GetComponent<Position>(playerEntity);
-        var shipRot = em.GetComponent<Rotation>(playerEntity);
-        var playerStats = em.GetComponent<Player>(playerEntity);
-
-        float angle = shipRot.Angle;
-        float size = 20f;
-
-        float cos = (float)Math.Cos(angle);
-        float sin = (float)Math.Sin(angle);
-
-        var tipLocal = new System.Numerics.Vector2(0f, -size);
-        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
-
-        var leftLocal = new System.Numerics.Vector2(-size * 0.4f, size * 0.6f);
-        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
-
-        var rightLocal = new System.Numerics.Vector2(size * 0.4f, size * 0.6f);
-        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
-
-        float tx1 = (float)shipPos.Value.X + tip.X - camX + windowWidth / 2f;
-        float ty1 = (float)shipPos.Value.Y + tip.Y - camY + windowHeight / 2f;
-        float tx2 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
-        float ty2 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
-        float tx3 = (float)shipPos.Value.X + right.X - camX + windowWidth / 2f;
-        float ty3 = (float)shipPos.Value.Y + right.Y - camY + windowHeight / 2f;
-
-        Raylib.DrawTriangle(
-            new System.Numerics.Vector2(tx1, ty1),
-            new System.Numerics.Vector2(tx2, ty2),
-            new System.Numerics.Vector2(tx3, ty3),
-            new Color(100, 200, 255, 255)
-        );
-
-        float shipCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-        float shipCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
-        Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)playerStats.Radius, new Color(0, 255, 0, 60));
     }
 
     public static void DrawTurrets(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -422,13 +381,8 @@ public static class Renderer
         {
             var optA = options.Value.OptionA;
             var optB = options.Value.OptionB;
-            DrawCard(startX, startY, GetUpgradeTitle(optA), GetUpgradeValue(optA), new Color(50, 150, 255, 255), "1");
-            DrawCard(startX + cardW + spacing, startY, GetUpgradeTitle(optB), GetUpgradeValue(optB), new Color(50, 150, 255, 255), "2");
-        }
-        else
-        {
-            DrawCard(startX, startY, "Fire Rate", "+15%", new Color(50, 150, 255, 255), "1");
-            DrawCard(startX + cardW + spacing, startY, "Projectile Speed", "+30%", new Color(50, 150, 255, 255), "2");
+            DrawCard(startX, startY, GetUpgradeLabel(optA), GetUpgradeValue(optA.Stat), new Color(50, 150, 255, 255), "1");
+            DrawCard(startX + cardW + spacing, startY, GetUpgradeLabel(optB), GetUpgradeValue(optB.Stat), new Color(50, 150, 255, 255), "2");
         }
 
         Raylib.DrawText("Click a card or press 1, 2", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
@@ -473,12 +427,29 @@ public static class Renderer
         return (new Vector2(x, startY), cardW, cardH);
     }
 
-    private static string GetUpgradeTitle(UpgradeOption option) => option switch
+    private static void DrawCard(int x, int y, string label, string statValue, Color borderColor, string key)
     {
-        UpgradeOption.FireRate => "Fire Rate",
-        UpgradeOption.ProjectileSpeed => "Projectile Speed",
-        UpgradeOption.PickupRadius => "Pickup Radius",
-        _ => "Unknown"
+        Raylib.DrawRectangle(x, y, 220, 140, new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, 220, 140, borderColor);
+
+        int keyWidth = Raylib.MeasureText(key, 18);
+        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
+
+        int labelWidth = Raylib.MeasureText(label, 24);
+        Raylib.DrawText(label, x + 110 - labelWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+
+        int valueWidth = Raylib.MeasureText(statValue, 36);
+        Raylib.DrawText(statValue, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
+    }
+
+    private static string GetUpgradeLabel(UpgradableOption option) => (option.WeaponName, option.Stat) switch
+    {
+        ("MachineGun", UpgradeOption.FireRate) => "machine gun attack speed",
+        ("MachineGun", UpgradeOption.ProjectileSpeed) => "machine gun projectile speed",
+        ("Shotgun", UpgradeOption.FireRate) => "side shot attack speed",
+        ("Shotgun", UpgradeOption.ProjectileSpeed) => "side shot projectile speed",
+        (_, UpgradeOption.PickupRadius) => "pickup radius",
+        _ => $"{option.WeaponName} {option.Stat}"
     };
 
     private static string GetUpgradeValue(UpgradeOption option) => option switch
@@ -488,21 +459,6 @@ public static class Renderer
         UpgradeOption.PickupRadius => "+20%",
         _ => "?"
     };
-
-    private static void DrawCard(int x, int y, string title, string value, Color borderColor, string key)
-    {
-        Raylib.DrawRectangle(x, y, 220, 140, new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, 220, 140, borderColor);
-
-        int keyWidth = Raylib.MeasureText(key, 18);
-        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
-
-        int titleWidth = Raylib.MeasureText(title, 24);
-        Raylib.DrawText(title, x + 110 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
-
-        int valueWidth = Raylib.MeasureText(value, 36);
-        Raylib.DrawText(value, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
-    }
 
     public static void DrawEngineCards(int windowWidth, int windowHeight)
     {
@@ -599,5 +555,100 @@ public static class Renderer
             int lineW = Raylib.MeasureText(lines[i], 16);
             Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
         }
+    }
+
+    public static void DrawShipCards(int windowWidth, int windowHeight)
+    {
+        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
+
+        var ships = new[] { ShipType.Scout, ShipType.Fighter, ShipType.Heavy };
+        int cardW = 340;
+        int cardH = 160;
+        int spacing = 60;
+        int totalW = cardW * 3 + spacing * 2;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        for (int i = 0; i < ships.Length; i++)
+        {
+            var ship = ships[i];
+            string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Weapon.Turrets.Count} turret{(ship.Weapon.Turrets.Count > 1 ? "s" : "")}";
+            var borderColor = new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
+            DrawShipCard(startX + i * (cardW + spacing), startY, ship.Name, stats, borderColor, $"{i + 1}");
+        }
+
+        Raylib.DrawText("Click a card or press 1, 2, 3", windowWidth / 2 - 140, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+    }
+
+    public static (Vector2 topLeft, int Width, int Height) GetShipCardRect(int index, int windowWidth, int windowHeight)
+    {
+        int cardW = 340;
+        int cardH = 160;
+        int spacing = 60;
+        int totalW = cardW * 3 + spacing * 2;
+        int startX = (windowWidth - totalW) / 2;
+        int startY = windowHeight / 2 - cardH / 2;
+
+        int x = startX + index * (cardW + spacing);
+        return (new Vector2(x, startY), cardW, cardH);
+    }
+
+    private static void DrawShipCard(int x, int y, string title, string details, Color borderColor, string key)
+    {
+        Raylib.DrawRectangle(x, y, 340, 160, new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, 340, 160, borderColor);
+
+        int keyWidth = Raylib.MeasureText(key, 18);
+        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
+
+        int titleWidth = Raylib.MeasureText(title, 24);
+        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+
+        string[] lines = details.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            int lineW = Raylib.MeasureText(lines[i], 16);
+            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
+        }
+    }
+
+    public static void DrawPlayerShip(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight, ShipType shipType)
+    {
+        var shipPos = em.GetComponent<Position>(playerEntity);
+        var shipRot = em.GetComponent<Rotation>(playerEntity);
+
+        float angle = shipRot.Angle;
+        float noseLen = shipType.NoseLength;
+        float wingSpread = shipType.WingSpread;
+
+        float cos = (float)Math.Cos(angle);
+        float sin = (float)Math.Sin(angle);
+
+        var tipLocal = new System.Numerics.Vector2(0f, -noseLen);
+        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+
+        var leftLocal = new System.Numerics.Vector2(-noseLen * wingSpread, noseLen * 0.6f);
+        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+
+        var rightLocal = new System.Numerics.Vector2(noseLen * wingSpread, noseLen * 0.6f);
+        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
+
+        float tx1 = (float)shipPos.Value.X + tip.X - camX + windowWidth / 2f;
+        float ty1 = (float)shipPos.Value.Y + tip.Y - camY + windowHeight / 2f;
+        float tx2 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
+        float ty2 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
+        float tx3 = (float)shipPos.Value.X + right.X - camX + windowWidth / 2f;
+        float ty3 = (float)shipPos.Value.Y + right.Y - camY + windowHeight / 2f;
+
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(tx1, ty1),
+            new System.Numerics.Vector2(tx2, ty2),
+            new System.Numerics.Vector2(tx3, ty3),
+            new Raylib_cs.Color((int)shipType.DrawR, (int)shipType.DrawG, (int)shipType.DrawB, 255)
+        );
+
+        float shipCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
+        float shipCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+        Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
     }
 }

@@ -9,6 +9,7 @@ public readonly record struct EngineLayout(
     public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f);
     public static EngineLayout Maneuverable { get; } = new("Maneuverable", 250f, 20f, 200f);
     public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f);
+    public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f);
 }
 
 public readonly record struct WeaponStats(
@@ -43,6 +44,9 @@ public readonly record struct WeaponLoadout(
     public static WeaponLoadout Shotgun { get; } = new("Shotgun", [
         new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun),
         new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun)]);
-}
 
-public record GameChoice(EngineLayout Engine, WeaponLoadout Weapon);
+    public static WeaponLoadout MachineGunShotgun { get; } = new("MachineGunShotgun", [
+        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 360f, WeaponType.MachineGun),
+        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun),
+        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun)]);
+}

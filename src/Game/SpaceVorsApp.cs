@@ -21,34 +21,33 @@ public static class SpaceVorsApp
         int GetW() => Raylib.GetScreenWidth();
         int GetH() => Raylib.GetScreenHeight();
 
-        EngineLayout chosenEngine = EngineLayout.Balanced;
-        WeaponLoadout chosenWeapon = WeaponLoadout.MachineGun;
-        bool showingEngineScreen = true;
+        ShipType chosenShip = ShipType.Scout;
+        bool showingShipScreen = true;
 
         while (!Raylib.WindowShouldClose())
         {
-            if (showingEngineScreen)
+            if (showingShipScreen)
             {
                 bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
                 bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
                 bool pressed3 = Raylib.IsKeyPressed(KeyboardKey.Three);
 
-                if (pressed1) chosenEngine = EngineLayout.Balanced;
-                else if (pressed2) chosenEngine = EngineLayout.Maneuverable;
-                else if (pressed3) chosenEngine = EngineLayout.Pursuit;
+                if (pressed1) chosenShip = ShipType.Scout;
+                else if (pressed2) chosenShip = ShipType.Fighter;
+                else if (pressed3) chosenShip = ShipType.Heavy;
 
-                bool engineSelected = pressed1 || pressed2 || pressed3;
-                if (!engineSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
+                bool shipSelected = pressed1 || pressed2 || pressed3;
+                if (!shipSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
                 {
                     int mouseX = Raylib.GetMouseX();
                     int mouseY = Raylib.GetMouseY();
                     for (int i = 0; i < 3; i++)
                     {
-                        var (topLeft, w, h) = Renderer.GetEngineCardRect(i, GetW(), GetH());
+                        var (topLeft, w, h) = Renderer.GetShipCardRect(i, GetW(), GetH());
                         if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                         {
-                            chosenEngine = i switch { 0 => EngineLayout.Balanced, 1 => EngineLayout.Maneuverable, _ => EngineLayout.Pursuit };
-                            engineSelected = true;
+                            chosenShip = i switch { 0 => ShipType.Scout, 1 => ShipType.Fighter, _ => ShipType.Heavy };
+                            shipSelected = true;
                             break;
                         }
                     }
@@ -60,7 +59,7 @@ public static class SpaceVorsApp
                 var frameStart = Raylib.GetTime();
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                Renderer.DrawEngineCards(GetW(), GetH());
+                Renderer.DrawShipCards(GetW(), GetH());
                 Raylib.EndDrawing();
 
                 float frameElapsed = (float)(Raylib.GetTime() - frameStart);
@@ -69,60 +68,13 @@ public static class SpaceVorsApp
                     Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
                 }
 
-                if (engineSelected)
-                    showingEngineScreen = false;
+                if (shipSelected)
+                    showingShipScreen = false;
 
                 continue;
             }
 
-            bool showingWeaponScreen = true;
-
-            while (!Raylib.WindowShouldClose())
-            {
-                if (showingWeaponScreen)
-                {
-                    if (Raylib.IsKeyPressed(KeyboardKey.F11))
-                        Raylib.ToggleFullscreen();
-
-                    bool pressed4 = Raylib.IsKeyPressed(KeyboardKey.Four);
-                    bool pressed5 = Raylib.IsKeyPressed(KeyboardKey.Five);
-
-                    if (pressed4) chosenWeapon = WeaponLoadout.MachineGun;
-                    else if (pressed5) chosenWeapon = WeaponLoadout.Shotgun;
-
-                    bool weaponSelected = pressed4 || pressed5;
-                    if (!weaponSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
-                    {
-                        int mouseX = Raylib.GetMouseX();
-                        int mouseY = Raylib.GetMouseY();
-                        for (int i = 0; i < 2; i++)
-                        {
-                            var (topLeft, w, h) = Renderer.GetLoadoutCardRect(i, GetW(), GetH());
-                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
-                            {
-                                chosenWeapon = i == 0 ? WeaponLoadout.MachineGun : WeaponLoadout.Shotgun;
-                                weaponSelected = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    Raylib.BeginDrawing();
-                    Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                    Renderer.DrawLoadoutCards(GetW(), GetH());
-                    Raylib.EndDrawing();
-
-                    if (weaponSelected)
-                        showingWeaponScreen = false;
-
-                    continue;
-                }
-
-                break;
-            }
-
-            var gameChoice = new GameChoice(chosenEngine, chosenWeapon);
-            var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(gameChoice);
+            var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(chosenShip);
 
             bool gameOver = false;
 
@@ -249,7 +201,7 @@ public static class SpaceVorsApp
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
                     var gameFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip);
 
                     float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
                     if (frameElapsed < MaxFrameTime)
@@ -291,7 +243,7 @@ public static class SpaceVorsApp
                         if (choiceEntity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceEntity))
                         {
                             var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
-                            UpgradeOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
+                            UpgradableOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
 
                             ApplyUpgrade(em, playerEntity, turretEntities, selected);
                         }
@@ -312,7 +264,7 @@ public static class SpaceVorsApp
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
                     var pauseFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, GameInitializer.PlayerMaxHealth);
+                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, chosenShip);
                     Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions);
 
                     float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
@@ -327,14 +279,14 @@ public static class SpaceVorsApp
         Raylib.CloseWindow();
     }
 
-    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, List<Entity> turretEntities, UpgradeOption upgrade)
+    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, List<Entity> turretEntities, UpgradableOption upgrade)
     {
         var playerStats = em.GetComponent<Player>(playerEntity);
 
-        switch (upgrade)
+        switch (upgrade.Stat)
         {
             case UpgradeOption.FireRate:
-                foreach (var turretEntity in turretEntities)
+                foreach (var turretEntity in turretEntities.Where(t => em.GetComponent<Turret>(t).WeaponName == upgrade.WeaponName))
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
                     int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
@@ -342,6 +294,7 @@ public static class SpaceVorsApp
 
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter),
+                        WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
                         IsEnemy: turret.IsEnemy));
@@ -349,11 +302,12 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.ProjectileSpeed:
-                foreach (var turretEntity in turretEntities)
+                foreach (var turretEntity in turretEntities.Where(t => em.GetComponent<Turret>(t).WeaponName == upgrade.WeaponName))
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter),
+                        WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
                         IsEnemy: turret.IsEnemy));
