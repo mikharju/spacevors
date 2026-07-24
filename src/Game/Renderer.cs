@@ -575,9 +575,40 @@ public static class Renderer
             string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Weapon.Turrets.Count} turret{(ship.Weapon.Turrets.Count > 1 ? "s" : "")}";
             var borderColor = new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
             DrawShipCard(startX + i * (cardW + spacing), startY, ship.Name, stats, borderColor, $"{i + 1}");
+
+            var cardBottom = startY + cardH - 15;
+            DrawShipPreview((float)(startX + i * (cardW + spacing) + cardW / 2), cardBottom, ship, 1.6f);
         }
 
         Raylib.DrawText("Click a card or press 1, 2, 3", windowWidth / 2 - 140, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+    }
+
+    private static void DrawShipPreview(float cx, float cy, ShipType ship, float scale)
+    {
+        float noseLen = ship.NoseLength * scale;
+        float wingSpread = ship.WingSpread;
+
+        var tipLocal = new System.Numerics.Vector2(0f, -noseLen);
+        var leftLocal = new System.Numerics.Vector2(-noseLen * wingSpread, noseLen * 0.6f);
+        var rightLocal = new System.Numerics.Vector2(noseLen * wingSpread, noseLen * 0.6f);
+
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(cx + tipLocal.X, cy + tipLocal.Y),
+            new System.Numerics.Vector2(cx + leftLocal.X, cy + leftLocal.Y),
+            new System.Numerics.Vector2(cx + rightLocal.X, cy + rightLocal.Y),
+            new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255)
+        );
+
+        var tip = new System.Numerics.Vector2(0f, -noseLen * 1.3f);
+        var left = new System.Numerics.Vector2(-noseLen * wingSpread * 1.4f, noseLen * 0.6f * 1.5f);
+        var right = new System.Numerics.Vector2(noseLen * wingSpread * 1.4f, noseLen * 0.6f * 1.5f);
+
+        Raylib.DrawTriangleLines(
+            new System.Numerics.Vector2(cx + tip.X, cy + tip.Y),
+            new System.Numerics.Vector2(cx + left.X, cy + left.Y),
+            new System.Numerics.Vector2(cx + right.X, cy + right.Y),
+            new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 100)
+        );
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetShipCardRect(int index, int windowWidth, int windowHeight)
@@ -602,13 +633,13 @@ public static class Renderer
         Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
 
         int titleWidth = Raylib.MeasureText(title, 24);
-        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 30, 24, new Color(255, 255, 255, 255));
 
         string[] lines = details.Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {
             int lineW = Raylib.MeasureText(lines[i], 16);
-            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
+            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 65 + i * 20, 16, new Color(200, 200, 200, 255));
         }
     }
 
