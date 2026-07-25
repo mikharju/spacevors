@@ -380,34 +380,39 @@ public static class Renderer
 
         Raylib.DrawText($"Level {playerLevel}", windowWidth / 2 - Raylib.MeasureText($"Level {playerLevel}", 36) / 2, 20, 36, new Color(255, 255, 255, 255));
 
-        int cardW = 220;
+        int cardW = 196;
         int cardH = 140;
-        int spacing = 60;
-        int totalW = cardW * 2 + spacing;
-        int startX = (windowWidth - totalW) / 2;
+        int spacing = 10;
+        int maxCards = options?.Options.Length ?? 2;
+        int totalW = cardW * maxCards + spacing * (maxCards - 1);
+        int startX = Math.Max(10, (windowWidth - totalW) / 2);
         int startY = windowHeight / 2 - cardH / 2;
 
         if (options.HasValue)
         {
-            var optA = options.Value.OptionA;
-            var optB = options.Value.OptionB;
-            DrawCard(startX, startY, GetUpgradeLabel(optA), GetUpgradeValue(optA.Stat), new Color(50, 150, 255, 255), "1");
-            DrawCard(startX + cardW + spacing, startY, GetUpgradeLabel(optB), GetUpgradeValue(optB.Stat), new Color(50, 150, 255, 255), "2");
+            for (int i = 0; i < options.Value.Options.Length; i++)
+            {
+                var opt = options.Value.Options[i];
+                int x = startX + i * (cardW + spacing);
+                string key = (i + 1).ToString();
+                DrawCard(x, startY, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), key);
+            }
         }
 
-        Raylib.DrawText("Click a card or press 1, 2", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        int hintX = windowWidth / 2 - Raylib.MeasureText("Click a card or press keys", 16) / 2;
+        Raylib.DrawText("Click a card or press keys", hintX, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int windowWidth, int windowHeight)
     {
-        int cardW = 220;
+        int cardW = 196;
         int cardH = 140;
-        int spacing = 60;
-        int totalW = cardW * 2 + spacing;
-        int startX = (windowWidth - totalW) / 2;
+        int spacing = 10;
+        int totalW = cardW * 5 + spacing * 4;
+        int startX = Math.Max(10, (windowWidth - totalW) / 2);
         int startY = windowHeight / 2 - cardH / 2;
 
-        int x = index == 0 ? startX : startX + cardW + spacing;
+        int x = startX + index * (cardW + spacing);
         return (new Vector2(x, startY), cardW, cardH);
     }
 
@@ -459,6 +464,17 @@ public static class Renderer
             return $"new weapon {option.WeaponName}";
         }
 
+        if (string.IsNullOrEmpty(option.WeaponName))
+        {
+            return option.Stat switch
+            {
+                UpgradeOption.Hp => "hit points",
+                UpgradeOption.ForwardAcceleration => "forward acceleration",
+                UpgradeOption.TurnSpeed => "turn speed",
+                _ => $"{option.Stat}"
+            };
+        }
+
         return (option.WeaponName, option.Stat) switch
         {
             ("MachineGun", UpgradeOption.FireRate) => "machine gun attack speed",
@@ -478,6 +494,9 @@ public static class Renderer
         UpgradeOption.FireRate => "+15%",
         UpgradeOption.ProjectileSpeed => "+30%",
         UpgradeOption.PickupRadius => "+20%",
+        UpgradeOption.Hp => "+2",
+        UpgradeOption.ForwardAcceleration => "+10%",
+        UpgradeOption.TurnSpeed => "+10%",
         _ => "?"
     };
 

@@ -216,25 +216,36 @@ public static class SpaceVorsApp
                 else
                 {
                     // Game is paused — no simulation runs. Only handle choice input.
-                    bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
-                    bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
-
                     int selectedIndex = -1;
-                    if (pressed1) selectedIndex = 0;
-                    else if (pressed2) selectedIndex = 1;
+
+                    for (int i = 1; i <= 5; i++)
+                    {
+                        var key = i switch { 1 => KeyboardKey.One, 2 => KeyboardKey.Two, 3 => KeyboardKey.Three, 4 => KeyboardKey.Four, 5 => KeyboardKey.Five, _ => (KeyboardKey)0 };
+                        if (Raylib.IsKeyPressed(key))
+                        {
+                            selectedIndex = i - 1;
+                            break;
+                        }
+                    }
 
                     bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
                     if (clicked && selectedIndex < 0)
                     {
                         int mouseX = Raylib.GetMouseX();
                         int mouseY = Raylib.GetMouseY();
-                        for (int i = 0; i < 2; i++)
+                        var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                        if (choiceTuple.Entity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceTuple.Entity))
                         {
-                            var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, GetW(), GetH());
-                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                            var options = em.GetComponent<PendingUpgradeOptions>(choiceTuple.Entity);
+                            int optionCount = options.Options.Length;
+                            for (int i = 0; i < optionCount; i++)
                             {
-                                selectedIndex = i;
-                                break;
+                                var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, GetW(), GetH());
+                                if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                                {
+                                    selectedIndex = i;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -247,9 +258,10 @@ public static class SpaceVorsApp
                         if (choiceEntity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceEntity))
                         {
                             var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
-                            UpgradableOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
-
-                            ApplyUpgrade(em, playerEntity, selected);
+                            if (selectedIndex < options.Options.Length)
+                            {
+                                ApplyUpgrade(em, playerEntity, options.Options[selectedIndex]);
+                            }
                         }
 
                         foreach (var (entity, _) in em.GetEntitiesWithComponents<PendingChoice>().ToList())
@@ -396,6 +408,47 @@ public static class SpaceVorsApp
                             AutoTarget: turret.AutoTarget,
                             IsEnemy: turret.IsEnemy));
                     }
+                }
+                break;
+
+            case UpgradeOption.Hp:
+                if (!em.HasComponent<Health>(playerEntity)) break;
+                var currentHealth = em.GetComponent<Health>(playerEntity);
+                int newHp = currentHealth.Current + 2;
+                em.AddComponent(playerEntity, new Health(newHp));
+                break;
+
+            case UpgradeOption.ForwardAcceleration:
+                {
+                    var stats = em.GetComponent<Player>(playerEntity);
+                    float newThrust = stats.Thrust * 1.1f;
+                    em.AddComponent(playerEntity, new Player(
+                        newThrust,
+                        stats.SideThrust,
+                        stats.BackThrust,
+                        stats.Boost,
+                        stats.Radius,
+                        stats.Xp,
+                        stats.Level,
+                        stats.PickupRadius,
+                        stats.RotationSpeed));
+                }
+                break;
+
+            case UpgradeOption.TurnSpeed:
+                {
+                    var stats = em.GetComponent<Player>(playerEntity);
+                    float newRotationSpeed = stats.RotationSpeed * 1.1f;
+                    em.AddComponent(playerEntity, new Player(
+                        stats.Thrust,
+                        stats.SideThrust,
+                        stats.BackThrust,
+                        stats.Boost,
+                        stats.Radius,
+                        stats.Xp,
+                        stats.Level,
+                        stats.PickupRadius,
+                        newRotationSpeed));
                 }
                 break;
         }

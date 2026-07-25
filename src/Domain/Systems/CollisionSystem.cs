@@ -121,6 +121,8 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, mineEntity) in ammoToMineHits)
         {
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            var ammo = em.GetComponent<Ammo>(ammoEntity);
             if (!em.HasComponent<Health>(mineEntity)) continue;
             var health = em.GetComponent<Health>(mineEntity);
             if (health.Current <= 1)
@@ -134,7 +136,7 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                em.AddComponent(mineEntity, new Health(health.Current - 1));
+                em.AddComponent(mineEntity, new Health(health.Current - ammo.Damage));
             }
             entitiesToDestroy.Add(ammoEntity);
         }
@@ -213,9 +215,11 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, enemyShipEntity) in ammoToEnemyShipHits)
         {
+            if (!em.HasComponent<Ammo>(ammoEntity)) continue;
+            var ammo = em.GetComponent<Ammo>(ammoEntity);
             if (!em.HasComponent<Health>(enemyShipEntity)) continue;
             var health = em.GetComponent<Health>(enemyShipEntity);
-            if (health.Current <= 1)
+            if (health.Current <= ammo.Damage)
             {
                 if (!em.HasComponent<Position>(enemyShipEntity)) continue;
                 var shipPos = em.GetComponent<Position>(enemyShipEntity);
@@ -224,7 +228,7 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                em.AddComponent(enemyShipEntity, new Health(health.Current - 1));
+                em.AddComponent(enemyShipEntity, new Health(health.Current - ammo.Damage));
             }
             entitiesToDestroy.Add(ammoEntity);
         }

@@ -49,24 +49,13 @@ public class LevelUpSystem : GameSystem
         var weaponNames = turrets.Select(t => em.GetComponent<Turret>(t.Entity).WeaponName).Distinct().ToList();
         var allOptions = new List<UpgradableOption>();
 
-        foreach (var weapon in weaponNames)
-        {
-            allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
-            allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
-        }
-
-        var firstWeapon = weaponNames[0];
-        allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
-
         int playerLevel = em.GetComponent<Player>(playerEntity).Level;
         bool isMilestoneLevel = playerLevel % 5 == 0;
 
         if (isMilestoneLevel)
         {
-            foreach (var weapon in weaponNames)
-            {
-                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Damage));
-            }
+            // Milestone: HP upgrade + new weapons or damage upgrades (3 options)
+            allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
 
             var usedSlots = weaponNames.Count;
             int maxSlots = GetMaxWeaponSlots(em, playerEntity);
@@ -82,15 +71,46 @@ public class LevelUpSystem : GameSystem
                     allOptions.Add(new UpgradableOption(weapon.Name, UpgradeOption.Damage, IsNewWeapon: true));
                 }
             }
+
+            foreach (var weapon in weaponNames)
+            {
+                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Damage));
+            }
+
+            var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
+            int count = Math.Min(3, shuffled.Length);
+
+            var choiceEntity = em.CreateEntity();
+            em.AddComponent(choiceEntity, new Position(position));
+            em.AddComponent(choiceEntity, new PendingChoice());
+            em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[..count]));
         }
+        else
+        {
+            // Minor level: HP + weapon upgrades + engine upgrade (5 options)
+            allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
 
-        var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
-        int count = Math.Min(2, shuffled.Length);
+            foreach (var weapon in weaponNames)
+            {
+                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
+                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
+            }
 
-        var choiceEntity = em.CreateEntity();
-        em.AddComponent(choiceEntity, new Position(position));
-        em.AddComponent(choiceEntity, new PendingChoice());
-        em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[0], shuffled[count - 1]));
+            var firstWeapon = weaponNames[0];
+            allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
+
+            // Add engine upgrades (one of each type)
+            allOptions.Add(new UpgradableOption("", UpgradeOption.ForwardAcceleration));
+            allOptions.Add(new UpgradableOption("", UpgradeOption.TurnSpeed));
+
+            var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
+            int count = Math.Min(5, shuffled.Length);
+
+            var choiceEntity = em.CreateEntity();
+            em.AddComponent(choiceEntity, new Position(position));
+            em.AddComponent(choiceEntity, new PendingChoice());
+            em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[..count]));
+        }
     }
 
     private static int GetMaxWeaponSlots(EntityManager em, Entity playerEntity)
