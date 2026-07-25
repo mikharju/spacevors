@@ -11,21 +11,6 @@ Ship types have:
 
 At game start, player must select one ship to fly during the game.
 
-Upgrades will now be selected at each level as follows:
-
-Levels 1-4 minor upgrade
-- Hp upgrade 2 points
-- 3 random weapon upgrades for any weapon carried by player ship currently
-- 1 random engine upgrade
-
-Level 5 new weapon
-- Hp upgrade 5 points
-- 2 Random weapons
-
-Weapons already carried may appear too. They will upgrade damage of the duplicated weapon and won't occupy a new slot. 
-New weapons will occupy a weapon slot on the ship.
-
-After level 5, the same upgrade cycle will repeat, so four minor upgrades, then weapon upgrade and so on.
 
 # Implementation phases:
 
@@ -69,7 +54,25 @@ Point defence turret
 - slower projectile speed and fire rate than machine gun
 - has autotargeting
 
-## Phase 3 Engine upgrades
+# Phase 3 minor upgrade vs new weapon
+
+Upgrades will now be selected at each level as follows:
+
+Levels 1-4 minor upgrade
+- Hp upgrade 2 points
+- 3 random weapon upgrades for any weapon carried by player ship currently
+- 1 random engine upgrade
+
+Level 5 new weapon
+- Hp upgrade 5 points
+- 2 Random weapons
+
+Weapons already carried may appear too. They will upgrade damage of the duplicated weapon and won't occupy a new slot. 
+New weapons will occupy a weapon slot on the ship.
+
+After level 5, the same upgrade cycle will repeat, so four minor upgrades, then weapon upgrade and so on.
+
+## Phase 4 Engine upgrades
 
 Engine upgrades:
 - Forward acceleration 10%

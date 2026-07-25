@@ -164,7 +164,11 @@ public static class SpaceVorsApp
                     }
 
                     // Sync turret positions and rotations to player ship
-                    foreach (var turretEntity in turretEntities)
+                    var playerTuples = em.GetEntitiesWithComponents<Turret>()
+                        .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+                        .ToList();
+
+                    foreach (var (turretEntity, _) in playerTuples)
                     {
                         var offset = em.GetComponent<TurretOffset>(turretEntity);
                         var arcOffset = em.GetComponent<ArcOffset>(turretEntity);
@@ -245,7 +249,7 @@ public static class SpaceVorsApp
                             var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
                             UpgradableOption selected = selectedIndex == 0 ? options.OptionA : options.OptionB;
 
-                            ApplyUpgrade(em, playerEntity, turretEntities, selected);
+                            ApplyUpgrade(em, playerEntity, selected);
                         }
 
                         foreach (var (entity, _) in em.GetEntitiesWithComponents<PendingChoice>().ToList())
@@ -259,13 +263,20 @@ public static class SpaceVorsApp
                         upgradeOptions = em.GetComponent<PendingUpgradeOptions>(pendingTuple.Entity);
                     }
 
+                    int playerLevel = 1;
+                    var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+                    if (playerTuple.Entity.Value >= 0)
+                    {
+                        playerLevel = em.GetComponent<Player>(playerTuple.Entity).Level;
+                    }
+
                     var upgradeCam = em.GetComponent<Camera>(cameraEntity);
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
                     var pauseFrameStart = Raylib.GetTime();
                     Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, chosenShip);
-                    Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions);
+                    Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions, playerLevel);
 
                     float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
                     if (frameElapsed2 < MaxFrameTime)
@@ -279,37 +290,51 @@ public static class SpaceVorsApp
         Raylib.CloseWindow();
     }
 
-    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, List<Entity> turretEntities, UpgradableOption upgrade)
+    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)
     {
         var playerStats = em.GetComponent<Player>(playerEntity);
+        var allPlayerTurrets = em.GetEntitiesWithComponents<Turret>()
+            .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+            .ToList();
+
+        var existingWeaponNames = allPlayerTurrets.Select(t => em.GetComponent<Turret>(t.Entity).WeaponName).ToHashSet();
+        bool isNewWeapon = !existingWeaponNames.Contains(upgrade.WeaponName);
+
+        if (isNewWeapon && upgrade.Stat == UpgradeOption.Damage)
+        {
+            AddNewWeaponTurret(em, playerEntity, upgrade.WeaponName);
+            return;
+        }
 
         switch (upgrade.Stat)
         {
             case UpgradeOption.FireRate:
-                foreach (var turretEntity in turretEntities.Where(t => em.GetComponent<Turret>(t).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
                     int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
                     float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * 1.15f : turret.Weapon.FireRate;
 
                     em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter),
+                        Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
+                        AutoTarget: turret.AutoTarget,
                         IsEnemy: turret.IsEnemy));
                 }
                 break;
 
             case UpgradeOption.ProjectileSpeed:
-                foreach (var turretEntity in turretEntities.Where(t => em.GetComponent<Turret>(t).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
                 {
                     var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter),
+                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
+                        AutoTarget: turret.AutoTarget,
                         IsEnemy: turret.IsEnemy));
                 }
                 break;
@@ -326,6 +351,81 @@ public static class SpaceVorsApp
                     playerStats.PickupRadius * 1.2f,
                     playerStats.RotationSpeed));
                 break;
+
+            case UpgradeOption.AutoTargetRange:
+                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName && em.GetComponent<Turret>(t.Entity).AutoTarget))
+                {
+                    var turret = em.GetComponent<Turret>(turretEntity);
+                    em.AddComponent(turretEntity, new Turret(
+                        Weapon: turret.Weapon,
+                        WeaponName: turret.WeaponName,
+                        ArcAngle: turret.ArcAngle,
+                        Range: turret.Range * 1.15f,
+                        AutoTarget: true,
+                        IsEnemy: turret.IsEnemy));
+                }
+                break;
+
+            case UpgradeOption.ShotLifetime:
+                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                {
+                    var turret = em.GetComponent<Turret>(turretEntity);
+                    em.AddComponent(turretEntity, new Turret(
+                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * 1.15f, turret.Weapon.Damage),
+                        WeaponName: turret.WeaponName,
+                        ArcAngle: turret.ArcAngle,
+                        Range: turret.Range,
+                        AutoTarget: turret.AutoTarget,
+                        IsEnemy: turret.IsEnemy));
+                }
+                break;
+
+            case UpgradeOption.Damage:
+                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                {
+                    var turret = em.GetComponent<Turret>(turretEntity);
+                    int newDamage = turret.Weapon.Damage + 1;
+
+                    if (newDamage > turret.Weapon.Damage)
+                    {
+                        em.AddComponent(turretEntity, new Turret(
+                            Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, newDamage),
+                            WeaponName: turret.WeaponName,
+                            ArcAngle: turret.ArcAngle,
+                            Range: turret.Range,
+                            AutoTarget: turret.AutoTarget,
+                            IsEnemy: turret.IsEnemy));
+                    }
+                }
+                break;
         }
+    }
+
+    private static void AddNewWeaponTurret(EntityManager em, Entity playerEntity, string weaponName)
+    {
+        var slots = em.GetComponent<WeaponSlots>(playerEntity);
+        if (slots.Used >= slots.Max) return;
+
+        var playerPos = em.GetComponent<Position>(playerEntity);
+        var playerRot = em.GetComponent<Rotation>(playerEntity);
+
+        TurretDefinition definition = weaponName switch
+        {
+            "RailGun" => new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 500f, WeaponType.RailGun, AutoTarget: false),
+            "TwinChainGun" => new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 360f, WeaponType.TwinChainGun, AutoTarget: false),
+            "AcidBubbleSpray" => new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 250f, WeaponType.AcidBubbleSpray, AutoTarget: false),
+            "PointDefenceTurret" => new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.PointDefenceTurret),
+            _ => throw new InvalidOperationException($"Unknown weapon: {weaponName}")
+        };
+
+        var turretEntity = em.CreateEntity();
+        Vector2 worldPos = playerPos.Value;
+        em.AddComponent(turretEntity, new Position(worldPos));
+        em.AddComponent(turretEntity, new Rotation(definition.ArcOffset));
+        em.AddComponent(turretEntity, new Turret(Weapon: definition.Weapon.Stats, WeaponName: definition.Weapon.Name, ArcAngle: definition.ArcAngle, Range: definition.Range, AutoTarget: definition.AutoTarget));
+        em.AddComponent(turretEntity, new TurretOffset(definition.Offset));
+        em.AddComponent(turretEntity, new ArcOffset(definition.ArcOffset));
+
+        em.AddComponent(playerEntity, new WeaponSlots(slots.Used + 1, slots.Max));
     }
 }

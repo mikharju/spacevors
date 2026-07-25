@@ -20,6 +20,7 @@ public static class GameInitializer
 
         em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
+        em.AddComponent(playerEntity, new WeaponSlots(shipType.Weapon.Turrets.Count, shipType.MaxWeaponSlots));
 
         // Create camera
         var cameraEntity = em.CreateEntity();

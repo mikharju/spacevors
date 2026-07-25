@@ -5,4 +5,5 @@ public readonly record struct Turret(
     string WeaponName,
     float ArcAngle = MathF.PI / 2f,
     float Range = 360f,
+    bool AutoTarget = true,
     bool IsEnemy = false);

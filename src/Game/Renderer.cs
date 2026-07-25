@@ -130,6 +130,14 @@ public static class Renderer
             {
                 color = new Color(255, 230, 100, 255);
             }
+            else if (ammo.Radius >= 5f)
+            {
+                color = new Color(80, 255, 80, 255);
+            }
+            else if (ammo.Radius >= 3.7f)
+            {
+                color = new Color(100, 180, 255, 255);
+            }
             else
             {
                 color = new Color(255, 230, 100, 255);
@@ -366,9 +374,11 @@ public static class Renderer
         }
     }
 
-    public static void DrawUpgradeCards(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null)
+    public static void DrawUpgradeCards(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
+
+        Raylib.DrawText($"Level {playerLevel}", windowWidth / 2 - Raylib.MeasureText($"Level {playerLevel}", 36) / 2, 20, 36, new Color(255, 255, 255, 255));
 
         int cardW = 220;
         int cardH = 140;
@@ -442,15 +452,26 @@ public static class Renderer
         Raylib.DrawText(statValue, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
     }
 
-    private static string GetUpgradeLabel(UpgradableOption option) => (option.WeaponName, option.Stat) switch
+    private static string GetUpgradeLabel(UpgradableOption option)
     {
-        ("MachineGun", UpgradeOption.FireRate) => "machine gun attack speed",
-        ("MachineGun", UpgradeOption.ProjectileSpeed) => "machine gun projectile speed",
-        ("Shotgun", UpgradeOption.FireRate) => "side shot attack speed",
-        ("Shotgun", UpgradeOption.ProjectileSpeed) => "side shot projectile speed",
-        (_, UpgradeOption.PickupRadius) => "pickup radius",
-        _ => $"{option.WeaponName} {option.Stat}"
-    };
+        if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage)
+        {
+            return $"new weapon {option.WeaponName}";
+        }
+
+        return (option.WeaponName, option.Stat) switch
+        {
+            ("MachineGun", UpgradeOption.FireRate) => "machine gun attack speed",
+            ("MachineGun", UpgradeOption.ProjectileSpeed) => "machine gun projectile speed",
+            ("Shotgun", UpgradeOption.FireRate) => "side shot attack speed",
+            ("Shotgun", UpgradeOption.ProjectileSpeed) => "side shot projectile speed",
+            (_, UpgradeOption.AutoTargetRange) => "auto target range",
+            (_, UpgradeOption.ShotLifetime) => "shot lifetime",
+            (_, UpgradeOption.Damage) => $"{option.WeaponName} damage",
+            (_, UpgradeOption.PickupRadius) => "pickup radius",
+            _ => $"{option.WeaponName} {option.Stat}"
+        };
+    }
 
     private static string GetUpgradeValue(UpgradeOption option) => option switch
     {

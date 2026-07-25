@@ -4,6 +4,12 @@ namespace Spacevors.Domain.Systems;
 
 public class LevelUpSystem : GameSystem
 {
+    private static readonly WeaponType[] AllNewWeapons = [
+        WeaponType.RailGun,
+        WeaponType.TwinChainGun,
+        WeaponType.AcidBubbleSpray,
+        WeaponType.PointDefenceTurret];
+
     public override void Update(EntityManager em, float deltaTime)
     {
         var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
@@ -52,6 +58,32 @@ public class LevelUpSystem : GameSystem
         var firstWeapon = weaponNames[0];
         allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
 
+        int playerLevel = em.GetComponent<Player>(playerEntity).Level;
+        bool isMilestoneLevel = playerLevel % 5 == 0;
+
+        if (isMilestoneLevel)
+        {
+            foreach (var weapon in weaponNames)
+            {
+                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Damage));
+            }
+
+            var usedSlots = weaponNames.Count;
+            int maxSlots = GetMaxWeaponSlots(em, playerEntity);
+
+            if (usedSlots < maxSlots)
+            {
+                var availableWeapons = AllNewWeapons
+                    .Where(w => !weaponNames.Contains(w.Name))
+                    .ToList();
+
+                foreach (var weapon in availableWeapons)
+                {
+                    allOptions.Add(new UpgradableOption(weapon.Name, UpgradeOption.Damage, IsNewWeapon: true));
+                }
+            }
+        }
+
         var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
         int count = Math.Min(2, shuffled.Length);
 
@@ -59,5 +91,14 @@ public class LevelUpSystem : GameSystem
         em.AddComponent(choiceEntity, new Position(position));
         em.AddComponent(choiceEntity, new PendingChoice());
         em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[0], shuffled[count - 1]));
+    }
+
+    private static int GetMaxWeaponSlots(EntityManager em, Entity playerEntity)
+    {
+        if (em.HasComponent<WeaponSlots>(playerEntity))
+        {
+            return em.GetComponent<WeaponSlots>(playerEntity).Max;
+        }
+        return 3;
     }
 }

@@ -11,7 +11,8 @@ public readonly record struct ShipType(
     byte DrawG,
     byte DrawB,
     float NoseLength,
-    float WingSpread)
+    float WingSpread,
+    int MaxWeaponSlots)
 {
     public static ShipType Scout { get; } = new(
         "Scout",
@@ -24,20 +25,22 @@ public readonly record struct ShipType(
         DrawG: 220,
         DrawB: 80,
         NoseLength: 22f,
-        WingSpread: 0.35f);
+        WingSpread: 0.35f,
+        MaxWeaponSlots: 1);
 
     public static ShipType Fighter { get; } = new(
         "Fighter",
         "Pursuit engines, machinegun",
         EngineLayout.Pursuit,
-        WeaponLoadout.MachineGun,
+        WeaponLoadout.RailGun,
         MaxHealth: 10,
         Radius: 18f,
         DrawR: 100,
         DrawG: 160,
         DrawB: 255,
         NoseLength: 24f,
-        WingSpread: 0.4f);
+        WingSpread: 0.4f,
+        MaxWeaponSlots: 2);
 
     public static ShipType Heavy { get; } = new(
         "Heavy",
@@ -50,5 +53,6 @@ public readonly record struct ShipType(
         DrawG: 80,
         DrawB: 70,
         NoseLength: 26f,
-        WingSpread: 0.5f);
+        WingSpread: 0.5f,
+        MaxWeaponSlots: 3);
 }
