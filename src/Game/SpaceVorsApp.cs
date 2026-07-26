@@ -78,7 +78,7 @@ public static class SpaceVorsApp
 
             bool gameOver = false;
 
-            var systems = new GameSystem[] { new FiringSystem(), new PhysicsSystem(), new BlueSparkHomeSystem(), new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
+            var systems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem(), new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
 
             float accumulator = 0f;
             GameSystem.ResetElapsedTime();

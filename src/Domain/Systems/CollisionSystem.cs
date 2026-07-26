@@ -125,7 +125,7 @@ public class CollisionSystem : GameSystem
             var ammo = em.GetComponent<Ammo>(ammoEntity);
             if (!em.HasComponent<Health>(mineEntity)) continue;
             var health = em.GetComponent<Health>(mineEntity);
-            if (health.Current <= 1)
+            if (health.Current <= ammo.Damage)
             {
                 if (!em.HasComponent<Position>(mineEntity)) continue;
                 var minePos = em.GetComponent<Position>(mineEntity);
