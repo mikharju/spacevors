@@ -99,9 +99,11 @@ public class LevelUpSystem : GameSystem
             var firstWeapon = weaponNames[0];
             allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
 
-            // Add engine upgrades (one of each type)
+            // Add engine upgrades (all four types)
             allOptions.Add(new UpgradableOption("", UpgradeOption.ForwardAcceleration));
             allOptions.Add(new UpgradableOption("", UpgradeOption.TurnSpeed));
+            allOptions.Add(new UpgradableOption("", UpgradeOption.SideThrust));
+            allOptions.Add(new UpgradableOption("", UpgradeOption.BackThrust));
 
             var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
             int count = Math.Min(5, shuffled.Length);

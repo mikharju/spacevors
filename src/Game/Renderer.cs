@@ -471,6 +471,8 @@ public static class Renderer
                 UpgradeOption.Hp => "hit points",
                 UpgradeOption.ForwardAcceleration => "forward acceleration",
                 UpgradeOption.TurnSpeed => "turn speed",
+                UpgradeOption.SideThrust => "side thrust",
+                UpgradeOption.BackThrust => "back thrust",
                 _ => $"{option.Stat}"
             };
         }
@@ -497,6 +499,8 @@ public static class Renderer
         UpgradeOption.Hp => "+2",
         UpgradeOption.ForwardAcceleration => "+10%",
         UpgradeOption.TurnSpeed => "+10%",
+        UpgradeOption.SideThrust => "+10%",
+        UpgradeOption.BackThrust => "+10%",
         _ => "?"
     };
 

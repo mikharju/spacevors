@@ -451,6 +451,40 @@ public static class SpaceVorsApp
                         newRotationSpeed));
                 }
                 break;
+
+            case UpgradeOption.SideThrust:
+                {
+                    var stats = em.GetComponent<Player>(playerEntity);
+                    float newSideThrust = stats.SideThrust * 1.1f;
+                    em.AddComponent(playerEntity, new Player(
+                        stats.Thrust,
+                        newSideThrust,
+                        stats.BackThrust,
+                        stats.Boost,
+                        stats.Radius,
+                        stats.Xp,
+                        stats.Level,
+                        stats.PickupRadius,
+                        stats.RotationSpeed));
+                }
+                break;
+
+            case UpgradeOption.BackThrust:
+                {
+                    var stats = em.GetComponent<Player>(playerEntity);
+                    float newBackThrust = stats.BackThrust * 1.1f;
+                    em.AddComponent(playerEntity, new Player(
+                        stats.Thrust,
+                        stats.SideThrust,
+                        newBackThrust,
+                        stats.Boost,
+                        stats.Radius,
+                        stats.Xp,
+                        stats.Level,
+                        stats.PickupRadius,
+                        stats.RotationSpeed));
+                }
+                break;
         }
     }
 
