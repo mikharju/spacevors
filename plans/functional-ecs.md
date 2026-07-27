@@ -67,7 +67,7 @@ Each step commits all changes before the next step starts. This means:
 
 ## Command types
 
-Commands are small record structs:
+Each command is a separate `readonly record struct` implementing `ICommand`:
 
 ```
 CreateEntityWithComponentsCommand – entity created with all components bundled together
@@ -75,20 +75,22 @@ DestroyEntityCommand              – entity to remove (by ID)
 AddComponentCommand<T>            – add/update component on existing entity (T : notnull)
 ```
 
+`ICommand` is a marker interface (no members) that allows all command types to be collected in a single list inside `CommandBuffer` and pattern-matched against in the processor. C# record structs cannot inherit from abstract classes but can implement interfaces.
+
 `CreateEntityWithComponentsCommand` bundles entity creation and initial components into a single command. This avoids the chicken-and-egg problem where `CreateEntityCommand` can't return an ID before execution — systems need to know the entity ID to reference it in subsequent `AddComponentCommand`s, but the ID is only assigned during processing. By bundling all initial components with creation, systems never need a pre-assigned ID for new entities.
 
-`AddComponentCommand<T>` is generic — the component value is stored as its actual type T, not boxed into an object. Used to add/update components on existing (pre-existing) entities. All commands share a common non-generic base `Command`. Components are immutable records — adding the same component type again replaces it, handling both "add" and "update". The processor uses pattern matching on generic types to dispatch without runtime type checks or casting.
+`AddComponentCommand<T>` is generic — the component value is stored as its actual type T, not boxed into an object. Used to add/update components on existing (pre-existing) entities. Components are immutable records — adding the same component type again replaces it, handling both "add" and "update". The processor uses pattern matching on generic types to dispatch without runtime type checks or casting.
 
 Each system receives its own `CommandBuffer` instance during execution. Systems add commands directly to their buffer. After all systems in a phase complete, the buffers are collected into one batch and applied. This eliminates thread-safety concerns since each system writes to its own buffer with no contention.
 
 ## New files
 
 ### `src/Domain/Commands.cs`
-- `Command` abstract base class
-- `CreateEntityWithComponentsCommand : Command` – holds a collection of component values to add on the newly created entity. Processor assigns ID and adds all components atomically.
-- `AddComponentCommand<T> : Command where T : notnull` – holds entity ID and strongly typed component value (T) for existing entities
-- `DestroyEntityCommand : Command` – holds entity ID to remove
-- `CommandBuffer` – simple mutable list per system. No thread-safety needed since each system has its own buffer. Provides `Add(Command)` and `Commands` (read-only list).
+- `ICommand` — marker interface (no members) that all commands implement, enabling collection in a single list and pattern matching
+- `CreateEntityWithComponentsCommand : ICommand` — `readonly record struct` with entity ID placeholder + component values
+- `AddComponentCommand<T> : ICommand where T : notnull` — `readonly record struct`, holds entity ID and strongly typed component value (T)
+- `DestroyEntityCommand : ICommand` — `readonly record struct` holding entity ID to remove
+- `CommandBuffer` — simple mutable list per system. No thread-safety needed since each system has its own buffer. Provides `Add<T>(T command)` where T : ICommand and `Commands` (read-only collection of `IEnumerable<ICommand>`).
 
 ### `src/Domain/WorldView.cs`
 - Thin read-only accessor over `EntityManager`
@@ -100,18 +102,18 @@ Each system receives its own `CommandBuffer` instance during execution. Systems 
 - No `AddComponent`, no `DestroyEntity` — these are compile-time errors
 
 ### `src/Domain/CommandProcessor.cs`
-- Takes `EntityManager` + `IEnumerable<Command>`
+- Takes `EntityManager` + `IEnumerable<ICommand>`
 - Applies all commands in order using pattern matching on generic types: creates entities with bundled components, adds components to existing entities, destroys entities
 - No separate ID assignment — `CreateEntityWithComponentsCommand` handles creation and component addition atomically
 - Handles deduplication of destroy operations
-- No runtime type checks or casting — uses C# pattern matching with generic arms like `case AddComponentCommand<Velocity> cmd`
+- Pattern matches against `ICommand` interface arms like `case CreateEntityWithComponentsCommand cmd`, then uses generic pattern matching for typed commands: `case AddComponentCommand<Velocity> velocityCmd`
 
 ## Changes to existing files
 
 ### `src/Domain/EntityManager.cs`
 - Keep as-is — it remains the mutation target
 - Existing methods (`CreateEntity`, `DestroyEntity`, `AddComponent`) unchanged for GameInitializer and tests
-- Add `ProcessCommands(IEnumerable<Command>)` method
+- Add `ProcessCommands(IEnumerable<ICommand>)` method
 
 ### `src/Domain/System.cs`
 - Change signature: `public abstract void Update(WorldView view, float deltaTime, CommandBuffer commands)`
@@ -164,8 +166,8 @@ void RunPhase(GameSystem[] systems)
     var view = new WorldView(em);
     foreach (var system in systems)
     {
-        system.Update(view, FixedDeltaTime, system._commandBuffer);
         system._commandBuffer.Clear();
+        system.Update(view, FixedDeltaTime, system._commandBuffer);
     }
     commandProcessor.Process(systems.SelectMany(s => s._commandBuffer.Commands));
 }
@@ -244,9 +246,9 @@ Between phases, there is a full commit. Each new phase sees fresh data from the 
 ## Implementation phases
 
 ### Phase 1: Foundation
-- Create `Commands.cs` with command types (`CreateEntityWithComponentsCommand` holding object[], `AddComponentCommand<T>` generic, `DestroyEntityCommand`) and simple mutable `CommandBuffer` class (one per system, no thread-safety needed)
+- Create `Commands.cs` with `ICommand` marker interface, command types (`CreateEntityWithComponentsCommand`, `AddComponentCommand<T>`, `DestroyEntityCommand`) as readonly record structs implementing ICommand, and simple mutable `CommandBuffer` class (one per system, no thread-safety needed) holding `List<ICommand>`
 - Create `WorldView.cs` with read-only query methods delegating to EntityManager
-- Create `CommandProcessor.cs` — uses pattern matching on generic command types for dispatch; handles CreateEntityWithComponentsCommand by iterating object[] and adding each component via reflection
+- Create `CommandProcessor.cs` — takes `IEnumerable<ICommand>`, uses pattern matching on generic command types for dispatch; handles CreateEntityWithComponentsCommand by iterating component values and adding each 
 - Add tests for CommandProcessor and WorldView
 
 ### Phase 2: Simple systems (Phase 4 cleanup)
