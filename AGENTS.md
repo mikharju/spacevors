@@ -13,6 +13,9 @@ Optimize for:
 
 Never optimize prematurely.
 
+Do not implement any code changes unless explicitly commanded to do so. Only exception is if already implementing code changes and a new problem is reported. 
+If unclear, default to replies first, then documentation updates and only in very clear cases code changes.
+
 ## Rules
 
 - Prefer deleting code over adding code.

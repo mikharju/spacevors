@@ -31,7 +31,7 @@ Step 1 — Physics phase
 Step 2 — Combat phase
     ├── Create fresh WorldView (sees Step 1 mutations: updated positions, camera targets)
     ├── Run systems sequentially against this View, each with its own CommandBuffer
-    │   ├── TurretFiringSystem → [CreateEntity for ammo, AddComponent]
+    │   ├── TurretFiringSystem → [CreateEntityWithComponents for ammo]
     │   └── PickupMagnetSystem → [UpdatePosition, DestroyEntity, AddComponent]
     ├── Collect all command buffers into one batch
     ├── Apply commands from buffer to ECS (single mutation pass)
@@ -40,7 +40,7 @@ Step 2 — Combat phase
 Step 3 — Resolution phase
     ├── Create fresh WorldView (sees Step 2 mutations: ammo entities exist, positions updated)
     ├── Run systems sequentially against this View, each with its own CommandBuffer
-    │   └── CollisionSystem → [DestroyEntity, AddComponent, CreateEntity for effects]
+    │   └── CollisionSystem → [DestroyEntity, AddComponent, CreateEntityWithComponents for effects]
     ├── Collect all command buffers into one batch
     ├── Apply commands from buffer to ECS (single mutation pass)
     │
@@ -50,7 +50,7 @@ Step 4 — Cleanup phase
     ├── Run systems sequentially against this View, each with its own CommandBuffer
     │   ├── EffectSystem → [UpdateLifetime, DestroyEntity]
     │   ├── AmmoLifetimeSystem → [DestroyEntity]
-    │   └── LevelUpSystem → [CreateEntity for PendingChoice]
+    │   └── LevelUpSystem → [CreateEntityWithComponents for PendingChoice]
     ├── Collect all command buffers into one batch
     ├── Apply commands from buffer to ECS (single mutation pass)
     │
@@ -70,12 +70,14 @@ Each step commits all changes before the next step starts. This means:
 Commands are small record structs:
 
 ```
-CreateEntityCommand          – no data, processor assigns ID
-AddComponentCommand<T>       – entity + strongly typed component value (T : notnull)
-DestroyEntityCommand         – entity to remove
+CreateEntityWithComponentsCommand – entity created with all components bundled together
+DestroyEntityCommand              – entity to remove (by ID)
+AddComponentCommand<T>            – add/update component on existing entity (T : notnull)
 ```
 
-`AddComponentCommand<T>` is generic — the component value is stored as its actual type T, not boxed into an object. All commands share a common non-generic base `Command`. Components are immutable records — adding the same component type again replaces it, handling both "add" and "update". The processor uses pattern matching on generic types to dispatch without runtime type checks or casting.
+`CreateEntityWithComponentsCommand` bundles entity creation and initial components into a single command. This avoids the chicken-and-egg problem where `CreateEntityCommand` can't return an ID before execution — systems need to know the entity ID to reference it in subsequent `AddComponentCommand`s, but the ID is only assigned during processing. By bundling all initial components with creation, systems never need a pre-assigned ID for new entities.
+
+`AddComponentCommand<T>` is generic — the component value is stored as its actual type T, not boxed into an object. Used to add/update components on existing (pre-existing) entities. All commands share a common non-generic base `Command`. Components are immutable records — adding the same component type again replaces it, handling both "add" and "update". The processor uses pattern matching on generic types to dispatch without runtime type checks or casting.
 
 Each system receives its own `CommandBuffer` instance during execution. Systems add commands directly to their buffer. After all systems in a phase complete, the buffers are collected into one batch and applied. This eliminates thread-safety concerns since each system writes to its own buffer with no contention.
 
@@ -83,9 +85,9 @@ Each system receives its own `CommandBuffer` instance during execution. Systems 
 
 ### `src/Domain/Commands.cs`
 - `Command` abstract base class
-- `CreateEntityCommand : Command`
-- `AddComponentCommand<T> : Command where T : notnull` – holds entity ID and strongly typed component value (T)
-- `DestroyEntityCommand : Command`
+- `CreateEntityWithComponentsCommand : Command` – holds a collection of component values to add on the newly created entity. Processor assigns ID and adds all components atomically.
+- `AddComponentCommand<T> : Command where T : notnull` – holds entity ID and strongly typed component value (T) for existing entities
+- `DestroyEntityCommand : Command` – holds entity ID to remove
 - `CommandBuffer` – simple mutable list per system. No thread-safety needed since each system has its own buffer. Provides `Add(Command)` and `Commands` (read-only list).
 
 ### `src/Domain/WorldView.cs`
@@ -99,8 +101,9 @@ Each system receives its own `CommandBuffer` instance during execution. Systems 
 
 ### `src/Domain/CommandProcessor.cs`
 - Takes `EntityManager` + `IEnumerable<Command>`
-- Applies all commands in order using pattern matching on generic types: creates entities (assigning IDs), adds components, destroys entities
-- Handles deduplication of destroy operations and entity creation ID assignment
+- Applies all commands in order using pattern matching on generic types: creates entities with bundled components, adds components to existing entities, destroys entities
+- No separate ID assignment — `CreateEntityWithComponentsCommand` handles creation and component addition atomically
+- Handles deduplication of destroy operations
 - No runtime type checks or casting — uses C# pattern matching with generic arms like `case AddComponentCommand<Velocity> cmd`
 
 ## Changes to existing files
@@ -144,11 +147,11 @@ Systems are grouped into phases based on data dependencies. Systems within a pha
 4. **CameraSystem** – read player pos, write camera target command in buffer
 5. **CooldownHelper** – becomes a pure function: `GetCooldown(view, entity)`, command-based set via buffer
 6. **PickupMagnetSystem** – reads + writes position/velocity, destroys collected items, applies XP/health via commands in buffer
-7. **MineDriftSystem**, **MineRespawnSystem**, **EnemyShipSpawnSystem** – spawning systems add create/add commands to buffer
+7. **MineDriftSystem**, **MineRespawnSystem**, **EnemyShipSpawnSystem** – spawning systems use CreateEntityWithComponentsCommand with bundled components
 8. **EnemyShipSystem** – AI logic adds commands to buffer
-9. **TurretFiringSystem** – target finding (read-only) + firing (adds ammo creation commands to buffer)
-10. **LevelUpSystem** – reads player XP, creates PendingChoice entity via command in buffer
-11. **CollisionSystem** – most complex: many interactions, spawns effects, adds commands to buffer
+9. **TurretFiringSystem** – target finding (read-only) + firing (adds CreateEntityWithComponentsCommand for ammo with bundled components)
+10. **LevelUpSystem** – reads player XP, creates PendingChoice entity via CreateEntityWithComponentsCommand in buffer
+11. **CollisionSystem** – most complex: many interactions, spawns effects via CreateEntityWithComponentsCommand, adds commands to buffer
 
 ## Main loop changes (`SpaceVorsApp.cs`)
 
@@ -241,9 +244,9 @@ Between phases, there is a full commit. Each new phase sees fresh data from the 
 ## Implementation phases
 
 ### Phase 1: Foundation
-- Create `Commands.cs` with command types (`CreateEntityCommand`, `AddComponentCommand<T>` generic, `DestroyEntityCommand`) and simple mutable `CommandBuffer` class (one per system, no thread-safety needed)
+- Create `Commands.cs` with command types (`CreateEntityWithComponentsCommand` holding object[], `AddComponentCommand<T>` generic, `DestroyEntityCommand`) and simple mutable `CommandBuffer` class (one per system, no thread-safety needed)
 - Create `WorldView.cs` with read-only query methods delegating to EntityManager
-- Create `CommandProcessor.cs` — uses pattern matching on generic command types for dispatch
+- Create `CommandProcessor.cs` — uses pattern matching on generic command types for dispatch; handles CreateEntityWithComponentsCommand by iterating object[] and adding each component via reflection
 - Add tests for CommandProcessor and WorldView
 
 ### Phase 2: Simple systems (Phase 4 cleanup)
@@ -263,10 +266,10 @@ Between phases, there is a full commit. Each new phase sees fresh data from the 
 - Refactor CooldownHelper — pure function for get, command-based set via buffer
 
 ### Phase 6: Resolution phase
-- Refactor CollisionSystem (largest refactor) — takes View + CommandBuffer, adds collision resolution commands
+- Refactor CollisionSystem (largest refactor) — takes View + CommandBuffer, uses CreateEntityWithComponentsCommand for spawning effects
 
 ### Phase 7: Progression phase
-- Refactor LevelUpSystem — takes View + CommandBuffer, adds level-up choice entity creation command
+- Refactor LevelUpSystem — takes View + CommandBuffer, adds level-up choice entity creation via CreateEntityWithComponentsCommand
 
 ### Phase 8: Sequential integration
 - Instantiate all systems once as class-level fields in SpaceVorsApp.cs
