@@ -79,3 +79,16 @@ Engine upgrades:
 - Faster turning 10%
 - Faster side thrust 10%
 - Faster backwards thrust 10%
+
+## Phase 5 Upgrades defined with weapon types
+
+WeaponTypes should include definition of what upgrades they can get.
+
+Each possible upgrade should have:
+- name
+- list of upgrade changes consisting of: what stat can change and by how much and is it additive or multiplicative
+
+Weapon type can have many different minor upgrade options and one major upgrade option which is applied if player chooses an existing weapon type
+in new weapon upgrade.
+
+When one of these weapon types is equipped on the player ship, it's upgrades are available to be randomly selected as one upgrade choice during minor level up.
