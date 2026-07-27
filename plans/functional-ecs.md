@@ -21,7 +21,7 @@ Frame start
     ▼
 Step 1 — Physics phase
     ├── Create WorldView (read-only accessor over EntityManager storage)
-    ├── Run systems in parallel against this View, each with its own CommandBuffer
+    ├── Run systems sequentially against this View, each with its own CommandBuffer
     │   ├── PhysicsSystem → [UpdateVelocity, UpdatePosition]
     │   └── CameraSystem → [UpdateCameraTarget]
     ├── Collect all command buffers into one batch
@@ -30,7 +30,7 @@ Step 1 — Physics phase
     ▼
 Step 2 — Combat phase
     ├── Create fresh WorldView (sees Step 1 mutations: updated positions, camera targets)
-    ├── Run systems in parallel against this View, each with its own CommandBuffer
+    ├── Run systems sequentially against this View, each with its own CommandBuffer
     │   ├── TurretFiringSystem → [CreateEntity for ammo, AddComponent]
     │   └── PickupMagnetSystem → [UpdatePosition, DestroyEntity, AddComponent]
     ├── Collect all command buffers into one batch
@@ -39,7 +39,7 @@ Step 2 — Combat phase
     ▼
 Step 3 — Resolution phase
     ├── Create fresh WorldView (sees Step 2 mutations: ammo entities exist, positions updated)
-    ├── Run systems in parallel against this View, each with its own CommandBuffer
+    ├── Run systems sequentially against this View, each with its own CommandBuffer
     │   └── CollisionSystem → [DestroyEntity, AddComponent, CreateEntity for effects]
     ├── Collect all command buffers into one batch
     ├── Apply commands from buffer to ECS (single mutation pass)
@@ -47,7 +47,7 @@ Step 3 — Resolution phase
     ▼
 Step 4 — Cleanup phase
     ├── Create fresh WorldView (sees Step 3 mutations: explosions, sparks spawned)
-    ├── Run systems in parallel against this View, each with its own CommandBuffer
+    ├── Run systems sequentially against this View, each with its own CommandBuffer
     │   ├── EffectSystem → [UpdateLifetime, DestroyEntity]
     │   ├── AmmoLifetimeSystem → [DestroyEntity]
     │   └── LevelUpSystem → [CreateEntity for PendingChoice]
@@ -152,15 +152,19 @@ Systems are grouped into phases based on data dependencies. Systems within a pha
 
 ## Main loop changes (`SpaceVorsApp.cs`)
 
+### Sequential (initial integration)
+
 Helper method:
 ```csharp
-async Task RunPhase(GameSystem[] systems)
+void RunPhase(GameSystem[] systems)
 {
     var view = new WorldView(em);
-    var buffers = systems.Select(_ => new CommandBuffer()).ToArray();
-    var tasks = systems.Zip(buffers, (s, b) => Task.Run(() => s.Update(view, FixedDeltaTime, b)));
-    await Task.WhenAll(tasks);
-    commandProcessor.Process(buffers.SelectMany(b => b.Commands));
+    foreach (var system in systems)
+    {
+        system.Update(view, FixedDeltaTime, system._commandBuffer);
+        system._commandBuffer.Clear();
+    }
+    commandProcessor.Process(systems.SelectMany(s => s._commandBuffer.Commands));
 }
 ```
 
@@ -174,18 +178,34 @@ Main loop:
 ```csharp
 while (accumulator >= FixedDeltaTime)
 {
-    await RunPhase(_movementSystems);
-    await RunPhase(_actionSystems);
-    await RunPhase(_resolutionSystems);
-    await RunPhase(_cleanupSystems);
+    RunPhase(_movementSystems);
+    RunPhase(_actionSystems);
+    RunPhase(_resolutionSystems);
+    RunPhase(_cleanupSystems);
 
     accumulator -= FixedDeltaTime;
 }
 ```
 
-Each system is instantiated once and reused across frames (systems hold mutable state like timers). The arrays are immutable references to the same system instances. Each phase creates fresh CommandBuffers — one per system — so there is no contention between systems. Commands from all buffers are collected via `SelectMany` and applied in a single pass after all systems complete.
+Each system is instantiated once and reused across frames (systems hold mutable state like timers). The arrays are immutable references to the same system instances. Each system holds its own `CommandBuffer` field, allocated once at construction time. At the start of each step, buffers are cleared before use — no per-frame allocations. Commands from all buffers are collected via `SelectMany` and applied in a single pass after all systems complete.
 
-## Parallelism model
+### Parallel (optional future optimization)
+
+When profiling shows parallel execution is beneficial:
+```csharp
+async Task RunPhaseParallel(GameSystem[] systems)
+{
+    var view = new WorldView(em);
+    foreach (var system in systems)
+        system._commandBuffer.Clear();
+    
+    var tasks = systems.Select(s => Task.Run(() => s.Update(view, FixedDeltaTime, s._commandBuffer)));
+    await Task.WhenAll(tasks);
+    commandProcessor.Process(systems.SelectMany(s => s._commandBuffer.Commands));
+}
+```
+
+## Parallelism model (future)
 
 Within each phase, systems run in parallel:
 
@@ -193,7 +213,7 @@ Within each phase, systems run in parallel:
 - **Writes:** each system writes to its own `CommandBuffer` — no contention, no locking required
 - **Mutation:** happens once after all systems finish, via `CommandProcessor.Process()` on collected commands — sequential but fast (just array operations)
 
-Between phases, there is a full commit. Each new phase sees fresh data from the previous phase's mutations. This gives us both parallelism within phases and correct ordering across phases. Fresh CommandBuffers are created each phase — no reuse or clearing needed.
+Between phases, there is a full commit. Each new phase sees fresh data from the previous phase's mutations. This gives us both parallelism within phases and correct ordering across phases. CommandBuffers are reused across frames — cleared at the start of each step to avoid allocations.
 
 ## Tradeoffs
 
@@ -202,12 +222,10 @@ Between phases, there is a full commit. Each new phase sees fresh data from the 
 - Clear separation: what the world looks like vs what we want to change it to
 - Deterministic: commands applied in known order at end of each phase
 - No accidental mutations during iteration (View has no mutation methods)
-- True parallelism within phases — independent systems benefit
 - Correct inter-phase ordering — physics updates visible before collision checks
 
 ### Cons
 - CommandBuffer is mutable — systems have a side effect (adding to buffer), slightly less pure than returning a collection
-- Per-system buffers create allocations each phase (one buffer per system per frame)
 - More indirection (system → commands buffer → processor)
 - CollisionSystem's complex multi-pass logic needs careful handling as a single system
 - More phases = more View creations and command processing passes, but each pass is fast
@@ -250,13 +268,20 @@ Between phases, there is a full commit. Each new phase sees fresh data from the 
 ### Phase 7: Progression phase
 - Refactor LevelUpSystem — takes View + CommandBuffer, adds level-up choice entity creation command
 
-### Phase 8: Integration
+### Phase 8: Sequential integration
 - Instantiate all systems once as class-level fields in SpaceVorsApp.cs
+- Add `CommandBuffer` field to each system (allocated at construction)
 - Create explicit immutable arrays for each phase (movement, actions, resolution, cleanup)
-- Add `RunPhase(GameSystem[] systems)` helper that creates WorldView, creates one CommandBuffer per system, runs systems in parallel via Task.Run, collects buffers via SelectMany, and processes commands
+- Add `RunPhase(GameSystem[] systems)` helper that creates WorldView, runs systems sequentially, clears each buffer after use, and processes collected commands
 - Update main loop to call RunPhase with the four phase collections
 - Full game test
 - Verify behavior matches pre-refactoring output
+
+### Phase 9: Parallel execution (optional)
+- Only if profiling shows parallelism is beneficial
+- Add `RunPhaseParallel(GameSystem[] systems)` helper that clears all buffers, runs systems via Task.Run in parallel, collects commands, and processes them
+- Update main loop to use parallel version
+- Verify behavior matches sequential output
 
 ## Inter-phase data flow
 
@@ -274,4 +299,10 @@ Systems within the same phase have no data dependencies and can safely run in pa
 
 **Decision: one batch per phase, applied before next phase starts.**
 
-Each phase runs all its systems in parallel against a shared View, each system writing to its own CommandBuffer. After all systems complete, buffers are collected into one batch and applied to ECS. The next phase creates a fresh View and repeats. This gives us parallelism within phases while preserving correct ordering across phases, with no thread-safety concerns since each system has its own buffer. The phased approach matches the current sequential system execution order (Physics → Actions → Collision → Cleanup) but enables parallelism where possible.
+Each phase runs all its systems sequentially (initially) against a shared View, each system writing to its own CommandBuffer. After all systems complete, buffers are collected into one batch and applied to ECS. The next phase creates a fresh View and repeats. This gives us correct ordering across phases with no thread-safety concerns since each system has its own buffer. Parallelism within phases is deferred until profiling shows it's needed. The phased approach matches the current sequential system execution order (Physics → Actions → Collision → Cleanup) but enables parallelism where possible in the future.
+
+## Decision: CommandBuffer lifecycle
+
+**Decision: allocate once per system, clear at start of each step.**
+
+Each system holds its own `CommandBuffer` as a field, allocated at construction time. Buffers are cleared before use within each phase (after systems write to them), not recreated each frame. This avoids per-frame allocations while keeping the isolation benefit of per-system buffers.
