@@ -4,20 +4,18 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSystem : GameSystem
 {
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
-        var ships = em.GetEntitiesWithComponents<EnemyShip>().ToList();
-
-        foreach (var (shipEntity, ship) in ships)
+        foreach (var (shipEntity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
         {
             if (!hasPlayer) continue;
 
-            var shipPos = em.GetComponent<Position>(shipEntity);
-            var playerPos = em.GetComponent<Position>(playerEntity);
+            var shipPos = view.GetComponent<Position>(shipEntity);
+            var playerPos = view.GetComponent<Position>(playerEntity);
 
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
@@ -27,36 +25,32 @@ public class EnemyShipSystem : GameSystem
             float dist = (float)Math.Sqrt(distSq);
             var toPlayerDir = toPlayer / dist;
 
-            // Turn toward player
             float targetAngle = (float)Math.Atan2(toPlayerDir.X, -toPlayerDir.Y);
-            var currentRot = em.GetComponent<Rotation>(shipEntity);
+            var currentRot = view.GetComponent<Rotation>(shipEntity);
             float angleDiff = NormalizeAngle(targetAngle - currentRot.Angle);
 
             float maxTurn = ship.TurnRate * deltaTime;
             if (Math.Abs(angleDiff) < maxTurn)
             {
-                em.AddComponent(shipEntity, new Rotation(targetAngle));
+                commands.Add(new AddComponentCommand<Rotation>(shipEntity, new Rotation(targetAngle)));
             }
             else
             {
-                em.AddComponent(shipEntity, new Rotation(currentRot.Angle + Math.Sign(angleDiff) * maxTurn));
+                commands.Add(new AddComponentCommand<Rotation>(shipEntity, new Rotation(currentRot.Angle + Math.Sign(angleDiff) * maxTurn)));
             }
 
-            // Phase 3: Inside firing range - only track player, no acceleration
             if (dist <= ship.FiringRange) continue;
 
-            // Phase 2: Chase phase - accelerate toward player
-            var currentVel = em.HasComponent<Velocity>(shipEntity)
-                ? em.GetComponent<Velocity>(shipEntity).Value
+            Vector2 currentVel = view.HasComponent<Velocity>(shipEntity)
+                ? view.GetComponent<Velocity>(shipEntity).Value
                 : Vector2.Zero;
 
             var targetAccel = toPlayerDir * ship.Acceleration;
-            em.AddComponent(shipEntity, new Acceleration(targetAccel));
+            commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(targetAccel)));
 
-            // Integrate acceleration into velocity
-            if (em.HasComponent<Acceleration>(shipEntity))
+            if (view.HasComponent<Acceleration>(shipEntity))
             {
-                var accel = em.GetComponent<Acceleration>(shipEntity).Value;
+                var accel = view.GetComponent<Acceleration>(shipEntity).Value;
                 var newVel = currentVel + accel * deltaTime;
 
                 if (newVel.Magnitude > ship.Speed)
@@ -64,7 +58,7 @@ public class EnemyShipSystem : GameSystem
                     newVel = newVel / newVel.Magnitude * ship.Speed;
                 }
 
-                em.AddComponent(shipEntity, new Velocity(newVel));
+                commands.Add(new AddComponentCommand<Velocity>(shipEntity, new Velocity(newVel)));
             }
         }
     }

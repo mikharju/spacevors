@@ -10,22 +10,22 @@ public class LevelUpSystem : GameSystem
         WeaponType.AcidBubbleSpray,
         WeaponType.PointDefenceTurret];
 
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
 
-        if (!em.HasComponent<Position>(playerEntity)) return;
-        var playerPos = em.GetComponent<Position>(playerEntity);
+        if (!view.HasComponent<Position>(playerEntity)) return;
+        var playerPos = view.GetComponent<Position>(playerEntity);
 
-        var playerStats = em.GetComponent<Player>(playerEntity);
+        var playerStats = view.GetComponent<Player>(playerEntity);
         int xpThreshold = playerStats.Level * 10;
 
         if (playerStats.Xp >= xpThreshold)
         {
-            SpawnLevelUpChoice(em, playerEntity, playerPos.Value);
-            em.AddComponent(playerEntity, new Player(
+            SpawnLevelUpChoice(view, playerEntity, playerPos.Value, commands);
+            commands.Add(new AddComponentCommand<Player>(playerEntity, new Player(
                 playerStats.Thrust,
                 playerStats.SideThrust,
                 playerStats.BackThrust,
@@ -34,31 +34,30 @@ public class LevelUpSystem : GameSystem
                 Xp: playerStats.Xp,
                 Level: playerStats.Level + 1,
                 PickupRadius: playerStats.PickupRadius,
-                RotationSpeed: playerStats.RotationSpeed));
+                RotationSpeed: playerStats.RotationSpeed)));
         }
     }
 
-    private void SpawnLevelUpChoice(EntityManager em, Entity playerEntity, Vector2 position)
+    private void SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, CommandBuffer commands)
     {
-        var turrets = em.GetEntitiesWithComponents<Turret>()
-            .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+        var turrets = view.GetEntitiesWithComponents<Turret>()
+            .Where(t => !t.Value.IsEnemy)
             .ToList();
 
         if (turrets.Count == 0) return;
 
-        var weaponNames = turrets.Select(t => em.GetComponent<Turret>(t.Entity).WeaponName).Distinct().ToList();
+        var weaponNames = turrets.Select(t => t.Value.WeaponName).Distinct().ToList();
         var allOptions = new List<UpgradableOption>();
 
-        int playerLevel = em.GetComponent<Player>(playerEntity).Level;
+        int playerLevel = view.GetComponent<Player>(playerEntity).Level;
         bool isMilestoneLevel = playerLevel % 5 == 0;
 
         if (isMilestoneLevel)
         {
-            // Milestone: HP upgrade + new weapons or damage upgrades (3 options)
             allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
 
             var usedSlots = weaponNames.Count;
-            int maxSlots = GetMaxWeaponSlots(em, playerEntity);
+            int maxSlots = GetMaxWeaponSlots(view, playerEntity);
 
             if (usedSlots < maxSlots)
             {
@@ -80,14 +79,14 @@ public class LevelUpSystem : GameSystem
             var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
             int count = Math.Min(3, shuffled.Length);
 
-            var choiceEntity = em.CreateEntity();
-            em.AddComponent(choiceEntity, new Position(position));
-            em.AddComponent(choiceEntity, new PendingChoice());
-            em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[..count]));
+            commands.Add(new CreateEntityWithComponentsCommand(
+                new Position(position),
+                new PendingChoice(),
+                new PendingUpgradeOptions(shuffled[..count])
+            ));
         }
         else
         {
-            // Minor level: HP + weapon upgrades + engine upgrade (5 options)
             allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
 
             foreach (var weapon in weaponNames)
@@ -99,7 +98,6 @@ public class LevelUpSystem : GameSystem
             var firstWeapon = weaponNames[0];
             allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
 
-            // Add engine upgrades (all four types)
             allOptions.Add(new UpgradableOption("", UpgradeOption.ForwardAcceleration));
             allOptions.Add(new UpgradableOption("", UpgradeOption.TurnSpeed));
             allOptions.Add(new UpgradableOption("", UpgradeOption.SideThrust));
@@ -108,18 +106,19 @@ public class LevelUpSystem : GameSystem
             var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
             int count = Math.Min(5, shuffled.Length);
 
-            var choiceEntity = em.CreateEntity();
-            em.AddComponent(choiceEntity, new Position(position));
-            em.AddComponent(choiceEntity, new PendingChoice());
-            em.AddComponent(choiceEntity, new PendingUpgradeOptions(shuffled[..count]));
+            commands.Add(new CreateEntityWithComponentsCommand(
+                new Position(position),
+                new PendingChoice(),
+                new PendingUpgradeOptions(shuffled[..count])
+            ));
         }
     }
 
-    private static int GetMaxWeaponSlots(EntityManager em, Entity playerEntity)
+    private static int GetMaxWeaponSlots(WorldView view, Entity playerEntity)
     {
-        if (em.HasComponent<WeaponSlots>(playerEntity))
+        if (view.HasComponent<WeaponSlots>(playerEntity))
         {
-            return em.GetComponent<WeaponSlots>(playerEntity).Max;
+            return view.GetComponent<WeaponSlots>(playerEntity).Max;
         }
         return 3;
     }

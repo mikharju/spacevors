@@ -10,9 +10,9 @@ public class EnemyShipSpawnSystem : GameSystem
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
 
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
@@ -22,12 +22,12 @@ public class EnemyShipSpawnSystem : GameSystem
 
         if (_timer > 0f) return;
 
-        int activeShips = em.GetEntitiesWithComponents<EnemyShip>().Count();
+        int activeShips = view.GetEntitiesWithComponents<EnemyShip>().Count();
         if (activeShips >= MaxEnemyShips) return;
 
-        var playerPos = em.GetComponent<Position>(playerEntity);
-        var playerVel = em.HasComponent<Velocity>(playerEntity)
-            ? em.GetComponent<Velocity>(playerEntity).Value
+        var playerPos = view.GetComponent<Position>(playerEntity);
+        Vector2 playerVel = view.HasComponent<Velocity>(playerEntity)
+            ? view.GetComponent<Velocity>(playerEntity).Value
             : Vector2.Zero;
 
         float velMagnitude = playerVel.Magnitude;
@@ -49,23 +49,26 @@ public class EnemyShipSpawnSystem : GameSystem
         float sx = playerPos.Value.X + spawnDir.X * spawnDist;
         float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
 
-        if (!IsSpawnClear(em, new Vector2(sx, sy))) return;
+        if (!IsSpawnClear(view, new Vector2(sx, sy))) return;
 
-        var shipEntity = em.CreateEntity();
+        var spawnPos = new Vector2(sx, sy);
         float variantRoll = (float)rand.NextDouble();
 
+        object[] components;
         if (variantRoll < 0.333f)
         {
-            EnemyShipFactory.AddInterceptorComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateInterceptorComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
         }
         else if (variantRoll < 0.666f)
         {
-            EnemyShipFactory.AddHeavyCannonComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateHeavyCannonComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
         }
         else
         {
-            EnemyShipFactory.AddEnemyShipComponents(em, shipEntity, new Vector2(sx, sy), Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateEnemyShipComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
         }
+
+        commands.Add(new CreateEntityWithComponentsCommand(components));
 
         float elapsed = ElapsedTime;
         float rampDuration = 180f;
@@ -76,11 +79,11 @@ public class EnemyShipSpawnSystem : GameSystem
         _timer = currentMinInterval + (float)rand.NextDouble() * (currentMaxInterval - currentMinInterval);
     }
 
-    private bool IsSpawnClear(EntityManager em, Vector2 spawnPos)
+    private bool IsSpawnClear(WorldView view, Vector2 spawnPos)
     {
-        foreach (var (shipEntity, ship) in em.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (shipEntity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
         {
-            var pos = em.GetComponent<Position>(shipEntity);
+            var pos = view.GetComponent<Position>(shipEntity);
             float dx = pos.Value.X - spawnPos.X;
             float dy = pos.Value.Y - spawnPos.Y;
             float distSq = dx * dx + dy * dy;

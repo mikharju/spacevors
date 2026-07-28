@@ -78,7 +78,10 @@ public static class SpaceVorsApp
 
             bool gameOver = false;
 
-            var systems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem(), new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new AmmoLifetimeSystem(), new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSpawnSystem(), new EnemyShipSystem(), new CameraSystem(), new TurretFiringSystem(), new EffectSystem() };
+            var movementSystems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem() };
+            var actionSystems = new GameSystem[] { new TurretFiringSystem(), new EnemyShipSpawnSystem() };
+            var resolutionSystems = new GameSystem[] { new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new EffectSystem() };
+            var cleanupSystems = new GameSystem[] { new AmmoLifetimeSystem(), new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSystem(), new CameraSystem() };
 
             float accumulator = 0f;
             GameSystem.ResetElapsedTime();
@@ -187,13 +190,21 @@ public static class SpaceVorsApp
                     // Fixed timestep simulation
                     while (accumulator >= FixedDeltaTime)
                     {
-                        foreach (var system in systems)
-                        {
-                            var sw = System.Diagnostics.Stopwatch.StartNew();
-                            system.Update(em, FixedDeltaTime);
-                            sw.Stop();
-                            DiagnosticLogger.LogSystem(system.GetType().Name, sw.ElapsedTicks);
-                        }
+                        var view = new WorldView(em);
+                        var commands = new CommandBuffer();
+
+                        RunPhase(view, commands, movementSystems);
+                        commands.Apply(em);
+
+                        RunPhase(view, commands, actionSystems);
+                        commands.Apply(em);
+
+                        RunPhase(view, commands, resolutionSystems);
+                        commands.Apply(em);
+
+                        RunPhase(view, commands, cleanupSystems);
+                        commands.Apply(em);
+
                         accumulator -= FixedDeltaTime;
                         GameSystem.AddElapsedTime(FixedDeltaTime);
                     }
@@ -514,5 +525,16 @@ public static class SpaceVorsApp
         em.AddComponent(turretEntity, new ArcOffset(definition.ArcOffset));
 
         em.AddComponent(playerEntity, new WeaponSlots(slots.Used + 1, slots.Max));
+    }
+
+    private static void RunPhase(WorldView view, CommandBuffer commands, GameSystem[] phaseSystems)
+    {
+        foreach (var system in phaseSystems)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            system.Update(view, FixedDeltaTime, commands);
+            sw.Stop();
+            DiagnosticLogger.LogSystem(system.GetType().Name, sw.ElapsedTicks);
+        }
     }
 }

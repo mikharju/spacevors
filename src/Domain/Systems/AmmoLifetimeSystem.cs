@@ -4,19 +4,18 @@ namespace Spacevors.Domain.Systems;
 
 public class AmmoLifetimeSystem : GameSystem
 {
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var ammoEntities = em.GetEntitiesWithComponents<Ammo>().ToList();
-
-        foreach (var (entity, ammo) in ammoEntities)
+        foreach (var (entity, ammo) in view.GetEntitiesWithComponents<Ammo>())
         {
-            if (ammo.Lifetime - deltaTime <= 0f)
+            var newLifetime = ammo.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new Ammo(ammo.Velocity, ammo.Radius, ammo.Lifetime - deltaTime, ammo.IsEnemy, ammo.Damage));
+                commands.Add(new AddComponentCommand<Ammo>(entity, new Ammo(ammo.Velocity, ammo.Radius, newLifetime, ammo.IsEnemy, ammo.Damage)));
             }
         }
     }

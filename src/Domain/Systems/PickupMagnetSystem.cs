@@ -7,32 +7,28 @@ public class PickupMagnetSystem : GameSystem
     const float MagnetAcceleration = 800f;
     const float MaxMagnetSpeed = 350f;
 
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
 
-        var playerPos = em.GetComponent<Position>(playerEntity);
-        var playerStats = em.GetComponent<Player>(playerEntity);
+        var playerPos = view.GetComponent<Position>(playerEntity);
+        var playerStats = view.GetComponent<Player>(playerEntity);
         float pickupRadius = playerStats.PickupRadius;
 
-        ProcessXpPickups(em, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime);
-        ProcessHealthOrbs(em, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime);
+        ProcessXpPickups(view, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime, commands);
+        ProcessHealthOrbs(view, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime, commands);
     }
 
-    private void ProcessXpPickups(EntityManager em, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime)
+    private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime, CommandBuffer commands)
     {
-        var pickups = em.GetEntitiesWithComponents<XpPickup, Position>().ToList();
-
-        foreach (var (pickupEntity, pickup, pos) in pickups)
+        foreach (var (pickupEntity, pickup, pos) in view.GetEntitiesWithComponents<XpPickup, Position>())
         {
-            if (!em.HasComponent<XpPickup>(pickupEntity)) continue;
-
             float newLifetime = pickup.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(pickupEntity);
+                commands.Add(new DestroyEntityCommand(pickupEntity));
                 continue;
             }
 
@@ -45,20 +41,20 @@ public class PickupMagnetSystem : GameSystem
 
             if (!insideRadius && !isChased)
             {
-                em.AddComponent(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, false));
+                commands.Add(new AddComponentCommand<XpPickup>(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, false)));
                 continue;
             }
 
             if (insideRadius && !isChased)
             {
-                em.AddComponent(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true));
+                commands.Add(new AddComponentCommand<XpPickup>(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true)));
             }
 
             float collectionDist = playerRadius + pickup.Radius;
             if (dist < collectionDist)
             {
-                ApplyXp(em, playerEntity, pickup.XpAmount);
-                em.DestroyEntity(pickupEntity);
+                ApplyXp(view, playerEntity, pickup.XpAmount, commands);
+                commands.Add(new DestroyEntityCommand(pickupEntity));
                 continue;
             }
 
@@ -66,24 +62,20 @@ public class PickupMagnetSystem : GameSystem
             var newVel = normalizedDir * MaxMagnetSpeed;
 
             var newPos = pos.Value + newVel * deltaTime;
-            em.AddComponent(pickupEntity, new Position(newPos));
-            em.AddComponent(pickupEntity, new Velocity(newVel));
-            em.AddComponent(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true));
+            commands.Add(new AddComponentCommand<Position>(pickupEntity, new Position(newPos)));
+            commands.Add(new AddComponentCommand<Velocity>(pickupEntity, new Velocity(newVel)));
+            commands.Add(new AddComponentCommand<XpPickup>(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true)));
         }
     }
 
-    private void ProcessHealthOrbs(EntityManager em, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime)
+    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime, CommandBuffer commands)
     {
-        var orbs = em.GetEntitiesWithComponents<HealthOrb, Position>().ToList();
-
-        foreach (var (orbEntity, orb, pos) in orbs)
+        foreach (var (orbEntity, orb, pos) in view.GetEntitiesWithComponents<HealthOrb, Position>())
         {
-            if (!em.HasComponent<HealthOrb>(orbEntity)) continue;
-
             float newLifetime = orb.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(orbEntity);
+                commands.Add(new DestroyEntityCommand(orbEntity));
                 continue;
             }
 
@@ -93,7 +85,7 @@ public class PickupMagnetSystem : GameSystem
 
             if (dist < pickupRadius + orb.Radius)
             {
-                var currentVel = em.HasComponent<Velocity>(orbEntity) ? em.GetComponent<Velocity>(orbEntity).Value : Vector2.Zero;
+                Vector2 currentVel = view.HasComponent<Velocity>(orbEntity) ? view.GetComponent<Velocity>(orbEntity).Value : Vector2.Zero;
                 var accel = (diff / dist) * MagnetAcceleration;
                 var newVel = currentVel + accel * deltaTime;
                 float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
@@ -104,24 +96,24 @@ public class PickupMagnetSystem : GameSystem
                 }
 
                 var newPos = pos.Value + newVel * deltaTime;
-                em.AddComponent(orbEntity, new Position(newPos));
-                em.AddComponent(orbEntity, new Velocity(newVel));
+                commands.Add(new AddComponentCommand<Position>(orbEntity, new Position(newPos)));
+                commands.Add(new AddComponentCommand<Velocity>(orbEntity, new Velocity(newVel)));
             }
 
             float collectionDist = playerRadius + orb.Radius;
             if (dist < collectionDist)
             {
-                ApplyHealth(em, playerEntity);
-                SpawnGreenExplosion(em, pos.Value);
-                em.DestroyEntity(orbEntity);
+                ApplyHealth(view, playerEntity, commands);
+                SpawnGreenExplosion(view, position: pos.Value, commands);
+                commands.Add(new DestroyEntityCommand(orbEntity));
             }
         }
     }
 
-    private void ApplyXp(EntityManager em, Entity playerEntity, int xpAmount)
+    private void ApplyXp(WorldView view, Entity playerEntity, int xpAmount, CommandBuffer commands)
     {
-        var playerStats = em.GetComponent<Player>(playerEntity);
-        em.AddComponent(playerEntity, new Player(
+        var playerStats = view.GetComponent<Player>(playerEntity);
+        commands.Add(new AddComponentCommand<Player>(playerEntity, new Player(
             playerStats.Thrust,
             playerStats.SideThrust,
             playerStats.BackThrust,
@@ -130,22 +122,18 @@ public class PickupMagnetSystem : GameSystem
             Xp: playerStats.Xp + xpAmount,
             Level: playerStats.Level,
             PickupRadius: playerStats.PickupRadius,
-            RotationSpeed: playerStats.RotationSpeed));
+            RotationSpeed: playerStats.RotationSpeed)));
     }
 
-    private void ApplyHealth(EntityManager em, Entity playerEntity)
+    private void ApplyHealth(WorldView view, Entity playerEntity, CommandBuffer commands)
     {
-        if (!em.HasComponent<Health>(playerEntity)) return;
-        var health = em.GetComponent<Health>(playerEntity);
-        em.AddComponent(playerEntity, new Health(health.Current + 3));
+        if (!view.HasComponent<Health>(playerEntity)) return;
+        var health = view.GetComponent<Health>(playerEntity);
+        commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(health.Current + 3)));
     }
 
-    private void SpawnGreenExplosion(EntityManager em, Vector2 position)
+    private void SpawnGreenExplosion(WorldView view, Vector2 position, CommandBuffer commands)
     {
-        var explosionEntity = em.CreateEntity();
-        em.AddComponent(explosionEntity, new Position(position));
-        em.AddComponent(explosionEntity, new Explosion(25f, 0.5f));
-
         for (int i = 0; i < 6; i++)
         {
             float angleOffset = ((float)i - 2.5f) * 0.3f;
@@ -157,10 +145,11 @@ public class PickupMagnetSystem : GameSystem
             float speed = 80f + i * 25f;
             var velocity = sparkDir * speed;
 
-            var sparkEntity = em.CreateEntity();
-            em.AddComponent(sparkEntity, new Position(position));
-            em.AddComponent(sparkEntity, new Velocity(velocity));
-            em.AddComponent(sparkEntity, new GreenSpark(0.6f));
+            commands.Add(new CreateEntityWithComponentsCommand(
+                new Position(position),
+                new Velocity(velocity),
+                new GreenSpark(0.6f)
+            ));
         }
     }
 }

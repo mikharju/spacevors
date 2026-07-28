@@ -4,85 +4,70 @@ namespace Spacevors.Domain.Systems;
 
 public class EffectSystem : GameSystem
 {
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var sparks = em.GetEntitiesWithComponents<Spark>().ToList();
-        foreach (var (entity, spark) in sparks)
+        foreach (var (entity, spark) in view.GetEntitiesWithComponents<Spark>())
         {
-            if (!em.HasComponent<Spark>(entity)) continue;
-
             var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new Spark(newLifetime));
+                commands.Add(new AddComponentCommand<Spark>(entity, new Spark(newLifetime)));
             }
         }
 
-        var explosions = em.GetEntitiesWithComponents<Explosion>().ToList();
-        foreach (var (entity, explosion) in explosions)
+        foreach (var (entity, explosion) in view.GetEntitiesWithComponents<Explosion>())
         {
-            if (!em.HasComponent<Explosion>(entity)) continue;
-
             var newLifetime = explosion.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new Explosion(explosion.Radius, newLifetime));
+                commands.Add(new AddComponentCommand<Explosion>(entity, new Explosion(explosion.Radius, newLifetime)));
             }
         }
 
-        var greenSparks = em.GetEntitiesWithComponents<GreenSpark>().ToList();
-        foreach (var (entity, spark) in greenSparks)
+        foreach (var (entity, spark) in view.GetEntitiesWithComponents<GreenSpark>())
         {
-            if (!em.HasComponent<GreenSpark>(entity)) continue;
-
             var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new GreenSpark(newLifetime));
+                commands.Add(new AddComponentCommand<GreenSpark>(entity, new GreenSpark(newLifetime)));
             }
         }
 
-        var blueSparks = em.GetEntitiesWithComponents<BlueSpark>().ToList();
-        foreach (var (entity, spark) in blueSparks)
+        foreach (var (entity, spark) in view.GetEntitiesWithComponents<BlueSpark>())
         {
-            if (!em.HasComponent<BlueSpark>(entity)) continue;
-
             var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new BlueSpark(newLifetime));
+                commands.Add(new AddComponentCommand<BlueSpark>(entity, new BlueSpark(newLifetime)));
             }
         }
 
-        var debugMarkers = em.GetEntitiesWithComponents<DebugMarker>().ToList();
-        foreach (var (entity, marker) in debugMarkers)
+        foreach (var (entity, marker) in view.GetEntitiesWithComponents<DebugMarker>())
         {
-            if (!em.HasComponent<DebugMarker>(entity)) continue;
-
             var newLifetime = marker.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
-                em.DestroyEntity(entity);
+                commands.Add(new DestroyEntityCommand(entity));
             }
             else
             {
-                em.AddComponent(entity, new DebugMarker(newLifetime));
+                commands.Add(new AddComponentCommand<DebugMarker>(entity, new DebugMarker(newLifetime)));
             }
         }
     }

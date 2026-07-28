@@ -7,5 +7,5 @@ public abstract class GameSystem
     public static void AddElapsedTime(float amount) => _accumulatedTime += amount;
     public static float ElapsedTime => _accumulatedTime;
 
-    public abstract void Update(EntityManager em, float deltaTime);
+    public abstract void Update(WorldView view, float deltaTime, CommandBuffer commands);
 }

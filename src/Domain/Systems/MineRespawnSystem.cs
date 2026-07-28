@@ -9,20 +9,20 @@ public class MineRespawnSystem : GameSystem
     private const int MaxInterval = 8;
     private const int TargetMineCount = 8;
 
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         _timer -= deltaTime;
 
         if (_timer > 0f) return;
 
-        int activeMines = em.GetEntitiesWithComponents<EnemyMine>().Count();
+        int activeMines = view.GetEntitiesWithComponents<EnemyMine>().Count();
         if (activeMines >= TargetMineCount + 15) return;
 
-        var playerTuple = em.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
 
-        var playerPos = em.GetComponent<Position>(playerEntity);
+        var playerPos = view.GetComponent<Position>(playerEntity);
 
         Random rand = new Random();
         float angle = (float)(rand.NextDouble() * Math.PI * 2f);
@@ -31,12 +31,14 @@ public class MineRespawnSystem : GameSystem
         float my = playerPos.Value.Y + (float)Math.Sin(angle) * dist;
         float mineAngle = (float)(rand.NextDouble() * Math.PI * 2);
 
-        var mineEntity = em.CreateEntity();
-        em.AddComponent(mineEntity, new Position(new Vector2(mx, my)));
-        em.AddComponent(mineEntity, new Velocity(Vector2.Zero));
         MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
-        em.AddComponent(mineEntity, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, mineAngle));
-        em.AddComponent(mineEntity, new Health(2));
+
+        commands.Add(new CreateEntityWithComponentsCommand(
+            new Position(new Vector2(mx, my)),
+            new Velocity(Vector2.Zero),
+            new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, mineAngle),
+            new Health(2)
+        ));
 
         float elapsed = ElapsedTime;
         float rampDuration = 180f;

@@ -6,18 +6,18 @@ public class CameraSystem : GameSystem
 {
     private const float FollowSpeed = 5f;
 
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Position, Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Position, Player>().FirstOrDefault();
         if (playerTuple.Entity.Value < 0) return;
 
         var targetPos = playerTuple.Value1.Value;
 
-        foreach (var (entity, camera) in em.GetEntitiesWithComponents<Camera>())
+        foreach (var (entity, camera) in view.GetEntitiesWithComponents<Camera>())
         {
             var diff = targetPos - camera.Target;
             var newTarget = camera.Target + diff * Math.Min(FollowSpeed * deltaTime, 1f);
-            em.AddComponent(entity, new Camera(newTarget));
+            commands.Add(new AddComponentCommand<Camera>(entity, new Camera(newTarget)));
         }
     }
 }

@@ -4,20 +4,18 @@ namespace Spacevors.Domain.Systems;
 
 public class MineDriftSystem : GameSystem
 {
-    public override void Update(EntityManager em, float deltaTime)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
-        var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();
-
-        foreach (var (mineEntity, mine) in mines)
+        foreach (var (mineEntity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
         {
             if (!hasPlayer) continue;
 
-            var minePos = em.GetComponent<Position>(mineEntity);
-            var playerPos = em.GetComponent<Position>(playerEntity);
+            var minePos = view.GetComponent<Position>(mineEntity);
+            var playerPos = view.GetComponent<Position>(playerEntity);
 
             var dir = playerPos.Value - minePos.Value;
             float distSq = dir.X * dir.X + dir.Y * dir.Y;
@@ -26,19 +24,17 @@ public class MineDriftSystem : GameSystem
             float dist = (float)Math.Sqrt(distSq);
             var normalizedDir = dir / dist;
 
-            var currentVel = em.HasComponent<Velocity>(mineEntity)
-                ? em.GetComponent<Velocity>(mineEntity).Value
+            Vector2 currentVel = view.HasComponent<Velocity>(mineEntity)
+                ? view.GetComponent<Velocity>(mineEntity).Value
                 : Vector2.Zero;
 
-            // Blend toward player direction at mine speed
             float targetSpeed = mine.Speed;
             var targetVel = normalizedDir * targetSpeed;
 
-            // Smooth blend (lerp factor based on deltaTime)
             float blendFactor = 1f - MathF.Exp(-3f * deltaTime);
             var newVel = currentVel + (targetVel - currentVel) * blendFactor;
 
-            em.AddComponent(mineEntity, new Velocity(newVel));
+            commands.Add(new AddComponentCommand<Velocity>(mineEntity, new Velocity(newVel)));
         }
     }
 }
