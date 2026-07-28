@@ -78,79 +78,97 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, ammo) in _ammoList)
         {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
-
             var ammoPos = view.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
 
-            bool hitSomething = false;
+            Entity? closestAsteroidHit = null;
+            Asteroid? closestAsteroidComp = null;
+            Vector2 asteroidDiff = default;
+            float asteroidDistSq = float.MaxValue;
+
+            Entity? closestMineHit = null;
+            MineSize? mineHitSize = null;
+            Vector2 mineHitPos = default;
+            float mineDistSq = float.MaxValue;
+
+            Entity? closestShipHit = null;
+            Vector2 shipHitPos = default;
+            float shipDistSq = float.MaxValue;
 
             foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
-                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
-                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
-                var asteroidPos = view.GetComponent<Position>(candidate.Id);
+                var candId = candidate.Id;
 
-                var diff = asteroidPos.Value - ammoPos.Value;
-                float distSq = diff.X * diff.X + diff.Y * diff.Y;
-                float radiusSum = ammoRadius + asteroid.Radius;
+                if (view.HasComponent<Asteroid>(candId))
+                {
+                    var asteroid = view.GetComponent<Asteroid>(candId);
+                    var pos = view.GetComponent<Position>(candId);
+                    var diff = pos.Value - ammoPos.Value;
+                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float rSum = ammoRadius + asteroid.Radius;
+                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < asteroidDistSq)
+                    {
+                        closestAsteroidHit = candId;
+                        closestAsteroidComp = asteroid;
+                        asteroidDiff = diff;
+                        asteroidDistSq = dSq;
+                    }
+                }
 
-                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+                if (!ammo.IsEnemy) continue;
 
-                ResolveAmmoVsAsteroid(view, ammoEntity, ammo, candidate.Id, asteroid, commands);
+                if (view.HasComponent<EnemyMine>(candId))
+                {
+                    var mine = view.GetComponent<EnemyMine>(candId);
+                    var pos = view.GetComponent<Position>(candId);
+                    var diff = pos.Value - ammoPos.Value;
+                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float rSum = ammoRadius + mine.Radius;
+                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < mineDistSq)
+                    {
+                        closestMineHit = candId;
+                        mineHitSize = mine.Size;
+                        mineHitPos = pos.Value;
+                        mineDistSq = dSq;
+                    }
+                }
+
+                if (view.HasComponent<EnemyShip>(candId))
+                {
+                    var ship = view.GetComponent<EnemyShip>(candId);
+                    var pos = view.GetComponent<Position>(candId);
+                    var diff = pos.Value - ammoPos.Value;
+                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float rSum = ammoRadius + ship.Radius;
+                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < shipDistSq)
+                    {
+                        closestShipHit = candId;
+                        shipHitPos = pos.Value;
+                        shipDistSq = dSq;
+                    }
+                }
+            }
+
+            if (closestAsteroidHit.HasValue)
+            {
+                var asteroid = closestAsteroidComp!.Value;
+                ResolveAmmoVsAsteroid(view, ammoEntity, ammo, closestAsteroidHit.Value, asteroid, commands);
                 _effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
                 _entitiesToDestroy.Add(ammoEntity);
-                hitSomething = true;
-                break;
+                continue;
             }
 
-            if (hitSomething) continue;
-
-            if (!ammo.IsEnemy)
+            if (closestMineHit.HasValue)
             {
-                foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
-                {
-                    if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
-                    var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                    var minePos = view.GetComponent<Position>(candidate.Id);
-
-                    var diff = minePos.Value - ammoPos.Value;
-                    float distSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float radiusSum = ammoRadius + mine.Radius;
-
-                    if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
-
-                    _ammoToMineHits.Add((ammoEntity, candidate.Id));
-                    _effectsToSpawn.Add((minePos.Value, mine.Size));
-                    hitSomething = true;
-                    break;
-                }
+                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value));
+                _effectsToSpawn.Add((mineHitPos!, mineHitSize!.Value));
             }
 
-            if (hitSomething) continue;
-
-            if (!ammo.IsEnemy)
+            if (closestShipHit.HasValue)
             {
-                foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
-                {
-                    if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
-                    var enemyShip = view.GetComponent<EnemyShip>(candidate.Id);
-                    var shipPos = view.GetComponent<Position>(candidate.Id);
-
-                    var diff = shipPos.Value - ammoPos.Value;
-                    float distSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float radiusSum = ammoRadius + enemyShip.Radius;
-
-                    if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
-
-                    _ammoToShipHits.Add((ammoEntity, candidate.Id));
-                    _effectsToSpawn.Add((shipPos.Value, MineSize.Small));
-                    hitSomething = true;
-                    break;
-                }
+                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value));
+                _effectsToSpawn.Add((shipHitPos!, MineSize.Small));
             }
-
-            if (hitSomething) continue;
 
             if (!ammo.IsEnemy) continue;
 
