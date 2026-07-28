@@ -33,7 +33,7 @@ public readonly record struct WeaponType(
     public static WeaponType TwinChainGun { get; } = new("TwinChainGun", new(14f, 550f, 3f, 1, Scatter: 0.015f, Damage: 1));
     public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1));
     public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1));
-    public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(2f, 200f, 100f, 1500, Scatter: 0.15f, Damage: 1));
+    public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(2f, 200f, 100f, 1000, Scatter: 0.15f, Damage: 1));
 }
 
 public readonly record struct TurretDefinition(

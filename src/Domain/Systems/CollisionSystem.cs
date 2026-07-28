@@ -51,6 +51,9 @@ public class CollisionSystem : GameSystem
 
         var entitiesToDestroy = new List<Entity>();
         var effectsToSpawn = new List<(Vector2 Position, MineSize Size)>();
+        var ammoToMineHits = new List<(Entity ammoEntity, Entity mineEntity)>();
+        var ammoToShipHits = new List<(Entity ammoEntity, Entity shipEntity)>();
+        var ammoToPlayerHits = new List<Entity>();
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
@@ -58,6 +61,8 @@ public class CollisionSystem : GameSystem
 
             var ammoPos = view.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
+
+            bool hitSomething = false;
 
             foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
@@ -74,66 +79,71 @@ public class CollisionSystem : GameSystem
                 ResolveAmmoVsAsteroid(view, ammoEntity, ammo, candidate.Id, asteroid, commands);
                 effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
                 entitiesToDestroy.Add(ammoEntity);
+                hitSomething = true;
                 break;
             }
-        }
 
-        foreach (var entity in entitiesToDestroy.Distinct())
-        {
-            commands.Add(new DestroyEntityCommand(entity));
-        }
+            if (hitSomething) continue;
 
-        if (hasPlayer)
-        {
-            foreach (var (mineEntity, mine) in mines)
+            if (!ammo.IsEnemy)
             {
-                if (!view.HasComponent<EnemyMine>(mineEntity)) continue;
-                ResolveMineVsPlayer(view, mineEntity, mine, playerEntity, commands);
+                foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
+                {
+                    if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
+                    var mine = view.GetComponent<EnemyMine>(candidate.Id);
+                    var minePos = view.GetComponent<Position>(candidate.Id);
+
+                    var diff = minePos.Value - ammoPos.Value;
+                    float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float radiusSum = ammoRadius + mine.Radius;
+
+                    if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+                    ammoToMineHits.Add((ammoEntity, candidate.Id));
+                    effectsToSpawn.Add((minePos.Value, mine.Size));
+                    hitSomething = true;
+                    break;
+                }
             }
 
-            _mineCollisionPositions.Clear();
-        }
+            if (hitSomething) continue;
 
-        foreach (var (mineEntity, mine) in mines)
-        {
-            if (!view.HasComponent<EnemyMine>(mineEntity)) continue;
-            if (!view.HasComponent<Position>(mineEntity)) continue;
-            var minePos = view.GetComponent<Position>(mineEntity);
-
-            foreach (var candidate in _grid.Query(minePos.Value, mine.Radius))
+            if (!ammo.IsEnemy)
             {
-                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
-                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
-                ResolveCircleVsCircle(view, mineEntity, mine, candidate.Id, commands, asteroid);
+                foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
+                {
+                    if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
+                    var enemyShip = view.GetComponent<EnemyShip>(candidate.Id);
+                    var shipPos = view.GetComponent<Position>(candidate.Id);
+
+                    var diff = shipPos.Value - ammoPos.Value;
+                    float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float radiusSum = ammoRadius + enemyShip.Radius;
+
+                    if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
+
+                    ammoToShipHits.Add((ammoEntity, candidate.Id));
+                    effectsToSpawn.Add((shipPos.Value, MineSize.Small));
+                    hitSomething = true;
+                    break;
+                }
             }
-        }
 
-        var ammoToMineHits = new List<(Entity ammoEntity, Entity mineEntity)>();
+            if (hitSomething) continue;
 
-        foreach (var (ammoEntity, ammo) in ammoList)
-        {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
-            if (ammo.IsEnemy) continue;
+            if (!ammo.IsEnemy) continue;
 
-            var ammoPos = view.GetComponent<Position>(ammoEntity);
-            float ammoRadius = ammo.Radius;
+            if (!hasPlayer) continue;
 
-            foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
-            {
-                if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
-                var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                var minePos = view.GetComponent<Position>(candidate.Id);
+            var playerPos = view.GetComponent<Position>(playerEntity);
+            var diff2 = playerPos.Value - ammoPos.Value;
+            float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
+            float radiusSum2 = ammoRadius + 18f;
 
-                var diff = minePos.Value - ammoPos.Value;
-                float distSq = diff.X * diff.X + diff.Y * diff.Y;
-                float radiusSum = ammoRadius + mine.Radius;
+            if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < 0.001f) continue;
 
-                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
-
-                ammoToMineHits.Add((ammoEntity, candidate.Id));
-                effectsToSpawn.Add((minePos.Value, mine.Size));
-                break;
-            }
+            ammoToPlayerHits.Add(ammoEntity);
+            effectsToSpawn.Add((playerPos.Value, MineSize.Small));
         }
 
         foreach (var (ammoEntity, mineEntity) in ammoToMineHits)
@@ -158,132 +168,32 @@ public class CollisionSystem : GameSystem
             entitiesToDestroy.Add(ammoEntity);
         }
 
-        foreach (var entity in entitiesToDestroy.Distinct())
-        {
-            if (!ammoToMineHits.Any(h => h.ammoEntity == entity))
-            {
-                commands.Add(new DestroyEntityCommand(entity));
-            }
-        }
-
-        foreach (var (enemyShipEntity, enemyShip) in enemyShips)
-        {
-            if (!view.HasComponent<EnemyShip>(enemyShipEntity)) continue;
-            if (!view.HasComponent<Position>(enemyShipEntity)) continue;
-            if (hasPlayer)
-            {
-                ResolveEnemyShipVsPlayer(view, enemyShipEntity, enemyShip, playerEntity, commands);
-            }
-        }
-
-        foreach (var (aEntity, aShip) in enemyShips)
-        {
-            if (!view.HasComponent<EnemyShip>(aEntity)) continue;
-            if (!view.HasComponent<Position>(aEntity)) continue;
-            var aPos = view.GetComponent<Position>(aEntity);
-
-            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
-            {
-                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
-                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
-                ResolveEnemyShipVsAsteroid(view, aEntity, aShip, candidate.Id, asteroid, commands);
-            }
-
-            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
-            {
-                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
-                var bShip = view.GetComponent<EnemyShip>(candidate.Id);
-                if (candidate.Id.Value <= aEntity.Value) continue;
-                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
-            }
-
-            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
-            {
-                if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
-                var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                ResolveEnemyShipVsMine(view, aEntity, aShip, candidate.Id, mine, commands);
-            }
-        }
-
-        var ammoToEnemyShipHits = new List<(Entity ammoEntity, Entity enemyShipEntity)>();
-
-        foreach (var (ammoEntity, ammo) in ammoList)
-        {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
-            if (ammo.IsEnemy) continue;
-
-            var ammoPos = view.GetComponent<Position>(ammoEntity);
-            float ammoRadius = ammo.Radius;
-
-            foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
-            {
-                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
-                var enemyShip = view.GetComponent<EnemyShip>(candidate.Id);
-                var shipPos = view.GetComponent<Position>(candidate.Id);
-
-                var diff = shipPos.Value - ammoPos.Value;
-                float distSq = diff.X * diff.X + diff.Y * diff.Y;
-                float radiusSum = ammoRadius + enemyShip.Radius;
-
-                if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
-
-                ammoToEnemyShipHits.Add((ammoEntity, candidate.Id));
-                effectsToSpawn.Add((shipPos.Value, MineSize.Small));
-                break;
-            }
-        }
-
-        foreach (var (ammoEntity, enemyShipEntity) in ammoToEnemyShipHits)
+        foreach (var (ammoEntity, shipEntity) in ammoToShipHits)
         {
             if (!view.HasComponent<Ammo>(ammoEntity)) continue;
             var ammo = view.GetComponent<Ammo>(ammoEntity);
-            if (!view.HasComponent<Health>(enemyShipEntity)) continue;
-            var health = view.GetComponent<Health>(enemyShipEntity);
+            if (!view.HasComponent<Health>(shipEntity)) continue;
+            var health = view.GetComponent<Health>(shipEntity);
             if (health.Current <= ammo.Damage)
             {
-                if (!view.HasComponent<Position>(enemyShipEntity)) continue;
-                var shipPos = view.GetComponent<Position>(enemyShipEntity);
+                if (!view.HasComponent<Position>(shipEntity)) continue;
+                var shipPos = view.GetComponent<Position>(shipEntity);
                 SpawnShipLootOnDeath(commands, shipPos.Value);
-                commands.Add(new DestroyEntityCommand(enemyShipEntity));
+                commands.Add(new DestroyEntityCommand(shipEntity));
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(enemyShipEntity, new Health(health.Current - ammo.Damage)));
+                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(health.Current - ammo.Damage)));
             }
             entitiesToDestroy.Add(ammoEntity);
         }
 
         foreach (var entity in entitiesToDestroy.Distinct())
         {
-            if (!ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) && !ammoToMineHits.Any(h => h.ammoEntity == entity))
+            if (!ammoToMineHits.Any(h => h.ammoEntity == entity) && !ammoToShipHits.Any(h => h.ammoEntity == entity))
             {
                 commands.Add(new DestroyEntityCommand(entity));
             }
-        }
-
-        var ammoToPlayerHits = new List<Entity>();
-
-        foreach (var (ammoEntity, ammo) in ammoList)
-        {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
-            if (!ammo.IsEnemy) continue;
-            if (ammoToEnemyShipHits.Any(h => h.ammoEntity == ammoEntity)) continue;
-            if (ammoToMineHits.Any(h => h.ammoEntity == ammoEntity)) continue;
-
-            var ammoPos = view.GetComponent<Position>(ammoEntity);
-            float ammoRadius = ammo.Radius;
-
-            if (!hasPlayer) continue;
-
-            var playerPos = view.GetComponent<Position>(playerEntity);
-            var diff = playerPos.Value - ammoPos.Value;
-            float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float radiusSum = ammoRadius + 18f;
-
-            if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
-
-            ammoToPlayerHits.Add(ammoEntity);
-            effectsToSpawn.Add((playerPos.Value, MineSize.Small));
         }
 
         foreach (var ammoEntity in ammoToPlayerHits.Distinct())
@@ -306,7 +216,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var entity in entitiesToDestroy.Distinct())
         {
-            if (ammoToPlayerHits.Contains(entity) || ammoToEnemyShipHits.Any(h => h.ammoEntity == entity) || ammoToMineHits.Any(h => h.ammoEntity == entity))
+            if (ammoToPlayerHits.Contains(entity) || ammoToShipHits.Any(h => h.ammoEntity == entity) || ammoToMineHits.Any(h => h.ammoEntity == entity))
             {
                 commands.Add(new DestroyEntityCommand(entity));
             }
