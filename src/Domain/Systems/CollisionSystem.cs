@@ -53,7 +53,7 @@ public class CollisionSystem : GameSystem
         var effectsToSpawn = new List<(Vector2 Position, MineSize Size)>();
         var ammoToMineHits = new List<(Entity ammoEntity, Entity mineEntity)>();
         var ammoToShipHits = new List<(Entity ammoEntity, Entity shipEntity)>();
-        var ammoToPlayerHits = new List<Entity>();
+        var ammoToPlayerHits = new HashSet<Entity>();
 
         foreach (var (ammoEntity, ammo) in ammoList)
         {
@@ -188,15 +188,19 @@ public class CollisionSystem : GameSystem
             entitiesToDestroy.Add(ammoEntity);
         }
 
+        var hitMineOrShip = new HashSet<Entity>();
+        foreach (var (ammoEntity, _) in ammoToMineHits) hitMineOrShip.Add(ammoEntity);
+        foreach (var (ammoEntity, _) in ammoToShipHits) hitMineOrShip.Add(ammoEntity);
+
         foreach (var entity in entitiesToDestroy.Distinct())
         {
-            if (!ammoToMineHits.Any(h => h.ammoEntity == entity) && !ammoToShipHits.Any(h => h.ammoEntity == entity))
+            if (!hitMineOrShip.Contains(entity))
             {
                 commands.Add(new DestroyEntityCommand(entity));
             }
         }
 
-        foreach (var ammoEntity in ammoToPlayerHits.Distinct())
+        foreach (var ammoEntity in ammoToPlayerHits)
         {
             var ammo = view.GetComponent<Ammo>(ammoEntity);
             int damage = ammo.Damage;
@@ -216,7 +220,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var entity in entitiesToDestroy.Distinct())
         {
-            if (ammoToPlayerHits.Contains(entity) || ammoToShipHits.Any(h => h.ammoEntity == entity) || ammoToMineHits.Any(h => h.ammoEntity == entity))
+            if (ammoToPlayerHits.Contains(entity) || hitMineOrShip.Contains(entity))
             {
                 commands.Add(new DestroyEntityCommand(entity));
             }
