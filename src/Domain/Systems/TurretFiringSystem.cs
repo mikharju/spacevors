@@ -23,10 +23,7 @@ public class TurretFiringSystem : GameSystem
 
                     if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
                     {
-                        commands.Add(new CreateEntityWithComponentsCommand(
-                            new Position(target.Value.PredictedPosition),
-                            new DebugMarker(0.5f)
-                        ));
+                        commands.AddEntity(new Position(target.Value.PredictedPosition), new DebugMarker(0.5f));
                     }
                 }
             }
@@ -355,11 +352,7 @@ public class TurretFiringSystem : GameSystem
             float ammoRadius = GetAmmoRadius(turret);
             int damage = turret.Weapon.Damage;
 
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(spawnPos),
-                new Velocity(ammoVel),
-                new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage)
-            ));
+            commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage));
         }
 
         if (turret.Weapon.KickbackForce > 0)

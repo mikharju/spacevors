@@ -33,12 +33,7 @@ public class MineRespawnSystem : GameSystem
 
         MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
 
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(new Vector2(mx, my)),
-            new Velocity(Vector2.Zero),
-            new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, mineAngle),
-            new Health(2)
-        ));
+        commands.AddEntity(new Position(new Vector2(mx, my)), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, mineAngle), new Health(2));
 
         float elapsed = ElapsedTime;
         float rampDuration = 180f;

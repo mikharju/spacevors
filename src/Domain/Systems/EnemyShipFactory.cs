@@ -60,7 +60,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Health(health));
     }
 
-    public static object[] CreateInterceptorComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
+    public static IInitialComponent[] CreateInterceptorComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
     {
         const float radius = 15f;
         const float speed = 40f;
@@ -68,19 +68,19 @@ public static class EnemyShipFactory
         const float acceleration = 15f;
         const float turretFireRate = 0.6f;
 
-        return new object[]
+        return new IInitialComponent[]
         {
-            new Position(position),
-            new Velocity(velocity),
-            new Rotation(rotation),
-            new AngularVelocity(angularVelocity),
-            new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, TurretAmmoSpeed, acceleration, Damage: 1),
-            new Turret(Weapon: new WeaponStats(turretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true),
-            new Health(health)
+            new InitialComponent<Position>(new Position(position)),
+            new InitialComponent<Velocity>(new Velocity(velocity)),
+            new InitialComponent<Rotation>(new Rotation(rotation)),
+            new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
+            new InitialComponent<EnemyShip>(new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, TurretAmmoSpeed, acceleration, Damage: 1)),
+            new InitialComponent<Turret>(new Turret(Weapon: new WeaponStats(turretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true)),
+            new InitialComponent<Health>(new Health(health))
         };
     }
 
-    public static object[] CreateHeavyCannonComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
+    public static IInitialComponent[] CreateHeavyCannonComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
     {
         const float radius = 28f;
         const float speed = 25f;
@@ -88,29 +88,29 @@ public static class EnemyShipFactory
         const float turretFireRate = 0.8f;
         const float turretAmmoSpeed = 160f;
 
-        return new object[]
+        return new IInitialComponent[]
         {
-            new Position(position),
-            new Velocity(velocity),
-            new Rotation(rotation),
-            new AngularVelocity(angularVelocity),
-            new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, turretAmmoSpeed, Acceleration, Damage: 2),
-            new Turret(Weapon: new WeaponStats(turretFireRate, turretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true),
-            new Health(health)
+            new InitialComponent<Position>(new Position(position)),
+            new InitialComponent<Velocity>(new Velocity(velocity)),
+            new InitialComponent<Rotation>(new Rotation(rotation)),
+            new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
+            new InitialComponent<EnemyShip>(new EnemyShip(radius, speed, TurnRate, health, DetectionRange, FiringRange, turretFireRate, turretAmmoSpeed, Acceleration, Damage: 2)),
+            new InitialComponent<Turret>(new Turret(Weapon: new WeaponStats(turretFireRate, turretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true)),
+            new InitialComponent<Health>(new Health(health))
         };
     }
 
-    public static object[] CreateEnemyShipComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
+    public static IInitialComponent[] CreateEnemyShipComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
     {
-        return new object[]
+        return new IInitialComponent[]
         {
-            new Position(position),
-            new Velocity(velocity),
-            new Rotation(rotation),
-            new AngularVelocity(angularVelocity),
-            new EnemyShip(Radius, Speed, TurnRate, Health, DetectionRange, FiringRange, TurretFireRate, TurretAmmoSpeed, Acceleration, Damage: 1),
-            new Turret(Weapon: new WeaponStats(TurretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true),
-            new Health(Health)
+            new InitialComponent<Position>(new Position(position)),
+            new InitialComponent<Velocity>(new Velocity(velocity)),
+            new InitialComponent<Rotation>(new Rotation(rotation)),
+            new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
+            new InitialComponent<EnemyShip>(new EnemyShip(Radius, Speed, TurnRate, Health, DetectionRange, FiringRange, TurretFireRate, TurretAmmoSpeed, Acceleration, Damage: 1)),
+            new InitialComponent<Turret>(new Turret(Weapon: new WeaponStats(TurretFireRate, TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: DetectionRange, IsEnemy: true)),
+            new InitialComponent<Health>(new Health(Health))
         };
     }
 }

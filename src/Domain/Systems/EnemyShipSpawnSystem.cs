@@ -54,7 +54,7 @@ public class EnemyShipSpawnSystem : GameSystem
         var spawnPos = new Vector2(sx, sy);
         float variantRoll = (float)rand.NextDouble();
 
-        object[] components;
+        IInitialComponent[] components;
         if (variantRoll < 0.333f)
         {
             components = EnemyShipFactory.CreateInterceptorComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
@@ -68,7 +68,7 @@ public class EnemyShipSpawnSystem : GameSystem
             components = EnemyShipFactory.CreateEnemyShipComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
         }
 
-        commands.Add(new CreateEntityWithComponentsCommand(components));
+        commands.AddEntity(components);
 
         float elapsed = ElapsedTime;
         float rampDuration = 180f;

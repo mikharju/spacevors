@@ -12,10 +12,7 @@ public class CommandApplyTest
         var em = new EntityManager();
         
         var commands = new CommandBuffer();
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(new Vector2(10f, 20f)),
-            new Ammo(new Vector2(100f, 100f), 3f, 2f)
-        ));
+        commands.AddEntity(new Position(new Vector2(10f, 20f)), new Ammo(new Vector2(100f, 100f), 3f, 2f));
         
         commands.Apply(em);
         
@@ -39,8 +36,8 @@ public class CommandApplyTest
         ICommand[] commands = 
         [
             new CreateEntityWithComponentsCommand(
-                new Position(new Vector2(10f, 20f)),
-                new Ammo(new Vector2(100f, 100f), 3f, 2f)
+                new InitialComponent<Position>(new Position(new Vector2(10f, 20f))),
+                new InitialComponent<Ammo>(new Ammo(new Vector2(100f, 100f), 3f, 2f))
             )
         ];
         

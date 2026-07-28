@@ -79,11 +79,7 @@ public class LevelUpSystem : GameSystem
             var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
             int count = Math.Min(3, shuffled.Length);
 
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(position),
-                new PendingChoice(),
-                new PendingUpgradeOptions(shuffled[..count])
-            ));
+            commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(shuffled[..count]));
         }
         else
         {
@@ -106,11 +102,7 @@ public class LevelUpSystem : GameSystem
             var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
             int count = Math.Min(5, shuffled.Length);
 
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(position),
-                new PendingChoice(),
-                new PendingUpgradeOptions(shuffled[..count])
-            ));
+            commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(shuffled[..count]));
         }
     }
 

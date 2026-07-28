@@ -308,10 +308,7 @@ public class CollisionSystem : GameSystem
     private void SpawnExplosion(CommandBuffer commands, Vector2 position, MineSize mineSize)
     {
         float radius = mineSize == MineSize.Large ? 30f : 15f;
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(position),
-            new Explosion(radius, 0.5f)
-        ));
+        commands.AddEntity(new Position(position), new Explosion(radius, 0.5f));
     }
 
     private void SpawnSpark(CommandBuffer commands, Vector2 position)
@@ -319,11 +316,7 @@ public class CollisionSystem : GameSystem
         float angle = (float)(new Random().NextDouble() * MathF.PI * 2f);
         float speed = 50f + (float)new Random().NextDouble() * 100f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(position),
-            new Velocity(velocity),
-            new Spark(0.8f + (float)new Random().NextDouble() * 0.6f)
-        ));
+        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(0.8f + (float)new Random().NextDouble() * 0.6f));
     }
 
     private void ResolveCircleVsCircle(
@@ -607,33 +600,21 @@ public class CollisionSystem : GameSystem
         int xpAmount = mineSize == MineSize.Small ? 1 : 2;
         float xpRadius = mineSize == MineSize.Small ? 6f : 9f;
 
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(position),
-            new XpPickup(xpAmount, Radius: xpRadius)
-        ));
+        commands.AddEntity(new Position(position), new XpPickup(xpAmount, Radius: xpRadius));
 
         if (Random.Shared.NextDouble() < 0.05)
         {
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(position),
-                new HealthOrb(Radius: xpRadius + 2f)
-            ));
+            commands.AddEntity(new Position(position), new HealthOrb(Radius: xpRadius + 2f));
         }
     }
 
     private void SpawnShipLootOnDeath(CommandBuffer commands, Vector2 position)
     {
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(position),
-            new XpPickup(3, Radius: 18f)
-        ));
+        commands.AddEntity(new Position(position), new XpPickup(3, Radius: 18f));
 
         if (Random.Shared.NextDouble() < 0.05)
         {
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(position),
-                new HealthOrb(Radius: 20f)
-            ));
+            commands.AddEntity(new Position(position), new HealthOrb(Radius: 20f));
         }
     }
 }

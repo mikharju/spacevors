@@ -13,11 +13,7 @@ public class CommandProcessorTest
         
         // Create an entity with Position and Ammo using CommandBuffer
         var commands = new CommandBuffer();
-        commands.Add(new CreateEntityWithComponentsCommand(
-            new Position(new Vector2(10f, 20f)),
-            new Velocity(new Vector2(5f, 5f)),
-            new Ammo(new Vector2(100f, 100f), 3f, 2f, false, 1)
-        ));
+        commands.AddEntity(new Position(new Vector2(10f, 20f)), new Velocity(new Vector2(5f, 5f)), new Ammo(new Vector2(100f, 100f), 3f, 2f, false, 1));
         
         commands.Apply(em);
         

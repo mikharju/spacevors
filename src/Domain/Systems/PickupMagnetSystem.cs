@@ -145,11 +145,7 @@ public class PickupMagnetSystem : GameSystem
             float speed = 80f + i * 25f;
             var velocity = sparkDir * speed;
 
-            commands.Add(new CreateEntityWithComponentsCommand(
-                new Position(position),
-                new Velocity(velocity),
-                new GreenSpark(0.6f)
-            ));
+            commands.AddEntity(new Position(position), new Velocity(velocity), new GreenSpark(0.6f));
         }
     }
 }

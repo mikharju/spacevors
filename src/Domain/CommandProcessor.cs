@@ -1,5 +1,3 @@
-using System.Reflection;
-
 namespace Spacevors.Domain;
 
 public class CommandProcessor
@@ -20,26 +18,16 @@ public class CommandProcessor
             if (cmd is CreateEntityWithComponentsCommand createCmd)
             {
                 var entity = _em.CreateEntity();
-                foreach (var component in createCmd.Components)
-                {
-                    var componentType = component.GetType();
-                    var method = typeof(EntityManager)
-                        .GetMethod(nameof(EntityManager.AddComponent))!
-                        .MakeGenericMethod(componentType);
-                    method.Invoke(_em, new object[] { entity, component });
-                }
-            }
-            else if (cmd.GetType().IsGenericType && cmd.GetType().GetGenericTypeDefinition() == typeof(AddComponentCommand<>))
-            {
-                var entityProp = cmd.GetType().GetProperty("Entity");
-                var componentProp = cmd.GetType().GetProperty("Component");
-                var entity = entityProp!.GetValue(cmd);
-                var component = componentProp!.GetValue(cmd);
-                ProcessAddComponent((Entity)entity!, component!);
+                foreach (var component in createCmd.InitialComponents)
+                    component.Apply(_em, entity);
             }
             else if (cmd is DestroyEntityCommand destroyCmd)
             {
                 destroyEntities.Add(destroyCmd.Entity);
+            }
+            else if (cmd is IApplyCommand applyCmd)
+            {
+                applyCmd.Apply(_em);
             }
         }
 
@@ -47,14 +35,5 @@ public class CommandProcessor
         {
             _em.DestroyEntity(entity);
         }
-    }
-
-    private void ProcessAddComponent(Entity entity, object component)
-    {
-        var componentType = component.GetType();
-        var method = typeof(EntityManager)
-            .GetMethod(nameof(EntityManager.AddComponent))!
-            .MakeGenericMethod(componentType);
-        method.Invoke(_em, new object[] { entity, component });
     }
 }
