@@ -56,6 +56,9 @@ public static class SpaceVorsApp
                 if (Raylib.IsKeyPressed(KeyboardKey.F11))
                     Raylib.ToggleFullscreen();
 
+                if (Raylib.IsKeyPressed(KeyboardKey.F12))
+                    Raylib.TakeScreenshot("screenshot.png");
+
                 var frameStart = Raylib.GetTime();
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
@@ -90,6 +93,9 @@ public static class SpaceVorsApp
             {
                 if (Raylib.IsKeyPressed(KeyboardKey.F11))
                     Raylib.ToggleFullscreen();
+
+                if (Raylib.IsKeyPressed(KeyboardKey.F12))
+                    Raylib.TakeScreenshot("screenshot.png");
 
                 float frameTime = (float)Raylib.GetFrameTime();
                 DiagnosticLogger.UpdateFps(frameTime);

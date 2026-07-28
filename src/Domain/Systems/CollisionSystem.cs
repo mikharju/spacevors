@@ -61,6 +61,34 @@ public class CollisionSystem : GameSystem
             {
                 ResolveCircleVsCircle(view, entity, asteroid, playerEntity, commands);
             }
+
+            foreach (var (entity, mine) in _mines)
+            {
+                if (!view.HasComponent<Position>(entity)) continue;
+                var pos = view.GetComponent<Position>(entity);
+                var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                float radiusSum = mine.Radius + 18f;
+
+                if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
+                {
+                    ResolveMineVsPlayer(view, entity, mine, playerEntity, commands);
+                }
+            }
+
+            foreach (var (entity, ship) in _enemyShips)
+            {
+                if (!view.HasComponent<Position>(entity)) continue;
+                var pos = view.GetComponent<Position>(entity);
+                var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
+                float distSq = diff.X * diff.X + diff.Y * diff.Y;
+                float radiusSum = ship.Radius + 18f;
+
+                if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
+                {
+                    ResolveEnemyShipVsPlayer(view, entity, ship, playerEntity, commands);
+                }
+            }
         }
 
         for (int i = 0; i < _asteroids.Count; i++)
@@ -115,9 +143,7 @@ public class CollisionSystem : GameSystem
                     }
                 }
 
-                if (!ammo.IsEnemy) continue;
-
-                if (view.HasComponent<EnemyMine>(candId))
+                if (!ammo.IsEnemy && view.HasComponent<EnemyMine>(candId))
                 {
                     var mine = view.GetComponent<EnemyMine>(candId);
                     var pos = view.GetComponent<Position>(candId);
@@ -133,7 +159,7 @@ public class CollisionSystem : GameSystem
                     }
                 }
 
-                if (view.HasComponent<EnemyShip>(candId))
+                if (!ammo.IsEnemy && view.HasComponent<EnemyShip>(candId))
                 {
                     var ship = view.GetComponent<EnemyShip>(candId);
                     var pos = view.GetComponent<Position>(candId);
