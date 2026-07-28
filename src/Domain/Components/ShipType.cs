@@ -18,7 +18,7 @@ public readonly record struct ShipType(
         "Scout",
         "Balanced engines, side shotguns",
         EngineLayout.Balanced,
-        WeaponLoadout.Shotgun,
+        WeaponLoadout.LoadTestWeapon,
         MaxHealth: 8,
         Radius: 16f,
         DrawR: 80,

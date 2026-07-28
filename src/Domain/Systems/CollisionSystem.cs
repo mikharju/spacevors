@@ -22,6 +22,12 @@ public class CollisionSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
+        var ammoList = view.GetEntitiesWithComponents<Ammo>().ToList();
+        var mines = view.GetEntitiesWithComponents<EnemyMine>().ToList();
+        var enemyShips = view.GetEntitiesWithComponents<EnemyShip>().ToList();
+
+        BuildSpatialGrid(view, asteroids, mines, enemyShips);
+
         if (hasPlayer)
         {
             foreach (var (entity, asteroid) in asteroids)
@@ -32,15 +38,17 @@ public class CollisionSystem : GameSystem
 
         for (int i = 0; i < asteroids.Count; i++)
         {
-            for (int j = i + 1; j < asteroids.Count; j++)
+            var (aEntity, aAsteroid) = asteroids[i];
+            foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aAsteroid.Radius))
             {
-                var (aEntity, aAsteroid) = asteroids[i];
-                var (bEntity, bAsteroid) = asteroids[j];
-                ResolveCircleVsCircle(view, aEntity, aAsteroid, bEntity, commands, bAsteroid);
+                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
+                if (candidate.Id.Value <= aEntity.Value) continue;
+
+                var bAst = view.GetComponent<Asteroid>(candidate.Id);
+                ResolveCircleVsCircle(view, aEntity, aAsteroid, candidate.Id, commands, bAst);
             }
         }
 
-        var ammoList = view.GetEntitiesWithComponents<Ammo>().ToList();
         var entitiesToDestroy = new List<Entity>();
         var effectsToSpawn = new List<(Vector2 Position, MineSize Size)>();
 
@@ -51,16 +59,19 @@ public class CollisionSystem : GameSystem
             var ammoPos = view.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
 
-            foreach (var (asteroidEntity, asteroid) in asteroids)
+            foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
-                var asteroidPos = view.GetComponent<Position>(asteroidEntity);
+                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
+                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
+                var asteroidPos = view.GetComponent<Position>(candidate.Id);
+
                 var diff = asteroidPos.Value - ammoPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = ammoRadius + asteroid.Radius;
 
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
-                ResolveAmmoVsAsteroid(view, ammoEntity, ammo, asteroidEntity, asteroid, commands);
+                ResolveAmmoVsAsteroid(view, ammoEntity, ammo, candidate.Id, asteroid, commands);
                 effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
                 entitiesToDestroy.Add(ammoEntity);
                 break;
@@ -71,8 +82,6 @@ public class CollisionSystem : GameSystem
         {
             commands.Add(new DestroyEntityCommand(entity));
         }
-
-        var mines = view.GetEntitiesWithComponents<EnemyMine>().ToList();
 
         if (hasPlayer)
         {
@@ -89,9 +98,13 @@ public class CollisionSystem : GameSystem
         {
             if (!view.HasComponent<EnemyMine>(mineEntity)) continue;
             if (!view.HasComponent<Position>(mineEntity)) continue;
-            foreach (var (asteroidEntity, asteroid) in asteroids)
+            var minePos = view.GetComponent<Position>(mineEntity);
+
+            foreach (var candidate in _grid.Query(minePos.Value, mine.Radius))
             {
-                ResolveCircleVsCircle(view, mineEntity, mine, asteroidEntity, commands, asteroid);
+                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
+                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
+                ResolveCircleVsCircle(view, mineEntity, mine, candidate.Id, commands, asteroid);
             }
         }
 
@@ -105,17 +118,19 @@ public class CollisionSystem : GameSystem
             var ammoPos = view.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
 
-            foreach (var (mineEntity, mine) in mines)
+            foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
-                if (!view.HasComponent<Position>(mineEntity)) continue;
-                var minePos = view.GetComponent<Position>(mineEntity);
+                if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
+                var mine = view.GetComponent<EnemyMine>(candidate.Id);
+                var minePos = view.GetComponent<Position>(candidate.Id);
+
                 var diff = minePos.Value - ammoPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = ammoRadius + mine.Radius;
 
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
-                ammoToMineHits.Add((ammoEntity, mineEntity));
+                ammoToMineHits.Add((ammoEntity, candidate.Id));
                 effectsToSpawn.Add((minePos.Value, mine.Size));
                 break;
             }
@@ -151,8 +166,6 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        var enemyShips = view.GetEntitiesWithComponents<EnemyShip>().ToList();
-
         foreach (var (enemyShipEntity, enemyShip) in enemyShips)
         {
             if (!view.HasComponent<EnemyShip>(enemyShipEntity)) continue;
@@ -163,29 +176,32 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        for (int i = 0; i < enemyShips.Count; i++)
+        foreach (var (aEntity, aShip) in enemyShips)
         {
-            var (aEntity, aShip) = enemyShips[i];
             if (!view.HasComponent<EnemyShip>(aEntity)) continue;
             if (!view.HasComponent<Position>(aEntity)) continue;
-            foreach (var (asteroidEntity, asteroid) in asteroids)
+            var aPos = view.GetComponent<Position>(aEntity);
+
+            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
-                ResolveEnemyShipVsAsteroid(view, aEntity, aShip, asteroidEntity, asteroid, commands);
+                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
+                var asteroid = view.GetComponent<Asteroid>(candidate.Id);
+                ResolveEnemyShipVsAsteroid(view, aEntity, aShip, candidate.Id, asteroid, commands);
             }
 
-            for (int j = i + 1; j < enemyShips.Count; j++)
+            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
-                var (bEntity, bShip) = enemyShips[j];
-                if (!view.HasComponent<EnemyShip>(bEntity)) continue;
-                if (!view.HasComponent<Position>(bEntity)) continue;
-                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, bEntity, bShip, commands);
+                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
+                var bShip = view.GetComponent<EnemyShip>(candidate.Id);
+                if (candidate.Id.Value <= aEntity.Value) continue;
+                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
             }
 
-            foreach (var (mineEntity, mine) in mines)
+            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
-                if (!view.HasComponent<EnemyMine>(mineEntity)) continue;
-                if (!view.HasComponent<Position>(mineEntity)) continue;
-                ResolveEnemyShipVsMine(view, aEntity, aShip, mineEntity, mine, commands);
+                if (!view.HasComponent<EnemyMine>(candidate.Id)) continue;
+                var mine = view.GetComponent<EnemyMine>(candidate.Id);
+                ResolveEnemyShipVsMine(view, aEntity, aShip, candidate.Id, mine, commands);
             }
         }
 
@@ -199,17 +215,19 @@ public class CollisionSystem : GameSystem
             var ammoPos = view.GetComponent<Position>(ammoEntity);
             float ammoRadius = ammo.Radius;
 
-            foreach (var (enemyShipEntity, enemyShip) in enemyShips)
+            foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
-                if (!view.HasComponent<Position>(enemyShipEntity)) continue;
-                var shipPos = view.GetComponent<Position>(enemyShipEntity);
+                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
+                var enemyShip = view.GetComponent<EnemyShip>(candidate.Id);
+                var shipPos = view.GetComponent<Position>(candidate.Id);
+
                 var diff = shipPos.Value - ammoPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = ammoRadius + enemyShip.Radius;
 
                 if (distSq >= radiusSum * radiusSum || distSq < 0.001f) continue;
 
-                ammoToEnemyShipHits.Add((ammoEntity, enemyShipEntity));
+                ammoToEnemyShipHits.Add((ammoEntity, candidate.Id));
                 effectsToSpawn.Add((shipPos.Value, MineSize.Small));
                 break;
             }
@@ -302,6 +320,33 @@ public class CollisionSystem : GameSystem
             {
                 SpawnSpark(commands, position);
             }
+        }
+    }
+
+    private SpatialGrid _grid = new(128f);
+
+    private void BuildSpatialGrid(WorldView view, List<(Entity, Asteroid)> asteroids, List<(Entity, EnemyMine)> mines, List<(Entity, EnemyShip)> enemyShips)
+    {
+        _grid.Clear();
+
+        foreach (var (entity, asteroid) in asteroids)
+        {
+            var pos = view.GetComponent<Position>(entity);
+            _grid.Insert(entity, pos.Value, asteroid.Radius);
+        }
+
+        foreach (var (entity, mine) in mines)
+        {
+            if (!view.HasComponent<Position>(entity)) continue;
+            var pos = view.GetComponent<Position>(entity);
+            _grid.Insert(entity, pos.Value, mine.Radius);
+        }
+
+        foreach (var (entity, ship) in enemyShips)
+        {
+            if (!view.HasComponent<Position>(entity)) continue;
+            var pos = view.GetComponent<Position>(entity);
+            _grid.Insert(entity, pos.Value, ship.Radius);
         }
     }
 

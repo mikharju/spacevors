@@ -29,10 +29,11 @@ public readonly record struct WeaponType(
     public static WeaponType Shotgun { get; } = new("Shotgun", new(2f, 350f, 2.5f, 3, Scatter: 0.04f, Damage: 1));
 
     // Phase 2 weapons
-    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 900f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 3));
+    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 900f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 100));
     public static WeaponType TwinChainGun { get; } = new("TwinChainGun", new(14f, 550f, 3f, 1, Scatter: 0.015f, Damage: 1));
     public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1));
     public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1));
+    public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(2f, 200f, 100f, 1500, Scatter: 0.15f, Damage: 1));
 }
 
 public readonly record struct TurretDefinition(
@@ -72,4 +73,8 @@ public readonly record struct WeaponLoadout(
 
     public static WeaponLoadout PointDefenceTurret { get; } = new("PointDefenceTurret", [
         new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.PointDefenceTurret)]);
+
+    public static WeaponLoadout LoadTestWeapon { get; } = new("LoadTestWeapon", [
+        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.LoadTestWeapon)]);
+
 }
