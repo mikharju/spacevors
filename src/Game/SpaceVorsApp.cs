@@ -97,14 +97,6 @@ public static class SpaceVorsApp
                 if (Raylib.IsKeyPressed(KeyboardKey.F12))
                     Raylib.TakeScreenshot("screenshot.png");
 
-                if (Raylib.IsKeyPressed((KeyboardKey)96))
-                {
-                    var ships = em.GetEntitiesWithComponents<EnemyShip, Position>()
-                        .Select(e => (em.GetComponent<EnemyShip>(e.Entity).ToString()!, e.Value2.Value))
-                        .ToList();
-                    DiagnosticLogger.LogAllEnemyShips("F13", ships);
-                }
-
                 float frameTime = (float)Raylib.GetFrameTime();
                 DiagnosticLogger.UpdateFps(frameTime);
 
@@ -206,25 +198,6 @@ public static class SpaceVorsApp
 
                         RunPhase(view, commands2, actionSystems);
                         commands2.Apply(em);
-
-                        if (Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1" && ((EnemyShipSpawnSystem)actionSystems[1]).SpawnedThisFrame)
-                        {
-                            var afterIds = em.GetEntitiesWithComponents<EnemyShip>()
-                                .Select(e => e.Entity.Value)
-                                .OrderBy(x => x)
-                                .ToList();
-                            Console.WriteLine($"[SHIP_SPAWN] after={string.Join(",", afterIds)}");
-
-                            var beforeIds = ((EnemyShipSpawnSystem)actionSystems[1]).ShipIdsBeforeSpawn!;
-                            var addedIds = afterIds.Except(beforeIds).ToList();
-                            if (addedIds.Count > 0)
-                                Console.WriteLine($"[SHIP_SPAWN] added={string.Join(",", addedIds)}");
-
-                            foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
-                            {
-                                Console.WriteLine($"[SHIP_SPAWN] entity={entity.Value} radius={ship.Radius:F0} pos=({pos.Value.X:F1},{pos.Value.Y:F1})");
-                            }
-                        }
 
                         var commands3 = new CommandBuffer();
 

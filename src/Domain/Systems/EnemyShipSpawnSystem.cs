@@ -1,4 +1,3 @@
-using System.Linq;
 using Spacevors.Domain.Components;
 
 namespace Spacevors.Domain.Systems;
@@ -10,11 +9,6 @@ public class EnemyShipSpawnSystem : GameSystem
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
-    private bool _spawnedThisFrame = false;
-    private List<int>? _shipIdsBeforeSpawn;
-
-    public bool SpawnedThisFrame => _spawnedThisFrame;
-    public IReadOnlyList<int>? ShipIdsBeforeSpawn => _shipIdsBeforeSpawn;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -24,8 +18,6 @@ public class EnemyShipSpawnSystem : GameSystem
 
         if (!hasPlayer) return;
 
-        _spawnedThisFrame = false;
-        _shipIdsBeforeSpawn = null;
         _timer -= deltaTime;
 
         if (_timer > 0f) return;
@@ -49,57 +41,36 @@ public class EnemyShipSpawnSystem : GameSystem
         float sinA = (float)Math.Sin(randomAngle);
         Vector2 spawnDir = new Vector2(
             velocityDir.X * cosA - velocityDir.Y * sinA,
-            velocityDir.X * sinA + velocityDir.Y * cosA
+            velocityDir.X * sinA + velocityDir.Y * sinA
         );
 
         float spawnDist = 500f + (float)Random.Shared.NextDouble() * 500f;
-        float sx = playerPos.Value.X + spawnDir.X * spawnDist;
-        float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
-
-        float testX = playerPos.Value.X + spawnDir.X * spawnDist;
-        float testY = playerPos.Value.Y + spawnDir.Y * spawnDist;
-        Vector2 testSpawnPos = new(testX, testY);
+        Vector2 testSpawnPos = new(
+            playerPos.Value.X + spawnDir.X * spawnDist,
+            playerPos.Value.Y + spawnDir.Y * spawnDist
+        );
 
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
-        var spawnPos = testSpawnPos;
         float variantRoll = (float)Random.Shared.NextDouble();
 
         IInitialComponent[] components;
         if (variantRoll < 0.333f)
         {
-            components = EnemyShipFactory.CreateInterceptorComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateInterceptorComponents(testSpawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
         else if (variantRoll < 0.666f)
         {
-            components = EnemyShipFactory.CreateHeavyCannonComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateHeavyCannonComponents(testSpawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
         else
         {
-            components = EnemyShipFactory.CreateEnemyShipComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateEnemyShipComponents(testSpawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
+
+        commands.AddEntity(components);
 
         float elapsed = ElapsedTime;
-        var variantName = variantRoll < 0.333f ? "Interceptor" : variantRoll < 0.666f ? "HeavyCannon" : "EnemyShip";
-        int existingCount = view.GetEntitiesWithComponents<EnemyShip>().Count();
-        DiagnosticLogger.LogShipSpawn(spawnPos, variantName, elapsed, existingCount);
-
-        if (Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1")
-        {
-            var beforeIds = view.GetEntitiesWithComponents<EnemyShip>()
-                .Select(e => e.Entity.Value)
-                .OrderBy(x => x)
-                .ToList();
-            Console.WriteLine($"[SHIP_SPAWN] before={string.Join(",", beforeIds)}");
-
-            _spawnedThisFrame = true;
-            _shipIdsBeforeSpawn = beforeIds;
-            commands.AddEntity(components);
-        }
-        else
-        {
-            commands.AddEntity(components);
-        }
         float rampDuration = 180f;
         float progress = MathF.Min(elapsed / rampDuration, 1f);
         float currentMinInterval = MinInterval + (5f - MinInterval) * (1f - progress);

@@ -80,9 +80,6 @@ public static class GameInitializer
             float sSpeed = 20f + (float)rand.NextDouble() * 15f;
             float sAngle = (float)(rand.NextDouble() * Math.PI * 2);
 
-            if (Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1")
-                Console.WriteLine($"[SHIP_INIT] ship={i} pos=({sx:F1},{sy:F1})");
-
             float variantRoll = (float)rand.NextDouble();
             if (variantRoll < 0.333f)
             {
