@@ -3,6 +3,7 @@ namespace Spacevors.Domain;
 public static class DiagnosticLogger
 {
     private static readonly bool _enabled = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+    private static readonly bool _shipSpawnEnabled = Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1";
     private static readonly object _lock = new();
 
     private static int _frameCount;
@@ -55,6 +56,32 @@ public static class DiagnosticLogger
         lock (_lock)
         {
             Console.WriteLine($"[MOUSE] X:{x} Y:{y} L:{leftDown} R:{rightDown} M:{middleDown}");
+        }
+    }
+
+    public static void LogShipSpawn(Vector2 position, string variant, float elapsedSeconds, int existingCount = 0)
+    {
+        if (!_shipSpawnEnabled) return;
+
+        lock (_lock)
+        {
+            Console.WriteLine($"[SHIP_SPAWN] pos=({position.X:F1},{position.Y:F1}) variant={variant} elapsed={elapsedSeconds:F0}s existing={existingCount}");
+        }
+    }
+
+    public static void LogAllEnemyShips(string label, IReadOnlyList<(string Name, Vector2 Position)> ships)
+    {
+        if (!_shipSpawnEnabled) return;
+
+        lock (_lock)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[SHIPS:{label}] count={ships.Count} ");
+            foreach (var (name, pos) in ships)
+            {
+                sb.Append($"{name}=({pos.X:F1},{pos.Y:F1}) ");
+            }
+            Console.WriteLine(sb.ToString());
         }
     }
 }

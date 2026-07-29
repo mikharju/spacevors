@@ -104,6 +104,19 @@ public class CollisionSystem : GameSystem
             }
         }
 
+        for (int i = 0; i < _enemyShips.Count; i++)
+        {
+            var (aEntity, aShip) = _enemyShips[i];
+            foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aShip.Radius))
+            {
+                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
+                if (candidate.Id.Value <= aEntity.Value) continue;
+
+                var bShip = view.GetComponent<EnemyShip>(candidate.Id);
+                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
+            }
+        }
+
         foreach (var (ammoEntity, ammo) in _ammoList)
         {
             var ammoPos = view.GetComponent<Position>(ammoEntity);

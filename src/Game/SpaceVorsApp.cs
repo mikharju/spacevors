@@ -97,6 +97,14 @@ public static class SpaceVorsApp
                 if (Raylib.IsKeyPressed(KeyboardKey.F12))
                     Raylib.TakeScreenshot("screenshot.png");
 
+                if (Raylib.IsKeyPressed((KeyboardKey)96))
+                {
+                    var ships = em.GetEntitiesWithComponents<EnemyShip, Position>()
+                        .Select(e => (em.GetComponent<EnemyShip>(e.Entity).ToString()!, e.Value2.Value))
+                        .ToList();
+                    DiagnosticLogger.LogAllEnemyShips("F13", ships);
+                }
+
                 float frameTime = (float)Raylib.GetFrameTime();
                 DiagnosticLogger.UpdateFps(frameTime);
 
@@ -117,14 +125,6 @@ public static class SpaceVorsApp
                     Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
                     float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
                     float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
-
-                    DiagnosticLogger.LogMouse(
-                        Raylib.GetMouseX(),
-                        Raylib.GetMouseY(),
-                        Raylib.IsMouseButtonDown(MouseButton.Left),
-                        Raylib.IsMouseButtonDown(MouseButton.Right),
-                        Raylib.IsMouseButtonDown(MouseButton.Middle));
-                    Console.WriteLine($"[ROTATION] playerRot:{playerRot.Angle:F3} targetAngle:{targetAngle:F3} angleDiff:{(targetAngle - playerRot.Angle):F3} angVel:{angVel.Value:F3}");
 
                     float cos = (float)Math.Cos(playerRot.Angle);
                     float sin = (float)Math.Sin(playerRot.Angle);

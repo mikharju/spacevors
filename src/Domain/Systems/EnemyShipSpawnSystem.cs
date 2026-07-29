@@ -4,7 +4,7 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSpawnSystem : GameSystem
 {
-    private float _timer = 5f + (float)new Random().NextDouble() * 5f;
+    private float _timer = 5f + (float)Random.Shared.NextDouble() * 5f;
     private const float MinInterval = 2f;
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
@@ -35,8 +35,7 @@ public class EnemyShipSpawnSystem : GameSystem
 
         Vector2 velocityDir = playerVel / velMagnitude;
 
-        Random rand = new Random();
-        float randomAngle = (float)(rand.NextDouble() * MathF.PI / 2f - MathF.PI / 4f);
+        float randomAngle = (float)(Random.Shared.NextDouble() * MathF.PI / 2f - MathF.PI / 4f);
 
         float cosA = (float)Math.Cos(randomAngle);
         float sinA = (float)Math.Sin(randomAngle);
@@ -45,38 +44,45 @@ public class EnemyShipSpawnSystem : GameSystem
             velocityDir.X * sinA + velocityDir.Y * cosA
         );
 
-        float spawnDist = 500f;
+        float spawnDist = 500f + (float)Random.Shared.NextDouble() * 500f;
         float sx = playerPos.Value.X + spawnDir.X * spawnDist;
         float sy = playerPos.Value.Y + spawnDir.Y * spawnDist;
 
-        if (!IsSpawnClear(view, new Vector2(sx, sy))) return;
+        float testX = playerPos.Value.X + spawnDir.X * spawnDist;
+        float testY = playerPos.Value.Y + spawnDir.Y * spawnDist;
+        Vector2 testSpawnPos = new(testX, testY);
 
-        var spawnPos = new Vector2(sx, sy);
-        float variantRoll = (float)rand.NextDouble();
+        if (!IsSpawnClear(view, testSpawnPos)) return;
+
+        var spawnPos = testSpawnPos;
+        float variantRoll = (float)Random.Shared.NextDouble();
 
         IInitialComponent[] components;
         if (variantRoll < 0.333f)
         {
-            components = EnemyShipFactory.CreateInterceptorComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateInterceptorComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
         else if (variantRoll < 0.666f)
         {
-            components = EnemyShipFactory.CreateHeavyCannonComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateHeavyCannonComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
         else
         {
-            components = EnemyShipFactory.CreateEnemyShipComponents(spawnPos, Vector2.Zero, (float)(rand.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateEnemyShipComponents(spawnPos, Vector2.Zero, (float)(Random.Shared.NextDouble() * Math.PI * 2f), 0f);
         }
 
-        commands.AddEntity(components);
-
         float elapsed = ElapsedTime;
+        var variantName = variantRoll < 0.333f ? "Interceptor" : variantRoll < 0.666f ? "HeavyCannon" : "EnemyShip";
+        int existingCount = view.GetEntitiesWithComponents<EnemyShip>().Count();
+        DiagnosticLogger.LogShipSpawn(spawnPos, variantName, elapsed, existingCount);
+
+        commands.AddEntity(components);
         float rampDuration = 180f;
         float progress = MathF.Min(elapsed / rampDuration, 1f);
         float currentMinInterval = MinInterval + (5f - MinInterval) * (1f - progress);
         float currentMaxInterval = MaxInterval + (10f - MaxInterval) * (1f - progress);
 
-        _timer = currentMinInterval + (float)rand.NextDouble() * (currentMaxInterval - currentMinInterval);
+        _timer = currentMinInterval + (float)Random.Shared.NextDouble() * (currentMaxInterval - currentMinInterval);
     }
 
     private bool IsSpawnClear(WorldView view, Vector2 spawnPos)
