@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Spacevors.Domain.Components;
 
 namespace Spacevors.Domain.Systems;
@@ -27,6 +28,8 @@ public class CollisionSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
+        var sw = Stopwatch.StartNew();
+
         _asteroids.Clear();
         _ammoList.Clear();
         _mines.Clear();
@@ -52,6 +55,11 @@ public class CollisionSystem : GameSystem
 
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
             _enemyShips.Add((entity, ship));
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: entity collection", sw.ElapsedTicks);
+
+        sw.Restart();
 
         BuildSpatialGrid(view, _asteroids, _mines, _enemyShips);
 
@@ -91,6 +99,11 @@ public class CollisionSystem : GameSystem
             }
         }
 
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: player detection", sw.ElapsedTicks);
+
+        sw.Restart();
+
         for (int i = 0; i < _asteroids.Count; i++)
         {
             var (aEntity, aAsteroid) = _asteroids[i];
@@ -104,6 +117,11 @@ public class CollisionSystem : GameSystem
             }
         }
 
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: asteroid detection", sw.ElapsedTicks);
+
+        sw.Restart();
+
         for (int i = 0; i < _enemyShips.Count; i++)
         {
             var (aEntity, aShip) = _enemyShips[i];
@@ -116,6 +134,11 @@ public class CollisionSystem : GameSystem
                 ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
             }
         }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: ship detection", sw.ElapsedTicks);
+
+        sw.Restart();
 
         foreach (var (ammoEntity, ammo) in _ammoList)
         {
@@ -224,6 +247,11 @@ public class CollisionSystem : GameSystem
             _effectsToSpawn.Add((playerPos.Value, MineSize.Small));
         }
 
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: ammo detection", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (ammoEntity, mineEntity) in _ammoToMineHits)
         {
             if (!view.HasComponent<Ammo>(ammoEntity)) continue;
@@ -313,6 +341,9 @@ public class CollisionSystem : GameSystem
                 SpawnSpark(commands, position);
             }
         }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: resolution", sw.ElapsedTicks);
     }
 
     private SpatialGrid _grid = new(128f);

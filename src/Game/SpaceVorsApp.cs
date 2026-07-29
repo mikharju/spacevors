@@ -188,6 +188,8 @@ public static class SpaceVorsApp
                     // Fixed timestep simulation
                     while (accumulator >= FixedDeltaTime)
                     {
+                        DiagnosticLogger.LogFrameStart();
+
                         var view = new WorldView(em);
                         var commands = new CommandBuffer();
 

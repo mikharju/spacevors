@@ -75,4 +75,14 @@ public static class DiagnosticLogger
             Console.WriteLine(sb.ToString());
         }
     }
+
+    public static void LogFrameStart()
+    {
+        if (!_enabled) return;
+
+        lock (_lock)
+        {
+            Console.WriteLine("[FRAME]");
+        }
+    }
 }

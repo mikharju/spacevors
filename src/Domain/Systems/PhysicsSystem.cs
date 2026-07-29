@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Spacevors.Domain.Components;
 
 namespace Spacevors.Domain.Systems;
@@ -8,6 +9,8 @@ public class PhysicsSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
+        var sw = Stopwatch.StartNew();
+
         foreach (var (entity, accel) in view.GetEntitiesWithComponents<Acceleration>())
         {
             Vector2 currentVel = view.HasComponent<Velocity>(entity)
@@ -18,11 +21,21 @@ public class PhysicsSystem : GameSystem
             commands.Add(new AddComponentCommand<Velocity>(entity, new Velocity(newVel)));
         }
 
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Physics: velocity integration", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, position, velocity) in view.GetEntitiesWithComponents<Position, Velocity>())
         {
             var newPos = position.Value + velocity.Value * deltaTime;
             commands.Add(new AddComponentCommand<Position>(entity, new Position(newPos)));
         }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Physics: position integration", sw.ElapsedTicks);
+
+        sw.Restart();
 
         foreach (var (entity, rotation, angVel) in view.GetEntitiesWithComponents<Rotation, AngularVelocity>())
         {
@@ -32,5 +45,8 @@ public class PhysicsSystem : GameSystem
             var newAngle = rotation.Angle + angVel.Value * deltaTime;
             commands.Add(new AddComponentCommand<Rotation>(entity, new Rotation(newAngle)));
         }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Physics: rotation", sw.ElapsedTicks);
     }
 }

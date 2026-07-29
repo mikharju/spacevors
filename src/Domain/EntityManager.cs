@@ -101,9 +101,9 @@ public class EntityManager
         foreach (var id in smallest.GetEntityIds())
         {
             var entity = new Entity(id);
-            if (!storage1.Has(entity)) continue;
-            if (!storage2.Has(entity)) continue;
-            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity));
+            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
+            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
+            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2));
         }
     }
 
@@ -121,10 +121,10 @@ public class EntityManager
         foreach (var id in smallest.GetEntityIds())
         {
             var entity = new Entity(id);
-            if (!storage1.Has(entity)) continue;
-            if (!storage2.Has(entity)) continue;
-            if (!storage3.Has(entity)) continue;
-            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity), GetComponent<T3>(entity));
+            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
+            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
+            if (!storage3.TryGetSlot(entity, out int slot3)) continue;
+            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2), storage3.GetBySlot(slot3));
         }
     }
 
@@ -143,11 +143,11 @@ public class EntityManager
         foreach (var id in smallest.GetEntityIds())
         {
             var entity = new Entity(id);
-            if (!storage1.Has(entity)) continue;
-            if (!storage2.Has(entity)) continue;
-            if (!storage3.Has(entity)) continue;
-            if (!storage4.Has(entity)) continue;
-            yield return (entity, GetComponent<T1>(entity), GetComponent<T2>(entity), GetComponent<T3>(entity), GetComponent<T4>(entity));
+            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
+            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
+            if (!storage3.TryGetSlot(entity, out int slot3)) continue;
+            if (!storage4.TryGetSlot(entity, out int slot4)) continue;
+            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2), storage3.GetBySlot(slot3), storage4.GetBySlot(slot4));
         }
     }
 

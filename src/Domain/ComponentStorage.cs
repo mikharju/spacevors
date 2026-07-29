@@ -46,6 +46,16 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
         return _slotMap.ContainsKey(entity.Value);
     }
 
+    public bool TryGetSlot(Entity entity, out int slot)
+    {
+        return _slotMap.TryGetValue(entity.Value, out slot);
+    }
+
+    public ref T GetBySlot(int slot)
+    {
+        return ref _data[slot];
+    }
+
     public override void Remove(Entity entity)
     {
         int id = entity.Value;
