@@ -124,6 +124,7 @@ public class CommandBuffer
     {
         var processor = new CommandProcessor(em);
         processor.Process(_commands);
+        _commands.Clear();
     }
 
     public void Clear()

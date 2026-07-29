@@ -189,25 +189,19 @@ public static class SpaceVorsApp
                     while (accumulator >= FixedDeltaTime)
                     {
                         var view = new WorldView(em);
-                        var commands1 = new CommandBuffer();
+                        var commands = new CommandBuffer();
 
-                        RunPhase(view, commands1, movementSystems);
-                        commands1.Apply(em);
+                        RunPhase(view, commands, movementSystems);
+                        commands.Apply(em);
 
-                        var commands2 = new CommandBuffer();
+                        RunPhase(view, commands, actionSystems);
+                        commands.Apply(em);
 
-                        RunPhase(view, commands2, actionSystems);
-                        commands2.Apply(em);
+                        RunPhase(view, commands, resolutionSystems);
+                        commands.Apply(em);
 
-                        var commands3 = new CommandBuffer();
-
-                        RunPhase(view, commands3, resolutionSystems);
-                        commands3.Apply(em);
-
-                        var commands4 = new CommandBuffer();
-
-                        RunPhase(view, commands4, cleanupSystems);
-                        commands4.Apply(em);
+                        RunPhase(view, commands, cleanupSystems);
+                        commands.Apply(em);
 
                         accumulator -= FixedDeltaTime;
                         GameSystem.AddElapsedTime(FixedDeltaTime);
