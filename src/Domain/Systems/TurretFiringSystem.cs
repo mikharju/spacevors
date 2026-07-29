@@ -4,7 +4,7 @@ namespace Spacevors.Domain.Systems;
 
 public class TurretFiringSystem : GameSystem
 {
-    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var turrets = view.GetEntitiesWithComponents<Turret>().ToList();
 

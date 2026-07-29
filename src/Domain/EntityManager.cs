@@ -23,6 +23,9 @@ public class EntityManager
         }
     }
 
+    public void SetComponent<T>(Entity entity, T component) where T : notnull
+        => AddComponent(entity, component);
+
     public void AddComponent<T>(Entity entity, T component) where T : notnull
     {
         var type = typeof(T);

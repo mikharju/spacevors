@@ -10,7 +10,7 @@ public class EnemyShipSpawnSystem : GameSystem
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
 
-    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;

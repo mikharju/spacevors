@@ -4,7 +4,7 @@ namespace Spacevors.Domain.Systems;
 
 public class MineDriftSystem : GameSystem
 {
-    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;

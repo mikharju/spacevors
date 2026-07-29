@@ -26,7 +26,7 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity, Entity)> _ammoToShipHits = new();
     private readonly HashSet<Entity> _ammoToPlayerHits = new();
 
-    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 

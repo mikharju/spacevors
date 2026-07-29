@@ -10,7 +10,7 @@ public class LevelUpSystem : GameSystem
         WeaponType.AcidBubbleSpray,
         WeaponType.PointDefenceTurret];
 
-    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
