@@ -197,19 +197,44 @@ public static class SpaceVorsApp
                     while (accumulator >= FixedDeltaTime)
                     {
                         var view = new WorldView(em);
-                        var commands = new CommandBuffer();
+                        var commands1 = new CommandBuffer();
 
-                        RunPhase(view, commands, movementSystems);
-                        commands.Apply(em);
+                        RunPhase(view, commands1, movementSystems);
+                        commands1.Apply(em);
 
-                        RunPhase(view, commands, actionSystems);
-                        commands.Apply(em);
+                        var commands2 = new CommandBuffer();
 
-                        RunPhase(view, commands, resolutionSystems);
-                        commands.Apply(em);
+                        RunPhase(view, commands2, actionSystems);
+                        commands2.Apply(em);
 
-                        RunPhase(view, commands, cleanupSystems);
-                        commands.Apply(em);
+                        if (Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1" && ((EnemyShipSpawnSystem)actionSystems[1]).SpawnedThisFrame)
+                        {
+                            var afterIds = em.GetEntitiesWithComponents<EnemyShip>()
+                                .Select(e => e.Entity.Value)
+                                .OrderBy(x => x)
+                                .ToList();
+                            Console.WriteLine($"[SHIP_SPAWN] after={string.Join(",", afterIds)}");
+
+                            var beforeIds = ((EnemyShipSpawnSystem)actionSystems[1]).ShipIdsBeforeSpawn!;
+                            var addedIds = afterIds.Except(beforeIds).ToList();
+                            if (addedIds.Count > 0)
+                                Console.WriteLine($"[SHIP_SPAWN] added={string.Join(",", addedIds)}");
+
+                            foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
+                            {
+                                Console.WriteLine($"[SHIP_SPAWN] entity={entity.Value} radius={ship.Radius:F0} pos=({pos.Value.X:F1},{pos.Value.Y:F1})");
+                            }
+                        }
+
+                        var commands3 = new CommandBuffer();
+
+                        RunPhase(view, commands3, resolutionSystems);
+                        commands3.Apply(em);
+
+                        var commands4 = new CommandBuffer();
+
+                        RunPhase(view, commands4, cleanupSystems);
+                        commands4.Apply(em);
 
                         accumulator -= FixedDeltaTime;
                         GameSystem.AddElapsedTime(FixedDeltaTime);

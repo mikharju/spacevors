@@ -265,6 +265,10 @@ public static class Renderer
             );
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+
+            string entityIdText = $"#{entity.Value}";
+            int textWidth = Raylib.MeasureText(entityIdText, 12);
+            Raylib.DrawText(entityIdText, (int)(cx + enemyShip.Radius + 8f), (int)(cy - 6), 12, new Color(200, 200, 200, 180));
         }
     }
 

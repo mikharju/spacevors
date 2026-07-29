@@ -9,6 +9,8 @@ public class WorldView
         _em = em;
     }
 
+    public int MaxEntityId => _em.MaxEntityId;
+
     public T GetComponent<T>(Entity entity) where T : notnull
     {
         return _em.GetComponent<T>(entity);

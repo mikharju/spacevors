@@ -1,3 +1,4 @@
+using System.Linq;
 using Spacevors.Domain.Components;
 
 namespace Spacevors.Domain.Systems;
@@ -9,6 +10,11 @@ public class EnemyShipSpawnSystem : GameSystem
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
+    private bool _spawnedThisFrame = false;
+    private List<int>? _shipIdsBeforeSpawn;
+
+    public bool SpawnedThisFrame => _spawnedThisFrame;
+    public IReadOnlyList<int>? ShipIdsBeforeSpawn => _shipIdsBeforeSpawn;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -18,6 +24,8 @@ public class EnemyShipSpawnSystem : GameSystem
 
         if (!hasPlayer) return;
 
+        _spawnedThisFrame = false;
+        _shipIdsBeforeSpawn = null;
         _timer -= deltaTime;
 
         if (_timer > 0f) return;
@@ -76,7 +84,22 @@ public class EnemyShipSpawnSystem : GameSystem
         int existingCount = view.GetEntitiesWithComponents<EnemyShip>().Count();
         DiagnosticLogger.LogShipSpawn(spawnPos, variantName, elapsed, existingCount);
 
-        commands.AddEntity(components);
+        if (Environment.GetEnvironmentVariable("SPACEVORS_SHIP_SPAWN_LOG") == "1")
+        {
+            var beforeIds = view.GetEntitiesWithComponents<EnemyShip>()
+                .Select(e => e.Entity.Value)
+                .OrderBy(x => x)
+                .ToList();
+            Console.WriteLine($"[SHIP_SPAWN] before={string.Join(",", beforeIds)}");
+
+            _spawnedThisFrame = true;
+            _shipIdsBeforeSpawn = beforeIds;
+            commands.AddEntity(components);
+        }
+        else
+        {
+            commands.AddEntity(components);
+        }
         float rampDuration = 180f;
         float progress = MathF.Min(elapsed / rampDuration, 1f);
         float currentMinInterval = MinInterval + (5f - MinInterval) * (1f - progress);

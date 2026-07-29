@@ -5,6 +5,8 @@ public class EntityManager
     private readonly Dictionary<Type, object> _storages = new();
     private int _nextId = 0;
 
+    public int MaxEntityId => _nextId - 1;
+
     public Entity CreateEntity()
     {
         return new Entity(_nextId++);
