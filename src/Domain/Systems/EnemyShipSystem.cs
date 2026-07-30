@@ -39,17 +39,15 @@ public class EnemyShipSystem : GameSystem
 
             if (dist <= ship.FiringRange) continue;
 
-            Vector2 currentVel = view.HasComponent<Velocity>(shipEntity)
-                ? view.GetComponent<Velocity>(shipEntity).Value
-                : Vector2.Zero;
+            view.TryGetComponent<Velocity>(shipEntity, out var vel);
+            var currentVel = vel.Value;
 
             var targetAccel = toPlayerDir * ship.Acceleration;
             commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(targetAccel)));
 
-            if (view.HasComponent<Acceleration>(shipEntity))
+            if (view.TryGetComponent<Acceleration>(shipEntity, out var accel))
             {
-                var accel = view.GetComponent<Acceleration>(shipEntity).Value;
-                var newVel = currentVel + accel * deltaTime;
+                var newVel = currentVel + accel.Value * deltaTime;
 
                 if (newVel.Magnitude > ship.Speed)
                 {

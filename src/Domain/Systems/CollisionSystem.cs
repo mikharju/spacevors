@@ -159,9 +159,8 @@ public class CollisionSystem : GameSystem
             {
                 var candId = candidate.Id;
 
-                if (view.HasComponent<Asteroid>(candId))
+                if (view.TryGetComponent<Asteroid>(candId, out var asteroid))
                 {
-                    var asteroid = view.GetComponent<Asteroid>(candId);
                     var pos = view.GetComponent<Position>(candId);
                     var diff = pos.Value - ammoPos.Value;
                     float dSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -175,9 +174,8 @@ public class CollisionSystem : GameSystem
                     }
                 }
 
-                if (!ammo.IsEnemy && view.HasComponent<EnemyMine>(candId))
+                if (!ammo.IsEnemy && view.TryGetComponent<EnemyMine>(candId, out var mine))
                 {
-                    var mine = view.GetComponent<EnemyMine>(candId);
                     var pos = view.GetComponent<Position>(candId);
                     var diff = pos.Value - ammoPos.Value;
                     float dSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -191,9 +189,8 @@ public class CollisionSystem : GameSystem
                     }
                 }
 
-                if (!ammo.IsEnemy && view.HasComponent<EnemyShip>(candId))
+                if (!ammo.IsEnemy && view.TryGetComponent<EnemyShip>(candId, out var ship))
                 {
-                    var ship = view.GetComponent<EnemyShip>(candId);
                     var pos = view.GetComponent<Position>(candId);
                     var diff = pos.Value - ammoPos.Value;
                     float dSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -449,12 +446,10 @@ public class CollisionSystem : GameSystem
         float invMassB = 1f / bMass;
         float totalInvMass = invMassA + invMassB;
 
-        Vector2 aVel = view.HasComponent<Velocity>(aEntity)
-            ? view.GetComponent<Velocity>(aEntity).Value
-            : Vector2.Zero;
-        Vector2 bVel = view.HasComponent<Velocity>(bEntity)
-            ? view.GetComponent<Velocity>(bEntity).Value
-            : Vector2.Zero;
+        view.TryGetComponent<Velocity>(aEntity, out var aVelComp);
+        view.TryGetComponent<Velocity>(bEntity, out var bVelComp);
+        var aVel = aVelComp.Value;
+        var bVel = bVelComp.Value;
 
         var relVel = bVel - aVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
@@ -484,15 +479,13 @@ public class CollisionSystem : GameSystem
         var tangentVel = correctedRelVel - normal * velNormalComponent;
         float tangentSpeed = tangentVel.Magnitude;
 
-        if (view.HasComponent<AngularVelocity>(aEntity))
+        if (view.TryGetComponent<AngularVelocity>(aEntity, out var aAngVel))
         {
-            var aAngVel = view.GetComponent<AngularVelocity>(aEntity);
             commands.Add(new AddComponentCommand<AngularVelocity>(aEntity, new AngularVelocity(aAngVel.Value + tangentSpeed * RotationFactor)));
         }
 
-        if (view.HasComponent<AngularVelocity>(bEntity))
+        if (view.TryGetComponent<AngularVelocity>(bEntity, out var bAngVel))
         {
-            var bAngVel = view.GetComponent<AngularVelocity>(bEntity);
             commands.Add(new AddComponentCommand<AngularVelocity>(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor)));
         }
     }
@@ -513,9 +506,8 @@ public class CollisionSystem : GameSystem
         var normal = diff / dist;
 
         Vector2 ammoVel = ammo.Velocity;
-        Vector2 asteroidVel = view.HasComponent<Velocity>(asteroidEntity)
-            ? view.GetComponent<Velocity>(asteroidEntity).Value
-            : Vector2.Zero;
+        view.TryGetComponent<Velocity>(asteroidEntity, out var asteroidVelComp);
+        var asteroidVel = asteroidVelComp.Value;
 
         var relVel = ammoVel - asteroidVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
@@ -530,10 +522,9 @@ public class CollisionSystem : GameSystem
         asteroidVel += impulse * (1f / asteroidMass);
         commands.Add(new AddComponentCommand<Velocity>(asteroidEntity, new Velocity(asteroidVel)));
 
-        if (view.HasComponent<AngularVelocity>(asteroidEntity))
+        if (view.TryGetComponent<AngularVelocity>(asteroidEntity, out var angVel))
         {
             var tangentSpeed = relVel.Magnitude - Math.Abs(velAlongNormal);
-            var angVel = view.GetComponent<AngularVelocity>(asteroidEntity);
             commands.Add(new AddComponentCommand<AngularVelocity>(asteroidEntity, new AngularVelocity(angVel.Value + tangentSpeed * 0.01f)));
         }
     }
@@ -565,10 +556,8 @@ public class CollisionSystem : GameSystem
 
         var normal = diff / (float)Math.Sqrt(distSq);
         float explosionForce = mine.Size == MineSize.Large ? 240f : 120f;
-        Vector2 playerVel = view.HasComponent<Velocity>(playerEntity)
-            ? view.GetComponent<Velocity>(playerEntity).Value
-            : Vector2.Zero;
-        playerVel += normal * explosionForce;
+        view.TryGetComponent<Velocity>(playerEntity, out var playerVelComp);
+        Vector2 playerVel = playerVelComp.Value + normal * explosionForce;
 
         commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(playerVel)));
 

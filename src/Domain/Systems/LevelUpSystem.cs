@@ -107,9 +107,9 @@ public class LevelUpSystem : GameSystem
 
     private static int GetMaxWeaponSlots(WorldView view, Entity playerEntity)
     {
-        if (view.HasComponent<WeaponSlots>(playerEntity))
+        if (view.TryGetComponent<WeaponSlots>(playerEntity, out var ws))
         {
-            return view.GetComponent<WeaponSlots>(playerEntity).Max;
+            return ws.Max;
         }
         return 3;
     }

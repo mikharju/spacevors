@@ -26,9 +26,8 @@ public class EnemyShipSpawnSystem : GameSystem
         if (activeShips >= MaxEnemyShips) return;
 
         var playerPos = view.GetComponent<Position>(playerEntity);
-        Vector2 playerVel = view.HasComponent<Velocity>(playerEntity)
-            ? view.GetComponent<Velocity>(playerEntity).Value
-            : Vector2.Zero;
+        view.TryGetComponent<Velocity>(playerEntity, out var playerVelComp);
+        Vector2 playerVel = playerVelComp.Value;
 
         float velMagnitude = playerVel.Magnitude;
         if (velMagnitude < 0.1f) return;

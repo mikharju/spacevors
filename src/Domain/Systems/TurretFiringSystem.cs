@@ -315,9 +315,8 @@ public class TurretFiringSystem : GameSystem
             float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.3f;
 
             Vector2 spawnOffset = pelletDir * 20f;
-            if (turret.IsEnemy && view.HasComponent<EnemyShip>(turretEntity))
+            if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))
             {
-                var ship = view.GetComponent<EnemyShip>(turretEntity);
                 float forwardOffset = ship.Radius + 5f;
                 Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
                 spawnOffset += forwardDir * forwardOffset;

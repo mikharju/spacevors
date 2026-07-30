@@ -13,9 +13,8 @@ public class PhysicsSystem : GameSystem
 
         foreach (var (entity, accel) in view.GetEntitiesWithComponents<Acceleration>())
         {
-            Vector2 currentVel = view.HasComponent<Velocity>(entity)
-                ? view.GetComponent<Velocity>(entity).Value
-                : Vector2.Zero;
+            view.TryGetComponent<Velocity>(entity, out var vel);
+            var currentVel = vel.Value;
 
             var newVel = currentVel + accel.Value * deltaTime;
             commands.Add(new AddComponentCommand<Velocity>(entity, new Velocity(newVel)));
