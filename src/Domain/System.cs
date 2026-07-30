@@ -9,5 +9,5 @@ public abstract class GameSystem
 
     public virtual void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands) { }
 
-    public virtual void DirectMutationUpdate(WorldView view, float deltaTime) { }
+    public virtual void DirectMutationUpdate(WorldView view, float deltaTime, CommandBuffer commands) { }
 }

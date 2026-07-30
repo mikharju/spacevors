@@ -5,12 +5,18 @@ namespace Spacevors.Domain.Systems;
 
 public class AmmoLifetimeSystem : GameSystem
 {
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void DirectMutationUpdate(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 
-        foreach (var (entity, ammo) in view.GetEntitiesWithComponents<Ammo>())
+        if (!view.TryGetStorage(out ComponentStorage<Ammo>? ammoStorage))
+            return;
+
+        for (int i = 0; i < ammoStorage.Count; i++)
         {
+            Entity entity = ammoStorage.GetEntity(i);
+            ref Ammo ammo = ref ammoStorage.GetComponent(i);
+
             var newLifetime = ammo.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
@@ -18,11 +24,11 @@ public class AmmoLifetimeSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Ammo>(entity, new Ammo(ammo.Velocity, ammo.Radius, newLifetime, ammo.IsEnemy, ammo.Damage)));
+                ammo = new Ammo(ammo.Velocity, ammo.Radius, newLifetime, ammo.IsEnemy, ammo.Damage);
             }
         }
 
         sw.Stop();
-        DiagnosticLogger.LogSystem("Ammo: lifetime", sw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Ammo: lifetime", sw.ElapsedTicks, ammoStorage.Count);
     }
 }

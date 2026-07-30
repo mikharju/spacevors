@@ -14,6 +14,9 @@ public class WorldView
     public ComponentStorage<T> GetStorage<T>() where T : notnull
         => _em.GetStorage<T>();
 
+    public bool TryGetStorage<T>(out ComponentStorage<T> storage) where T : notnull
+        => _em.TryGetStorage(out storage);
+
     public ref T GetComponentRef<T>(Entity entity) where T : notnull
         => ref _em.GetComponentRef<T>(entity);
 

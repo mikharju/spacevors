@@ -82,10 +82,10 @@ public static class SpaceVorsApp
             bool gameOver = false;
 
             var movementSystems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem() };
-            var positionUpdateSystems = new GameSystem[] { new PositionIntegrationSystem() };
+            var positionUpdateSystems = new GameSystem[] { new PositionIntegrationSystem(), new AmmoLifetimeSystem() };
             var actionSystems = new GameSystem[] { new TurretFiringSystem(), new EnemyShipSpawnSystem() };
             var resolutionSystems = new GameSystem[] { new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new EffectSystem() };
-            var cleanupSystems = new GameSystem[] { new AmmoLifetimeSystem(), new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSystem(), new CameraSystem() };
+            var cleanupSystems = new GameSystem[] { new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSystem(), new CameraSystem() };
 
             float accumulator = 0f;
             GameSystem.ResetElapsedTime();
@@ -195,7 +195,8 @@ public static class SpaceVorsApp
                         commands.Apply(em);
 
                         foreach (var system in positionUpdateSystems)
-                            system.DirectMutationUpdate(view, FixedDeltaTime);
+                            system.DirectMutationUpdate(view, FixedDeltaTime, commands);
+                        commands.Apply(em);
 
                         RunPhase(view, commands, actionSystems);
                         commands.Apply(em);

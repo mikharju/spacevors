@@ -5,7 +5,7 @@ namespace Spacevors.Domain.Systems;
 
 public class PositionIntegrationSystem : GameSystem
 {
-    public override void DirectMutationUpdate(WorldView view, float deltaTime)
+    public override void DirectMutationUpdate(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 
