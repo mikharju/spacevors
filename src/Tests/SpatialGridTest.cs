@@ -18,7 +18,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(0, 0), 10f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 10f);
 
         var results = grid.Query(new Vector2(0, 0), 10f).ToList();
         Assert.NotEmpty(results);
@@ -30,7 +30,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(5000, 5000), 10f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(5000, 5000), 10f);
 
         var results = grid.Query(new Vector2(0, 0), 10f).ToList();
         Assert.Empty(results);
@@ -41,7 +41,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(50, 50), 10f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(50, 50), 10f);
 
         var results = grid.Query(new Vector2(60, 60), 30f).ToList();
         Assert.Single(results);
@@ -52,7 +52,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(64, 64), 50f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(64, 64), 50f);
 
         var results = grid.Query(new Vector2(0, 0), 100f).ToList();
         Assert.Single(results);
@@ -66,13 +66,13 @@ public class SpatialGridTest
         var e2 = new Entity(2);
         var e3 = new Entity(3);
 
-        grid.Insert(e1, new Vector2(0, 0), 50f);
-        grid.Insert(e2, new Vector2(64, 64), 50f);
-        grid.Insert(e3, new Vector2(500, 500), 10f);
+        grid.Insert(e1, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 50f);
+        grid.Insert(e2, SpatialGrid.CollisionKind.EnemyMine, new Vector2(64, 64), 50f);
+        grid.Insert(e3, SpatialGrid.CollisionKind.EnemyShip, new Vector2(500, 500), 10f);
 
         var results = grid.Query(new Vector2(0, 0), 100f).ToList();
-        Assert.Contains(results, r => r.Id == e1);
-        Assert.Contains(results, r => r.Id == e2);
+        Assert.Contains(results, r => r.Id == e1 && r.Kind == SpatialGrid.CollisionKind.Asteroid);
+        Assert.Contains(results, r => r.Id == e2 && r.Kind == SpatialGrid.CollisionKind.EnemyMine);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(0, 0), 10f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 10f);
 
         grid.Clear();
 
@@ -95,8 +95,8 @@ public class SpatialGridTest
         var e1 = new Entity(1);
         var e2 = new Entity(2);
 
-        grid.Insert(e1, new Vector2(-64, -64), 5f);
-        grid.Insert(e2, new Vector2(192, 192), 5f);
+        grid.Insert(e1, SpatialGrid.CollisionKind.Asteroid, new Vector2(-64, -64), 5f);
+        grid.Insert(e2, SpatialGrid.CollisionKind.EnemyMine, new Vector2(192, 192), 5f);
 
         var results = grid.Query(new Vector2(0, 0), 300f).ToList();
         Assert.Equal(2, results.Count);
@@ -107,7 +107,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(0, 0), 200f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 200f);
 
         var results = grid.Query(new Vector2(256, 256), 10f).ToList();
         Assert.Single(results);
@@ -118,7 +118,7 @@ public class SpatialGridTest
     {
         var grid = new SpatialGrid(128f);
         var entity = new Entity(1);
-        grid.Insert(entity, new Vector2(0, 0), 0.5f);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 0.5f);
 
         var results = grid.Query(new Vector2(100, 100), 0.5f).ToList();
         Assert.Single(results);

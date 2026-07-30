@@ -105,10 +105,10 @@ public class CollisionSystem : GameSystem
             var (aEntity, aAsteroid, aPos) = _asteroids[i];
             foreach (var candidate in _grid.Query(aPos.Value, aAsteroid.Radius))
             {
-                if (!view.TryGetComponent<Asteroid>(candidate.Id, out var bAst)) continue;
+                if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                ResolveCircleVsCircle(view, aEntity, aAsteroid, candidate.Id, commands, bAst);
+                ResolveCircleVsCircle(view, aEntity, aAsteroid, candidate.Id, commands);
             }
         }
 
@@ -122,10 +122,10 @@ public class CollisionSystem : GameSystem
             var (aEntity, aShip, aPos) = _enemyShips[i];
             foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
-                if (!view.TryGetComponent<EnemyShip>(candidate.Id, out var bShip)) continue;
+                if (candidate.Kind != SpatialGrid.CollisionKind.EnemyShip) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
+                ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, commands);
             }
         }
 
@@ -140,7 +140,6 @@ public class CollisionSystem : GameSystem
             float ammoRadius = ammo.Radius;
 
             Entity? closestAsteroidHit = null;
-            Asteroid? closestAsteroidComp = null;
             Vector2 asteroidDiff = default;
             float asteroidDistSq = float.MaxValue;
 
@@ -155,56 +154,56 @@ public class CollisionSystem : GameSystem
 
             foreach (var candidate in _grid.Query(ammoPos.Value, ammoRadius))
             {
-                var candId = candidate.Id;
+                var diff = candidate.Position - ammoPos.Value;
+                float dSq = diff.X * diff.X + diff.Y * diff.Y;
+                if (dSq < 0.001f) continue;
 
-                if (view.TryGetComponent<Asteroid>(candId, out var asteroid))
+                switch (candidate.Kind)
                 {
-                    var pos = view.GetComponent<Position>(candId);
-                    var diff = pos.Value - ammoPos.Value;
-                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float rSum = ammoRadius + asteroid.Radius;
-                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < asteroidDistSq)
-                    {
-                        closestAsteroidHit = candId;
-                        closestAsteroidComp = asteroid;
-                        asteroidDiff = diff;
-                        asteroidDistSq = dSq;
-                    }
-                }
+                    case SpatialGrid.CollisionKind.Asteroid:
+                        {
+                            float rSum = ammoRadius + candidate.Radius;
+                            if (dSq < rSum * rSum && dSq < asteroidDistSq)
+                            {
+                                closestAsteroidHit = candidate.Id;
+                                asteroidDiff = diff;
+                                asteroidDistSq = dSq;
+                            }
+                        }
+                        break;
 
-                if (!ammo.IsEnemy && view.TryGetComponent<EnemyMine>(candId, out var mine))
-                {
-                    var pos = view.GetComponent<Position>(candId);
-                    var diff = pos.Value - ammoPos.Value;
-                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float rSum = ammoRadius + mine.Radius;
-                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < mineDistSq)
-                    {
-                        closestMineHit = candId;
-                        mineHitSize = mine.Size;
-                        mineHitPos = pos.Value;
-                        mineDistSq = dSq;
-                    }
-                }
+                    case SpatialGrid.CollisionKind.EnemyMine when !ammo.IsEnemy:
+                        {
+                            float rSum = ammoRadius + candidate.Radius;
+                            if (dSq < rSum * rSum && dSq < mineDistSq)
+                            {
+                                closestMineHit = candidate.Id;
+                                // Size not stored in grid - look it up once after detection
+                                mineHitPos = candidate.Position;
+                                var mineComp = view.GetComponent<EnemyMine>(candidate.Id);
+                                mineHitSize = mineComp.Size;
+                                mineDistSq = dSq;
+                            }
+                        }
+                        break;
 
-                if (!ammo.IsEnemy && view.TryGetComponent<EnemyShip>(candId, out var ship))
-                {
-                    var pos = view.GetComponent<Position>(candId);
-                    var diff = pos.Value - ammoPos.Value;
-                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float rSum = ammoRadius + ship.Radius;
-                    if (dSq < rSum * rSum && dSq >= 0.001f && dSq < shipDistSq)
-                    {
-                        closestShipHit = candId;
-                        shipHitPos = pos.Value;
-                        shipDistSq = dSq;
-                    }
+                    case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
+                        {
+                            float rSum = ammoRadius + candidate.Radius;
+                            if (dSq < rSum * rSum && dSq < shipDistSq)
+                            {
+                                closestShipHit = candidate.Id;
+                                shipHitPos = candidate.Position;
+                                shipDistSq = dSq;
+                            }
+                        }
+                        break;
                 }
             }
 
             if (closestAsteroidHit.HasValue)
             {
-                var asteroid = closestAsteroidComp!.Value;
+                var asteroid = view.GetComponent<Asteroid>(closestAsteroidHit.Value);
                 ResolveAmmoVsAsteroid(view, ammoEntity, ammo, closestAsteroidHit.Value, asteroid, commands);
                 _effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
                 _entitiesToDestroy.Add(ammoEntity);
@@ -337,17 +336,17 @@ public class CollisionSystem : GameSystem
 
         foreach (var (entity, asteroid, pos) in asteroids)
         {
-            _grid.Insert(entity, pos.Value, asteroid.Radius);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, pos.Value, asteroid.Radius);
         }
 
         foreach (var (entity, mine, pos) in mines)
         {
-            _grid.Insert(entity, pos.Value, mine.Radius);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius);
         }
 
         foreach (var (entity, ship, pos) in enemyShips)
         {
-            _grid.Insert(entity, pos.Value, ship.Radius);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius);
         }
     }
 
@@ -370,25 +369,22 @@ public class CollisionSystem : GameSystem
         Entity aEntity,
         Asteroid aAst,
         Entity bEntity,
-        CommandBuffer commands,
-        Asteroid? bAst = null)
+        CommandBuffer commands)
     {
         var aPos = view.GetComponent<Position>(aEntity);
         var bPos = view.GetComponent<Position>(bEntity);
 
-        float aRadius;
+        float aRadius = aAst.Radius;
         float bRadius;
         bool isAsteroidVsAsteroid;
 
-        if (bAst != null)
+        if (view.TryGetComponent<Asteroid>(bEntity, out var bAst))
         {
-            aRadius = aAst.Radius;
-            bRadius = bAst.Value.Radius;
+            bRadius = bAst.Radius;
             isAsteroidVsAsteroid = true;
         }
         else
         {
-            aRadius = aAst.Radius;
             var playerComp = view.GetComponent<Player>(bEntity);
             bRadius = playerComp.Radius;
             isAsteroidVsAsteroid = false;
@@ -604,13 +600,13 @@ public class CollisionSystem : GameSystem
         Entity aEntity,
         EnemyShip aShip,
         Entity bEntity,
-        EnemyShip bShip,
         CommandBuffer commands)
     {
         var aPos = view.GetComponent<Position>(aEntity);
         var bPos = view.GetComponent<Position>(bEntity);
 
         float aRadius = aShip.Radius;
+        var bShip = view.GetComponent<EnemyShip>(bEntity);
         float bRadius = bShip.Radius;
 
         ResolveCollision(view, aPos, bPos, aEntity, bEntity, aRadius, bRadius, true, commands, 3000f);

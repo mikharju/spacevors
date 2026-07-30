@@ -7,19 +7,26 @@ public class SpatialGrid
     private readonly Dictionary<(int CellX, int CellY), List<QueryEntry>> _cells = new();
     public float CellSize { get; }
 
+    public enum CollisionKind
+    {
+        Asteroid,
+        EnemyMine,
+        EnemyShip
+    }
+
     public SpatialGrid(float cellSize)
     {
         CellSize = cellSize;
     }
 
-    public readonly record struct QueryEntry(Entity Id, float Radius);
+    public readonly record struct QueryEntry(Entity Id, CollisionKind Kind, Vector2 Position, float Radius);
 
     public void Clear()
     {
         _cells.Clear();
     }
 
-    public void Insert(Entity id, Vector2 position, float radius)
+    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius)
     {
         int minX = (int)MathF.Floor((position.X - radius) / CellSize);
         int maxX = (int)MathF.Floor((position.X + radius) / CellSize);
@@ -35,7 +42,7 @@ public class SpatialGrid
                     entries = new List<QueryEntry>();
                     _cells[(x, y)] = entries;
                 }
-                entries.Add(new QueryEntry(id, radius));
+                entries.Add(new QueryEntry(id, kind, position, radius));
             }
         }
     }
