@@ -11,8 +11,8 @@ public class WorldView
 
     public int MaxEntityId => _em.MaxEntityId;
 
-    public void SetComponent<T>(Entity entity, T component) where T : notnull
-        => _em.SetComponent(entity, component);
+    public ref T GetComponentRef<T>(Entity entity) where T : notnull
+        => ref _em.GetComponentRef<T>(entity);
 
     public T GetComponent<T>(Entity entity) where T : notnull
     {

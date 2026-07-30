@@ -83,6 +83,13 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
         return false;
     }
 
+    public ref T GetComponentRef(Entity entity)
+    {
+        if (!TryGetSlot(entity, out int slot))
+            throw new KeyNotFoundException($"Component of type {typeof(T).Name} not found for entity {entity.Value}");
+        return ref GetBySlot(slot);
+    }
+
     public ref T GetBySlot(int slot)
     {
         return ref _data[slot];

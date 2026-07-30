@@ -23,8 +23,15 @@ public class EntityManager
         }
     }
 
-    public void SetComponent<T>(Entity entity, T component) where T : notnull
-        => AddComponent(entity, component);
+    public ref T GetComponentRef<T>(Entity entity) where T : notnull
+    {
+        var type = typeof(T);
+        if (_storages.TryGetValue(type, out var storage))
+        {
+            return ref ((ComponentStorage<T>)storage).GetComponentRef(entity);
+        }
+        throw new KeyNotFoundException($"Component of type {typeof(T).Name} not found for entity {entity.Value}");
+    }
 
     public void AddComponent<T>(Entity entity, T component) where T : notnull
     {

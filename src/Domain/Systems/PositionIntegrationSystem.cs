@@ -9,10 +9,10 @@ public class PositionIntegrationSystem : GameSystem
     {
         var sw = Stopwatch.StartNew();
 
-        foreach (var (entity, position, velocity) in view.GetEntitiesWithComponents<Position, Velocity>())
+        foreach (var (entity, velocity) in view.GetEntitiesWithComponents<Velocity>())
         {
-            var newPos = position.Value + velocity.Value * deltaTime;
-            view.SetComponent(entity, new Position(newPos));
+            ref var pos = ref view.GetComponentRef<Position>(entity);
+            pos = new Position(pos.Value + velocity.Value * deltaTime);
         }
 
         sw.Stop();
