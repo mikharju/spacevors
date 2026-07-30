@@ -85,7 +85,7 @@ public class PickupMagnetSystem : GameSystem
 
             if (dist < pickupRadius + orb.Radius)
             {
-                Vector2 currentVel = view.HasComponent<Velocity>(orbEntity) ? view.GetComponent<Velocity>(orbEntity).Value : Vector2.Zero;
+                Vector2 currentVel = view.TryGetComponent<Velocity>(orbEntity, out var vel) ? vel.Value : Vector2.Zero;
                 var accel = (diff / dist) * MagnetAcceleration;
                 var newVel = currentVel + accel * deltaTime;
                 float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);

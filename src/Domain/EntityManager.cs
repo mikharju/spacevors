@@ -58,6 +58,23 @@ public class EntityManager
         return false;
     }
 
+    public bool TryGetComponent<T>(Entity entity, out T component) where T : notnull
+    {
+        var type = typeof(T);
+        if (_storages.TryGetValue(type, out var storage))
+        {
+            var typedStorage = (ComponentStorage<T>)storage;
+            if (typedStorage.TryGetSlot(entity, out int slot))
+            {
+                component = typedStorage.GetBySlot(slot);
+                return true;
+            }
+        }
+
+        component = default!;
+        return false;
+    }
+
     public IEnumerable<Entity> GetEntitiesWith<T>() where T : notnull
     {
         var type = typeof(T);

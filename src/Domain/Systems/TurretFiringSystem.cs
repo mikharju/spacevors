@@ -72,15 +72,19 @@ public class TurretFiringSystem : GameSystem
             var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
-            EnemyShip enemyShip = view.HasComponent<EnemyShip>(turretEntity) ? view.GetComponent<EnemyShip>(turretEntity) : new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0, 0);
+            EnemyShip enemyShip = new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0, 0);
+            if (view.TryGetComponent<EnemyShip>(turretEntity, out var es))
+            {
+                enemyShip = es;
+            }
             float firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
 
             if (playerEntity.Value >= 0 && view.HasComponent<EnemyShip>(turretEntity))
             {
                 Vector2 enemyVelocity = Vector2.Zero;
-                if (view.HasComponent<Velocity>(turretEntity))
+                if (view.TryGetComponent<Velocity>(turretEntity, out var vel))
                 {
-                    enemyVelocity = view.GetComponent<Velocity>(turretEntity).Value;
+                    enemyVelocity = vel.Value;
                 }
 
                 foreach (var (_, _, playerVel) in view.GetEntitiesWithComponents<Player, Velocity>())
@@ -343,10 +347,9 @@ public class TurretFiringSystem : GameSystem
             var playerTuples = view.GetEntitiesWithComponents<Player>().ToList();
             foreach (var (playerEntity, _) in playerTuples)
             {
-                if (view.HasComponent<Velocity>(playerEntity))
+                if (view.TryGetComponent<Velocity>(playerEntity, out var currentVel))
                 {
-                    var currentVel = view.GetComponent<Velocity>(playerEntity).Value;
-                    commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(currentVel + kickbackDir * turret.Weapon.KickbackForce)));
+                    commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(currentVel.Value + kickbackDir * turret.Weapon.KickbackForce)));
                 }
             }
         }

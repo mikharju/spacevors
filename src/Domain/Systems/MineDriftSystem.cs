@@ -22,9 +22,7 @@ public class MineDriftSystem : GameSystem
             float dist = (float)Math.Sqrt(distSq);
             var normalizedDir = dir / dist;
 
-            Vector2 currentVel = view.HasComponent<Velocity>(mineEntity)
-                ? view.GetComponent<Velocity>(mineEntity).Value
-                : Vector2.Zero;
+            Vector2 currentVel = view.TryGetComponent<Velocity>(mineEntity, out var vel) ? vel.Value : Vector2.Zero;
 
             float targetSpeed = mine.Speed;
             var targetVel = normalizedDir * targetSpeed;

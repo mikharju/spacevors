@@ -23,9 +23,7 @@ public class BlueSparkHomeSystem : GameSystem
             float dist = (float)Math.Sqrt(distSq);
             var normalizedDir = dir / dist;
 
-            Vector2 currentVel = view.HasComponent<Velocity>(sparkEntity)
-                ? view.GetComponent<Velocity>(sparkEntity).Value
-                : Vector2.Zero;
+            Vector2 currentVel = view.TryGetComponent<Velocity>(sparkEntity, out var vel) ? vel.Value : Vector2.Zero;
 
             float targetSpeed = 180f;
             var targetVel = normalizedDir * targetSpeed;
