@@ -322,10 +322,10 @@ public class CollisionSystem : GameSystem
 
     private void SpawnSpark(CommandBuffer commands, Vector2 position)
     {
-        float angle = (float)(new Random().NextDouble() * MathF.PI * 2f);
-        float speed = 50f + (float)new Random().NextDouble() * 100f;
+        float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
+        float speed = 50f + (float)Random.Shared.NextDouble() * 100f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
-        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(0.8f + (float)new Random().NextDouble() * 0.6f));
+        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(0.8f + (float)Random.Shared.NextDouble() * 0.6f));
     }
 
     private void ResolveCircleVsCircle(
