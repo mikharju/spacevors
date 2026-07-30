@@ -16,10 +16,10 @@ public class CollisionSystem : GameSystem
     private const float AmmoMass = 1f;
     private readonly List<Vector2> _mineCollisionPositions = new();
 
-    private readonly List<(Entity, Asteroid)> _asteroids = new();
+    private readonly List<(Entity, Asteroid, Position)> _asteroids = new();
     private readonly List<(Entity, Ammo)> _ammoList = new();
-    private readonly List<(Entity, EnemyMine)> _mines = new();
-    private readonly List<(Entity, EnemyShip)> _enemyShips = new();
+    private readonly List<(Entity, EnemyMine, Position)> _mines = new();
+    private readonly List<(Entity, EnemyShip, Position)> _enemyShips = new();
     private readonly List<Entity> _entitiesToDestroy = new();
     private readonly List<(Vector2 Position, MineSize Size)> _effectsToSpawn = new();
     private readonly List<(Entity, Entity)> _ammoToMineHits = new();
@@ -41,7 +41,7 @@ public class CollisionSystem : GameSystem
         _ammoToPlayerHits.Clear();
 
         foreach (var (entity, asteroid) in view.GetEntitiesWithComponents<Asteroid>())
-            _asteroids.Add((entity, asteroid));
+            _asteroids.Add((entity, asteroid, view.GetComponent<Position>(entity)));
 
         var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
@@ -51,10 +51,10 @@ public class CollisionSystem : GameSystem
             _ammoList.Add((entity, ammo));
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
-            _mines.Add((entity, mine));
+            _mines.Add((entity, mine, view.GetComponent<Position>(entity)));
 
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
-            _enemyShips.Add((entity, ship));
+            _enemyShips.Add((entity, ship, view.GetComponent<Position>(entity)));
 
         sw.Stop();
         DiagnosticLogger.LogSystem("Collision: entity collection", sw.ElapsedTicks);
@@ -65,15 +65,14 @@ public class CollisionSystem : GameSystem
 
         if (hasPlayer)
         {
-            foreach (var (entity, asteroid) in _asteroids)
+            foreach (var (entity, asteroid, _) in _asteroids)
             {
                 ResolveCircleVsCircle(view, entity, asteroid, playerEntity, commands);
             }
 
-            foreach (var (entity, mine) in _mines)
+            foreach (var (entity, mine, minePos) in _mines)
             {
-                var pos = view.GetComponent<Position>(entity);
-                var diff = playerTuple.Value2.Value - pos.Value;
+                var diff = playerTuple.Value2.Value - minePos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = mine.Radius + 18f;
 
@@ -83,10 +82,9 @@ public class CollisionSystem : GameSystem
                 }
             }
 
-            foreach (var (entity, ship) in _enemyShips)
+            foreach (var (entity, ship, shipPos) in _enemyShips)
             {
-                var pos = view.GetComponent<Position>(entity);
-                var diff = playerTuple.Value2.Value - pos.Value;
+                var diff = playerTuple.Value2.Value - shipPos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = ship.Radius + 18f;
 
@@ -104,8 +102,8 @@ public class CollisionSystem : GameSystem
 
         for (int i = 0; i < _asteroids.Count; i++)
         {
-            var (aEntity, aAsteroid) = _asteroids[i];
-            foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aAsteroid.Radius))
+            var (aEntity, aAsteroid, aPos) = _asteroids[i];
+            foreach (var candidate in _grid.Query(aPos.Value, aAsteroid.Radius))
             {
                 if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
@@ -122,8 +120,8 @@ public class CollisionSystem : GameSystem
 
         for (int i = 0; i < _enemyShips.Count; i++)
         {
-            var (aEntity, aShip) = _enemyShips[i];
-            foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aShip.Radius))
+            var (aEntity, aShip, aPos) = _enemyShips[i];
+            foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
                 if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
@@ -338,25 +336,22 @@ public class CollisionSystem : GameSystem
 
     private SpatialGrid _grid = new(128f);
 
-    private void BuildSpatialGrid(WorldView view, List<(Entity, Asteroid)> asteroids, List<(Entity, EnemyMine)> mines, List<(Entity, EnemyShip)> enemyShips)
+    private void BuildSpatialGrid(WorldView view, List<(Entity, Asteroid, Position)> asteroids, List<(Entity, EnemyMine, Position)> mines, List<(Entity, EnemyShip, Position)> enemyShips)
     {
         _grid.Clear();
 
-        foreach (var (entity, asteroid) in asteroids)
+        foreach (var (entity, asteroid, pos) in asteroids)
         {
-            var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, asteroid.Radius);
         }
 
-        foreach (var (entity, mine) in mines)
+        foreach (var (entity, mine, pos) in mines)
         {
-            var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, mine.Radius);
         }
 
-        foreach (var (entity, ship) in enemyShips)
+        foreach (var (entity, ship, pos) in enemyShips)
         {
-            var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, ship.Radius);
         }
     }
