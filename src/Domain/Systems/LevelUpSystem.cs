@@ -16,7 +16,6 @@ public class LevelUpSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
 
-        if (!view.HasComponent<Position>(playerEntity)) return;
         var playerPos = view.GetComponent<Position>(playerEntity);
 
         var playerStats = view.GetComponent<Player>(playerEntity);

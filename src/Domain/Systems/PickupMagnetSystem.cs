@@ -127,7 +127,6 @@ public class PickupMagnetSystem : GameSystem
 
     private void ApplyHealth(WorldView view, Entity playerEntity, CommandBuffer commands)
     {
-        if (!view.HasComponent<Health>(playerEntity)) return;
         var health = view.GetComponent<Health>(playerEntity);
         commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(health.Current + 3)));
     }

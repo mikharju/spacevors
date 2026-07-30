@@ -72,7 +72,6 @@ public class CollisionSystem : GameSystem
 
             foreach (var (entity, mine) in _mines)
             {
-                if (!view.HasComponent<Position>(entity)) continue;
                 var pos = view.GetComponent<Position>(entity);
                 var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -86,7 +85,6 @@ public class CollisionSystem : GameSystem
 
             foreach (var (entity, ship) in _enemyShips)
             {
-                if (!view.HasComponent<Position>(entity)) continue;
                 var pos = view.GetComponent<Position>(entity);
                 var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
@@ -254,15 +252,11 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, mineEntity) in _ammoToMineHits)
         {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
             var ammo = view.GetComponent<Ammo>(ammoEntity);
-            if (!view.HasComponent<Health>(mineEntity)) continue;
             var health = view.GetComponent<Health>(mineEntity);
             if (health.Current <= ammo.Damage)
             {
-                if (!view.HasComponent<Position>(mineEntity)) continue;
                 var minePos = view.GetComponent<Position>(mineEntity);
-                if (!view.HasComponent<EnemyMine>(mineEntity)) continue;
                 var mine = view.GetComponent<EnemyMine>(mineEntity);
                 SpawnLootOnDeath(commands, minePos.Value, mine.Size);
                 commands.Add(new DestroyEntityCommand(mineEntity));
@@ -276,13 +270,10 @@ public class CollisionSystem : GameSystem
 
         foreach (var (ammoEntity, shipEntity) in _ammoToShipHits)
         {
-            if (!view.HasComponent<Ammo>(ammoEntity)) continue;
             var ammo = view.GetComponent<Ammo>(ammoEntity);
-            if (!view.HasComponent<Health>(shipEntity)) continue;
             var health = view.GetComponent<Health>(shipEntity);
             if (health.Current <= ammo.Damage)
             {
-                if (!view.HasComponent<Position>(shipEntity)) continue;
                 var shipPos = view.GetComponent<Position>(shipEntity);
                 SpawnShipLootOnDeath(commands, shipPos.Value);
                 commands.Add(new DestroyEntityCommand(shipEntity));
@@ -311,7 +302,6 @@ public class CollisionSystem : GameSystem
             var ammo = view.GetComponent<Ammo>(ammoEntity);
             int damage = ammo.Damage;
 
-            if (!view.HasComponent<Health>(playerEntity)) continue;
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (playerHealth.Current <= damage)
             {
@@ -360,14 +350,12 @@ public class CollisionSystem : GameSystem
 
         foreach (var (entity, mine) in mines)
         {
-            if (!view.HasComponent<Position>(entity)) continue;
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, mine.Radius);
         }
 
         foreach (var (entity, ship) in enemyShips)
         {
-            if (!view.HasComponent<Position>(entity)) continue;
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, ship.Radius);
         }

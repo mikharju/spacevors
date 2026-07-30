@@ -216,25 +216,22 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (enemyShipEntity, enemyShip) in view.GetEntitiesWithComponents<EnemyShip>())
         {
-            if (!view.HasComponent<Velocity>(enemyShipEntity))
+            var shipPos = view.GetComponent<Position>(enemyShipEntity);
+            var toTarget = shipPos.Value - turretPos;
+            float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+
+            if (distSq > rangeSq || distSq < 0.001f) continue;
+
+            float dist = (float)Math.Sqrt(distSq);
+            var toTargetDir = toTarget / dist;
+
+            float dot = Vector2.Dot(forwardDir, toTargetDir);
+            if (dot < cosHalfArc) continue;
+
+            if (distSq < nearestDistSq)
             {
-                var shipPos = view.GetComponent<Position>(enemyShipEntity);
-                var toTarget = shipPos.Value - turretPos;
-                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
-
-                if (distSq > rangeSq || distSq < 0.001f) continue;
-
-                float dist = (float)Math.Sqrt(distSq);
-                var toTargetDir = toTarget / dist;
-
-                float dot = Vector2.Dot(forwardDir, toTargetDir);
-                if (dot < cosHalfArc) continue;
-
-                if (distSq < nearestDistSq)
-                {
-                    nearestTarget = (toTargetDir, shipPos.Value, enemyShip.Radius);
-                    nearestDistSq = distSq;
-                }
+                nearestTarget = (toTargetDir, shipPos.Value, enemyShip.Radius);
+                nearestDistSq = distSq;
             }
         }
     }
@@ -283,24 +280,21 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (enemyShipEntity, enemyShip) in view.GetEntitiesWithComponents<EnemyShip>())
         {
-            if (!view.HasComponent<Velocity>(enemyShipEntity))
+            var shipPos = view.GetComponent<Position>(enemyShipEntity);
+            Vector2 toTarget = shipPos.Value - turretPos;
+            float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
+
+            if (distSq > rangeSq || distSq < 0.001f) continue;
+
+            float dist = (float)Math.Sqrt(distSq);
+            var aimDir = toTarget / dist;
+            float dot = Vector2.Dot(forwardDir, aimDir);
+            if (dot < cosHalfArc) continue;
+
+            if (distSq < nearestDistSq)
             {
-                var shipPos = view.GetComponent<Position>(enemyShipEntity);
-                Vector2 toTarget = shipPos.Value - turretPos;
-                float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
-
-                if (distSq > rangeSq || distSq < 0.001f) continue;
-
-                float dist = (float)Math.Sqrt(distSq);
-                var aimDir = toTarget / dist;
-                float dot = Vector2.Dot(forwardDir, aimDir);
-                if (dot < cosHalfArc) continue;
-
-                if (distSq < nearestDistSq)
-                {
-                    nearestTarget = (aimDir, shipPos.Value, enemyShip.Radius);
-                    nearestDistSq = distSq;
-                }
+                nearestTarget = (aimDir, shipPos.Value, enemyShip.Radius);
+                nearestDistSq = distSq;
             }
         }
     }
