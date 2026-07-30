@@ -6,16 +6,15 @@ public class EnemyShipSystem : GameSystem
 {
     public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
-        foreach (var (shipEntity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (shipEntity, ship, shipPos, currentRot) in view.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
             if (!hasPlayer) continue;
 
-            var shipPos = view.GetComponent<Position>(shipEntity);
-            var playerPos = view.GetComponent<Position>(playerEntity);
+            var playerPos = playerTuple.Value2;
 
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
@@ -26,7 +25,6 @@ public class EnemyShipSystem : GameSystem
             var toPlayerDir = toPlayer / dist;
 
             float targetAngle = (float)Math.Atan2(toPlayerDir.X, -toPlayerDir.Y);
-            var currentRot = view.GetComponent<Rotation>(shipEntity);
             float angleDiff = NormalizeAngle(targetAngle - currentRot.Angle);
 
             float maxTurn = ship.TurnRate * deltaTime;

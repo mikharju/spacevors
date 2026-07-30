@@ -81,9 +81,8 @@ public class EnemyShipSpawnSystem : GameSystem
 
     private bool IsSpawnClear(WorldView view, Vector2 spawnPos)
     {
-        foreach (var (shipEntity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (shipEntity, ship, pos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
         {
-            var pos = view.GetComponent<Position>(shipEntity);
             float dx = pos.Value.X - spawnPos.X;
             float dy = pos.Value.Y - spawnPos.Y;
             float distSq = dx * dx + dy * dy;

@@ -43,7 +43,7 @@ public class CollisionSystem : GameSystem
         foreach (var (entity, asteroid) in view.GetEntitiesWithComponents<Asteroid>())
             _asteroids.Add((entity, asteroid));
 
-        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
@@ -73,7 +73,7 @@ public class CollisionSystem : GameSystem
             foreach (var (entity, mine) in _mines)
             {
                 var pos = view.GetComponent<Position>(entity);
-                var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
+                var diff = playerTuple.Value2.Value - pos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = mine.Radius + 18f;
 
@@ -86,7 +86,7 @@ public class CollisionSystem : GameSystem
             foreach (var (entity, ship) in _enemyShips)
             {
                 var pos = view.GetComponent<Position>(entity);
-                var diff = view.GetComponent<Position>(playerEntity).Value - pos.Value;
+                var diff = playerTuple.Value2.Value - pos.Value;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
                 float radiusSum = ship.Radius + 18f;
 
@@ -234,7 +234,7 @@ public class CollisionSystem : GameSystem
 
             if (!hasPlayer) continue;
 
-            var playerPos = view.GetComponent<Position>(playerEntity);
+            var playerPos = playerTuple.Value2;
             var diff2 = playerPos.Value - ammoPos.Value;
             float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
             float radiusSum2 = ammoRadius + 18f;

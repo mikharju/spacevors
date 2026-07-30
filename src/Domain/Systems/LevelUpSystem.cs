@@ -12,11 +12,11 @@ public class LevelUpSystem : GameSystem
 
     public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
 
-        var playerPos = view.GetComponent<Position>(playerEntity);
+        var playerPos = playerTuple.Value2;
 
         var playerStats = view.GetComponent<Player>(playerEntity);
         int xpThreshold = playerStats.Level * 10;

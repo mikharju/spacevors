@@ -10,11 +10,9 @@ public class MineDriftSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
-        foreach (var (mineEntity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
+        foreach (var (mineEntity, mine, minePos) in view.GetEntitiesWithComponents<EnemyMine, Position>())
         {
             if (!hasPlayer) continue;
-
-            var minePos = view.GetComponent<Position>(mineEntity);
             var playerPos = view.GetComponent<Position>(playerEntity);
 
             var dir = playerPos.Value - minePos.Value;
