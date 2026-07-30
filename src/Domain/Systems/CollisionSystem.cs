@@ -20,8 +20,8 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly List<Entity> _entitiesToDestroy = new();
     private readonly List<(Vector2 Position, MineSize Size)> _effectsToSpawn = new();
-    private readonly List<(Entity, Entity)> _ammoToMineHits = new();
-    private readonly List<(Entity, Entity)> _ammoToShipHits = new();
+    private readonly List<(Entity ammo, Entity target, int health)> _ammoToMineHits = new();
+    private readonly List<(Entity ammo, Entity target, int health)> _ammoToShipHits = new();
     private readonly HashSet<Entity> _ammoToPlayerHits = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
@@ -74,7 +74,7 @@ public class CollisionSystem : GameSystem
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
         {
             var pos = view.GetComponent<Position>(entity);
-            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, null, mine.Size, 0);
 
             if (!hasPlayer) continue;
 
@@ -91,7 +91,7 @@ public class CollisionSystem : GameSystem
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
         {
             var pos = view.GetComponent<Position>(entity);
-            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius, ship.Health, null, ship.Damage);
             _shipPositions.Add((entity, pos));
 
             if (!hasPlayer) continue;
@@ -162,8 +162,7 @@ public class CollisionSystem : GameSystem
                             {
                                 closestMineHit = candidate.Id;
                                 mineHitPos = candidate.Position;
-                                var mineComp = view.GetComponent<EnemyMine>(candidate.Id);
-                                mineHitSize = mineComp.Size;
+                                mineHitSize = candidate.Size!;
                                 mineDistSq = dSq;
                             }
                         }
@@ -194,13 +193,16 @@ public class CollisionSystem : GameSystem
 
             if (closestMineHit.HasValue)
             {
-                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value));
+                var mineComp = view.GetComponent<EnemyMine>(closestMineHit.Value);
+                var health = view.GetComponent<Health>(closestMineHit.Value).Current;
+                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, health));
                 _effectsToSpawn.Add((mineHitPos!, mineHitSize!.Value));
             }
 
             if (closestShipHit.HasValue)
             {
-                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value));
+                var shipComp = view.GetComponent<EnemyShip>(closestShipHit.Value);
+                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipComp.Health));
                 _effectsToSpawn.Add((shipHitPos!, MineSize.Small));
             }
 
@@ -224,29 +226,29 @@ public class CollisionSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (ammoEntity, mineEntity) in _ammoToMineHits)
+        foreach (var (ammoEntity, mineEntity, health) in _ammoToMineHits)
         {
             var ammo = view.GetComponent<Ammo>(ammoEntity);
-            var health = view.GetComponent<Health>(mineEntity);
-            if (health.Current <= ammo.Damage)
+            var minePos = view.GetComponent<Position>(mineEntity);
+            var mineSize = view.GetComponent<EnemyMine>(mineEntity).Size;
+
+            if (health <= ammo.Damage)
             {
-                var minePos = view.GetComponent<Position>(mineEntity);
-                var mine = view.GetComponent<EnemyMine>(mineEntity);
-                SpawnLootOnDeath(commands, minePos.Value, mine.Size);
+                SpawnLootOnDeath(commands, minePos.Value, mineSize);
                 commands.Add(new DestroyEntityCommand(mineEntity));
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(health.Current - ammo.Damage)));
+                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(health - ammo.Damage)));
             }
             _entitiesToDestroy.Add(ammoEntity);
         }
 
-        foreach (var (ammoEntity, shipEntity) in _ammoToShipHits)
+        foreach (var (ammoEntity, shipEntity, health) in _ammoToShipHits)
         {
             var ammo = view.GetComponent<Ammo>(ammoEntity);
-            var health = view.GetComponent<Health>(shipEntity);
-            if (health.Current <= ammo.Damage)
+
+            if (health <= ammo.Damage)
             {
                 var shipPos = view.GetComponent<Position>(shipEntity);
                 SpawnShipLootOnDeath(commands, shipPos.Value);
@@ -254,14 +256,14 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(health.Current - ammo.Damage)));
+                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(health - ammo.Damage)));
             }
             _entitiesToDestroy.Add(ammoEntity);
         }
 
         var hitMineOrShip = new HashSet<Entity>();
-        foreach (var (ammoEntity, _) in _ammoToMineHits) hitMineOrShip.Add(ammoEntity);
-        foreach (var (ammoEntity, _) in _ammoToShipHits) hitMineOrShip.Add(ammoEntity);
+        foreach (var (ammoEntity, _, _) in _ammoToMineHits) hitMineOrShip.Add(ammoEntity);
+        foreach (var (ammoEntity, _, _) in _ammoToShipHits) hitMineOrShip.Add(ammoEntity);
 
         foreach (var entity in _entitiesToDestroy.Distinct())
         {
