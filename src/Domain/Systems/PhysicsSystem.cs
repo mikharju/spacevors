@@ -7,7 +7,7 @@ public class PhysicsSystem : GameSystem
 {
     private const float AngularDamping = 0.95f;
 
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 

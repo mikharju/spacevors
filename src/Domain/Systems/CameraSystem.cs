@@ -6,7 +6,7 @@ public class CameraSystem : GameSystem
 {
     private const float FollowSpeed = 5f;
 
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var playerTuple = view.GetEntitiesWithComponents<Position, Player>().FirstOrDefault();
         if (playerTuple.Entity.Value < 0) return;

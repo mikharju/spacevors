@@ -45,7 +45,7 @@ public class TurretFiringTest
         // Run TurretFiringSystem
         var commands = new CommandBuffer();
         var system = new TurretFiringSystem();
-        system.GenerateUpdateCommands(view, 1f / 60f, commands);
+        system.Update(view, 1f / 60f, commands);
 
         Assert.True(commands.Commands.Count() > 0, $"No commands added! Cooldown={cooldown}");
 

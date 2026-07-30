@@ -81,8 +81,7 @@ public static class SpaceVorsApp
 
             bool gameOver = false;
 
-            var movementSystems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem() };
-            var positionUpdateSystems = new GameSystem[] { new PositionIntegrationSystem(), new AmmoLifetimeSystem() };
+            var movementSystems = new GameSystem[] { new PhysicsSystem(), new BlueSparkHomeSystem(), new PositionIntegrationSystem(), new AmmoLifetimeSystem() };
             var actionSystems = new GameSystem[] { new TurretFiringSystem(), new EnemyShipSpawnSystem() };
             var resolutionSystems = new GameSystem[] { new CollisionSystem(), new PickupMagnetSystem(), new LevelUpSystem(), new EffectSystem() };
             var cleanupSystems = new GameSystem[] { new MineDriftSystem(), new MineRespawnSystem(), new EnemyShipSystem(), new CameraSystem() };
@@ -192,10 +191,6 @@ public static class SpaceVorsApp
                         var commands = new CommandBuffer();
 
                         RunPhase(view, commands, movementSystems);
-                        commands.Apply(em);
-
-                        foreach (var system in positionUpdateSystems)
-                            system.DirectMutationUpdate(view, FixedDeltaTime, commands);
                         commands.Apply(em);
 
                         RunPhase(view, commands, actionSystems);
@@ -529,7 +524,7 @@ public static class SpaceVorsApp
         foreach (var system in phaseSystems)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            system.GenerateUpdateCommands(view, FixedDeltaTime, commands);
+            system.Update(view, FixedDeltaTime, commands);
             sw.Stop();
             DiagnosticLogger.LogSystem(system.GetType().Name, sw.ElapsedTicks);
         }

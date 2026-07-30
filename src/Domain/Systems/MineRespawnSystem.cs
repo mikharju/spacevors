@@ -9,7 +9,7 @@ public class MineRespawnSystem : GameSystem
     private const int MaxInterval = 8;
     private const int TargetMineCount = 8;
 
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         _timer -= deltaTime;
 

@@ -7,7 +7,7 @@ public class PickupMagnetSystem : GameSystem
     const float MagnetAcceleration = 800f;
     const float MaxMagnetSpeed = 350f;
 
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
         Entity playerEntity = playerTuple.Entity;

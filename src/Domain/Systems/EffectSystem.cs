@@ -5,7 +5,7 @@ namespace Spacevors.Domain.Systems;
 
 public class EffectSystem : GameSystem
 {
-    public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
+    public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 
