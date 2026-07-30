@@ -166,15 +166,12 @@ public static class SpaceVorsApp
                     }
 
                     // Sync turret positions and rotations to player ship
-                    var playerTuples = em.GetEntitiesWithComponents<Turret>()
-                        .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+                    var playerTuples = em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>()
+                        .Where(t => !t.Value1.IsEnemy)
                         .ToList();
 
-                    foreach (var (turretEntity, _) in playerTuples)
+                    foreach (var (turretEntity, turret, offset, arcOffset) in playerTuples)
                     {
-                        var offset = em.GetComponent<TurretOffset>(turretEntity);
-                        var arcOffset = em.GetComponent<ArcOffset>(turretEntity);
-
                         var rotatedOffset = new Vector2(
                             offset.Value.X * cos - offset.Value.Y * sin,
                             offset.Value.X * sin + offset.Value.Y * cos
@@ -249,9 +246,9 @@ public static class SpaceVorsApp
                         int mouseX = Raylib.GetMouseX();
                         int mouseY = Raylib.GetMouseY();
                         var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
-                        if (choiceTuple.Entity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceTuple.Entity))
+                        if (choiceTuple.Entity.Value >= 0)
                         {
-                            var options = em.GetComponent<PendingUpgradeOptions>(choiceTuple.Entity);
+                            var options = choiceTuple.Value2;
                             int optionCount = options.Options.Length;
                             for (int i = 0; i < optionCount; i++)
                             {
@@ -270,9 +267,9 @@ public static class SpaceVorsApp
                         var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
                         Entity choiceEntity = choiceTuple.Entity;
 
-                        if (choiceEntity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(choiceEntity))
+                        if (choiceEntity.Value >= 0)
                         {
-                            var options = em.GetComponent<PendingUpgradeOptions>(choiceEntity);
+                            var options = choiceTuple.Value2;
                             if (selectedIndex < options.Options.Length)
                             {
                                 ApplyUpgrade(em, playerEntity, options.Options[selectedIndex]);
@@ -285,9 +282,9 @@ public static class SpaceVorsApp
 
                     var pendingTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
                     PendingUpgradeOptions? upgradeOptions = null;
-                    if (pendingTuple.Entity.Value >= 0 && em.HasComponent<PendingUpgradeOptions>(pendingTuple.Entity))
+                    if (pendingTuple.Entity.Value >= 0)
                     {
-                        upgradeOptions = em.GetComponent<PendingUpgradeOptions>(pendingTuple.Entity);
+                        upgradeOptions = pendingTuple.Value2;
                     }
 
                     int playerLevel = 1;
@@ -321,10 +318,10 @@ public static class SpaceVorsApp
     {
         var playerStats = em.GetComponent<Player>(playerEntity);
         var allPlayerTurrets = em.GetEntitiesWithComponents<Turret>()
-            .Where(t => !em.GetComponent<Turret>(t.Entity).IsEnemy)
+            .Where(t => !t.Value.IsEnemy)
             .ToList();
 
-        var existingWeaponNames = allPlayerTurrets.Select(t => em.GetComponent<Turret>(t.Entity).WeaponName).ToHashSet();
+        var existingWeaponNames = allPlayerTurrets.Select(t => t.Value.WeaponName).ToHashSet();
         bool isNewWeapon = !existingWeaponNames.Contains(upgrade.WeaponName);
 
         if (isNewWeapon && upgrade.Stat == UpgradeOption.Damage)
@@ -336,9 +333,8 @@ public static class SpaceVorsApp
         switch (upgrade.Stat)
         {
             case UpgradeOption.FireRate:
-                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    var turret = em.GetComponent<Turret>(turretEntity);
                     int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
                     float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * 1.15f : turret.Weapon.FireRate;
 
@@ -353,9 +349,8 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.ProjectileSpeed:
-                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
@@ -380,9 +375,8 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.AutoTargetRange:
-                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName && em.GetComponent<Turret>(t.Entity).AutoTarget))
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName && t.Value.AutoTarget))
                 {
-                    var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: turret.Weapon,
                         WeaponName: turret.WeaponName,
@@ -394,9 +388,8 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.ShotLifetime:
-                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    var turret = em.GetComponent<Turret>(turretEntity);
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * 1.15f, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
@@ -408,9 +401,8 @@ public static class SpaceVorsApp
                 break;
 
             case UpgradeOption.Damage:
-                foreach (var (turretEntity, _) in allPlayerTurrets.Where(t => em.GetComponent<Turret>(t.Entity).WeaponName == upgrade.WeaponName))
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    var turret = em.GetComponent<Turret>(turretEntity);
                     int newDamage = turret.Weapon.Damage + 1;
 
                     if (newDamage > turret.Weapon.Damage)
