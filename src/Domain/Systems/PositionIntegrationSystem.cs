@@ -14,15 +14,15 @@ public class PositionIntegrationSystem : GameSystem
 
         int updated = 0;
 
-        for (int i = 0; i < velStorage.Count; i++)
+        for (int i = 0; i < posStorage.Count; i++)
         {
-            Entity entity = velStorage.GetEntity(i);
+            Entity entity = posStorage.GetEntity(i);
 
-            if (!posStorage.TryGetSlot(entity, out int posSlot))
+            if (!velStorage.TryGetSlot(entity, out int velSlot))
                 continue;
 
-            ref Position position = ref posStorage.GetComponent(posSlot);
-            ref Velocity velocity = ref velStorage.GetComponent(i);
+            ref Position position = ref posStorage.GetComponent(i);
+            ref Velocity velocity = ref velStorage.GetComponent(velSlot);
 
             position = new Position(position.Value + velocity.Value * deltaTime);
             updated++;
