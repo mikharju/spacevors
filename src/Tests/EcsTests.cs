@@ -270,4 +270,88 @@ public class EntityManagerTests
         Assert.Single(results);
         Assert.Equal(e2, results[0].Entity);
     }
+
+    [Fact]
+    public void GetStorage_ReturnsCorrectStorage()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(5f, 10f));
+        _em.AddComponent(entity, new Velocity(3f, 4f));
+
+        var posStorage = _em.GetStorage<Position>();
+        var velStorage = _em.GetStorage<Velocity>();
+
+        Assert.Single(posStorage);
+        Assert.Single(velStorage);
+    }
+
+    [Fact]
+    public void GetStorage_IndexedAccess_MatchesIterator()
+    {
+        var e1 = _em.CreateEntity();
+        var e2 = _em.CreateEntity();
+        var e3 = _em.CreateEntity();
+
+        _em.AddComponent(e1, new Position(1f, 2f));
+        _em.AddComponent(e1, new Velocity(0.5f, 0.5f));
+
+        _em.AddComponent(e2, new Position(3f, 4f));
+        _em.AddComponent(e2, new Velocity(1f, 1f));
+
+        _em.AddComponent(e3, new Position(5f, 6f));
+
+        var velStorage = _em.GetStorage<Velocity>();
+        var posStorage = _em.GetStorage<Position>();
+
+        var indexedResults = new List<(Entity Entity, Position Pos, Velocity Vel)>();
+
+        for (int i = 0; i < velStorage.Count; i++)
+        {
+            Entity entity = velStorage.GetEntity(i);
+            if (!posStorage.TryGetSlot(entity, out int posSlot))
+                continue;
+
+            ref Position position = ref posStorage.GetComponent(posSlot);
+            ref Velocity velocity = ref velStorage.GetComponent(i);
+
+            indexedResults.Add((entity, position, velocity));
+        }
+
+        var iteratorResults = _em.GetEntitiesWithComponents<Position, Velocity>().ToList();
+
+        Assert.Equal(iteratorResults.Count, indexedResults.Count);
+        foreach (var (indexedEntity, indexedPos, _) in indexedResults)
+        {
+            var matching = iteratorResults.FirstOrDefault(r => r.Entity == indexedEntity);
+            Assert.Equal(indexedPos.X, matching.Value1.X);
+            Assert.Equal(indexedPos.Y, matching.Value1.Y);
+        }
+    }
+
+    [Fact]
+    public void GetStorage_IndexedMutation_AffectsGetComponent()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 2f));
+        _em.AddComponent(entity, new Velocity(0.5f, 0.5f));
+
+        var velStorage = _em.GetStorage<Velocity>();
+        var posStorage = _em.GetStorage<Position>();
+
+        for (int i = 0; i < velStorage.Count; i++)
+        {
+            Entity entity2 = velStorage.GetEntity(i);
+            if (!posStorage.TryGetSlot(entity2, out int posSlot))
+                continue;
+
+            ref Position position = ref posStorage.GetComponent(posSlot);
+            ref Velocity velocity = ref velStorage.GetComponent(i);
+
+            position = new Position(position.X + velocity.Dx, position.Y + velocity.Dy);
+        }
+
+        var retrieved = _em.GetComponent<Position>(entity);
+        Assert.Equal(1.5f, retrieved.X);
+        Assert.Equal(2.5f, retrieved.Y);
+    }
 }

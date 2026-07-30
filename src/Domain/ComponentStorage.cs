@@ -83,6 +83,10 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
         return false;
     }
 
+    public Entity GetEntity(int slot) => _entityIds[slot];
+
+    public ref T GetComponent(int slot) => ref _data[slot];
+
     public ref T GetComponentRef(Entity entity)
     {
         if (!TryGetSlot(entity, out int slot))

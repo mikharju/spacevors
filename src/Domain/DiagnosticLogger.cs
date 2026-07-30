@@ -27,14 +27,17 @@ public static class DiagnosticLogger
         }
     }
 
-    public static void LogSystem(string systemName, long elapsedTicks)
+    public static void LogSystem(string systemName, long elapsedTicks, int entitiesUpdated = 0)
     {
         if (!_enabled) return;
 
         long ms = elapsedTicks / TimeSpan.TicksPerMillisecond;
         lock (_lock)
         {
-            Console.WriteLine($"[SYSTEM] {systemName}: {ms}ms");
+            if (entitiesUpdated > 0)
+                Console.WriteLine($"[SYSTEM] {systemName}: {ms}ms ({entitiesUpdated} entities)");
+            else
+                Console.WriteLine($"[SYSTEM] {systemName}: {ms}ms");
         }
     }
 

@@ -11,6 +11,9 @@ public class WorldView
 
     public int MaxEntityId => _em.MaxEntityId;
 
+    public ComponentStorage<T> GetStorage<T>() where T : notnull
+        => _em.GetStorage<T>();
+
     public ref T GetComponentRef<T>(Entity entity) where T : notnull
         => ref _em.GetComponentRef<T>(entity);
 

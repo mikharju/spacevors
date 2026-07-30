@@ -9,13 +9,26 @@ public class PositionIntegrationSystem : GameSystem
     {
         var sw = Stopwatch.StartNew();
 
-        foreach (var (entity, velocity) in view.GetEntitiesWithComponents<Velocity>())
+        var velStorage = view.GetStorage<Velocity>();
+        var posStorage = view.GetStorage<Position>();
+
+        int updated = 0;
+
+        for (int i = 0; i < velStorage.Count; i++)
         {
-            ref var pos = ref view.GetComponentRef<Position>(entity);
-            pos = new Position(pos.Value + velocity.Value * deltaTime);
+            Entity entity = velStorage.GetEntity(i);
+
+            if (!posStorage.TryGetSlot(entity, out int posSlot))
+                continue;
+
+            ref Position position = ref posStorage.GetComponent(posSlot);
+            ref Velocity velocity = ref velStorage.GetComponent(i);
+
+            position = new Position(position.Value + velocity.Value * deltaTime);
+            updated++;
         }
 
         sw.Stop();
-        DiagnosticLogger.LogSystem("Position: integration", sw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Position: integration", sw.ElapsedTicks, updated);
     }
 }

@@ -33,6 +33,14 @@ public class EntityManager
         throw new KeyNotFoundException($"Component of type {typeof(T).Name} not found for entity {entity.Value}");
     }
 
+    public ComponentStorage<T> GetStorage<T>() where T : notnull
+    {
+        var type = typeof(T);
+        if (_storages.TryGetValue(type, out var storage))
+            return (ComponentStorage<T>)storage;
+        throw new KeyNotFoundException($"No storage for {typeof(T).Name}");
+    }
+
     public void AddComponent<T>(Entity entity, T component) where T : notnull
     {
         var type = typeof(T);
