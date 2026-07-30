@@ -6,19 +6,19 @@ public class TurretFiringSystem : GameSystem
 {
     public override void GenerateUpdateCommands(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var turrets = view.GetEntitiesWithComponents<Turret>().ToList();
+        var turrets = view.GetEntitiesWithComponents<Turret, Position, Rotation>().ToList();
 
-        foreach (var (turretEntity, turret) in turrets)
+        foreach (var (turretEntity, turret, turretPos, turretRot) in turrets)
         {
             var cooldown = CooldownHelper.GetCooldown(view, turretEntity);
 
             if (cooldown <= 0f)
             {
-                var target = FindTarget(view, turret, turretEntity);
+                var target = FindTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle);
 
                 if (target.HasValue)
                 {
-                    FireAtTarget(view, turretEntity, turret, target.Value, commands);
+                    FireAtTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle, target.Value, commands);
                     commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
 
                     if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
@@ -35,12 +35,9 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
-    private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Turret turret, Entity turretEntity)
+    private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
     {
-        var turretPos = view.GetComponent<Position>(turretEntity);
-        var turretRot = view.GetComponent<Rotation>(turretEntity);
-
-        Vector2 forwardDir = new Vector2((float)Math.Sin(turretRot.Angle), -(float)Math.Cos(turretRot.Angle));
+        Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
 
         float cosHalfArc = (float)Math.Cos(turret.ArcAngle / 2f);
         float rangeSq = turret.Range * turret.Range;
@@ -61,18 +58,18 @@ public class TurretFiringSystem : GameSystem
 
             if (turret.AutoTarget)
             {
-                FindTargetWithPrediction(view, turretPos.Value, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed, ref nearestTarget, ref nearestDistSq);
+                FindTargetWithPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed, ref nearestTarget, ref nearestDistSq);
             }
             else
             {
-                FindTargetWithoutPrediction(view, turretPos.Value, forwardDir, cosHalfArc, rangeSq, ref nearestTarget, ref nearestDistSq);
+                FindTargetWithoutPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, ref nearestTarget, ref nearestDistSq);
             }
 
             CheckTargets(view.GetEntitiesWithComponents<Asteroid>(), a => a.Radius, rangeSq);
         }
         else
         {
-            var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+            var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
             EnemyShip enemyShip = view.HasComponent<EnemyShip>(turretEntity) ? view.GetComponent<EnemyShip>(turretEntity) : new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0, 0);
@@ -89,7 +86,7 @@ public class TurretFiringSystem : GameSystem
                 foreach (var (_, _, playerVel) in view.GetEntitiesWithComponents<Player, Velocity>())
                 {
                     var playerPos = view.GetComponent<Position>(playerEntity);
-                    Vector2 relPos = playerPos.Value - turretPos.Value;
+                    Vector2 relPos = playerPos.Value - turretPos;
                     float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
                     if (distSq > firingRangeSq || distSq < 0.001f) continue;
@@ -104,7 +101,7 @@ public class TurretFiringSystem : GameSystem
                     if (travelTime <= 0f) continue;
 
                     Vector2 predictedPos = playerPos.Value + playerVel.Value * travelTime;
-                    var toPredicted = predictedPos - turretPos.Value;
+                    var toPredicted = predictedPos - turretPos;
                     float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
 
                     if (distToPredictedSq > firingRangeSq) continue;
@@ -128,7 +125,7 @@ public class TurretFiringSystem : GameSystem
             foreach (var (candidateEntity, value) in candidates)
             {
                 var pos = view.GetComponent<Position>(candidateEntity);
-                var diff = pos.Value - turretPos.Value;
+                var diff = pos.Value - turretPos;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
 
                 if (distSq > checkRangeSq || distSq < 0.001f) continue;
@@ -148,9 +145,8 @@ public class TurretFiringSystem : GameSystem
 
     private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget, ref float nearestDistSq)
     {
-        foreach (var (mineEntity, mine, velocity) in view.GetEntitiesWithComponents<EnemyMine, Velocity>())
+        foreach (var (mineEntity, mine, velocity, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
         {
-            var minePos = view.GetComponent<Position>(mineEntity);
             Vector2 relPos = minePos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
@@ -181,9 +177,8 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip, velocity) in view.GetEntitiesWithComponents<EnemyShip, Velocity>())
+        foreach (var (enemyShipEntity, enemyShip, velocity, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
         {
-            var shipPos = view.GetComponent<Position>(enemyShipEntity);
             Vector2 relPos = shipPos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
@@ -214,9 +209,8 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip) in view.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (enemyShipEntity, enemyShip, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
         {
-            var shipPos = view.GetComponent<Position>(enemyShipEntity);
             var toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
@@ -238,9 +232,8 @@ public class TurretFiringSystem : GameSystem
 
     private static void FindTargetWithoutPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, ref (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget, ref float nearestDistSq)
     {
-        foreach (var (mineEntity, mine, velocity) in view.GetEntitiesWithComponents<EnemyMine, Velocity>())
+        foreach (var (mineEntity, mine, velocity, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
         {
-            var minePos = view.GetComponent<Position>(mineEntity);
             Vector2 toTarget = minePos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
@@ -258,9 +251,8 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip, velocity) in view.GetEntitiesWithComponents<EnemyShip, Velocity>())
+        foreach (var (enemyShipEntity, enemyShip, velocity, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
         {
-            var shipPos = view.GetComponent<Position>(enemyShipEntity);
             Vector2 toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
@@ -278,9 +270,8 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip) in view.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (enemyShipEntity, enemyShip, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
         {
-            var shipPos = view.GetComponent<Position>(enemyShipEntity);
             Vector2 toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
@@ -299,11 +290,8 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
-    private void FireAtTarget(WorldView view, Entity turretEntity, Turret turret, (Vector2 AimDirection, Vector2 PredictedPosition, float Radius) target, CommandBuffer commands)
+    private void FireAtTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle, (Vector2 AimDirection, Vector2 PredictedPosition, float Radius) target, CommandBuffer commands)
     {
-        var turretPos = view.GetComponent<Position>(turretEntity);
-        var turretRot = view.GetComponent<Rotation>(turretEntity);
-
         Vector2 ammoDir = target.AimDirection;
 
         int pelletCount = turret.Weapon.PelletCount;
@@ -327,11 +315,11 @@ public class TurretFiringSystem : GameSystem
             {
                 var ship = view.GetComponent<EnemyShip>(turretEntity);
                 float forwardOffset = ship.Radius + 5f;
-                Vector2 forwardDir = new Vector2((float)Math.Sin(turretRot.Angle), -(float)Math.Cos(turretRot.Angle));
+                Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
                 spawnOffset += forwardDir * forwardOffset;
             }
 
-            var spawnPos = turretPos.Value + spawnOffset;
+            var spawnPos = turretPos + spawnOffset;
             Vector2 ammoVel = pelletDir * turret.Weapon.AmmoSpeed * speedVariation;
 
             if (!turret.IsEnemy)
