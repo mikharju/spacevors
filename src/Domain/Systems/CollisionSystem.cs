@@ -107,6 +107,7 @@ public class CollisionSystem : GameSystem
         for (int i = 0; i < _asteroids.Count; i++)
         {
             var (aEntity, aAsteroid) = _asteroids[i];
+            if (!view.HasComponent<Position>(aEntity)) continue;
             foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aAsteroid.Radius))
             {
                 if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
@@ -125,6 +126,7 @@ public class CollisionSystem : GameSystem
         for (int i = 0; i < _enemyShips.Count; i++)
         {
             var (aEntity, aShip) = _enemyShips[i];
+            if (!view.HasComponent<Position>(aEntity)) continue;
             foreach (var candidate in _grid.Query(view.GetComponent<Position>(aEntity).Value, aShip.Radius))
             {
                 if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
@@ -354,6 +356,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var (entity, asteroid) in asteroids)
         {
+            if (!view.HasComponent<Position>(entity)) continue;
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, pos.Value, asteroid.Radius);
         }
