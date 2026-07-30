@@ -76,25 +76,27 @@ public class SpatialGrid
         }
     }
 
-    public IEnumerable<SpatialItem> Query(Vector2 position, float radius)
+    public int GetQueryItems(Vector2 position, float radius, Span<SpatialItem> result)
     {
         int minX = (int)MathF.Floor((position.X - radius) / CellSize);
         int maxX = (int)MathF.Floor((position.X + radius) / CellSize);
         int minY = (int)MathF.Floor((position.Y - radius) / CellSize);
         int maxY = (int)MathF.Floor((position.Y + radius) / CellSize);
 
-        for (int x = minX; x <= maxX; x++)
+        int count = 0;
+        for (int x = minX; x <= maxX && count < result.Length; x++)
         {
-            for (int y = minY; y <= maxY; y++)
+            for (int y = minY; y <= maxY && count < result.Length; y++)
             {
                 if (_cells.TryGetValue((x, y), out var entries))
                 {
-                    foreach (var entry in entries)
+                    for (int i = 0; i < entries.Count && count < result.Length; i++)
                     {
-                        yield return entry;
+                        result[count++] = entries[i];
                     }
                 }
             }
         }
+        return count;
     }
 }

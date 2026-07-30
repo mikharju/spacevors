@@ -115,12 +115,17 @@ public class CollisionSystem : GameSystem
 
         var asteroidSw = Stopwatch.StartNew();
 
+        Span<SpatialGrid.SpatialItem> queryBuffer = stackalloc SpatialGrid.SpatialItem[256];
+
         foreach (var (aEntity, aPos) in _asteroidPositions)
         {
             var asteroid = view.GetComponent<Asteroid>(aEntity);
             float aRadius = asteroid.Radius;
-            foreach (var candidate in _grid.Query(aPos.Value, aRadius))
+            int count = _grid.GetQueryItems(aPos.Value, aRadius, queryBuffer);
+
+            for (int i = 0; i < count; i++)
             {
+                ref readonly var candidate = ref queryBuffer[i];
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
@@ -137,8 +142,11 @@ public class CollisionSystem : GameSystem
         {
             var ship = view.GetComponent<EnemyShip>(sEntity);
             float aRadius = ship.Radius;
-            foreach (var candidate in _grid.Query(sPos.Value, aRadius))
+            int count = _grid.GetQueryItems(sPos.Value, aRadius, queryBuffer);
+
+            for (int i = 0; i < count; i++)
             {
+                ref readonly var candidate = ref queryBuffer[i];
                 if (candidate.Kind != SpatialGrid.CollisionKind.EnemyShip) continue;
                 if (candidate.Id.Value <= sEntity.Value) continue;
 
@@ -171,12 +179,13 @@ public class CollisionSystem : GameSystem
             float shipDistSq = float.MaxValue;
 
             var qsw = Stopwatch.StartNew();
-            var candidates = _grid.Query(ammoPos.Value, ammoRadius).ToList();
+            int count = _grid.GetQueryItems(ammoPos.Value, ammoRadius, queryBuffer);
             qsw.Stop();
             gridQueryTicks += qsw.ElapsedTicks;
 
-            foreach (var candidate in candidates)
+            for (int i = 0; i < count; i++)
             {
+                ref readonly var candidate = ref queryBuffer[i];
                 var fsw = Stopwatch.StartNew();
                 var diff = candidate.Position - ammoPos.Value;
                 float dSq = diff.X * diff.X + diff.Y * diff.Y;

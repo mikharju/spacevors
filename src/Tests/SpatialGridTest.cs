@@ -9,8 +9,9 @@ public class SpatialGridTest
     public void Query_EmptyGrid_ReturnsNothing()
     {
         var grid = new SpatialGrid(128f);
-        var results = grid.Query(new Vector2(0, 0), 10f).ToList();
-        Assert.Empty(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 10f, results);
+        Assert.Equal(0, count);
     }
 
     [Fact]
@@ -20,9 +21,13 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 10f);
 
-        var results = grid.Query(new Vector2(0, 0), 10f).ToList();
-        Assert.NotEmpty(results);
-        Assert.All(results, r => Assert.Equal(entity, r.Id));
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 10f, results);
+        Assert.True(count > 0);
+        for (int i = 0; i < count; i++)
+        {
+            Assert.Equal(entity, results[i].Id);
+        }
     }
 
     [Fact]
@@ -32,8 +37,9 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(5000, 5000), 10f);
 
-        var results = grid.Query(new Vector2(0, 0), 10f).ToList();
-        Assert.Empty(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 10f, results);
+        Assert.Equal(0, count);
     }
 
     [Fact]
@@ -43,8 +49,9 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(50, 50), 10f);
 
-        var results = grid.Query(new Vector2(60, 60), 30f).ToList();
-        Assert.Single(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(60, 60), 30f, results);
+        Assert.Equal(1, count);
     }
 
     [Fact]
@@ -54,8 +61,9 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(64, 64), 50f);
 
-        var results = grid.Query(new Vector2(0, 0), 100f).ToList();
-        Assert.Single(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 100f, results);
+        Assert.Equal(1, count);
     }
 
     [Fact]
@@ -70,9 +78,20 @@ public class SpatialGridTest
         grid.Insert(e2, SpatialGrid.CollisionKind.EnemyMine, new Vector2(64, 64), 50f);
         grid.Insert(e3, SpatialGrid.CollisionKind.EnemyShip, new Vector2(500, 500), 10f);
 
-        var results = grid.Query(new Vector2(0, 0), 100f).ToList();
-        Assert.Contains(results, r => r.Id == e1 && r.Kind == SpatialGrid.CollisionKind.Asteroid);
-        Assert.Contains(results, r => r.Id == e2 && r.Kind == SpatialGrid.CollisionKind.EnemyMine);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 100f, results);
+        
+        bool foundAsteroid = false;
+        bool foundMine = false;
+        for (int i = 0; i < count; i++)
+        {
+            if (results[i].Id == e1 && results[i].Kind == SpatialGrid.CollisionKind.Asteroid)
+                foundAsteroid = true;
+            if (results[i].Id == e2 && results[i].Kind == SpatialGrid.CollisionKind.EnemyMine)
+                foundMine = true;
+        }
+        Assert.True(foundAsteroid);
+        Assert.True(foundMine);
     }
 
     [Fact]
@@ -84,8 +103,9 @@ public class SpatialGridTest
 
         grid.Clear();
 
-        var results = grid.Query(new Vector2(0, 0), 10f).ToList();
-        Assert.Empty(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 10f, results);
+        Assert.Equal(0, count);
     }
 
     [Fact]
@@ -98,8 +118,9 @@ public class SpatialGridTest
         grid.Insert(e1, SpatialGrid.CollisionKind.Asteroid, new Vector2(-64, -64), 5f);
         grid.Insert(e2, SpatialGrid.CollisionKind.EnemyMine, new Vector2(192, 192), 5f);
 
-        var results = grid.Query(new Vector2(0, 0), 300f).ToList();
-        Assert.Equal(2, results.Count);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(0, 0), 300f, results);
+        Assert.Equal(2, count);
     }
 
     [Fact]
@@ -109,8 +130,9 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 200f);
 
-        var results = grid.Query(new Vector2(256, 256), 10f).ToList();
-        Assert.Single(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(256, 256), 10f, results);
+        Assert.Equal(1, count);
     }
 
     [Fact]
@@ -120,7 +142,8 @@ public class SpatialGridTest
         var entity = new Entity(1);
         grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(0, 0), 0.5f);
 
-        var results = grid.Query(new Vector2(100, 100), 0.5f).ToList();
-        Assert.Single(results);
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItems(new Vector2(100, 100), 0.5f, results);
+        Assert.Equal(1, count);
     }
 }
