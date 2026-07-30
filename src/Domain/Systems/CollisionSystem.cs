@@ -105,10 +105,9 @@ public class CollisionSystem : GameSystem
             var (aEntity, aAsteroid, aPos) = _asteroids[i];
             foreach (var candidate in _grid.Query(aPos.Value, aAsteroid.Radius))
             {
-                if (!view.HasComponent<Asteroid>(candidate.Id)) continue;
+                if (!view.TryGetComponent<Asteroid>(candidate.Id, out var bAst)) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                var bAst = view.GetComponent<Asteroid>(candidate.Id);
                 ResolveCircleVsCircle(view, aEntity, aAsteroid, candidate.Id, commands, bAst);
             }
         }
@@ -123,10 +122,9 @@ public class CollisionSystem : GameSystem
             var (aEntity, aShip, aPos) = _enemyShips[i];
             foreach (var candidate in _grid.Query(aPos.Value, aShip.Radius))
             {
-                if (!view.HasComponent<EnemyShip>(candidate.Id)) continue;
+                if (!view.TryGetComponent<EnemyShip>(candidate.Id, out var bShip)) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                var bShip = view.GetComponent<EnemyShip>(candidate.Id);
                 ResolveEnemyShipVsEnemyShip(view, aEntity, aShip, candidate.Id, bShip, commands);
             }
         }

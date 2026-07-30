@@ -72,14 +72,13 @@ public class TurretFiringSystem : GameSystem
             var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
             Entity playerEntity = playerTuple.Entity;
 
-            EnemyShip enemyShip = new EnemyShip(0, 0, 0, 0, 0, 300f, 0, 0, 0, 0);
-            if (view.TryGetComponent<EnemyShip>(turretEntity, out var es))
+            float firingRangeSq = 90000f;
+            if (view.TryGetComponent<EnemyShip>(turretEntity, out var enemyShip))
             {
-                enemyShip = es;
+                firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
             }
-            float firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
 
-            if (playerEntity.Value >= 0 && view.HasComponent<EnemyShip>(turretEntity))
+            if (playerEntity.Value >= 0 && view.TryGetComponent<EnemyShip>(turretEntity, out var es))
             {
                 Vector2 enemyVelocity = Vector2.Zero;
                 if (view.TryGetComponent<Velocity>(turretEntity, out var vel))
@@ -96,7 +95,7 @@ public class TurretFiringSystem : GameSystem
                     if (distSq > firingRangeSq || distSq < 0.001f) continue;
 
                     Vector2 relVel = playerVel.Value - enemyVelocity;
-                    float ammoSpeed = enemyShip.TurretAmmoSpeed;
+                    float ammoSpeed = es.TurretAmmoSpeed;
                     float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
                     float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
                     float c = -distSq;
@@ -110,7 +109,7 @@ public class TurretFiringSystem : GameSystem
 
                     if (distToPredictedSq > firingRangeSq) continue;
 
-                    Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (enemyShip.TurretAmmoSpeed * travelTime);
+                    Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (es.TurretAmmoSpeed * travelTime);
                     float dot = Vector2.Dot(forwardDir, aimDir);
                     if (dot < cosHalfArc) continue;
 
