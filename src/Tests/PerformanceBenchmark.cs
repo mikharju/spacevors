@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
-using Spacevors.Domain.Systems;
 using Xunit;
 
 public class PerformanceBenchmark
@@ -161,69 +159,31 @@ public class PerformanceBenchmark
                 var commands = new CommandBuffer();
 
                 // Phase 1: movementSystems
-                foreach (var system in new GameSystem[]
+                SimulationRunner.RunPhase(view, commands, SimulationRunner.MovementSystems, deltaTime, (name, ticks) =>
                 {
-                    new PhysicsSystem(),
-                    new BlueSparkHomeSystem(),
-                    new PositionIntegrationSystem(),
-                    new AmmoLifetimeSystem()
-                })
-                {
-                    var sw = Stopwatch.StartNew();
-                    system.Update(view, deltaTime, commands);
-                    sw.Stop();
-                    var key = system.GetType().Name;
-                    timings[key] = (timings.GetValueOrDefault(key, 0) + sw.ElapsedTicks / TimeSpan.TicksPerMillisecond);
-                }
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                });
                 commands.Apply(em);
 
                 // Phase 2: actionSystems
-                foreach (var system in new GameSystem[]
+                SimulationRunner.RunPhase(view, commands, SimulationRunner.ActionSystems, deltaTime, (name, ticks) =>
                 {
-                    new TurretFiringSystem(),
-                    new EnemyShipSpawnSystem()
-                })
-                {
-                    var sw = Stopwatch.StartNew();
-                    system.Update(view, deltaTime, commands);
-                    sw.Stop();
-                    var key = system.GetType().Name;
-                    timings[key] = (timings.GetValueOrDefault(key, 0) + sw.ElapsedTicks / TimeSpan.TicksPerMillisecond);
-                }
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                });
                 commands.Apply(em);
 
                 // Phase 3: resolutionSystems
-                foreach (var system in new GameSystem[]
+                SimulationRunner.RunPhase(view, commands, SimulationRunner.ResolutionSystems, deltaTime, (name, ticks) =>
                 {
-                    new CollisionSystem(),
-                    new PickupMagnetSystem(),
-                    new LevelUpSystem(),
-                    new EffectSystem()
-                })
-                {
-                    var sw = Stopwatch.StartNew();
-                    system.Update(view, deltaTime, commands);
-                    sw.Stop();
-                    var key = system.GetType().Name;
-                    timings[key] = (timings.GetValueOrDefault(key, 0) + sw.ElapsedTicks / TimeSpan.TicksPerMillisecond);
-                }
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                });
                 commands.Apply(em);
 
                 // Phase 4: cleanupSystems
-                foreach (var system in new GameSystem[]
+                SimulationRunner.RunPhase(view, commands, SimulationRunner.CleanupSystems, deltaTime, (name, ticks) =>
                 {
-                    new MineDriftSystem(),
-                    new MineRespawnSystem(),
-                    new EnemyShipSystem(),
-                    new CameraSystem()
-                })
-                {
-                    var sw = Stopwatch.StartNew();
-                    system.Update(view, deltaTime, commands);
-                    sw.Stop();
-                    var key = system.GetType().Name;
-                    timings[key] = (timings.GetValueOrDefault(key, 0) + sw.ElapsedTicks / TimeSpan.TicksPerMillisecond);
-                }
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                });
                 commands.Apply(em);
 
                 double frameTime = timings.Values.Sum();
