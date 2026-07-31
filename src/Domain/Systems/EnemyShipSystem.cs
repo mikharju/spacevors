@@ -27,6 +27,8 @@ public class EnemyShipSystem : GameSystem
             float targetAngle = (float)Math.Atan2(toPlayerDir.X, -toPlayerDir.Y);
             float angleDiff = NormalizeAngle(targetAngle - currentRot.Angle);
 
+            if (float.IsNaN(angleDiff)) continue;
+
             float maxTurn = ship.TurnRate * deltaTime;
             if (Math.Abs(angleDiff) < maxTurn)
             {
