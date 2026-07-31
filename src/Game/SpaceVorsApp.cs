@@ -308,9 +308,12 @@ public static class SpaceVorsApp
     private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)
     {
         var playerStats = em.GetComponent<Player>(playerEntity);
-        var allPlayerTurrets = em.GetEntitiesWithComponents<Turret>()
-            .Where(t => !t.Value.IsEnemy)
-            .ToList();
+        var allPlayerTurrets = new List<(Entity Entity, Turret Value)>();
+        foreach (var t in em.GetEntitiesWithComponents<Turret>())
+        {
+            if (!t.Value1.IsEnemy) allPlayerTurrets.Add(t);
+        }
+        
 
         var existingWeaponNames = allPlayerTurrets.Select(t => t.Value.WeaponName).ToHashSet();
         bool isNewWeapon = !existingWeaponNames.Contains(upgrade.WeaponName);

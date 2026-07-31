@@ -134,7 +134,7 @@ public class EntityManagerTests
         var results = _em.GetEntitiesWithComponents<Position>().ToList();
         Assert.Single(results);
         Assert.Equal(entity, results[0].Entity);
-        Assert.Equal(pos.X, results[0].Value.X);
+        Assert.Equal(pos.X, results[0].Value1.X);
     }
 
     [Fact]

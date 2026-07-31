@@ -35,7 +35,7 @@ public class WorldView
         return _em.TryGetComponent(entity, out component);
     }
 
-    public IEnumerable<(Entity Entity, T Value)> GetEntitiesWithComponents<T>() where T : notnull
+    public ComponentQuery<T> GetEntitiesWithComponents<T>() where T : notnull
     {
         return _em.GetEntitiesWithComponents<T>();
     }

@@ -39,13 +39,15 @@ public class LevelUpSystem : GameSystem
 
     private void SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, CommandBuffer commands)
     {
-        var turrets = view.GetEntitiesWithComponents<Turret>()
-            .Where(t => !t.Value.IsEnemy)
-            .ToList();
+        var turrets = new List<Turret>();
+        foreach (var t in view.GetEntitiesWithComponents<Turret>())
+        {
+            if (!t.Value1.IsEnemy) turrets.Add(t.Value1);
+        }
 
         if (turrets.Count == 0) return;
 
-        var weaponNames = turrets.Select(t => t.Value.WeaponName).Distinct().ToList();
+        var weaponNames = turrets.Select(t => t.WeaponName).Distinct().ToList();
         var allOptions = new List<UpgradableOption>();
 
         int playerLevel = view.GetComponent<Player>(playerEntity).Level;

@@ -123,7 +123,8 @@ public class TurretFiringSystem : GameSystem
 
         return nearestTarget;
 
-        void CheckTargets<T>(IEnumerable<(Entity Entity, T Value)> candidates, Func<T, float> getRadius, float checkRangeSq)
+        void CheckTargets<T>(ComponentQuery<T> candidates, Func<T, float> getRadius, float checkRangeSq)
+            where T : notnull
         {
             foreach (var (candidateEntity, value) in candidates)
             {

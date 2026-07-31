@@ -117,16 +117,13 @@ public class EntityManager
         }
     }
 
-    public IEnumerable<(Entity Entity, T Value)> GetEntitiesWithComponents<T>() where T : notnull
+    public ComponentQuery<T1> GetEntitiesWithComponents<T1>() where T1 : notnull
     {
-        var type = typeof(T);
-        if (_storages.TryGetValue(type, out var storage))
-        {
-            foreach (var pair in (ComponentStorage<T>)storage)
-            {
-                yield return pair;
-            }
-        }
+        if (!_storages.TryGetValue(typeof(T1), out var s1))
+            return default;
+
+        return new ComponentQuery<T1>(
+            (ComponentStorage<T1>)s1);
     }
 
     public static ComponentStorageBase FindSmallest(ComponentStorageBase first, params ComponentStorageBase[] rest)
@@ -229,6 +226,98 @@ public abstract class ComponentStorageBase
 
     public abstract Entity GetEntity(int slot);
 }
+public readonly struct ComponentQuery<T1>
+    where T1 : notnull
+{
+    private readonly ComponentStorage<T1> _s1;
+    
+    internal ComponentQuery(ComponentStorage<T1> s1)
+    {
+        _s1 = s1;
+    }
+
+    public Enumerator GetEnumerator()
+    {
+        if (_s1 == null) return new Enumerator(false);
+        return new Enumerator(_s1);
+    }
+    public struct Enumerator
+    {
+        private readonly ComponentStorage<T1> _storage1;
+        private readonly ComponentStorageBase _smallest;
+        private int _index;
+        private readonly bool _valid;
+
+        internal Enumerator(ComponentStorage<T1> storage1)
+        {
+            _storage1 = storage1;
+            _smallest = EntityManager.FindSmallest(_storage1);
+            _index = -1;
+            _valid = true;
+        }
+
+        internal Enumerator(bool valid)
+        {
+            _storage1 = null!;
+            _smallest = null!;
+            _index = 0;
+            _valid = valid;
+        }
+
+        public (Entity Entity, T1 Value1) Current { get; private set; }
+        
+        public bool MoveNext()
+        {
+            if (!_valid) return false;
+
+            while (++_index < _smallest.Count)
+            {
+                var entity = _smallest.GetEntity(_index);
+
+                if (!_storage1.TryGetSlot(entity, out var s1))
+                    continue;
+
+                Current = (
+                    entity,
+                    _storage1.GetBySlot(s1));
+
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    public bool TryFirst(out (Entity Entity, T1 Value1) result)
+    {
+        var e = GetEnumerator();
+        if (e.MoveNext())
+        {
+            result = e.Current;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public List<(Entity Entity, T1 Value1)> ToList()
+    {
+        var list = new List<(Entity Entity, T1 Value1)>();
+
+        foreach (var item in this)
+            list.Add(item);
+
+        return list;
+    }
+
+    public int Count() => _s1.Count;
+
+    public (Entity Entity, T1 Value1) FirstOrDefault() => TryFirst(out var result) ? result : default;
+
+    public bool Any() => _s1 is not null && _s1.Count > 0;
+}
+
 
 public readonly struct ComponentQuery<T1,T2>
     where T1 : notnull
@@ -281,7 +370,7 @@ public readonly struct ComponentQuery<T1,T2>
         public bool MoveNext()
         {
             if (!_valid) return false;
-            
+
             while (++_index < _smallest.Count)
             {
                 var entity = _smallest.GetEntity(_index);
