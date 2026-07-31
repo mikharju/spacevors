@@ -25,7 +25,6 @@ public class SpatialGrid
         CollisionKind Kind,
         Vector2 Position,
         float Radius,
-        int? Health = null,
         MineSize? Size = null,
         int Damage = 0);
 
@@ -55,7 +54,7 @@ public class SpatialGrid
         }
     }
 
-    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius, int? health, MineSize? size, int damage)
+    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius, MineSize? size, int damage)
     {
         int minX = (int)MathF.Floor((position.X - radius) / CellSize);
         int maxX = (int)MathF.Floor((position.X + radius) / CellSize);
@@ -71,7 +70,7 @@ public class SpatialGrid
                     entries = new List<SpatialItem>();
                     _cells[(x, y)] = entries;
                 }
-                entries.Add(new SpatialItem(id, kind, position, radius, health, size, damage));
+                entries.Add(new SpatialItem(id, kind, position, radius, size, damage));
             }
         }
     }

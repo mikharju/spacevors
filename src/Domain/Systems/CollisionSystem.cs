@@ -72,7 +72,7 @@ public class CollisionSystem : GameSystem
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
         {
             var pos = view.GetComponent<Position>(entity);
-            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, null, mine.Size, 0);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, mine.Size, 0);
 
             if (!hasPlayer) continue;
 
@@ -92,7 +92,7 @@ public class CollisionSystem : GameSystem
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
         {
             var pos = view.GetComponent<Position>(entity);
-            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius, ship.Health, null, ship.Damage);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius, null, ship.Damage);
             _shipPositions.Add((entity, pos));
 
             if (!hasPlayer) continue;
