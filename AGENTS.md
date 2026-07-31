@@ -7,6 +7,7 @@ Build a small, clean, highly maintainable Vampire Survivors-style space game.
 Optimize for:
 - readability
 - simplicity
+- performance
 - deterministic behavior
 - small commits
 - easy LLM understanding
@@ -76,6 +77,10 @@ Simulation should be testable without graphics.
 
 ## Performance
 
-Prioritize simplicity first.
+Prioritize simplicity along with performance.
 
 Optimize only after measuring.
+
+Performance goal is to have initially 10k objects at 120 fps and possibly in the future 100k objects.
+Avoid yield return in hot path. Do not refactor existing ones out unless specifically asked, but do not make
+new yield returns. 
