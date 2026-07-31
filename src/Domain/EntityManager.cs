@@ -105,18 +105,6 @@ public class EntityManager
         return false;
     }
 
-    public IEnumerable<Entity> GetEntitiesWith<T>() where T : notnull
-    {
-        var type = typeof(T);
-        if (_storages.TryGetValue(type, out var storage))
-        {
-            foreach (var (entity, _) in (ComponentStorage<T>)storage)
-            {
-                yield return entity;
-            }
-        }
-    }
-
     public ComponentQuery<T1> GetEntitiesWithComponents<T1>() where T1 : notnull
     {
         if (!_storages.TryGetValue(typeof(T1), out var s1))
@@ -251,7 +239,7 @@ public readonly struct ComponentQuery<T1>
         internal Enumerator(ComponentStorage<T1> storage1)
         {
             _storage1 = storage1;
-            _smallest = EntityManager.FindSmallest(_storage1);
+            _smallest = _storage1;
             _index = -1;
             _valid = true;
         }
