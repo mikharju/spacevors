@@ -25,6 +25,11 @@ public static class DiagnosticLogger
             _frameCount = 0;
             _fpsTimer = 0.0;
         }
+
+        lock (_lock)
+        {
+            Console.WriteLine($"[FRAME] dt={frameTime:F6}s fps={_currentFps}");
+        }
     }
 
     public static void LogSystem(string systemName, long elapsedTicks, int entitiesUpdated = 0)
