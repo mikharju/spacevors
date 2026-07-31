@@ -25,15 +25,14 @@ public class SpatialGrid
         CollisionKind Kind,
         Vector2 Position,
         float Radius,
-        MineSize? Size = null,
-        int Damage = 0);
+        MineSize? Size = null);
 
     public void Clear()
     {
         _cells.Clear();
     }
 
-    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius)
+    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius, MineSize? size = null)
     {
         int minX = (int)MathF.Floor((position.X - radius) / CellSize);
         int maxX = (int)MathF.Floor((position.X + radius) / CellSize);
@@ -49,28 +48,7 @@ public class SpatialGrid
                     entries = new List<SpatialItem>();
                     _cells[(x, y)] = entries;
                 }
-                entries.Add(new SpatialItem(id, kind, position, radius));
-            }
-        }
-    }
-
-    public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius, MineSize? size, int damage)
-    {
-        int minX = (int)MathF.Floor((position.X - radius) / CellSize);
-        int maxX = (int)MathF.Floor((position.X + radius) / CellSize);
-        int minY = (int)MathF.Floor((position.Y - radius) / CellSize);
-        int maxY = (int)MathF.Floor((position.Y + radius) / CellSize);
-
-        for (int x = minX; x <= maxX; x++)
-        {
-            for (int y = minY; y <= maxY; y++)
-            {
-                if (!_cells.TryGetValue((x, y), out var entries))
-                {
-                    entries = new List<SpatialItem>();
-                    _cells[(x, y)] = entries;
-                }
-                entries.Add(new SpatialItem(id, kind, position, radius, size, damage));
+                entries.Add(new SpatialItem(id, kind, position, radius, size));
             }
         }
     }
