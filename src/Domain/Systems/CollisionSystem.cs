@@ -257,8 +257,8 @@ public class CollisionSystem : GameSystem
 
             if (closestShipHit.HasValue)
             {
-                var shipComp = view.GetComponent<EnemyShip>(closestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipComp.Health, shipHitPos, ammo.Damage));
+                var shipHealth = view.GetComponent<Health>(closestShipHit.Value).Current;
+                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipHealth, shipHitPos, ammo.Damage));
                 _effectsToSpawn.Add((shipHitPos!, MineSize.Small));
             }
 
