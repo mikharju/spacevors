@@ -281,8 +281,8 @@ public class EntityManagerTests
         var posStorage = _em.GetStorage<Position>();
         var velStorage = _em.GetStorage<Velocity>();
 
-        Assert.Single(posStorage);
-        Assert.Single(velStorage);
+        Assert.Equal(1, posStorage.Count);
+        Assert.Equal(1, velStorage.Count);
     }
 
     [Fact]

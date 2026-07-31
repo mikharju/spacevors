@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace Spacevors.Domain;
 
-public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Entity, T Value)> where T : notnull
+public class ComponentStorage<T> : ComponentStorageBase where T : notnull
 {
     public const int MaxEntities = 20_000;
 
@@ -83,7 +83,7 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
         return false;
     }
 
-    public Entity GetEntity(int slot) => _entityIds[slot];
+    public override Entity GetEntity(int slot) => _entityIds[slot];
 
     public ref T GetComponent(int slot) => ref _data[slot];
 
@@ -119,24 +119,26 @@ public class ComponentStorage<T> : ComponentStorageBase, IEnumerable<(Entity Ent
 
     public override int Count => _count;
 
-    public override IEnumerable<int> GetEntityIds()
-    {
-        for (int i = 0; i < _count; i++)
-        {
-            yield return _entityIds[i].Value;
-        }
-    }
+    public Enumerator GetEnumerator() => new(this);
 
-    public IEnumerator<(Entity Entity, T Value)> GetEnumerator()
+    public struct Enumerator
     {
-        for (int i = 0; i < _count; i++)
-        {
-            yield return (_entityIds[i], _data[i]);
-        }
-    }
+        private readonly ComponentStorage<T> _storage;
+        private int _index;
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
+        internal Enumerator(ComponentStorage<T> storage)
+        {
+            _storage = storage;
+            _index = -1;
+        }
+
+        public bool MoveNext()
+        {
+            _index++;
+            return _index < _storage._count;
+        }
+
+        public (Entity Entity, T Value) Current =>
+            (_storage._entityIds[_index], _storage._data[_index]);
     }
 }

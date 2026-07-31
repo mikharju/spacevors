@@ -146,13 +146,20 @@ public class EntityManager
         var storage2 = (ComponentStorage<T2>)s2;
         var smallest = FindSmallest(storage1, storage2);
 
-        foreach (var id in smallest.GetEntityIds())
+        for (int i = 0; i < smallest.Count; i++)
         {
-            var entity = new Entity(id);
-            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
-            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
-            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2));
-        }
+            var entity = smallest.GetEntity(i);
+
+            if (!storage1.TryGetSlot(entity, out int slot1))
+                continue;
+            if (!storage2.TryGetSlot(entity, out int slot2))
+                continue;
+
+            yield return (
+                entity,
+                storage1.GetBySlot(slot1),
+                storage2.GetBySlot(slot2));
+        }    
     }
 
     public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3)> GetEntitiesWithComponents<T1, T2, T3>()
@@ -166,14 +173,23 @@ public class EntityManager
         var storage3 = (ComponentStorage<T3>)s3;
         var smallest = FindSmallest(storage1, storage2, storage3);
 
-        foreach (var id in smallest.GetEntityIds())
+        for (int i = 0; i < smallest.Count; i++)
         {
-            var entity = new Entity(id);
-            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
-            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
-            if (!storage3.TryGetSlot(entity, out int slot3)) continue;
-            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2), storage3.GetBySlot(slot3));
-        }
+            var entity = smallest.GetEntity(i);
+
+            if (!storage1.TryGetSlot(entity, out int slot1))
+                continue;
+            if (!storage2.TryGetSlot(entity, out int slot2))
+                continue;
+            if (!storage3.TryGetSlot(entity, out int slot3))
+                continue;
+
+            yield return (
+                entity,
+                storage1.GetBySlot(slot1),
+                storage2.GetBySlot(slot2),
+                storage3.GetBySlot(slot3));
+        }    
     }
 
     public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3, T4 Value4)> GetEntitiesWithComponents<T1, T2, T3, T4>()
@@ -188,15 +204,26 @@ public class EntityManager
         var storage4 = (ComponentStorage<T4>)s4;
         var smallest = FindSmallest(storage1, storage2, storage3, storage4);
 
-        foreach (var id in smallest.GetEntityIds())
+        for (int i = 0; i < smallest.Count; i++)
         {
-            var entity = new Entity(id);
-            if (!storage1.TryGetSlot(entity, out int slot1)) continue;
-            if (!storage2.TryGetSlot(entity, out int slot2)) continue;
-            if (!storage3.TryGetSlot(entity, out int slot3)) continue;
-            if (!storage4.TryGetSlot(entity, out int slot4)) continue;
-            yield return (entity, storage1.GetBySlot(slot1), storage2.GetBySlot(slot2), storage3.GetBySlot(slot3), storage4.GetBySlot(slot4));
-        }
+            var entity = smallest.GetEntity(i);
+
+            if (!storage1.TryGetSlot(entity, out int slot1))
+                continue;
+            if (!storage2.TryGetSlot(entity, out int slot2))
+                continue;
+            if (!storage3.TryGetSlot(entity, out int slot3))
+                continue;
+            if (!storage4.TryGetSlot(entity, out int slot4))
+                continue;
+
+            yield return (
+                entity,
+                storage1.GetBySlot(slot1),
+                storage2.GetBySlot(slot2),
+                storage3.GetBySlot(slot3),
+                storage4.GetBySlot(slot4));
+        }    
     }
 
     public void Clear()
@@ -210,5 +237,6 @@ public abstract class ComponentStorageBase
 {
     public abstract void Remove(Entity entity);
     public abstract int Count { get; }
-    public abstract IEnumerable<int> GetEntityIds();
+
+    public abstract Entity GetEntity(int slot);
 }

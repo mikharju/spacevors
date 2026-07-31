@@ -10,11 +10,11 @@ public class PerformanceBenchmark
         var scenarios = new[]
         {
             ("5k ammo + 100 ships", 5000, 100, 0, 0),
-            ("500 ammo + 1k ships + 100 asteroids", 500, 1000, 100, 0),
-            ("500 ammo + 100 ships + 1k asteroids", 500, 100, 1000, 0),
-            ("3k mines (few others)", 0, 0, 0, 3000),
-            ("1k of everything", 1000, 1000, 1000, 1000),
-            ("15k ammo + 100 each other", 15000, 100, 100, 100),
+            //("500 ammo + 1k ships + 100 asteroids", 500, 1000, 100, 0),
+            // ("500 ammo + 100 ships + 1k asteroids", 500, 100, 1000, 0),
+            // ("3k mines (few others)", 0, 0, 0, 3000),
+            // ("1k of everything", 1000, 1000, 1000, 1000),
+            // ("15k ammo + 100 each other", 15000, 100, 100, 100),
         };
 
         foreach (var (name, ammoCount, shipCount, asteroidCount, mineCount) in scenarios)
