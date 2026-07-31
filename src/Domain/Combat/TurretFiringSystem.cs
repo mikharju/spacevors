@@ -69,7 +69,7 @@ public class TurretFiringSystem : GameSystem
         }
         else
         {
-            var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
+            view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
             Entity playerEntity = playerTuple.Entity;
 
             float firingRangeSq = 90000f;

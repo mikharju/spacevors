@@ -236,7 +236,7 @@ public static class SpaceVorsApp
                     {
                         int mouseX = Raylib.GetMouseX();
                         int mouseY = Raylib.GetMouseY();
-                        var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                        em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
                         if (choiceTuple.Entity.Value >= 0)
                         {
                             var options = choiceTuple.Value2;
@@ -255,7 +255,7 @@ public static class SpaceVorsApp
 
                     if (selectedIndex >= 0)
                     {
-                        var choiceTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                        em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
                         Entity choiceEntity = choiceTuple.Entity;
 
                         if (choiceEntity.Value >= 0)
@@ -271,7 +271,7 @@ public static class SpaceVorsApp
                             em.DestroyEntity(entity);
                     }
 
-                    var pendingTuple = em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().FirstOrDefault();
+                    em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
                     PendingUpgradeOptions? upgradeOptions = null;
                     if (pendingTuple.Entity.Value >= 0)
                     {

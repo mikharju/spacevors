@@ -39,7 +39,7 @@ public class CollisionSystem : GameSystem
         _ammoToAsteroidHits.Clear();
         _ammoToPlayerHits.Clear();
 
-        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
+        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 

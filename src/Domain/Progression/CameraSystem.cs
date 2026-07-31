@@ -8,7 +8,7 @@ public class CameraSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = view.GetEntitiesWithComponents<Position, Player>().FirstOrDefault();
+        view.GetEntitiesWithComponents<Position, Player>().TryFirst(out var playerTuple);
         if (playerTuple.Entity.Value < 0) return;
 
         var targetPos = playerTuple.Value1.Value;

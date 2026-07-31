@@ -6,7 +6,7 @@ public class EnemyShipSystem : GameSystem
 {
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = view.GetEntitiesWithComponents<Player, Position>().FirstOrDefault();
+        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
