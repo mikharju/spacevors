@@ -47,7 +47,7 @@ public class ReflectionTest
         em.AddComponent(entity, new Position(new Vector2(10f, 20f)));
         em.AddComponent(entity, new Ammo(new Vector2(100f, 100f), 3f, 2f));
         
-        var ammoEntities = em.GetEntitiesWith<Ammo>().ToList();
+        var ammoEntities = em.GetEntitiesWithComponents<Ammo>().ToList();
         Assert.True(ammoEntities.Count() == 1, $"Expected 1 but got {ammoEntities.Count()}");
     }
 }

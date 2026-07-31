@@ -58,8 +58,4 @@ public class WorldView
         return _em.GetEntitiesWithComponents<T1, T2, T3, T4>();
     }
 
-    public IEnumerable<Entity> GetEntitiesWith<T>() where T : notnull
-    {
-        return _em.GetEntitiesWith<T>();
-    }
 }

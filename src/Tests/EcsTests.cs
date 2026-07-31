@@ -118,10 +118,10 @@ public class EntityManagerTests
         _em.AddComponent(e2, new Position(1f, 1f));
         // e3 has no position
 
-        var entities = _em.GetEntitiesWith<Position>().ToList();
+        var entities = _em.GetEntitiesWithComponents<Position>().ToList();
         Assert.Equal(2, entities.Count);
-        Assert.Contains(e1, entities);
-        Assert.Contains(e2, entities);
+        Assert.Contains(entities, x => x.Entity == e1);
+        Assert.Contains(entities, x => x.Entity == e2);
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class EntityManagerTests
 
         _em.DestroyEntity(e2);
 
-        Assert.Equal(2, _em.GetEntitiesWith<Position>().Count());
+        Assert.Equal(2, _em.GetEntitiesWithComponents<Position>().Count());
         Assert.True(_em.HasComponent<Position>(e1));
         Assert.False(_em.HasComponent<Position>(e2));
         Assert.True(_em.HasComponent<Position>(e3));
@@ -228,7 +228,7 @@ public class EntityManagerTests
 
         _em.DestroyEntity(e3);
 
-        Assert.Equal(2, _em.GetEntitiesWith<Position>().Count());
+        Assert.Equal(2, _em.GetEntitiesWithComponents<Position>().Count());
         Assert.True(_em.HasComponent<Position>(e1));
         Assert.True(_em.HasComponent<Position>(e2));
     }
@@ -245,7 +245,7 @@ public class EntityManagerTests
         _em.DestroyEntity(e1);
         _em.DestroyEntity(e2);
 
-        Assert.Empty(_em.GetEntitiesWith<Position>());
+        Assert.Equal(0, _em.GetEntitiesWithComponents<Position>().Count());
     }
 
     [Fact]

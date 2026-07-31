@@ -16,7 +16,7 @@ public class CommandApplyTest
         
         commands.Apply(em);
         
-        var ammoEntities = em.GetEntitiesWith<Ammo>().ToList();
+        var ammoEntities = em.GetEntitiesWithComponents<Ammo>().ToList();
         Assert.True(ammoEntities.Count() == 1, $"Expected 1 Ammo entity but got {ammoEntities.Count()}");
     }
     
@@ -28,7 +28,7 @@ public class CommandApplyTest
         // First verify that AddComponent works directly
         var testEntity = em.CreateEntity();
         em.AddComponent(testEntity, new Ammo(new Vector2(100f, 100f), 3f, 2f));
-        var directAmmo = em.GetEntitiesWith<Ammo>().ToList();
+        var directAmmo = em.GetEntitiesWithComponents<Ammo>().ToList();
         Assert.True(directAmmo.Count() == 1, $"Direct AddComponent failed: got {directAmmo.Count()}");
         
         // Now test via CommandProcessor
@@ -44,7 +44,7 @@ public class CommandApplyTest
         var processor = new CommandProcessor(em2);
         processor.Process(commands);
         
-        var ammoEntities = em2.GetEntitiesWith<Ammo>().ToList();
+        var ammoEntities = em2.GetEntitiesWithComponents<Ammo>().ToList();
         Assert.True(ammoEntities.Count() == 1, $"CommandProcessor failed: got {ammoEntities.Count()}");
     }
 }

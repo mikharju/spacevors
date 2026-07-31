@@ -18,7 +18,7 @@ public class CommandProcessorTest
         commands.Apply(em);
         
         // Verify entity was created with all components
-        var ammoEntities = em.GetEntitiesWith<Ammo>().ToList();
+        var ammoEntities = em.GetEntitiesWithComponents<Ammo>().ToList();
         Assert.Single(ammoEntities);
         
         var ammoComponents = em.GetEntitiesWithComponents<Ammo>().ToList();
