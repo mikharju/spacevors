@@ -28,12 +28,11 @@ public static class GameInitializer
 
         Random rand = new Random(42);
 
-        // 5 close asteroids within initial view range
-        for (int i = 0; i < 5; i++)
+        // One close asteroid within initial view range
         {
             var asteroid = em.CreateEntity();
             float angle = (float)(rand.NextDouble() * Math.PI * 2f);
-            float dist = 150f + (float)rand.NextDouble() * 400f;
+            float dist = 150f + (float)rand.NextDouble() * 1500f;
             float ax = (float)Math.Cos(angle) * dist;
             float ay = (float)Math.Sin(angle) * dist;
             float aSpeed = 15f + (float)rand.NextDouble() * 35f;
@@ -42,7 +41,7 @@ public static class GameInitializer
         }
 
         // Remaining asteroids in a larger area (~5 screens away)
-        for (int i = 5; i < 105; i++)
+        for (int i = 1; i < 35; i++)
         {
             var asteroid = em.CreateEntity();
             float angle = (float)(rand.NextDouble() * Math.PI * 2f);
