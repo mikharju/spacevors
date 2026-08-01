@@ -22,12 +22,12 @@ public static class EnemyShipFactory
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetInterceptorParams()
     {
-        return (15f, 40f, 2, 15f, 0.6f, TurretAmmoSpeed);
+        return (45f, 40f, 2, 15f, 0.6f, TurretAmmoSpeed);
     }
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetHeavyCannonParams()
     {
-        return (28f, 25f, 5, Acceleration, 0.8f, 160f);
+        return (78f, 25f, 5, Acceleration, 0.8f, 160f);
     }
 
     public static void AddEnemyShipComponents(EntityManager em, Entity entity, Vector2 position, Vector2 velocity, float rotation, float angularVelocity)

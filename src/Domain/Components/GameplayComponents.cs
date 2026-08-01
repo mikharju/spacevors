@@ -109,11 +109,11 @@ public readonly record struct ShipType(
         EngineLayout.Balanced,
         WeaponLoadout.LoadTestWeapon,
         MaxHealth: 8,
-        Radius: 16f,
+        Radius: 46f,
         DrawR: 80,
         DrawG: 220,
         DrawB: 80,
-        NoseLength: 22f,
+        NoseLength: 46f,
         WingSpread: 0.35f,
         MaxWeaponSlots: 1);
 
@@ -123,11 +123,11 @@ public readonly record struct ShipType(
         EngineLayout.Pursuit,
         WeaponLoadout.RailGun,
         MaxHealth: 10,
-        Radius: 18f,
+        Radius: 58f,
         DrawR: 100,
         DrawG: 160,
         DrawB: 255,
-        NoseLength: 24f,
+        NoseLength: 58f,
         WingSpread: 0.4f,
         MaxWeaponSlots: 2);
 
@@ -137,11 +137,11 @@ public readonly record struct ShipType(
         EngineLayout.Slow,
         WeaponLoadout.MachineGunShotgun,
         MaxHealth: 20,
-        Radius: 24f,
+        Radius: 84f,
         DrawR: 230,
         DrawG: 80,
         DrawB: 70,
-        NoseLength: 26f,
+        NoseLength: 84f,
         WingSpread: 0.5f,
         MaxWeaponSlots: 3);
 }
