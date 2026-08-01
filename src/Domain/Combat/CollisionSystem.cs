@@ -59,7 +59,7 @@ public class CollisionSystem : GameSystem
             playerSw.Restart();
             var diff = playerTuple.Value2.Value - pos.Value;
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float radiusSum = asteroid.Radius + 18f;
+            float radiusSum = asteroid.Radius + playerTuple.Value1.Radius;
 
             if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
             {
@@ -79,11 +79,11 @@ public class CollisionSystem : GameSystem
             playerSw.Restart();
             var diff = playerTuple.Value2.Value - pos.Value;
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float radiusSum = mine.Radius + 18f;
+            float radiusSum = mine.Radius + playerTuple.Value1.Radius;
 
             if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
             {
-                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands);
+                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerTuple.Value1.Radius);
             }
             playerSw.Stop();
             playerCollisionTicks += playerSw.ElapsedTicks;
@@ -100,7 +100,7 @@ public class CollisionSystem : GameSystem
             playerSw.Restart();
             var diff = playerTuple.Value2.Value - pos.Value;
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float radiusSum = ship.Radius + 18f;
+            float radiusSum = ship.Radius + playerTuple.Value1.Radius;
 
             if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
             {
@@ -284,7 +284,7 @@ public class CollisionSystem : GameSystem
             var playerPos = playerTuple.Value2;
             var diff2 = playerPos.Value - ammoPos.Value;
             float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
-            float radiusSum2 = ammoRadius + 18f;
+            float radiusSum2 = ammoRadius + playerTuple.Value1.Radius;
 
             if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < 0.001f) continue;
 
@@ -544,14 +544,14 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity playerEntity, CommandBuffer commands)
+    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity playerEntity, CommandBuffer commands, float PlayerRadius)
     {
         var minePos = view.GetComponent<Position>(mineEntity);
         var playerPos = view.GetComponent<Position>(playerEntity);
 
         var diff = playerPos.Value - minePos.Value;
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
-        float radiusSum = mine.Radius + 18f;
+        float radiusSum = mine.Radius + PlayerRadius;
 
         if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
 
