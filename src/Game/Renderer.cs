@@ -1,6 +1,7 @@
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Game;
 
 namespace Spacevors.Domain.Systems;
 
@@ -629,30 +630,23 @@ public static class Renderer
 
     private static void DrawShipPreview(float cx, float cy, ShipType ship, float scale)
     {
-        float noseLen = ship.NoseLength * scale;
-        float wingSpread = ship.WingSpread;
+        if (ImageLoader.ShipTexture.HasValue)
+        {
+            var tex = ImageLoader.ShipTexture.Value;
+            float drawDiameter = ship.Radius * 2f * scale;
+            float textureScale = drawDiameter / tex.Width;
+            float destWidth = tex.Width * textureScale;
+            float destHeight = tex.Height * textureScale;
 
-        var tipLocal = new System.Numerics.Vector2(0f, -noseLen);
-        var leftLocal = new System.Numerics.Vector2(-noseLen * wingSpread, noseLen * 0.6f);
-        var rightLocal = new System.Numerics.Vector2(noseLen * wingSpread, noseLen * 0.6f);
-
-        Raylib.DrawTriangle(
-            new System.Numerics.Vector2(cx + tipLocal.X, cy + tipLocal.Y),
-            new System.Numerics.Vector2(cx + leftLocal.X, cy + leftLocal.Y),
-            new System.Numerics.Vector2(cx + rightLocal.X, cy + rightLocal.Y),
-            new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255)
-        );
-
-        var tip = new System.Numerics.Vector2(0f, -noseLen * 1.3f);
-        var left = new System.Numerics.Vector2(-noseLen * wingSpread * 1.4f, noseLen * 0.6f * 1.5f);
-        var right = new System.Numerics.Vector2(noseLen * wingSpread * 1.4f, noseLen * 0.6f * 1.5f);
-
-        Raylib.DrawTriangleLines(
-            new System.Numerics.Vector2(cx + tip.X, cy + tip.Y),
-            new System.Numerics.Vector2(cx + left.X, cy + left.Y),
-            new System.Numerics.Vector2(cx + right.X, cy + right.Y),
-            new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 100)
-        );
+            Raylib.DrawTexturePro(
+                tex,
+                new Rectangle(0f, 0f, tex.Width, tex.Height),
+                new Rectangle(cx, cy, destWidth, destHeight),
+                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                0f,
+                Color.White
+            );
+        }
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetShipCardRect(int index, int windowWidth, int windowHeight)
@@ -692,38 +686,28 @@ public static class Renderer
         var shipPos = em.GetComponent<Position>(playerEntity);
         var shipRot = em.GetComponent<Rotation>(playerEntity);
 
-        float angle = shipRot.Angle;
-        float noseLen = shipType.NoseLength;
-        float wingSpread = shipType.WingSpread;
+        float screenCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
+        float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+        float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-        float cos = (float)Math.Cos(angle);
-        float sin = (float)Math.Sin(angle);
+        if (ImageLoader.ShipTexture.HasValue)
+        {
+            var tex = ImageLoader.ShipTexture.Value;
+            float drawDiameter = shipType.Radius * 2f;
+            float scale = drawDiameter / tex.Width;
+            float destWidth = tex.Width * scale;
+            float destHeight = tex.Height * scale;
 
-        var tipLocal = new System.Numerics.Vector2(0f, -noseLen);
-        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+            Raylib.DrawTexturePro(
+                tex,
+                new Rectangle(0f, 0f, tex.Width, tex.Height),
+                new Rectangle(screenCx, screenCy, destWidth, destHeight),
+                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                angleDeg,
+                Color.White
+            );
+        }
 
-        var leftLocal = new System.Numerics.Vector2(-noseLen * wingSpread, noseLen * 0.6f);
-        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
-
-        var rightLocal = new System.Numerics.Vector2(noseLen * wingSpread, noseLen * 0.6f);
-        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
-
-        float tx1 = (float)shipPos.Value.X + tip.X - camX + windowWidth / 2f;
-        float ty1 = (float)shipPos.Value.Y + tip.Y - camY + windowHeight / 2f;
-        float tx2 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
-        float ty2 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
-        float tx3 = (float)shipPos.Value.X + right.X - camX + windowWidth / 2f;
-        float ty3 = (float)shipPos.Value.Y + right.Y - camY + windowHeight / 2f;
-
-        Raylib.DrawTriangle(
-            new System.Numerics.Vector2(tx1, ty1),
-            new System.Numerics.Vector2(tx2, ty2),
-            new System.Numerics.Vector2(tx3, ty3),
-            new Raylib_cs.Color((int)shipType.DrawR, (int)shipType.DrawG, (int)shipType.DrawB, 255)
-        );
-
-        float shipCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-        float shipCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
-        Raylib.DrawCircle((int)shipCx, (int)shipCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
+        Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
     }
 }

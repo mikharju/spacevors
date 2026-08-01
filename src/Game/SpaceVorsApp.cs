@@ -18,6 +18,8 @@ public static class SpaceVorsApp
         Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
         Raylib.InitWindow(DefaultWindowWidth, DefaultWindowHeight, "SpaceVors");
 
+        ImageLoader.LoadAssets();
+
         int GetW() => Raylib.GetScreenWidth();
         int GetH() => Raylib.GetScreenHeight();
 
@@ -302,6 +304,7 @@ public static class SpaceVorsApp
             }
         }
 
+        ImageLoader.UnloadAssets();
         Raylib.CloseWindow();
     }
 
