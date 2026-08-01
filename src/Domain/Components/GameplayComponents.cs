@@ -60,33 +60,33 @@ public readonly record struct WeaponLoadout(
     IReadOnlyList<TurretDefinition> Turrets)
 {
     public static WeaponLoadout MachineGun { get; } = new("MachineGun", [
-        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 360f, WeaponType.MachineGun)]);
+        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 1260f, WeaponType.MachineGun)]);
 
     public static WeaponLoadout Shotgun { get; } = new("Shotgun", [
-        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun),
-        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun)]);
+        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun),
+        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun)]);
 
     public static WeaponLoadout MachineGunShotgun { get; } = new("MachineGunShotgun", [
-        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 360f, WeaponType.MachineGun),
-        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun),
-        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 360f, WeaponType.Shotgun)]);
+        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 1260f, WeaponType.MachineGun),
+        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun),
+        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun)]);
 
     // Phase 2 weapon loadouts
     public static WeaponLoadout RailGun { get; } = new("RailGun", [
-        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 500f, WeaponType.RailGun, AutoTarget: false)]);
+        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 2000f, WeaponType.RailGun, AutoTarget: false)]);
 
     public static WeaponLoadout TwinChainGun { get; } = new("TwinChainGun", [
-        new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 360f, WeaponType.TwinChainGun, AutoTarget: false),
-        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 360f, WeaponType.TwinChainGun, AutoTarget: false)]);
+        new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false),
+        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false)]);
 
     public static WeaponLoadout AcidBubbleSpray { get; } = new("AcidBubbleSpray", [
-        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 250f, WeaponType.AcidBubbleSpray, AutoTarget: false)]);
+        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 650f, WeaponType.AcidBubbleSpray, AutoTarget: false)]);
 
     public static WeaponLoadout PointDefenceTurret { get; } = new("PointDefenceTurret", [
-        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.PointDefenceTurret)]);
+        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 680f, WeaponType.PointDefenceTurret)]);
 
     public static WeaponLoadout LoadTestWeapon { get; } = new("LoadTestWeapon", [
-        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.LoadTestWeapon)]);
+        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 580f, WeaponType.LoadTestWeapon)]);
 
 }
 
