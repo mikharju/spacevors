@@ -92,11 +92,12 @@ public static class Renderer
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
+            float angleDeg = rot.Angle * 180f / MathF.PI;
             if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
             {
                 var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
-                float angleDeg = rot.Angle * 180f / MathF.PI;
-                float scale = asteroid.Width / tex.Width;
+                float drawDiameter = asteroid.Radius * 2f;
+                float scale = drawDiameter / tex.Width;
                 float destWidth = tex.Width * scale;
                 float destHeight = tex.Height * scale;
 
@@ -111,10 +112,9 @@ public static class Renderer
             }
             else
             {
-                float angleDeg = rot.Angle * 180f / MathF.PI;
                 Raylib.DrawRectanglePro(
-                    new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height),
-                    new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
+                    new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
+                    new System.Numerics.Vector2(asteroid.Radius, asteroid.Radius),
                     angleDeg,
                     new Color(200, 200, 210, 255)
                 );
@@ -134,7 +134,8 @@ public static class Renderer
             if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
             {
                 var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
-                float scale = asteroid.Width / tex.Width;
+                float drawDiameter = asteroid.Radius * 2f;
+                float scale = drawDiameter / tex.Width;
                 float destWidth = tex.Width * scale;
                 float destHeight = tex.Height * scale;
 
@@ -149,9 +150,9 @@ public static class Renderer
             }
             else
             {
-                float rx = cx - asteroid.Width / 2f;
-                float ry = cy - asteroid.Height / 2f;
-                Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+                float rx = cx - asteroid.Radius;
+                float ry = cy - asteroid.Radius;
+                Raylib.DrawRectangle((int)rx, (int)ry, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2), new Color(120, 120, 130, 255));
             }
         }
     }

@@ -33,7 +33,7 @@ public class TurretFiringTest
         var asteroidEntity = em.CreateEntity();
         em.AddComponent(asteroidEntity, new Position(new Vector2(0f, -100f)));
         em.AddComponent(asteroidEntity, new Velocity(Vector2.Zero));
-        em.AddComponent(asteroidEntity, new Asteroid(Width: 60f, Height: 60f, Radius: 30f));
+        em.AddComponent(asteroidEntity, new Asteroid(Radius: 30f));
 
         // Create view and run system
         var view = new WorldView(em);
