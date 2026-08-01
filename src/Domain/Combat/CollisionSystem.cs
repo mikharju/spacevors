@@ -108,6 +108,19 @@ public class CollisionSystem : GameSystem
             }
             playerSw.Stop();
             playerCollisionTicks += playerSw.ElapsedTicks;
+
+            foreach (var (aEntity, aPos) in _asteroidPositions)
+            {
+                var asteroid = view.GetComponent<Asteroid>(aEntity);
+                float radiusSum2 = ship.Radius + asteroid.Radius;
+                var diff2 = pos.Value - aPos.Value;
+                float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
+
+                if (distSq2 < radiusSum2 * radiusSum2 && distSq2 >= 0.001f)
+                {
+                    ResolveEnemyShipVsAsteroid(view, entity, ship, aEntity, asteroid, commands);
+                }
+            }
         }
 
         gridBuildSw.Stop();
@@ -129,7 +142,8 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                ResolveCircleVsCircle(aPos.Value, candidate.Position, aRadius, candidate.Radius);
+                var bPos = view.GetComponent<Position>(candidate.Id);
+                ResolveCollision(view, aPos, bPos, aEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
             }
         }
 
@@ -150,7 +164,8 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.EnemyShip) continue;
                 if (candidate.Id.Value <= sEntity.Value) continue;
 
-                ResolveCircleVsCircle(sPos.Value, candidate.Position, aRadius, candidate.Radius);
+                var bPos = view.GetComponent<Position>(candidate.Id);
+                ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
             }
         }
 
@@ -401,6 +416,11 @@ public class CollisionSystem : GameSystem
             bRadius = bAst.Radius;
             isAsteroidVsAsteroid = true;
         }
+        else if (view.TryGetComponent<EnemyShip>(bEntity, out var bShip))
+        {
+            bRadius = bShip.Radius;
+            isAsteroidVsAsteroid = false;
+        }
         else
         {
             var playerComp = view.GetComponent<Player>(bEntity);
@@ -411,18 +431,6 @@ public class CollisionSystem : GameSystem
         ResolveCollision(view, aPos, bPos, aEntity, bEntity, aRadius, bRadius, isAsteroidVsAsteroid, commands);
     }
 
-    private void ResolveCircleVsCircle(
-        Vector2 aPos,
-        Vector2 bPos,
-        float aRadius,
-        float bRadius)
-    {
-        float radiusSum = aRadius + bRadius;
-        var diff = bPos - aPos;
-        float distSq = diff.X * diff.X + diff.Y * diff.Y;
-
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
-    }
 
     private void ResolveCollision(
         WorldView view,
