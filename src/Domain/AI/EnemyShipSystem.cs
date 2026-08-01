@@ -21,6 +21,21 @@ public class EnemyShipSystem : GameSystem
 
             if (distSq > ship.DetectionRange * ship.DetectionRange || distSq < 0.01f) continue;
 
+            view.TryGetComponent<AngularVelocity>(shipEntity, out var angVel);
+            float currentAngVel = angVel.Value;
+
+            if (Math.Abs(currentAngVel) > ship.TurnRate)
+            {
+                float damping = Math.Sign(currentAngVel) * ship.TurnRate * deltaTime;
+                float newAngVel = currentAngVel - damping;
+                if (Math.Sign(newAngVel) != Math.Sign(currentAngVel))
+                {
+                    newAngVel = 0f;
+                }
+                commands.Add(new AddComponentCommand<AngularVelocity>(shipEntity, new AngularVelocity(newAngVel)));
+                continue;
+            }
+
             float dist = (float)Math.Sqrt(distSq);
             var toPlayerDir = toPlayer / dist;
 
