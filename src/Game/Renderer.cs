@@ -425,16 +425,16 @@ public static class Renderer
         int cardW = 196;
         int cardH = 140;
         int spacing = 10;
-        int maxCards = options?.Options.Length ?? 2;
+        int maxCards = options?.Options?.Length ?? 2;
         int totalW = cardW * maxCards + spacing * (maxCards - 1);
         int startX = Math.Max(10, (windowWidth - totalW) / 2);
         int startY = windowHeight / 2 - cardH / 2;
 
-        if (options.HasValue)
+        if (options is { Options.Length: > 0 } opts)
         {
-            for (int i = 0; i < options.Value.Options.Length; i++)
+            for (int i = 0; i < opts.Options.Length; i++)
             {
-                var opt = options.Value.Options[i];
+                var opt = opts.Options[i];
                 int x = startX + i * (cardW + spacing);
                 string key = (i + 1).ToString();
                 DrawCard(x, startY, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), key);
