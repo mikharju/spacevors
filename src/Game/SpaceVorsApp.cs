@@ -10,8 +10,8 @@ public static class SpaceVorsApp
     public const int MaxFps = 120;
     const float FixedDeltaTime = 1f / MaxFps;
     const float MaxFrameTime = 1f / MaxFps;
-    const int DefaultWindowWidth = 1280;
-    const int DefaultWindowHeight = 720;
+    const int DefaultWindowWidth = 1920;
+    const int DefaultWindowHeight = 1024;
 
     public static void Main()
     {
@@ -480,7 +480,7 @@ public static class SpaceVorsApp
                     em.AddComponent(playerEntity, new Player(
                         stats.Thrust,
                         stats.SideThrust,
-                        newBackThrust,
+                        stats.BackThrust,
                         stats.Boost,
                         stats.Radius,
                         stats.Xp,

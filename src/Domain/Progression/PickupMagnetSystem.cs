@@ -15,14 +15,15 @@ public class PickupMagnetSystem : GameSystem
 
         var playerPos = view.GetComponent<Position>(playerEntity);
         var playerStats = view.GetComponent<Player>(playerEntity);
-        float pickupRadius = playerStats.PickupRadius;
 
-        ProcessXpPickups(view, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime, commands);
-        ProcessHealthOrbs(view, playerEntity, playerPos.Value, pickupRadius, playerStats.Radius, deltaTime, commands);
+        ProcessXpPickups(view, playerEntity, playerPos.Value, playerStats.PickupRadius, deltaTime, commands);
+        ProcessHealthOrbs(view, playerEntity, playerPos.Value, playerStats.PickupRadius, deltaTime, commands);
     }
 
-    private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime, CommandBuffer commands)
+    private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
     {
+        var playerStats = view.GetComponent<Player>(playerEntity);
+
         foreach (var (pickupEntity, pickup, pos) in view.GetEntitiesWithComponents<XpPickup, Position>())
         {
             float newLifetime = pickup.Lifetime - deltaTime;
@@ -36,7 +37,7 @@ public class PickupMagnetSystem : GameSystem
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
             float dist = (float)Math.Sqrt(distSq);
 
-            bool insideRadius = dist < pickupRadius + pickup.Radius;
+            bool insideRadius = dist < playerStats.PickupRadius;
             bool isChased = pickup.Chased;
 
             if (!insideRadius && !isChased)
@@ -50,7 +51,7 @@ public class PickupMagnetSystem : GameSystem
                 commands.Add(new AddComponentCommand<XpPickup>(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true)));
             }
 
-            float collectionDist = playerRadius + pickup.Radius;
+            float collectionDist = playerStats.Radius + pickup.Radius;
             if (dist < collectionDist)
             {
                 ApplyXp(view, playerEntity, pickup.XpAmount, commands);
@@ -68,8 +69,10 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float pickupRadius, float playerRadius, float deltaTime, CommandBuffer commands)
+    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
     {
+        var playerStats = view.GetComponent<Player>(playerEntity);
+
         foreach (var (orbEntity, orb, pos) in view.GetEntitiesWithComponents<HealthOrb, Position>())
         {
             float newLifetime = orb.Lifetime - deltaTime;
@@ -83,7 +86,7 @@ public class PickupMagnetSystem : GameSystem
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
             float dist = (float)Math.Sqrt(distSq);
 
-            if (dist < pickupRadius + orb.Radius)
+            if (dist < playerStats.PickupRadius)
             {
                 Vector2 currentVel = view.TryGetComponent<Velocity>(orbEntity, out var vel) ? vel.Value : Vector2.Zero;
                 var accel = (diff / dist) * MagnetAcceleration;
@@ -100,7 +103,7 @@ public class PickupMagnetSystem : GameSystem
                 commands.Add(new AddComponentCommand<Velocity>(orbEntity, new Velocity(newVel)));
             }
 
-            float collectionDist = playerRadius + orb.Radius;
+            float collectionDist = playerStats.Radius + orb.Radius;
             if (dist < collectionDist)
             {
                 ApplyHealth(view, playerEntity, commands);
