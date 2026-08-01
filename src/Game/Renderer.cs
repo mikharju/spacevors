@@ -701,8 +701,8 @@ public static class Renderer
             Raylib.DrawTexturePro(
                 tex,
                 new Rectangle(0f, 0f, tex.Width, tex.Height),
-                new Rectangle(screenCx, screenCy, destWidth, destHeight),
-                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                new Rectangle(screenCx, screenCy, destWidth, destHeight), // no origin shifting here
+                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f), // This line already takes care of origin shifting
                 angleDeg,
                 Color.White
             );
