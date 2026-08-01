@@ -5,7 +5,8 @@ namespace Spacevors.Domain.Systems;
 
 public class PhysicsSystem : GameSystem
 {
-    private const float AngularDamping = 0.95f;
+    private const float AngularDampingShip = 0.95f;
+    private const float AngularDampingAsteroid = 0.999f;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -27,7 +28,17 @@ public class PhysicsSystem : GameSystem
 
         foreach (var (entity, rotation, angVel) in view.GetEntitiesWithComponents<Rotation, AngularVelocity>())
         {
-            var dampedAngVel = angVel.Value * AngularDamping;
+            float dampedAngVel = angVel.Value;
+
+            if (view.HasComponent<Player>(entity))
+            {
+                dampedAngVel *= AngularDampingShip;
+            }
+            else
+            {
+                dampedAngVel *= AngularDampingAsteroid;
+            }
+
             commands.Add(new AddComponentCommand<AngularVelocity>(entity, new AngularVelocity(dampedAngVel)));
 
             var newAngle = rotation.Angle + angVel.Value * deltaTime;
