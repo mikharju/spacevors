@@ -81,6 +81,8 @@ public static class Renderer
 
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        bool hasTextures = ImageLoader.AsteroidTextures != null;
+
         foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
         {
             var pos = em.GetComponent<Position>(entity);
@@ -89,13 +91,33 @@ public static class Renderer
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-            float angleDeg = rot.Angle * 180f / MathF.PI;
-            Raylib.DrawRectanglePro(
-                new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height),
-                new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
-                angleDeg,
-                new Color(200, 200, 210, 255)
-            );
+            if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
+            {
+                var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
+                float angleDeg = rot.Angle * 180f / MathF.PI;
+                float scale = asteroid.Width / tex.Width;
+                float destWidth = tex.Width * scale;
+                float destHeight = tex.Height * scale;
+
+                Raylib.DrawTexturePro(
+                    tex,
+                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    new Rectangle(cx, cy, destWidth, destHeight),
+                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                    angleDeg,
+                    Color.White
+                );
+            }
+            else
+            {
+                float angleDeg = rot.Angle * 180f / MathF.PI;
+                Raylib.DrawRectanglePro(
+                    new Rectangle((int)cx, (int)cy, (int)asteroid.Width, (int)asteroid.Height),
+                    new System.Numerics.Vector2(asteroid.Width / 2f, asteroid.Height / 2f),
+                    angleDeg,
+                    new Color(200, 200, 210, 255)
+                );
+            }
         }
 
         foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
@@ -108,9 +130,28 @@ public static class Renderer
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-            float rx = cx - asteroid.Width / 2f;
-            float ry = cy - asteroid.Height / 2f;
-            Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+            if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
+            {
+                var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
+                float scale = asteroid.Width / tex.Width;
+                float destWidth = tex.Width * scale;
+                float destHeight = tex.Height * scale;
+
+                Raylib.DrawTexturePro(
+                    tex,
+                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    new Rectangle(cx, cy, destWidth, destHeight),
+                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                    0f,
+                    Color.White
+                );
+            }
+            else
+            {
+                float rx = cx - asteroid.Width / 2f;
+                float ry = cy - asteroid.Height / 2f;
+                Raylib.DrawRectangle((int)rx, (int)ry, (int)asteroid.Width, (int)asteroid.Height, new Color(120, 120, 130, 255));
+            }
         }
     }
 

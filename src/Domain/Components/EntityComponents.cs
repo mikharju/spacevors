@@ -29,6 +29,9 @@ public readonly record struct EnemyMine(MineSize Size, float Speed, float Angle)
     public float Radius => Size == MineSize.Large ? 15f : 7.5f;
 }
 
-public readonly record struct Asteroid(float Width, float Height, float Radius = 40f);
+public readonly record struct Asteroid(float Width, float Height, float Radius = 40f, byte Variant = 0)
+{
+    public const int VariantCount = 6;
+}
 
 public readonly record struct Camera(Vector2 Target);

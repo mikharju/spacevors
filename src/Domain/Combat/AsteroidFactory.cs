@@ -14,6 +14,6 @@ public static class AsteroidFactory
         em.AddComponent(entity, new Velocity(new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed)));
         em.AddComponent(entity, new Rotation((float)(rand.NextDouble() * Math.PI * 2)));
         em.AddComponent(entity, new AngularVelocity((float)(rand.NextDouble() - 0.5f) * 1.5f));
-        em.AddComponent(entity, new Asteroid(aw, ah, ar));
+        em.AddComponent(entity, new Asteroid(aw, ah, ar, (byte)rand.Next(Asteroid.VariantCount)));
     }
 }
