@@ -15,27 +15,28 @@ public static class Renderer
         List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
         List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
         Entity playerEntity,
-        ShipType shipType)
+        ShipType shipType,
+        bool diagnostics)
     {
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
         DrawStarfield(stars, camX, camY, windowWidth, windowHeight);
         DrawClutter(clutter, camX, camY, windowWidth, windowHeight);
-        DrawAsteroids(em, camX, camY, windowWidth, windowHeight);
+        DrawAsteroids(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawSparks(em, camX, camY, windowWidth, windowHeight);
         DrawGreenSparks(em, camX, camY, windowWidth, windowHeight);
-        DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType);
-        DrawEnemyShips(em, camX, camY, windowWidth, windowHeight);
+        DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
+        DrawEnemyShips(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
         DrawHealthBar(em, playerEntity, shipType.MaxHealth, windowWidth, windowHeight);
 
-        if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
+        if (diagnostics)
         {
             DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
         }
@@ -79,7 +80,7 @@ public static class Renderer
         }
     }
 
-    private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         bool hasTextures = ImageLoader.AsteroidTextures != null;
 
@@ -89,7 +90,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
             if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
             {
@@ -128,7 +129,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
             if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
             {
@@ -245,11 +246,11 @@ public static class Renderer
         }
     }
 
-    private static void DrawEnemyShips(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawEnemyShips(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         if (ImageLoader.EnemyShipTextures == null)
         {
-            DrawEnemyShipsFallback(em, camX, camY, windowWidth, windowHeight);
+            DrawEnemyShipsFallback(em, camX, camY, windowWidth, windowHeight, diagnostics);
             return;
         }
 
@@ -288,7 +289,7 @@ public static class Renderer
             }
             else
             {
-                DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight);
+                DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight, diagnostics);
             }
 
             float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
@@ -302,11 +303,11 @@ public static class Renderer
                 new Color(255, 140, 30, 255)
             );
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
         }
     }
 
-    private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
         {
@@ -367,11 +368,11 @@ public static class Renderer
                 new Color(255, 140, 30, 255)
             );
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
         }
     }
 
-    private static void DrawEnemyShipFallback(Vector2 pos, float angle, float size, float camX, int windowWidth, float camY, int windowHeight)
+    private static void DrawEnemyShipFallback(Vector2 pos, float angle, float size, float camX, int windowWidth, float camY, int windowHeight, bool diagnostics)
     {
         float cos = (float)Math.Cos(angle);
         float sin = (float)Math.Sin(angle);
@@ -398,6 +399,13 @@ public static class Renderer
             new System.Numerics.Vector2(tx3, ty3),
             Color.Red
         );
+
+        if (diagnostics)
+        {
+            float cx = (float)pos.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Y - camY + windowHeight / 2f;
+            Raylib.DrawCircle((int)cx, (int)cy, (int)size, new Color(255, 165, 0, 60));
+        }
     }
 
     private static void DrawMines(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -811,7 +819,7 @@ public static class Renderer
         }
     }
 
-    public static void DrawPlayerShip(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight, ShipType shipType)
+    public static void DrawPlayerShip(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight, ShipType shipType, bool diagnostics)
     {
         var shipPos = em.GetComponent<Position>(playerEntity);
         var shipRot = em.GetComponent<Rotation>(playerEntity);
@@ -837,6 +845,6 @@ public static class Renderer
             );
         }
 
-        Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
+        if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
     }
 }

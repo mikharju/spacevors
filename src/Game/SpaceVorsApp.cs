@@ -210,7 +210,8 @@ public static class SpaceVorsApp
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
                     var gameFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip);
+                    bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+                    Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip, diagnostics);
 
                     float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
                     if (frameElapsed < MaxFrameTime)
@@ -292,7 +293,8 @@ public static class SpaceVorsApp
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
                     var pauseFrameStart = Raylib.GetTime();
-                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, chosenShip);
+                    bool pauseDiagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, chosenShip, pauseDiagnostics);
                     Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions, playerLevel);
 
                     float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
