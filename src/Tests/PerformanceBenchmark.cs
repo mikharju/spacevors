@@ -83,7 +83,7 @@ public class PerformanceBenchmark
                 em.AddComponent(entity, new AngularVelocity((float)((rng.NextDouble() - 0.5) * 2f)));
                 em.AddComponent(entity, new EnemyShip(
                     Radius: 20f, Speed: 35f, TurnRate: 1f, DetectionRange: 1200f, FiringRange: 300f,
-                    TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 9f, Damage: 1));
+                    TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 9f, Damage: 1, GraphicsId: 0));
                 em.AddComponent(entity, new Health(3));
 
                 // Enemy turrets with zero cooldown so they fire immediately

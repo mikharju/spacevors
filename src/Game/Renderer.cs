@@ -247,6 +247,67 @@ public static class Renderer
 
     private static void DrawEnemyShips(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        if (ImageLoader.EnemyShipTextures == null)
+        {
+            DrawEnemyShipsFallback(em, camX, camY, windowWidth, windowHeight);
+            return;
+        }
+
+        foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
+        {
+            var shipPos = em.GetComponent<Position>(entity);
+            var shipRot = em.GetComponent<Rotation>(entity);
+
+            float screenCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
+            float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+            float angleDeg = shipRot.Angle * 180f / MathF.PI;
+
+            string? texKey = enemyShip.GraphicsId switch
+            {
+                EnemyShipFactory.DefaultGraphicsId => "enemy-1",
+                EnemyShipFactory.InterceptorGraphicsId => "interceptor",
+                EnemyShipFactory.HeavyCannonGraphicsId => "heavy-cannon",
+                _ => null
+            };
+
+            if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var tex) && tex.Id != 0)
+            {
+                float drawDiameter = enemyShip.Radius * 2f;
+                float scale = drawDiameter / tex.Width;
+                float destWidth = tex.Width * scale;
+                float destHeight = tex.Height * scale;
+
+                Raylib.DrawTexturePro(
+                    tex,
+                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    new Rectangle(screenCx, screenCy, destWidth, destHeight),
+                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                    angleDeg,
+                    Color.White
+                );
+            }
+            else
+            {
+                DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight);
+            }
+
+            float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+            float enemyTurretSize = 8f;
+            Raylib.DrawRectangle(
+                (int)(cx - enemyTurretSize / 2f),
+                (int)(cy - enemyTurretSize / 2f),
+                (int)enemyTurretSize,
+                (int)enemyTurretSize,
+                new Color(255, 140, 30, 255)
+            );
+
+            Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+        }
+    }
+
+    private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
         foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
         {
             var shipPos = em.GetComponent<Position>(entity);
@@ -308,6 +369,35 @@ public static class Renderer
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
         }
+    }
+
+    private static void DrawEnemyShipFallback(Vector2 pos, float angle, float size, float camX, int windowWidth, float camY, int windowHeight)
+    {
+        float cos = (float)Math.Cos(angle);
+        float sin = (float)Math.Sin(angle);
+
+        var tipLocal = new System.Numerics.Vector2(0f, size);
+        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+
+        var leftLocal = new System.Numerics.Vector2(-size * 0.4f, -size * 0.6f);
+        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+
+        var rightLocal = new System.Numerics.Vector2(size * 0.4f, -size * 0.6f);
+        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
+
+        float tx1 = (float)pos.X + tip.X - camX + windowWidth / 2f;
+        float ty1 = (float)pos.Y + tip.Y - camY + windowHeight / 2f;
+        float tx2 = (float)pos.X + right.X - camX + windowWidth / 2f;
+        float ty2 = (float)pos.Y + right.Y - camY + windowHeight / 2f;
+        float tx3 = (float)pos.X + left.X - camX + windowWidth / 2f;
+        float ty3 = (float)pos.Y + left.Y - camY + windowHeight / 2f;
+
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(tx1, ty1),
+            new System.Numerics.Vector2(tx2, ty2),
+            new System.Numerics.Vector2(tx3, ty3),
+            Color.Red
+        );
     }
 
     private static void DrawMines(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -671,9 +761,8 @@ public static class Renderer
 
     private static void DrawShipPreview(float cx, float cy, ShipType ship, float scale)
     {
-        if (ImageLoader.ShipTexture.HasValue)
+        if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(ship.Name.ToLower(), out var tex) && tex.Id != 0)
         {
-            var tex = ImageLoader.ShipTexture.Value;
             float drawDiameter = ship.Radius * 2f * scale;
             float textureScale = drawDiameter / tex.Width;
             float destWidth = tex.Width * textureScale;
@@ -731,9 +820,8 @@ public static class Renderer
         float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
         float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-        if (ImageLoader.ShipTexture.HasValue)
+        if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(shipType.Name.ToLower(), out var tex) && tex.Id != 0)
         {
-            var tex = ImageLoader.ShipTexture.Value;
             float drawDiameter = shipType.Radius * 2f;
             float scale = drawDiameter / tex.Width;
             float destWidth = tex.Width * scale;
@@ -742,8 +830,8 @@ public static class Renderer
             Raylib.DrawTexturePro(
                 tex,
                 new Rectangle(0f, 0f, tex.Width, tex.Height),
-                new Rectangle(screenCx, screenCy, destWidth, destHeight), // no origin shifting here
-                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f), // This line already takes care of origin shifting
+                new Rectangle(screenCx, screenCy, destWidth, destHeight),
+                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
                 angleDeg,
                 Color.White
             );

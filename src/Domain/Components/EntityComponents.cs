@@ -20,7 +20,8 @@ public readonly record struct EnemyShip(
     float TurretFireRate,
     float TurretAmmoSpeed,
     float Acceleration,
-    int Damage);
+    int Damage,
+    byte GraphicsId);
 
 public enum MineSize { Small = 0, Large = 1 }
 
