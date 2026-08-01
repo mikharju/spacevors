@@ -17,10 +17,10 @@ public readonly record struct EngineLayout(
     float BackThrust,
     float TurnRate)
 {
-    public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f, 3.33f);
-    public static EngineLayout Maneuverable { get; } = new("Maneuverable", 250f, 20f, 200f, 3.33f);
-    public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f, 2.5f);
-    public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f, 1.67f);
+    public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f, 1.33f);
+    public static EngineLayout Maneuverable { get; } = new("Maneuverable", 250f, 20f, 200f, 1.33f);
+    public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f, 1.2f);
+    public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f, 0.67f);
 }
 
 public readonly record struct WeaponStats(
