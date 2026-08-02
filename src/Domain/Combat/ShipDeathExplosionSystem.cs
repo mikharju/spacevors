@@ -46,10 +46,10 @@ public class ShipDeathExplosionSystem : GameSystem
                 new Explosion(shipRadius * 0.4f, 0.5f, 0.5f)
             );
 
-            int sparkCount = 3;
+            int sparkCount = 6;
             for (int j = 0; j < sparkCount; j++)
             {
-                SpawnSpark(commands, impactPos);
+                SpawnSpark(commands, impactPos, shipRadius);
             }
         }
     }
@@ -61,10 +61,10 @@ public class ShipDeathExplosionSystem : GameSystem
             new Explosion(shipRadius * 1.3f, 0.8f, 0.8f)
         );
 
-        int sparkCount = 6;
+        int sparkCount = (int)(shipRadius / 4f);
         for (int i = 0; i < sparkCount; i++)
         {
-            SpawnSpark(commands, shipPos);
+            SpawnSpark(commands, shipPos, shipRadius);
         }
     }
 
@@ -85,11 +85,13 @@ public class ShipDeathExplosionSystem : GameSystem
         }
     }
 
-    private void SpawnSpark(CommandBuffer commands, Vector2 position)
+    private void SpawnSpark(CommandBuffer commands, Vector2 position, float explosionRadius)
     {
         float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
-        float speed = 50f + (float)Random.Shared.NextDouble() * 100f;
-        Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
-        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(0.8f + (float)Random.Shared.NextDouble() * 0.6f));
+        float speed = (explosionRadius + 15f) / 0.7f;
+        float speedVariation = 0.8f + (float)Random.Shared.NextDouble() * 0.4f;
+        Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed * speedVariation, (float)Math.Sin(angle) * speed * speedVariation);
+        float sparkLifetime = 2.5f + (float)Random.Shared.NextDouble() * 0.5f;
+        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
     }
 }

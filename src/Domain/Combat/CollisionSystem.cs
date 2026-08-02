@@ -340,7 +340,11 @@ public class CollisionSystem : GameSystem
                 commands.AddEntity(new Position(hitPoint), new Explosion(shipRadius * 0.8f, 0.6f, 0.6f));
                 for (int i = 0; i < 4; i++)
                 {
-                    SpawnSpark(commands, hitPoint);
+                    float sparkAngle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
+                    float sparkSpeed = (shipRadius + 15f) / 0.7f * (0.8f + (float)Random.Shared.NextDouble() * 0.4f);
+                    Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
+                    float sparkLifetime = 0.7f + (float)Random.Shared.NextDouble() * 0.3f;
+                    commands.AddEntity(new Position(hitPoint), new Velocity(sparkVel), new Spark(sparkLifetime, sparkLifetime));
                 }
             }
             else
@@ -410,7 +414,8 @@ public class CollisionSystem : GameSystem
         float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
         float speed = 50f + (float)Random.Shared.NextDouble() * 100f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
-        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(0.8f + (float)Random.Shared.NextDouble() * 0.6f));
+        float sparkLifetime = 0.8f + (float)Random.Shared.NextDouble() * 0.6f;
+        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
     }
 
     private void ResolveCircleVsCircle(

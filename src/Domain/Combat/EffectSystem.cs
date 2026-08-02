@@ -18,7 +18,7 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Spark>(entity, new Spark(newLifetime)));
+                commands.Add(new AddComponentCommand<Spark>(entity, new Spark(newLifetime, spark.InitialLifetime)));
             }
         }
 

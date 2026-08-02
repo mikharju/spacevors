@@ -234,7 +234,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            float lifeRatio = spark.Lifetime / 1.4f;
+            float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
             int r = (int)(lifeRatio * 255);
             int g = (int)(lifeRatio * lifeRatio * 80);
