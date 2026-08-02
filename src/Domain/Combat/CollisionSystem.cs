@@ -244,7 +244,16 @@ public class CollisionSystem : GameSystem
                             if (dSq < rSum * rSum && dSq < shipDistSq)
                             {
                                 closestShipHit = candidate.Id;
-                                shipHitPos = candidate.Position;
+                                var toAmmo = ammoPos.Value - candidate.Position;
+                                float distToAmmo = (float)Math.Sqrt(toAmmo.X * toAmmo.X + toAmmo.Y * toAmmo.Y);
+                                if (distToAmmo > 0.001f)
+                                {
+                                    shipHitPos = candidate.Position + (toAmmo / distToAmmo) * candidate.Radius;
+                                }
+                                else
+                                {
+                                    shipHitPos = candidate.Position;
+                                }
                                 shipDistSq = dSq;
                             }
                         }
