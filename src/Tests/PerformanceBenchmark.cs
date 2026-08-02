@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
 using Xunit;
@@ -161,28 +162,28 @@ public class PerformanceBenchmark
                 // Phase 1: movementSystems
                 SimulationRunner.RunPhase(view, commands, SimulationRunner.MovementSystems, deltaTime, (name, ticks) =>
                 {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 2: actionSystems
                 SimulationRunner.RunPhase(view, commands, SimulationRunner.ActionSystems, deltaTime, (name, ticks) =>
                 {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 3: resolutionSystems
                 SimulationRunner.RunPhase(view, commands, SimulationRunner.ResolutionSystems, deltaTime, (name, ticks) =>
                 {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 4: cleanupSystems
                 SimulationRunner.RunPhase(view, commands, SimulationRunner.CleanupSystems, deltaTime, (name, ticks) =>
                 {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks / TimeSpan.TicksPerMillisecond);
+                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 

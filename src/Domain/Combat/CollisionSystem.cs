@@ -49,14 +49,10 @@ public class CollisionSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
         bool hasPlayer = playerEntity.Value >= 0;
 
-        long playerCollisionTicks = 0;
-        var playerSw = new Stopwatch();
-
         void CheckPlayerCollision(Vector2 entityPos, float entityRadius, Action onCollision)
         {
             if (!hasPlayer) return;
 
-            playerSw.Restart();
             var diff = playerTuple.Value2.Value - entityPos;
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
             float radiusSum = entityRadius + playerTuple.Value1.Radius;
@@ -65,8 +61,6 @@ public class CollisionSystem : GameSystem
             {
                 onCollision();
             }
-            playerSw.Stop();
-            playerCollisionTicks += playerSw.ElapsedTicks;
         }
 
         var gridBuildSw = Stopwatch.StartNew();
@@ -119,7 +113,6 @@ public class CollisionSystem : GameSystem
         }
 
         gridBuildSw.Stop();
-        DiagnosticLogger.LogSystem("Collision: grid build", gridBuildSw.ElapsedTicks);
 
         var asteroidSw = Stopwatch.StartNew();
 
@@ -154,7 +147,6 @@ public class CollisionSystem : GameSystem
         }
 
         asteroidSw.Stop();
-        DiagnosticLogger.LogSystem("Collision: asteroid collisions", asteroidSw.ElapsedTicks);
 
         var shipSw = Stopwatch.StartNew();
 
@@ -187,10 +179,7 @@ public class CollisionSystem : GameSystem
         }
 
         shipSw.Stop();
-        DiagnosticLogger.LogSystem("Collision: ship collisions", shipSw.ElapsedTicks);
 
-        long gridQueryTicks = 0;
-        long candidateFilterTicks = 0;
         var ammoDetectionSw = Stopwatch.StartNew();
 
         foreach (var (ammoEntity, ammo, ammoPos) in view.GetEntitiesWithComponents<Ammo, Position>())
@@ -210,23 +199,14 @@ public class CollisionSystem : GameSystem
             Vector2 shipHitPos = default;
             float shipDistSq = float.MaxValue;
 
-            var qsw = Stopwatch.StartNew();
             int count = _grid.GetQueryItems(ammoPos.Value, ammoRadius, queryBuffer);
-            qsw.Stop();
-            gridQueryTicks += qsw.ElapsedTicks;
 
             for (int i = 0; i < count; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
-                var fsw = Stopwatch.StartNew();
                 var diff = candidate.Position - ammoPos.Value;
                 float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                if (dSq < 0.001f)
-                {
-                    fsw.Stop();
-                    candidateFilterTicks += fsw.ElapsedTicks;
-                    continue;
-                }
+                if (dSq < 0.001f) continue;
 
                 switch (candidate.Kind)
                 {
@@ -276,8 +256,6 @@ public class CollisionSystem : GameSystem
                         }
                         break;
                 }
-                fsw.Stop();
-                candidateFilterTicks += fsw.ElapsedTicks;
             }
 
             if (closestAsteroidHit.HasValue)
@@ -322,15 +300,12 @@ public class CollisionSystem : GameSystem
         }
 
         ammoDetectionSw.Stop();
-        DiagnosticLogger.LogSystem("Collision: grid query", gridQueryTicks);
-        DiagnosticLogger.LogSystem("Collision: candidate filtering", candidateFilterTicks);
-        DiagnosticLogger.LogSystem("Collision: ammo collisions", ammoDetectionSw.ElapsedTicks - gridQueryTicks - candidateFilterTicks);
-
-        playerSw.Stop();
-        DiagnosticLogger.LogSystem("Collision: player collisions", playerCollisionTicks);
 
         sw.Stop();
-        DiagnosticLogger.LogSystem("Collision: detection", sw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: grid build", gridBuildSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: asteroid collisions", asteroidSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: ship collisions", shipSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: detection", ammoDetectionSw.ElapsedTicks);
 
         sw.Restart();
 

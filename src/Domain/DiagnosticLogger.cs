@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Spacevors.Domain;
 
 public static class DiagnosticLogger
@@ -36,13 +38,13 @@ public static class DiagnosticLogger
     {
         if (!_enabled) return;
 
-        long ms = elapsedTicks / TimeSpan.TicksPerMillisecond;
+        double ms = elapsedTicks * 1000.0 / Stopwatch.Frequency;
         lock (_lock)
         {
             if (entitiesUpdated > 0)
-                Console.WriteLine($"[SYSTEM] {systemName}: {ms}ms ({entitiesUpdated} entities)");
+                Console.WriteLine($"[SYSTEM] {systemName}: {ms:F2}ms ({entitiesUpdated} entities)");
             else
-                Console.WriteLine($"[SYSTEM] {systemName}: {ms}ms");
+                Console.WriteLine($"[SYSTEM] {systemName}: {ms:F2}ms");
         }
     }
 
