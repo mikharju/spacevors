@@ -10,8 +10,8 @@ public class CollisionSystem : GameSystem
     private const float PlayerRestitution = 0.2f;
     private const float AsteroidAsteroidRestitution = 0.4f;
     private const float AmmoRestitution = 0.15f;
-    private const float CorrectionPercent = 0.8f;
-    private const float Slop = 0.01f;
+    private const float CorrectionPercent = 0.4f;
+    private const float Slop = 1.0f;
     private readonly List<Vector2> _mineCollisionPositions = new();
 
     private readonly List<(Entity, Position)> _asteroidPositions = new();
