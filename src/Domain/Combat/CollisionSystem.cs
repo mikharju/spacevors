@@ -12,8 +12,6 @@ public class CollisionSystem : GameSystem
     private const float AmmoRestitution = 0.15f;
     private const float CorrectionPercent = 0.4f;
     private const float Slop = 1.0f;
-    private readonly List<Vector2> _mineCollisionPositions = new();
-
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly List<Entity> _entitiesToDestroy = new();
@@ -710,8 +708,6 @@ public class CollisionSystem : GameSystem
         float radiusSum = mine.Radius + PlayerRadius;
 
         if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
-
-        _mineCollisionPositions.Add(minePos.Value);
 
         commands.Add(new DestroyEntityCommand(mineEntity));
 
