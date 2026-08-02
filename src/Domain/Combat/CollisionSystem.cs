@@ -23,6 +23,11 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity ammo, Entity target, Vector2 asteroidPos)> _ammoToAsteroidHits = new();
     private readonly List<(Entity ammo, int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
+    // Per-frame collision state accumulators (fixes deferred command overwrite bug)
+    private Dictionary<Entity, Vector2> _collisionVelocities = new();
+    private Dictionary<Entity, Vector2> _positionCorrections = new();
+    private Dictionary<Entity, float> _angularVelocityAccumulator = new();
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
@@ -36,6 +41,9 @@ public class CollisionSystem : GameSystem
         _ammoToShipHits.Clear();
         _ammoToAsteroidHits.Clear();
         _ammoToPlayerHits.Clear();
+        _collisionVelocities.Clear();
+        _positionCorrections.Clear();
+        _angularVelocityAccumulator.Clear();
 
         view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -395,11 +403,60 @@ public class CollisionSystem : GameSystem
             }
         }
 
+        FlushCollisions(commands, view);
+
         sw.Stop();
         DiagnosticLogger.LogSystem("Collision: resolution", sw.ElapsedTicks);
     }
 
     private SpatialGrid _grid = new(128f);
+
+    private Vector2 GetCollisionVelocity(WorldView view, Entity entity, Vector2 ecsDefault)
+    {
+        if (_collisionVelocities.TryGetValue(entity, out var v)) return v;
+        if (view.TryGetComponent<Velocity>(entity, out var vel)) return vel.Value;
+        return ecsDefault;
+    }
+
+    private void SetCollisionVelocity(Entity entity, Vector2 velocity)
+    {
+        _collisionVelocities[entity] = velocity;
+    }
+
+    private void AccumulatePosition(Entity entity, Vector2 correction)
+    {
+        if (_positionCorrections.TryGetValue(entity, out var existing))
+            _positionCorrections[entity] = existing + correction;
+        else
+            _positionCorrections[entity] = correction;
+    }
+
+    private float GetCollisionAngularVelocity(WorldView view, Entity entity, float ecsDefault)
+    {
+        if (_angularVelocityAccumulator.TryGetValue(entity, out var a)) return a;
+        if (view.TryGetComponent<AngularVelocity>(entity, out var av)) return av.Value;
+        return ecsDefault;
+    }
+
+    private void SetCollisionAngularVelocity(Entity entity, float value)
+    {
+        _angularVelocityAccumulator[entity] = value;
+    }
+
+    private void FlushCollisions(CommandBuffer commands, WorldView view)
+    {
+        foreach (var (entity, velocity) in _collisionVelocities)
+            commands.Add(new AddComponentCommand<Velocity>(entity, new Velocity(velocity)));
+
+        foreach (var (entity, delta) in _positionCorrections)
+        {
+            if (!view.TryGetComponent<Position>(entity, out var pos)) continue;
+            commands.Add(new AddComponentCommand<Position>(entity, new Position(pos.Value + delta)));
+        }
+
+        foreach (var (entity, angVel) in _angularVelocityAccumulator)
+            commands.Add(new AddComponentCommand<AngularVelocity>(entity, new AngularVelocity(angVel)));
+    }
 
     private void SpawnExplosion(CommandBuffer commands, Vector2 position, MineSize mineSize)
     {
@@ -480,10 +537,8 @@ public class CollisionSystem : GameSystem
         float invMassB = 1f / bMass;
         float totalInvMass = invMassA + invMassB;
 
-        view.TryGetComponent<Velocity>(aEntity, out var aVelComp);
-        view.TryGetComponent<Velocity>(bEntity, out var bVelComp);
-        var aVel = aVelComp.Value;
-        var bVel = bVelComp.Value;
+        var aVel = GetCollisionVelocity(view, aEntity, default);
+        var bVel = GetCollisionVelocity(view, bEntity, default);
 
         var relVel = bVel - aVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
@@ -492,8 +547,8 @@ public class CollisionSystem : GameSystem
         if (correctionMagnitude > 0f && totalInvMass > 0f)
         {
             var correctionPerInvMass = normal * (correctionMagnitude / totalInvMass);
-            commands.Add(new AddComponentCommand<Position>(aEntity, new Position(aPos.Value - correctionPerInvMass * invMassA)));
-            commands.Add(new AddComponentCommand<Position>(bEntity, new Position(bPos.Value + correctionPerInvMass * invMassB)));
+            AccumulatePosition(aEntity, correctionPerInvMass * (-invMassA));
+            AccumulatePosition(bEntity, correctionPerInvMass * invMassB);
         }
 
         if (velAlongNormal > 0f) return;
@@ -509,8 +564,8 @@ public class CollisionSystem : GameSystem
         aVel -= impulse * invMassA;
         bVel += impulse * invMassB;
 
-        commands.Add(new AddComponentCommand<Velocity>(aEntity, new Velocity(aVel)));
-        commands.Add(new AddComponentCommand<Velocity>(bEntity, new Velocity(bVel)));
+        SetCollisionVelocity(aEntity, aVel);
+        SetCollisionVelocity(bEntity, bVel);
 
         var correctedRelVel = bVel - aVel;
         var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
@@ -524,13 +579,11 @@ public class CollisionSystem : GameSystem
             var rA = normal * aRadius;
             var rB = normal * bRadius;
 
-            float aAngVel = 0f;
-            bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out var aAngVelComp);
-            if (hasAAngVel) aAngVel = aAngVelComp.Value;
+            float aAngVel = GetCollisionAngularVelocity(view, aEntity, 0f);
+            bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out _);
 
-            float bAngVel = 0f;
-            bool hasBAngVel = view.TryGetComponent<AngularVelocity>(bEntity, out var bAngVelComp);
-            if (hasBAngVel) bAngVel = bAngVelComp.Value;
+            float bAngVel = GetCollisionAngularVelocity(view, bEntity, 0f);
+            bool hasBAngVel = view.TryGetComponent<AngularVelocity>(bEntity, out _);
 
             float contactTangentVelX = relVelTangent.X + aAngVel * rA.Y - bAngVel * rB.Y;
             float contactTangentVelY = relVelTangent.Y - aAngVel * rA.X + bAngVel * rB.X;
@@ -550,21 +603,21 @@ public class CollisionSystem : GameSystem
                 aVel -= frictionImpulse * invMassA;
                 bVel += frictionImpulse * invMassB;
 
-                commands.Add(new AddComponentCommand<Velocity>(aEntity, new Velocity(aVel)));
-                commands.Add(new AddComponentCommand<Velocity>(bEntity, new Velocity(bVel)));
+                SetCollisionVelocity(aEntity, aVel);
+                SetCollisionVelocity(bEntity, bVel);
 
                 float aMOI = 0.5f * aMass * aRadius * aRadius;
                 if (hasAAngVel)
                 {
                     float torqueA = rA.X * frictionImpulse.Y - rA.Y * frictionImpulse.X;
-                    commands.Add(new AddComponentCommand<AngularVelocity>(aEntity, new AngularVelocity(aAngVel + torqueA / aMOI)));
+                    SetCollisionAngularVelocity(aEntity, aAngVel + torqueA / aMOI);
                 }
 
                 float bMOI = 0.5f * bMass * bRadius * bRadius;
                 if (hasBAngVel)
                 {
                     float torqueB = rB.X * (-frictionImpulse.Y) - rB.Y * (-frictionImpulse.X);
-                    commands.Add(new AddComponentCommand<AngularVelocity>(bEntity, new AngularVelocity(bAngVel + torqueB / bMOI)));
+                    SetCollisionAngularVelocity(bEntity, bAngVel + torqueB / bMOI);
                 }
             }
         }
@@ -586,8 +639,7 @@ public class CollisionSystem : GameSystem
         var normal = diff / dist;
 
         Vector2 ammoVel = ammo.Velocity;
-        view.TryGetComponent<Velocity>(asteroidEntity, out var asteroidVelComp);
-        var asteroidVel = asteroidVelComp.Value;
+        var asteroidVel = GetCollisionVelocity(view, asteroidEntity, default);
 
         var relVel = ammoVel - asteroidVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
@@ -602,14 +654,14 @@ public class CollisionSystem : GameSystem
         var impulse = normal * j;
 
         asteroidVel += impulse * (1f / asteroidMass);
-        commands.Add(new AddComponentCommand<Velocity>(asteroidEntity, new Velocity(asteroidVel)));
+        SetCollisionVelocity(asteroidEntity, asteroidVel);
 
         const float Friction = 0.2f;
 
         var relVelTangent = relVel - normal * velAlongNormal;
         float tangentSpeed = relVelTangent.Magnitude;
 
-        if (tangentSpeed > Slop && view.TryGetComponent<AngularVelocity>(asteroidEntity, out var angVel))
+        if (tangentSpeed > Slop && view.TryGetComponent<AngularVelocity>(asteroidEntity, out _))
         {
             float asteroidMOI = 0.5f * asteroidMass * asteroid.Radius * asteroid.Radius;
 
@@ -625,10 +677,11 @@ public class CollisionSystem : GameSystem
             );
 
             asteroidVel += frictionImpulse / asteroidMass;
-            commands.Add(new AddComponentCommand<Velocity>(asteroidEntity, new Velocity(asteroidVel)));
+            SetCollisionVelocity(asteroidEntity, asteroidVel);
 
             float torque = rAsteroid.X * frictionImpulse.Y - rAsteroid.Y * frictionImpulse.X;
-            commands.Add(new AddComponentCommand<AngularVelocity>(asteroidEntity, new AngularVelocity(angVel.Value + torque / asteroidMOI)));
+            float currentAngVel = GetCollisionAngularVelocity(view, asteroidEntity, 0f);
+            SetCollisionAngularVelocity(asteroidEntity, currentAngVel + torque / asteroidMOI);
         }
     }
 
@@ -659,10 +712,9 @@ public class CollisionSystem : GameSystem
 
         var normal = diff / (float)Math.Sqrt(distSq);
         float explosionForce = mine.Size == MineSize.Large ? 240f : 120f;
-        view.TryGetComponent<Velocity>(playerEntity, out var playerVelComp);
-        Vector2 playerVel = playerVelComp.Value + normal * explosionForce;
+        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + normal * explosionForce;
 
-        commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(playerVel)));
+        SetCollisionVelocity(playerEntity, playerVel);
 
         int sparkCount = mine.Size == MineSize.Large ? 10 : 5;
         for (int i = 0; i < sparkCount; i++)
