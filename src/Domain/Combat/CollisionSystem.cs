@@ -16,8 +16,8 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly List<Entity> _entitiesToDestroy = new();
     private readonly List<(Vector2 Position, MineSize Size)> _effectsToSpawn = new();
-    private readonly List<(Entity ammo, Entity target, int health, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
-    private readonly List<(Entity ammo, Entity target, int health, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
+    private readonly List<(Entity ammo, Entity target, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
+    private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 asteroidPos)> _ammoToAsteroidHits = new();
     private readonly List<(Entity ammo, int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
@@ -276,7 +276,7 @@ public class CollisionSystem : GameSystem
                     _frameRemainingHealth[closestMineHit.Value] = health;
                 }
                 _frameRemainingHealth[closestMineHit.Value] -= ammo.Damage;
-                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, health, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
+                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
                 _effectsToSpawn.Add((mineHitPos!, mineHitSize!.Value));
             }
 
@@ -292,7 +292,7 @@ public class CollisionSystem : GameSystem
                 _frameRemainingHealth[closestShipHit.Value] -= ammo.Damage;
                 var enemyShip = view.GetComponent<EnemyShip>(closestShipHit.Value);
                 var shipPos = view.GetComponent<Position>(closestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, h, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
             }
 
             if (!ammo.IsEnemy) continue;
@@ -322,7 +322,7 @@ public class CollisionSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (ammoEntity, mineEntity, _, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
+        foreach (var (ammoEntity, mineEntity, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
         {
             var minePosComp = view.GetComponent<Position>(mineEntity);
             var ammoPosComp = view.GetComponent<Position>(ammoEntity);
@@ -354,7 +354,7 @@ public class CollisionSystem : GameSystem
         }
 
         var mineDamageMap = new Dictionary<Entity, int>();
-        foreach (var (_, mineEntity, _, _, _, ammoDamage, _) in _ammoToMineHits)
+        foreach (var (_, mineEntity, _, _, ammoDamage, _) in _ammoToMineHits)
         {
             if (!mineDamageMap.TryGetValue(mineEntity, out var d)) mineDamageMap[mineEntity] = 0;
             mineDamageMap[mineEntity] += ammoDamage;
@@ -376,15 +376,14 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        var shipDamageMap = new Dictionary<Entity, (int totalDamage, Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)>();
-        foreach (var (_, shipEntity, _, hitPoint, shipPos, ammoDamage, shipRadius, graphicsId) in _ammoToShipHits)
+        var shipDeathData = new Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)>();
+        foreach (var (_, shipEntity, hitPoint, shipPos, _, shipRadius, graphicsId) in _ammoToShipHits)
         {
-            if (!shipDamageMap.TryGetValue(shipEntity, out var entry))
-                shipDamageMap[shipEntity] = default;
-            shipDamageMap[shipEntity] = (entry.totalDamage + ammoDamage, hitPoint, shipPos, shipRadius, graphicsId);
+            if (!shipDeathData.ContainsKey(shipEntity))
+                shipDeathData[shipEntity] = (hitPoint, shipPos, shipRadius, graphicsId);
         }
 
-        foreach (var (shipEntity, data) in shipDamageMap)
+        foreach (var (shipEntity, data) in shipDeathData)
         {
             var remaining = _frameRemainingHealth.TryGetValue(shipEntity, out var r) ? r : -1;
             if (remaining <= 0)
@@ -410,8 +409,8 @@ public class CollisionSystem : GameSystem
         }
 
         var protectedEntities = new HashSet<Entity>();
-        foreach (var (_, mineEntity, _, _, _, _, _) in _ammoToMineHits) protectedEntities.Add(mineEntity);
-        foreach (var (_, shipEntity, _, _, _, _, _, _) in _ammoToShipHits) protectedEntities.Add(shipEntity);
+        foreach (var (_, mineEntity, _, _, _, _) in _ammoToMineHits) protectedEntities.Add(mineEntity);
+        foreach (var (_, shipEntity, _, _, _, _, _) in _ammoToShipHits) protectedEntities.Add(shipEntity);
 
         foreach (var (ammoEntity, ammoDamage, playerHealth) in _ammoToPlayerHits)
         {
