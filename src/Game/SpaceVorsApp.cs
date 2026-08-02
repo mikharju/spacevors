@@ -162,12 +162,11 @@ public static class SpaceVorsApp
                     }
 
                     // Sync turret positions and rotations to player ship
-                    var playerTuples = em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>()
-                        .Where(t => !t.Value1.IsEnemy)
-                        .ToList();
+                    var playerTuples = em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>();
 
                     foreach (var (turretEntity, turret, offset, arcOffset) in playerTuples)
                     {
+                        if (turret.IsEnemy) continue;
                         var rotatedOffset = new Vector2(
                             offset.Value.X * cos - offset.Value.Y * sin,
                             offset.Value.X * sin + offset.Value.Y * cos

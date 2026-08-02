@@ -145,34 +145,20 @@ public class EntityManager
             (ComponentStorage<T2>)s2);
     }
 
-    public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3)> GetEntitiesWithComponents<T1, T2, T3>()
-        where T1 : notnull where T2 : notnull where T3 : notnull
+    public ComponentQuery<T1, T2, T3> GetEntitiesWithComponents<T1, T2, T3>()
+        where T1 : notnull
+        where T2 : notnull
+        where T3 : notnull
     {
-        if (!_storages.TryGetValue(typeof(T1), out var s1) || !_storages.TryGetValue(typeof(T2), out var s2) || !_storages.TryGetValue(typeof(T3), out var s3))
-            yield break;
+        if (!_storages.TryGetValue(typeof(T1), out var s1) ||
+            !_storages.TryGetValue(typeof(T2), out var s2) ||
+            !_storages.TryGetValue(typeof(T3), out var s3))
+            return default;
 
-        var storage1 = (ComponentStorage<T1>)s1;
-        var storage2 = (ComponentStorage<T2>)s2;
-        var storage3 = (ComponentStorage<T3>)s3;
-        var smallest = FindSmallest(storage1, storage2, storage3);
-
-        for (int i = 0; i < smallest.Count; i++)
-        {
-            var entity = smallest.GetEntity(i);
-
-            if (!storage1.TryGetSlot(entity, out int slot1))
-                continue;
-            if (!storage2.TryGetSlot(entity, out int slot2))
-                continue;
-            if (!storage3.TryGetSlot(entity, out int slot3))
-                continue;
-
-            yield return (
-                entity,
-                storage1.GetBySlot(slot1),
-                storage2.GetBySlot(slot2),
-                storage3.GetBySlot(slot3));
-        }    
+        return new ComponentQuery<T1, T2, T3>(
+            (ComponentStorage<T1>)s1,
+            (ComponentStorage<T2>)s2,
+            (ComponentStorage<T3>)s3);
     }
 
     public IEnumerable<(Entity Entity, T1 Value1, T2 Value2, T3 Value3, T4 Value4)> GetEntitiesWithComponents<T1, T2, T3, T4>()
@@ -223,6 +209,7 @@ public abstract class ComponentStorageBase
 
     public abstract Entity GetEntity(int slot);
 }
+
 public readonly struct ComponentQuery<T1>
     where T1 : notnull
 {
@@ -406,6 +393,114 @@ public readonly struct ComponentQuery<T1,T2>
     public List<(Entity Entity, T1 Value1, T2 Value2)> ToList()
     {
         var list = new List<(Entity Entity, T1 Value1, T2 Value2)>();
+
+        foreach (var item in this)
+            list.Add(item);
+
+        return list;
+    }
+}
+
+public readonly struct ComponentQuery<T1,T2,T3>
+    where T1 : notnull
+    where T2 : notnull
+    where T3 : notnull
+{
+    private readonly ComponentStorage<T1> _s1;
+    private readonly ComponentStorage<T2> _s2;
+    private readonly ComponentStorage<T3> _s3;
+
+    internal ComponentQuery(ComponentStorage<T1> s1,
+                            ComponentStorage<T2> s2,
+                            ComponentStorage<T3> s3)
+    {
+        _s1 = s1;
+        _s2 = s2;
+        _s3 = s3;
+    }
+
+    public Enumerator GetEnumerator()
+    {
+        if (_s1 == null || _s2 == null || _s3 == null) return new Enumerator(false);
+        return new Enumerator(_s1, _s2, _s3);
+    }
+
+    public struct Enumerator
+    {
+        private readonly ComponentStorage<T1> _storage1;
+        private readonly ComponentStorage<T2> _storage2;
+        private readonly ComponentStorage<T3> _storage3;
+        private readonly ComponentStorageBase _smallest;
+        private int _index;
+        private readonly bool _valid;
+
+        internal Enumerator(ComponentStorage<T1> storage1, ComponentStorage<T2> storage2, ComponentStorage<T3> storage3)
+        {
+            _storage1 = storage1;
+            _storage2 = storage2;
+            _storage3 = storage3;
+            _smallest = EntityManager.FindSmallest(_storage1, _storage2, _storage3);
+            _index = -1;
+            _valid = true;
+        }
+
+        internal Enumerator(bool valid)
+        {
+            _storage1 = null!;
+            _storage2 = null!;
+            _storage3 = null!;
+            _smallest = null!;
+            _index = 0;
+            _valid = valid;
+        }
+
+        public (Entity Entity, T1 Value1, T2 Value2, T3 Value3) Current { get; private set; }
+        
+        public bool MoveNext()
+        {
+            if (!_valid) return false;
+
+            while (++_index < _smallest.Count)
+            {
+                var entity = _smallest.GetEntity(_index);
+
+                if (!_storage1.TryGetSlot(entity, out var s1))
+                    continue;
+                if (!_storage2.TryGetSlot(entity, out var s2))
+                    continue;
+                if (!_storage3.TryGetSlot(entity, out var s3))
+                    continue;
+
+                Current = (
+                    entity,
+                    _storage1.GetBySlot(s1),
+                    _storage2.GetBySlot(s2),
+                    _storage3.GetBySlot(s3));
+
+                return true;
+            }
+
+            return false;
+        }
+
+    }
+
+    public bool TryFirst(out (Entity Entity, T1 Value1, T2 Value2, T3 Value3) result)
+    {
+        var e = GetEnumerator();
+        if (e.MoveNext())
+        {
+            result = e.Current;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public List<(Entity Entity, T1 Value1, T2 Value2, T3 Value3)> ToList()
+    {
+        var list = new List<(Entity Entity, T1 Value1, T2 Value2, T3 Value3)>();
 
         foreach (var item in this)
             list.Add(item);
