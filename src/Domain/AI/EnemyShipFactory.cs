@@ -11,23 +11,23 @@ public static class EnemyShipFactory
 
     // Shared constants for default enemy ship
     public const float Radius = 20f;
-    public const float Speed = 35f;
+    public const float Speed = 65f;
     public const float TurnRate = 1.0f;
     public const int Health = 3;
     public const float DetectionRange = 1200f;
-    public const float FiringRange = 300f;
+    public const float FiringRange = 700f;
     public const float TurretFireRate = 1.5f;
     public const float TurretAmmoSpeed = 200f;
     public const float Acceleration = 9.0f;
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetInterceptorParams()
     {
-        return (45f, 40f, 2, 15f, 0.6f, TurretAmmoSpeed);
+        return (45f, 90f, 2, 15f, 0.6f, TurretAmmoSpeed);
     }
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetHeavyCannonParams()
     {
-        return (78f, 25f, 5, Acceleration, 0.8f, 160f);
+        return (78f, 50f, 5, Acceleration, 0.8f, 160f);
     }
 
     public static void AddEnemyShipComponents(EntityManager em, Entity entity, Vector2 position, Vector2 velocity, float rotation, float angularVelocity)
