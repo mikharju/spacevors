@@ -25,6 +25,7 @@ public class CollisionSystem : GameSystem
     private Dictionary<Entity, Vector2> _collisionVelocities = new();
     private Dictionary<Entity, Vector2> _positionCorrections = new();
     private Dictionary<Entity, float> _angularVelocityAccumulator = new();
+    private Dictionary<Entity, int> _frameRemainingHealth = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -42,6 +43,7 @@ public class CollisionSystem : GameSystem
         _collisionVelocities.Clear();
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
+        _frameRemainingHealth.Clear();
 
         view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -267,17 +269,30 @@ public class CollisionSystem : GameSystem
             if (closestMineHit.HasValue)
             {
                 var mineComp = view.GetComponent<EnemyMine>(closestMineHit.Value);
-                var health = view.GetComponent<Health>(closestMineHit.Value).Current;
+                if (!view.TryGetComponent<Health>(closestMineHit.Value, out var healthComp)) continue;
+                if (!_frameRemainingHealth.TryGetValue(closestMineHit.Value, out var health))
+                {
+                    health = healthComp.Current;
+                    _frameRemainingHealth[closestMineHit.Value] = health;
+                }
+                _frameRemainingHealth[closestMineHit.Value] -= ammo.Damage;
                 _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, health, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
                 _effectsToSpawn.Add((mineHitPos!, mineHitSize!.Value));
             }
 
             if (closestShipHit.HasValue)
             {
-                var shipHealth = view.GetComponent<Health>(closestShipHit.Value).Current;
+                if (!view.TryGetComponent<Health>(closestShipHit.Value, out var shipHealthComp)) continue;
+                var shipHealth = shipHealthComp.Current;
+                if (!_frameRemainingHealth.TryGetValue(closestShipHit.Value, out var h))
+                {
+                    h = shipHealth;
+                    _frameRemainingHealth[closestShipHit.Value] = h;
+                }
+                _frameRemainingHealth[closestShipHit.Value] -= ammo.Damage;
                 var enemyShip = view.GetComponent<EnemyShip>(closestShipHit.Value);
                 var shipPos = view.GetComponent<Position>(closestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipHealth, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, h, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
             }
 
             if (!ammo.IsEnemy) continue;
@@ -307,7 +322,7 @@ public class CollisionSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (ammoEntity, mineEntity, health, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
+        foreach (var (ammoEntity, mineEntity, _, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
         {
             var minePosComp = view.GetComponent<Position>(mineEntity);
             var ammoPosComp = view.GetComponent<Position>(ammoEntity);
@@ -326,15 +341,6 @@ public class CollisionSystem : GameSystem
             float velAlongNormal = Vector2.Dot(ammoVel - mineVel, normal);
             if (velAlongNormal > 0f)
             {
-                if (health <= ammoDamage)
-                {
-                    SpawnLootOnDeath(commands, minePos, mineSize);
-                    commands.Add(new DestroyEntityCommand(mineEntity));
-                }
-                else
-                {
-                    commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(health - ammoDamage)));
-                }
                 _entitiesToDestroy.Add(ammoEntity);
                 continue;
             }
@@ -344,40 +350,63 @@ public class CollisionSystem : GameSystem
             mineVel += impulse * (1f / mineMass);
             SetCollisionVelocity(mineEntity, mineVel);
 
-            if (health <= ammoDamage)
+            _entitiesToDestroy.Add(ammoEntity);
+        }
+
+        var mineDamageMap = new Dictionary<Entity, int>();
+        foreach (var (_, mineEntity, _, _, _, ammoDamage, _) in _ammoToMineHits)
+        {
+            if (!mineDamageMap.TryGetValue(mineEntity, out var d)) mineDamageMap[mineEntity] = 0;
+            mineDamageMap[mineEntity] += ammoDamage;
+        }
+
+        foreach (var (mineEntity, totalDamage) in mineDamageMap)
+        {
+            var remaining = _frameRemainingHealth[mineEntity];
+            if (remaining <= 0)
             {
-                SpawnLootOnDeath(commands, minePos, mineSize);
+                var pos = view.GetComponent<Position>(mineEntity);
+                var mine = view.GetComponent<EnemyMine>(mineEntity);
+                SpawnLootOnDeath(commands, pos.Value, mine.Size);
                 commands.Add(new DestroyEntityCommand(mineEntity));
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(health - ammoDamage)));
+                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(remaining)));
             }
-            _entitiesToDestroy.Add(ammoEntity);
         }
 
-        foreach (var (ammoEntity, shipEntity, health, hitPoint, shipPos, ammoDamage, shipRadius, graphicsId) in _ammoToShipHits)
+        var shipDamageMap = new Dictionary<Entity, (int totalDamage, Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)>();
+        foreach (var (_, shipEntity, _, hitPoint, shipPos, ammoDamage, shipRadius, graphicsId) in _ammoToShipHits)
         {
-            if (health <= ammoDamage)
+            if (!shipDamageMap.TryGetValue(shipEntity, out var entry))
+                shipDamageMap[shipEntity] = default;
+            shipDamageMap[shipEntity] = (entry.totalDamage + ammoDamage, hitPoint, shipPos, shipRadius, graphicsId);
+        }
+
+        foreach (var (shipEntity, data) in shipDamageMap)
+        {
+            var remaining = _frameRemainingHealth.TryGetValue(shipEntity, out var r) ? r : -1;
+            if (remaining <= 0)
             {
-                SpawnShipLootOnDeath(commands, shipPos);
+                SpawnShipLootOnDeath(commands, data.shipPos);
+                commands.Add(new RemoveComponentCommand<Health>(shipEntity));
                 commands.Add(new AddComponentCommand<Dead>(shipEntity, new Dead()));
-                commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, hitPoint, shipRadius, graphicsId)));
-                commands.AddEntity(new Position(hitPoint), new Explosion(shipRadius * 0.8f, 0.6f, 0.6f));
+                commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, data.hitPoint, data.shipRadius, data.graphicsId)));
+                commands.AddEntity(new Position(data.hitPoint), new Explosion(data.shipRadius * 0.8f, 0.6f, 0.6f));
                 for (int i = 0; i < 4; i++)
                 {
                     float sparkAngle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
-                    float sparkSpeed = (shipRadius + 15f) / 0.7f * (0.8f + (float)Random.Shared.NextDouble() * 0.4f);
+                    float sparkSpeed = (data.shipRadius + 15f) / 0.7f * (0.8f + (float)Random.Shared.NextDouble() * 0.4f);
                     Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
                     float sparkLifetime = 0.7f + (float)Random.Shared.NextDouble() * 0.3f;
-                    commands.AddEntity(new Position(hitPoint), new Velocity(sparkVel), new Spark(sparkLifetime, sparkLifetime));
+                    commands.AddEntity(new Position(data.hitPoint), new Velocity(sparkVel), new Spark(sparkLifetime, sparkLifetime));
                 }
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(health - ammoDamage)));
+                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(remaining)));
             }
-            _entitiesToDestroy.Add(ammoEntity);
         }
 
         var protectedEntities = new HashSet<Entity>();

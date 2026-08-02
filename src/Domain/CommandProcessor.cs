@@ -25,6 +25,11 @@ public class CommandProcessor
             {
                 destroyEntities.Add(destroyCmd.Entity);
             }
+            else if (cmd.GetType().IsGenericType && cmd.GetType().GetGenericTypeDefinition() == typeof(RemoveComponentCommand<>))
+            {
+                var applyMethod = cmd.GetType().GetMethod("Apply")!;
+                applyMethod.Invoke(cmd, new object[] { _em });
+            }
             else if (cmd is IApplyCommand applyCmd)
             {
                 applyCmd.Apply(_em);

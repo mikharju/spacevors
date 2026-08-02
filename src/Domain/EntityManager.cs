@@ -88,6 +88,15 @@ public class EntityManager
         return false;
     }
 
+    public void RemoveComponent<T>(Entity entity) where T : notnull
+    {
+        var type = typeof(T);
+        if (_storages.TryGetValue(type, out var storage))
+        {
+            ((ComponentStorage<T>)storage).Remove(entity);
+        }
+    }
+
     public bool TryGetComponent<T>(Entity entity, out T component) where T : notnull
     {
         var type = typeof(T);

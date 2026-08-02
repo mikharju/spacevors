@@ -53,6 +53,15 @@ public readonly record struct DestroyEntityCommand : ICommand
     }
 }
 
+public readonly record struct RemoveComponentCommand<T>(Entity TargetEntity) : IApplyCommand
+    where T : notnull
+{
+    public void Apply(EntityManager em)
+    {
+        em.RemoveComponent<T>(TargetEntity);
+    }
+}
+
 public class CommandBuffer
 {
     private readonly List<ICommand> _commands = new();

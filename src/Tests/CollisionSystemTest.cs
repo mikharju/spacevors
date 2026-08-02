@@ -285,4 +285,86 @@ public class CollisionSystemTests
         var mineVel = em.GetComponent<Velocity>(mine);
         Assert.True(mineVel.Value.X < -0.1f, $"Mine should be pushed left (negative X) when hit from left, got {mineVel.Value.X}");
     }
+
+    [Fact]
+    public void AmmoVsEnemyShip_SingleHit_DamageApplied()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
+        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, DetectionRange: 500f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, Damage: 1, GraphicsId: 0));
+        em.AddComponent(ship, new Health(10));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-496f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var commands = new CommandBuffer();
+
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.True(em.HasComponent<Health>(ship), "Ship should survive single hit");
+        var health = em.GetComponent<Health>(ship);
+        Assert.Equal(4, health.Current);
+    }
+
+    [Fact]
+    public void TwoAmmoVsEnemyShip_BothDamageApplied_ShipDies()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
+        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, DetectionRange: 500f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, Damage: 1, GraphicsId: 0));
+        em.AddComponent(ship, new Health(10));
+
+        var ammo1 = em.CreateEntity();
+        em.AddComponent(ammo1, new Position(new Vector2(-496f, 0f)));
+        em.AddComponent(ammo1, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var ammo2 = em.CreateEntity();
+        em.AddComponent(ammo2, new Position(new Vector2(-497f, 0.5f)));
+        em.AddComponent(ammo2, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var commands = new CommandBuffer();
+
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.False(em.HasComponent<Health>(ship), "Ship should be destroyed after taking 12 damage from two projectiles");
+    }
+
+    [Fact]
+    public void TwoAmmoVsMine_BothDamageApplied_MineDies()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var mine = em.CreateEntity();
+        em.AddComponent(mine, new Position(new Vector2(-508f, 0f)));
+        em.AddComponent(mine, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
+        em.AddComponent(mine, new Health(10));
+
+        var ammo1 = em.CreateEntity();
+        em.AddComponent(ammo1, new Position(new Vector2(-504f, 0f)));
+        em.AddComponent(ammo1, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var ammo2 = em.CreateEntity();
+        em.AddComponent(ammo2, new Position(new Vector2(-505f, 0.5f)));
+        em.AddComponent(ammo2, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        commands.Apply(em);
+
+        Assert.False(em.HasComponent<Health>(mine), "Mine should be destroyed after taking 12 damage from two projectiles");
+    }
 }
