@@ -23,6 +23,7 @@ public static class SimulationRunner
         new CollisionSystem(),
         new PickupMagnetSystem(),
         new LevelUpSystem(),
+        new ShipDeathExplosionSystem(),
         new EffectSystem()
     };
 

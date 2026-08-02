@@ -12,6 +12,8 @@ public class EnemyShipSystem : GameSystem
 
         foreach (var (shipEntity, ship, shipPos, currentRot) in view.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
+            if (view.TryGetComponent<Dead>(shipEntity, out _)) continue;
+
             if (!hasPlayer) continue;
 
             var playerPos = playerTuple.Value2;

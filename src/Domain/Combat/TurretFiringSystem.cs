@@ -10,6 +10,8 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (turretEntity, turret, turretPos, turretRot) in turrets)
         {
+            if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
+
             var cooldown = CooldownHelper.GetCooldown(view, turretEntity);
 
             if (cooldown <= 0f)

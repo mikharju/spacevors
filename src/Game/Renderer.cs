@@ -199,11 +199,30 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            float lifeRatio = explosion.Lifetime / 0.5f;
-            float currentRadius = explosion.Radius * (1f - lifeRatio);
+            float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
+            float currentRadius = explosion.Radius * (1f + (1f - lifeRatio));
             int alpha = (int)(255f * lifeRatio);
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), new Color(255, 230, 50, alpha));
+            Color color;
+            if (lifeRatio > 0.7f)
+            {
+                color = new Color(255, 255, 180, alpha);
+            }
+            else if (lifeRatio > 0.4f)
+            {
+                float t = (lifeRatio - 0.4f) / 0.3f;
+                color = new Color(
+                    255,
+                    (int)(140 + t * 60),
+                    (int)(30 + t * 20),
+                    alpha);
+            }
+            else
+            {
+                color = new Color(255, 140, 30, alpha);
+            }
+
+            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), color);
         }
     }
 

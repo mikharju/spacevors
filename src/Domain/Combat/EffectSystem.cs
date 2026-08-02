@@ -36,7 +36,7 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Explosion>(entity, new Explosion(explosion.Radius, newLifetime)));
+                commands.Add(new AddComponentCommand<Explosion>(entity, new Explosion(explosion.Radius, newLifetime, explosion.InitialLifetime)));
             }
         }
 
