@@ -304,7 +304,12 @@ public class CollisionSystem : GameSystem
             if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < 0.001f) continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
-            _ammoToPlayerHits.Add((ammo.Damage, playerHealth.Current));
+            if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
+            {
+                remaining = playerHealth.Current;
+                _frameRemainingHealth[playerEntity] = remaining;
+            }
+            _frameRemainingHealth[playerEntity] -= ammo.Damage;
             _effectsToSpawn.Add((playerPos.Value, MineSize.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
@@ -409,15 +414,15 @@ public class CollisionSystem : GameSystem
         foreach (var (_, mineEntity, _, _, _, _) in _ammoToMineHits) protectedEntities.Add(mineEntity);
         foreach (var (_, shipEntity, _, _, _, _, _) in _ammoToShipHits) protectedEntities.Add(shipEntity);
 
-        foreach (var (ammoDamage, playerHealth) in _ammoToPlayerHits)
+        if (hasPlayer && _frameRemainingHealth.TryGetValue(playerEntity, out var playerRemaining))
         {
-            if (playerHealth <= ammoDamage)
+            if (playerRemaining <= 0)
             {
                 commands.Add(new AddComponentCommand<Dead>(playerEntity, new Dead()));
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerHealth - ammoDamage)));
+                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerRemaining)));
             }
         }
 
@@ -737,14 +742,12 @@ public class CollisionSystem : GameSystem
         commands.Add(new DestroyEntityCommand(mineEntity));
 
         var playerHealth = view.GetComponent<Health>(playerEntity);
-        if (playerHealth.Current <= 3)
+        if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
         {
-            commands.Add(new AddComponentCommand<Dead>(playerEntity, new Dead()));
+            remaining = playerHealth.Current;
+            _frameRemainingHealth[playerEntity] = remaining;
         }
-        else
-        {
-            commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerHealth.Current - 3)));
-        }
+        _frameRemainingHealth[playerEntity] -= 3;
 
         var normal = diff / (float)Math.Sqrt(distSq);
         float explosionForce = mine.Size == MineSize.Large ? 240f : 120f;
