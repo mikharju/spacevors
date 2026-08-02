@@ -634,12 +634,12 @@ public class CollisionSystem : GameSystem
         var ammoPos = view.GetComponent<Position>(ammoEntity);
         var asteroidPos = view.GetComponent<Position>(asteroidEntity);
 
-        var diff = asteroidPos.Value - ammoPos.Value;
+        var diff = ammoPos.Value - asteroidPos.Value;
         float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
         var normal = diff / dist;
 
+        Vector2 asteroidVel = GetCollisionVelocity(view, asteroidEntity, default);
         Vector2 ammoVel = ammo.Velocity;
-        var asteroidVel = GetCollisionVelocity(view, asteroidEntity, default);
 
         var relVel = ammoVel - asteroidVel;
         float velAlongNormal = Vector2.Dot(relVel, normal);
@@ -676,7 +676,7 @@ public class CollisionSystem : GameSystem
                 -relVelTangent.Y / contactTangentSpeed * frictionMag
             );
 
-            asteroidVel += frictionImpulse / asteroidMass;
+            asteroidVel -= frictionImpulse / asteroidMass;
             SetCollisionVelocity(asteroidEntity, asteroidVel);
 
             float torque = rAsteroid.X * frictionImpulse.Y - rAsteroid.Y * frictionImpulse.X;
