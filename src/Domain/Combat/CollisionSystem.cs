@@ -10,10 +10,8 @@ public class CollisionSystem : GameSystem
     private const float PlayerRestitution = 0.2f;
     private const float AsteroidAsteroidRestitution = 0.4f;
     private const float AmmoRestitution = 0.15f;
-    private const float RotationFactor = 0.03f;
     private const float CorrectionPercent = 0.8f;
     private const float Slop = 0.01f;
-    private const float AmmoMass = 1f;
     private readonly List<Vector2> _mineCollisionPositions = new();
 
     private readonly List<(Entity, Position)> _asteroidPositions = new();
@@ -512,17 +510,59 @@ public class CollisionSystem : GameSystem
 
         var correctedRelVel = bVel - aVel;
         var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
-        var tangentVel = correctedRelVel - normal * velNormalComponent;
-        float tangentSpeed = tangentVel.Magnitude;
+        var relVelTangent = correctedRelVel - normal * velNormalComponent;
+        float tangentSpeed = relVelTangent.Magnitude;
 
-        if (view.TryGetComponent<AngularVelocity>(aEntity, out var aAngVel))
-        {
-            commands.Add(new AddComponentCommand<AngularVelocity>(aEntity, new AngularVelocity(aAngVel.Value + tangentSpeed * RotationFactor)));
-        }
+        const float Friction = 0.2f;
 
-        if (view.TryGetComponent<AngularVelocity>(bEntity, out var bAngVel))
+        if (tangentSpeed > Slop)
         {
-            commands.Add(new AddComponentCommand<AngularVelocity>(bEntity, new AngularVelocity(bAngVel.Value - tangentSpeed * RotationFactor)));
+            var rA = normal * aRadius;
+            var rB = normal * bRadius;
+
+            float aAngVel = 0f;
+            bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out var aAngVelComp);
+            if (hasAAngVel) aAngVel = aAngVelComp.Value;
+
+            float bAngVel = 0f;
+            bool hasBAngVel = view.TryGetComponent<AngularVelocity>(bEntity, out var bAngVelComp);
+            if (hasBAngVel) bAngVel = bAngVelComp.Value;
+
+            float contactTangentVelX = relVelTangent.X + aAngVel * rA.Y - bAngVel * rB.Y;
+            float contactTangentVelY = relVelTangent.Y - aAngVel * rA.X + bAngVel * rB.X;
+            float contactTangentSpeed = MathF.Sqrt(contactTangentVelX * contactTangentVelX + contactTangentVelY * contactTangentVelY);
+
+            if (contactTangentSpeed > Slop)
+            {
+                float normalImpulseMag = MathF.Abs(j);
+                float maxFrictionImpulse = Friction * normalImpulseMag;
+                float frictionImpulseMag = MathF.Min(contactTangentSpeed * MathF.Min(invMassA, invMassB), maxFrictionImpulse);
+
+                var frictionImpulse = new Vector2(
+                    -contactTangentVelX / contactTangentSpeed * frictionImpulseMag,
+                    -contactTangentVelY / contactTangentSpeed * frictionImpulseMag
+                );
+
+                aVel -= frictionImpulse * invMassA;
+                bVel += frictionImpulse * invMassB;
+
+                commands.Add(new AddComponentCommand<Velocity>(aEntity, new Velocity(aVel)));
+                commands.Add(new AddComponentCommand<Velocity>(bEntity, new Velocity(bVel)));
+
+                float aMOI = 0.5f * aMass * aRadius;
+                if (hasAAngVel)
+                {
+                    float torqueA = rA.X * frictionImpulse.Y - rA.Y * frictionImpulse.X;
+                    commands.Add(new AddComponentCommand<AngularVelocity>(aEntity, new AngularVelocity(aAngVel + torqueA / aMOI)));
+                }
+
+                float bMOI = 0.5f * bMass * bRadius;
+                if (hasBAngVel)
+                {
+                    float torqueB = rB.X * (-frictionImpulse.Y) - rB.Y * (-frictionImpulse.X);
+                    commands.Add(new AddComponentCommand<AngularVelocity>(bEntity, new AngularVelocity(bAngVel + torqueB / bMOI)));
+                }
+            }
         }
     }
 
@@ -549,6 +589,8 @@ public class CollisionSystem : GameSystem
         float velAlongNormal = Vector2.Dot(relVel, normal);
         if (velAlongNormal > 0f) return;
 
+        const float AmmoMass = 1f;
+
         float asteroidMass = MathF.PI * asteroid.Radius * asteroid.Radius;
         float totalInvMass = 1f / AmmoMass + 1f / asteroidMass;
 
@@ -558,10 +600,31 @@ public class CollisionSystem : GameSystem
         asteroidVel += impulse * (1f / asteroidMass);
         commands.Add(new AddComponentCommand<Velocity>(asteroidEntity, new Velocity(asteroidVel)));
 
-        if (view.TryGetComponent<AngularVelocity>(asteroidEntity, out var angVel))
+        const float Friction = 0.2f;
+
+        var relVelTangent = relVel - normal * velAlongNormal;
+        float tangentSpeed = relVelTangent.Magnitude;
+
+        if (tangentSpeed > Slop && view.TryGetComponent<AngularVelocity>(asteroidEntity, out var angVel))
         {
-            var tangentSpeed = relVel.Magnitude - Math.Abs(velAlongNormal);
-            commands.Add(new AddComponentCommand<AngularVelocity>(asteroidEntity, new AngularVelocity(angVel.Value + tangentSpeed * 0.01f)));
+            float asteroidMOI = 0.5f * asteroidMass * asteroid.Radius;
+
+            var rAsteroid = normal * asteroid.Radius;
+            float contactTangentSpeed = MathF.Sqrt(relVelTangent.X * relVelTangent.X + relVelTangent.Y * relVelTangent.Y);
+
+            float maxFriction = Friction * MathF.Abs(j);
+            float frictionMag = MathF.Min(contactTangentSpeed / totalInvMass, maxFriction);
+
+            var frictionImpulse = new Vector2(
+                -relVelTangent.X / contactTangentSpeed * frictionMag,
+                -relVelTangent.Y / contactTangentSpeed * frictionMag
+            );
+
+            asteroidVel += frictionImpulse / asteroidMass;
+            commands.Add(new AddComponentCommand<Velocity>(asteroidEntity, new Velocity(asteroidVel)));
+
+            float torque = rAsteroid.X * frictionImpulse.Y - rAsteroid.Y * frictionImpulse.X;
+            commands.Add(new AddComponentCommand<AngularVelocity>(asteroidEntity, new AngularVelocity(angVel.Value + torque / asteroidMOI)));
         }
     }
 
