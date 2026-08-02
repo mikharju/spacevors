@@ -367,4 +367,55 @@ public class CollisionSystemTests
 
         Assert.False(em.HasComponent<Health>(mine), "Mine should be destroyed after taking 12 damage from two projectiles");
     }
+
+    [Fact]
+    public void TwoMinesVsPlayer_BothHitInOneFrame_PlayerTakesDamage()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var mine1 = em.CreateEntity();
+        em.AddComponent(mine1, new Position(new Vector2(-15f, 0f)));
+        em.AddComponent(mine1, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
+
+        var mine2 = em.CreateEntity();
+        em.AddComponent(mine2, new Position(new Vector2(0f, -15f)));
+        em.AddComponent(mine2, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.False(em.HasComponent<Health>(mine1), "Mine 1 should be destroyed");
+        Assert.False(em.HasComponent<Health>(mine2), "Mine 2 should be destroyed");
+
+        view.GetEntitiesWithComponents<Player, Health>().TryFirst(out var playerTuple);
+        var playerHealth = playerTuple.Value2;
+        Assert.Equal(4, playerHealth.Current);
+    }
+
+    [Fact]
+    public void TwoAmmoVsPlayer_BothHitInOneFrame_TotalDamageLessThanHealth()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var ammo1 = em.CreateEntity();
+        em.AddComponent(ammo1, new Position(new Vector2(-10f, 0f)));
+        em.AddComponent(ammo1, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, IsEnemy: true, Damage: 3));
+
+        var ammo2 = em.CreateEntity();
+        em.AddComponent(ammo2, new Position(new Vector2(0f, -10f)));
+        em.AddComponent(ammo2, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, IsEnemy: true, Damage: 3));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        view.GetEntitiesWithComponents<Player, Health>().TryFirst(out var playerTuple);
+        var playerHealth = playerTuple.Value2;
+        Assert.Equal(4, playerHealth.Current);
+    }
 }
