@@ -499,6 +499,10 @@ public class CollisionSystem : GameSystem
         if (velAlongNormal > 0f) return;
 
         float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
+        if (MathF.Abs(velAlongNormal) < 5f)
+        {
+            restitution = 0f;
+        }
         float j = -(1 + restitution) * velAlongNormal / totalInvMass;
         var impulse = normal * j;
 
@@ -549,14 +553,14 @@ public class CollisionSystem : GameSystem
                 commands.Add(new AddComponentCommand<Velocity>(aEntity, new Velocity(aVel)));
                 commands.Add(new AddComponentCommand<Velocity>(bEntity, new Velocity(bVel)));
 
-                float aMOI = 0.5f * aMass * aRadius;
+                float aMOI = 0.5f * aMass * aRadius * aRadius;
                 if (hasAAngVel)
                 {
                     float torqueA = rA.X * frictionImpulse.Y - rA.Y * frictionImpulse.X;
                     commands.Add(new AddComponentCommand<AngularVelocity>(aEntity, new AngularVelocity(aAngVel + torqueA / aMOI)));
                 }
 
-                float bMOI = 0.5f * bMass * bRadius;
+                float bMOI = 0.5f * bMass * bRadius * bRadius;
                 if (hasBAngVel)
                 {
                     float torqueB = rB.X * (-frictionImpulse.Y) - rB.Y * (-frictionImpulse.X);
@@ -607,7 +611,7 @@ public class CollisionSystem : GameSystem
 
         if (tangentSpeed > Slop && view.TryGetComponent<AngularVelocity>(asteroidEntity, out var angVel))
         {
-            float asteroidMOI = 0.5f * asteroidMass * asteroid.Radius;
+            float asteroidMOI = 0.5f * asteroidMass * asteroid.Radius * asteroid.Radius;
 
             var rAsteroid = normal * asteroid.Radius;
             float contactTangentSpeed = MathF.Sqrt(relVelTangent.X * relVelTangent.X + relVelTangent.Y * relVelTangent.Y);
