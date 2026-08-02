@@ -18,8 +18,7 @@ public class CollisionSystem : GameSystem
     private readonly List<(Vector2 Position, MineSize Size)> _effectsToSpawn = new();
     private readonly List<(Entity ammo, Entity target, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
-    private readonly List<(Entity ammo, Entity target, Vector2 asteroidPos)> _ammoToAsteroidHits = new();
-    private readonly List<(Entity ammo, int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
+    private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
     // Per-frame collision state accumulators (fixes deferred command overwrite bug)
     private Dictionary<Entity, Vector2> _collisionVelocities = new();
@@ -38,7 +37,6 @@ public class CollisionSystem : GameSystem
         _effectsToSpawn.Clear();
         _ammoToMineHits.Clear();
         _ammoToShipHits.Clear();
-        _ammoToAsteroidHits.Clear();
         _ammoToPlayerHits.Clear();
         _collisionVelocities.Clear();
         _positionCorrections.Clear();
@@ -268,7 +266,6 @@ public class CollisionSystem : GameSystem
 
             if (closestMineHit.HasValue)
             {
-                var mineComp = view.GetComponent<EnemyMine>(closestMineHit.Value);
                 if (!view.TryGetComponent<Health>(closestMineHit.Value, out var healthComp)) continue;
                 if (!_frameRemainingHealth.TryGetValue(closestMineHit.Value, out var health))
                 {
@@ -307,7 +304,7 @@ public class CollisionSystem : GameSystem
             if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < 0.001f) continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
-            _ammoToPlayerHits.Add((ammoEntity, ammo.Damage, playerHealth.Current));
+            _ammoToPlayerHits.Add((ammo.Damage, playerHealth.Current));
             _effectsToSpawn.Add((playerPos.Value, MineSize.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
@@ -412,7 +409,7 @@ public class CollisionSystem : GameSystem
         foreach (var (_, mineEntity, _, _, _, _) in _ammoToMineHits) protectedEntities.Add(mineEntity);
         foreach (var (_, shipEntity, _, _, _, _, _) in _ammoToShipHits) protectedEntities.Add(shipEntity);
 
-        foreach (var (ammoEntity, ammoDamage, playerHealth) in _ammoToPlayerHits)
+        foreach (var (ammoDamage, playerHealth) in _ammoToPlayerHits)
         {
             if (playerHealth <= ammoDamage)
             {
