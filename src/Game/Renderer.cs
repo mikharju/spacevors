@@ -82,8 +82,6 @@ public static class Renderer
 
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
-        bool hasTextures = ImageLoader.AsteroidTextures != null;
-
         foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
         {
             var pos = em.GetComponent<Position>(entity);
@@ -93,17 +91,22 @@ public static class Renderer
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
             float angleDeg = rot.Angle * 180f / MathF.PI;
-            if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
+            Texture2D[]? asteroidTexs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
+
+            Texture2D? tex = null;
+            if (asteroid.Variant < asteroidTexs!.Length)
+                tex = asteroidTexs[asteroid.Variant];
+
+            if (tex.HasValue)
             {
-                var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
                 float drawDiameter = asteroid.Radius * 2f;
-                float scale = drawDiameter / tex.Width;
-                float destWidth = tex.Width * scale;
-                float destHeight = tex.Height * scale;
+                float scale = drawDiameter / tex.Value.Width;
+                float destWidth = tex.Value.Width * scale;
+                float destHeight = tex.Value.Height * scale;
 
                 Raylib.DrawTexturePro(
-                    tex,
-                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    tex.Value,
+                    new Rectangle(0f, 0f, tex.Value.Width, tex.Value.Height),
                     new Rectangle(cx, cy, destWidth, destHeight),
                     new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
                     angleDeg,
@@ -131,9 +134,10 @@ public static class Renderer
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-            if (hasTextures && asteroid.Variant < ImageLoader.AsteroidTextures!.Length)
+            Texture2D[]? texs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
+            if (texs != null && asteroid.Variant < texs.Length)
             {
-                var tex = ImageLoader.AsteroidTextures![asteroid.Variant];
+                var tex = texs[asteroid.Variant];
                 float drawDiameter = asteroid.Radius * 2f;
                 float scale = drawDiameter / tex.Width;
                 float destWidth = tex.Width * scale;

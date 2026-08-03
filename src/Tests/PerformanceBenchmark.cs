@@ -112,7 +112,7 @@ public class PerformanceBenchmark
                     (float)((rng.NextDouble() - 0.5) * 30f))));
                 em.AddComponent(entity, new Rotation((float)(rng.NextDouble() * MathF.PI * 2f)));
                 em.AddComponent(entity, new AngularVelocity((float)((rng.NextDouble() - 0.5) * 1f)));
-                em.AddComponent(entity, new Asteroid(radius));
+                em.AddComponent(entity, new Asteroid(IsSmall: false, radius));
             }
 
             // Ammo firing toward center (crossfire pattern)

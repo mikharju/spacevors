@@ -28,7 +28,7 @@ public class CollisionSystemTests
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(-5f, 0f)));
@@ -54,7 +54,7 @@ public class CollisionSystemTests
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(-5f, 0f)));
@@ -73,12 +73,12 @@ public class CollisionSystemTests
 
         var a1 = em.CreateEntity();
         em.AddComponent(a1, new Position(new Vector2(-30f, 0f)));
-        em.AddComponent(a1, new Asteroid(Radius: 20f));
+        em.AddComponent(a1, new Asteroid(IsSmall: false, Radius: 20f));
         em.AddComponent(a1, new Velocity(new Vector2(100f, 0f)));
 
         var a2 = em.CreateEntity();
         em.AddComponent(a2, new Position(new Vector2(30f, 0f)));
-        em.AddComponent(a2, new Asteroid(Radius: 20f));
+        em.AddComponent(a2, new Asteroid(IsSmall: false, Radius: 20f));
         em.AddComponent(a2, new Velocity(new Vector2(-100f, 0f)));
 
         var commands = new CommandBuffer();
@@ -99,12 +99,12 @@ public class CollisionSystemTests
 
         var a1 = em.CreateEntity();
         em.AddComponent(a1, new Position(new Vector2(-5f, 0f)));
-        em.AddComponent(a1, new Asteroid(Radius: 10f));
+        em.AddComponent(a1, new Asteroid(IsSmall: false, Radius: 10f));
         em.AddComponent(a1, new Velocity(new Vector2(3f, 0f)));
 
         var a2 = em.CreateEntity();
         em.AddComponent(a2, new Position(new Vector2(5f, 0f)));
-        em.AddComponent(a2, new Asteroid(Radius: 10f));
+        em.AddComponent(a2, new Asteroid(IsSmall: false, Radius: 10f));
         em.AddComponent(a2, new Velocity(new Vector2(-3f, 0f)));
 
         var commands = new CommandBuffer();
@@ -125,7 +125,7 @@ public class CollisionSystemTests
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
         em.AddComponent(asteroid, new AngularVelocity(0f));
 
         var ammo = em.CreateEntity();
@@ -148,7 +148,7 @@ public class CollisionSystemTests
         // Asteroid at origin, ammo approaching from left
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(-5f, 0f)));
@@ -173,7 +173,7 @@ public class CollisionSystemTests
         // Stationary asteroid at origin, projectile approaching from right moving leftward
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(10f, 0f)));
@@ -200,7 +200,7 @@ public class CollisionSystemTests
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(-500f, 0f)));
-        em.AddComponent(asteroid, new Asteroid(Radius: 20f));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
         em.AddComponent(asteroid, new Velocity(Vector2.Zero));
 
         var mine = em.CreateEntity();

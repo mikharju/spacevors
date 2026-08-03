@@ -7,8 +7,10 @@ namespace Spacevors.Game;
 
 public static class ImageLoader
 {
-    public static readonly int AsteroidTextureCount = 6;
-    public static Texture2D[]? AsteroidTextures { get; private set; }
+    public static readonly int SmallAsteroidTextureCount = 6;
+    public static readonly int LargeAsteroidTextureCount = 6;
+    public static Texture2D[]? AsteroidSmallTextures { get; private set; }
+    public static Texture2D[]? AsteroidLargeTextures { get; private set; }
 
     // Enemy ship textures keyed by filename stem (e.g. "enemy-1", "interceptor", "heavy-cannon")
     public static Dictionary<string, Texture2D>? EnemyShipTextures { get; private set; }
@@ -18,13 +20,21 @@ public static class ImageLoader
 
     public static void LoadAssets()
     {
-        var asteroidFiles = Directory.GetFiles("assets/asteroids", "*.png").OrderBy(f => f).ToArray();
-        var asteroidTexs = new Texture2D[Math.Min(asteroidFiles.Length, AsteroidTextureCount)];
-        for (int i = 0; i < asteroidTexs.Length; i++)
+        var smallAsteroidFiles = Directory.GetFiles("assets/asteroids/small", "*.png").OrderBy(f => f).ToArray();
+        var smallAsteroidTexs = new Texture2D[Math.Min(smallAsteroidFiles.Length, SmallAsteroidTextureCount)];
+        for (int i = 0; i < smallAsteroidTexs.Length; i++)
         {
-            asteroidTexs[i] = Raylib.LoadTexture(asteroidFiles[i]);
+            smallAsteroidTexs[i] = Raylib.LoadTexture(smallAsteroidFiles[i]);
         }
-        AsteroidTextures = asteroidTexs;
+        AsteroidSmallTextures = smallAsteroidTexs;
+
+        var largeAsteroidFiles = Directory.GetFiles("assets/asteroids/large", "*.png").OrderBy(f => f).ToArray();
+        var largeAsteroidTexs = new Texture2D[Math.Min(largeAsteroidFiles.Length, LargeAsteroidTextureCount)];
+        for (int i = 0; i < largeAsteroidTexs.Length; i++)
+        {
+            largeAsteroidTexs[i] = Raylib.LoadTexture(largeAsteroidFiles[i]);
+        }
+        AsteroidLargeTextures = largeAsteroidTexs;
 
         EnemyShipTextures = LoadDirectoryTextures("assets/enemy-ships");
         PlayerShipTextures = LoadDirectoryTextures("assets/player-ships");
@@ -45,14 +55,24 @@ public static class ImageLoader
 
     public static void UnloadAssets()
     {
-        if (AsteroidTextures != null)
+        if (AsteroidSmallTextures != null)
         {
-            foreach (var tex in AsteroidTextures)
+            foreach (var tex in AsteroidSmallTextures)
             {
                 if (tex.Id != 0)
                     Raylib.UnloadTexture(tex);
             }
-            AsteroidTextures = null;
+            AsteroidSmallTextures = null;
+        }
+
+        if (AsteroidLargeTextures != null)
+        {
+            foreach (var tex in AsteroidLargeTextures)
+            {
+                if (tex.Id != 0)
+                    Raylib.UnloadTexture(tex);
+            }
+            AsteroidLargeTextures = null;
         }
 
         if (EnemyShipTextures != null)
