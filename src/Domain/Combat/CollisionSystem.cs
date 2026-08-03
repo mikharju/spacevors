@@ -393,7 +393,9 @@ public class CollisionSystem : GameSystem
                 SpawnShipLootOnDeath(commands, data.shipPos);
                 commands.Add(new RemoveComponentCommand<Health>(shipEntity));
                 commands.Add(new AddComponentCommand<Dead>(shipEntity, new Dead()));
-                commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, data.hitPoint, data.shipRadius, data.graphicsId)));
+                view.TryGetComponent<Velocity>(shipEntity, out var deathVel);
+                Vector2 inheritedVel = deathVel.Value;
+                commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, data.hitPoint, data.shipRadius, data.graphicsId, inheritedVel)));
                 commands.AddEntity(new Position(data.hitPoint), new Explosion(data.shipRadius * 0.8f, 0.6f, 0.6f));
                 for (int i = 0; i < 4; i++)
                 {

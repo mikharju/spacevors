@@ -4,7 +4,6 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSystem : GameSystem
 {
-    private const float DriftSpeedThreshold = 50f;
     private const float DriftCancelForwardThrust = 18f;
     private const float DriftCancelSideThrust = 14f;
     private const float DriftCancelBackThrust = 16f;
@@ -30,7 +29,7 @@ public class EnemyShipSystem : GameSystem
             var currentVel = vel.Value;
             float speed = currentVel.Magnitude;
 
-            bool inDriftCancel = speed > DriftSpeedThreshold;
+            bool inDriftCancel = speed > ship.Speed;
 
             if (inDriftCancel)
             {

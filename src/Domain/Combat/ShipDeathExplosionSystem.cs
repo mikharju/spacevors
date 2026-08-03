@@ -16,13 +16,13 @@ public class ShipDeathExplosionSystem : GameSystem
 
             if (explosion.TimeRemaining > SecondaryThreshold && newTimeRemaining <= SecondaryThreshold)
             {
-                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, enemyShip.Radius);
+                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, enemyShip.Radius, explosion.InheritedVelocity);
                 ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: true);
             }
 
             if (explosion.TimeRemaining > FinalThreshold && newTimeRemaining <= FinalThreshold)
             {
-                SpawnFinalExplosion(commands, pos.Value, enemyShip.Radius);
+                SpawnFinalExplosion(commands, pos.Value, enemyShip.Radius, explosion.InheritedVelocity);
                 ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: false);
                 commands.Add(new DestroyEntityCommand(entity));
             }
@@ -30,11 +30,11 @@ public class ShipDeathExplosionSystem : GameSystem
             if (newTimeRemaining <= FinalThreshold)
                 continue;
 
-            commands.Add(new AddComponentCommand<ShipDeathExplosion>(entity, new ShipDeathExplosion(newTimeRemaining, explosion.ImpactPoint, explosion.ShipRadius, explosion.GraphicsId)));
+            commands.Add(new AddComponentCommand<ShipDeathExplosion>(entity, new ShipDeathExplosion(newTimeRemaining, explosion.ImpactPoint, explosion.ShipRadius, explosion.GraphicsId, explosion.InheritedVelocity)));
         }
     }
 
-    private void SpawnSecondaryExplosions(CommandBuffer commands, Vector2 shipPos, float shipRotation, float shipRadius)
+    private void SpawnSecondaryExplosions(CommandBuffer commands, Vector2 shipPos, float shipRotation, float shipRadius, Vector2 inheritedVel)
     {
         for (int i = 0; i < 2; i++)
         {
@@ -43,6 +43,7 @@ public class ShipDeathExplosionSystem : GameSystem
 
             commands.AddEntity(
                 new Position(impactPos),
+                inheritedVel,
                 new Explosion(shipRadius * 0.4f, 0.5f, 0.5f)
             );
 
@@ -54,10 +55,11 @@ public class ShipDeathExplosionSystem : GameSystem
         }
     }
 
-    private void SpawnFinalExplosion(CommandBuffer commands, Vector2 shipPos, float shipRadius)
+    private void SpawnFinalExplosion(CommandBuffer commands, Vector2 shipPos, float shipRadius, Vector2 inheritedVel)
     {
         commands.AddEntity(
             new Position(shipPos),
+            inheritedVel,
             new Explosion(shipRadius * 1.3f, 0.8f, 0.8f)
         );
 

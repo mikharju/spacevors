@@ -20,4 +20,5 @@ public readonly record struct ShipDeathExplosion(
     float TimeRemaining,
     Vector2 ImpactPoint,
     float ShipRadius,
-    byte GraphicsId);
+    byte GraphicsId,
+    Vector2 InheritedVelocity);

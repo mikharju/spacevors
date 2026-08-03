@@ -18,11 +18,11 @@ public static class EnemyShipFactory
     public const float FiringRange = 700f;
     public const float TurretFireRate = 1.5f;
     public const float TurretAmmoSpeed = 200f;
-    public const float Acceleration = 9.0f;
+    public const float Acceleration = 45.0f;
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetInterceptorParams()
     {
-        return (45f, 90f, 2, 15f, 0.6f, TurretAmmoSpeed);
+        return (45f, 90f, 2, 85f, 0.6f, TurretAmmoSpeed);
     }
 
     private static (float radius, float speed, int health, float acceleration, float turretFireRate, float turretAmmoSpeed) GetHeavyCannonParams()
