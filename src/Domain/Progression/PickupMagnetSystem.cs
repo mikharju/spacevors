@@ -125,13 +125,16 @@ public class PickupMagnetSystem : GameSystem
             Xp: playerStats.Xp + xpAmount,
             Level: playerStats.Level,
             PickupRadius: playerStats.PickupRadius,
-            RotationSpeed: playerStats.RotationSpeed)));
+            RotationSpeed: playerStats.RotationSpeed,
+            MaxHealth: playerStats.MaxHealth)));
     }
 
     private void ApplyHealth(WorldView view, Entity playerEntity, CommandBuffer commands)
     {
         var health = view.GetComponent<Health>(playerEntity);
-        commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(health.Current + 3)));
+        var playerStats = view.GetComponent<Player>(playerEntity);
+        int healed = Math.Min(health.Current + 3, playerStats.MaxHealth);
+        commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed)));
     }
 
     private void SpawnGreenExplosion(WorldView view, Vector2 position, CommandBuffer commands)

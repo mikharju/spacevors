@@ -17,7 +17,7 @@ public class CollisionSystemTests
     {
         var player = em.CreateEntity();
         em.AddComponent(player, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
         em.AddComponent(player, new Health(10));
     }
 

@@ -47,7 +47,7 @@ public class PerformanceBenchmark
             em.AddComponent(playerEntity, new Velocity(new Vector2(10f, -5f)));
             em.AddComponent(playerEntity, new Rotation(0f));
             em.AddComponent(playerEntity, new AngularVelocity(0f));
-            em.AddComponent(playerEntity, new Player());
+            em.AddComponent(playerEntity, new Player(0f, 0f, 0f, 1f, MaxHealth: 10));
             em.AddComponent(playerEntity, new Health(10));
             em.AddComponent(playerEntity, new WeaponSlots(0, 4));
 

@@ -5,6 +5,7 @@ public readonly record struct Player(
     float SideThrust,
     float BackThrust,
     float Boost,
+    int MaxHealth,
     float Radius = 18f,
     int Xp = 0,
     int Level = 1,

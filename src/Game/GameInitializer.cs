@@ -18,7 +18,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
 
-        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate));
+        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
         em.AddComponent(playerEntity, new WeaponSlots(shipType.Weapon.Turrets.Count, shipType.MaxWeaponSlots));
 

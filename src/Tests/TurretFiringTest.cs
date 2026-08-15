@@ -16,7 +16,7 @@ public class TurretFiringTest
         var playerEntity = em.CreateEntity();
         em.AddComponent(playerEntity, new Position(new Vector2(100f, 100f)));
         em.AddComponent(playerEntity, new Velocity(new Vector2(10f, 5f)));
-        em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, Radius: 18f, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
+        em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 10, Radius: 18f, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
 
         // Create turret
         var turretEntity = em.CreateEntity();

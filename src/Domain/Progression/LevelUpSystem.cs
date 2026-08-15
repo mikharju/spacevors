@@ -33,7 +33,8 @@ public class LevelUpSystem : GameSystem
                 Xp: playerStats.Xp,
                 Level: playerStats.Level + 1,
                 PickupRadius: playerStats.PickupRadius,
-                RotationSpeed: playerStats.RotationSpeed)));
+                RotationSpeed: playerStats.RotationSpeed,
+                MaxHealth: playerStats.MaxHealth)));
         }
     }
 

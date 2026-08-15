@@ -365,6 +365,7 @@ public static class SpaceVorsApp
                     playerStats.SideThrust,
                     playerStats.BackThrust,
                     playerStats.Boost,
+                    playerStats.MaxHealth,
                     playerStats.Radius,
                     playerStats.Xp,
                     playerStats.Level,
@@ -419,8 +420,18 @@ public static class SpaceVorsApp
             case UpgradeOption.Hp:
                 if (!em.HasComponent<Health>(playerEntity)) break;
                 var currentHealth = em.GetComponent<Health>(playerEntity);
-                int newHp = currentHealth.Current + 2;
-                em.AddComponent(playerEntity, new Health(newHp));
+                em.AddComponent(playerEntity, new Health(currentHealth.Current + 2));
+                em.AddComponent(playerEntity, new Player(
+                    playerStats.Thrust,
+                    playerStats.SideThrust,
+                    playerStats.BackThrust,
+                    playerStats.Boost,
+                    playerStats.MaxHealth + 2,
+                    playerStats.Radius,
+                    playerStats.Xp,
+                    playerStats.Level,
+                    playerStats.PickupRadius,
+                    playerStats.RotationSpeed));
                 break;
 
             case UpgradeOption.ForwardAcceleration:
@@ -432,6 +443,7 @@ public static class SpaceVorsApp
                         stats.SideThrust,
                         stats.BackThrust,
                         stats.Boost,
+                        stats.MaxHealth,
                         stats.Radius,
                         stats.Xp,
                         stats.Level,
@@ -449,6 +461,7 @@ public static class SpaceVorsApp
                         stats.SideThrust,
                         stats.BackThrust,
                         stats.Boost,
+                        stats.MaxHealth,
                         stats.Radius,
                         stats.Xp,
                         stats.Level,
@@ -466,6 +479,7 @@ public static class SpaceVorsApp
                         newSideThrust,
                         stats.BackThrust,
                         stats.Boost,
+                        stats.MaxHealth,
                         stats.Radius,
                         stats.Xp,
                         stats.Level,
@@ -483,6 +497,7 @@ public static class SpaceVorsApp
                         stats.SideThrust,
                         stats.BackThrust,
                         stats.Boost,
+                        stats.MaxHealth,
                         stats.Radius,
                         stats.Xp,
                         stats.Level,
