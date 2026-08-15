@@ -13,6 +13,8 @@ public class WorldView
 
     public float ElapsedTime => _em.ElapsedTime;
 
+    public Random Rng => _em.Rng;
+
     public ComponentStorage<T> GetStorage<T>() where T : notnull
         => _em.GetStorage<T>();
 

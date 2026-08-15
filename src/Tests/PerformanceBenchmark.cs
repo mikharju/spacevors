@@ -26,8 +26,6 @@ public class PerformanceBenchmark
 
     private void RunScenario(string name, int ammoCount, int shipCount, int asteroidCount, int mineCount)
     {
-        var rng = new Random(42);
-
         const int iterations = 3;
         const int framesPerIteration = 60;
         const float deltaTime = 1f / 120f;
@@ -38,6 +36,7 @@ public class PerformanceBenchmark
         for (int iter = 0; iter < iterations; iter++)
         {
             var em = new EntityManager();
+            var rng = em.Rng;
             var runner = new SimulationRunner();
 
             // Player at origin with some initial velocity

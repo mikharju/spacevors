@@ -314,7 +314,7 @@ public class TurretFiringSystem : GameSystem
                 ammoDir.X * sinOff + ammoDir.Y * cosOff
             );
 
-            float speedVariation = 1f + (Random.Shared.NextSingle() - 0.5f) * 0.3f;
+            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * 0.3f;
 
             Vector2 spawnOffset = pelletDir * 20f;
             if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))

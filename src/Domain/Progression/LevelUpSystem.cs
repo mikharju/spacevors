@@ -69,7 +69,8 @@ public class LevelUpSystem : GameSystem
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Damage));
             }
 
-            var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
+            Shuffle(allOptions, view.Rng);
+            var shuffled = allOptions.ToArray();
             int count = Math.Min(3, shuffled.Length);
 
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(shuffled[..count]));
@@ -92,10 +93,20 @@ public class LevelUpSystem : GameSystem
             allOptions.Add(new UpgradableOption("", UpgradeOption.SideThrust));
             allOptions.Add(new UpgradableOption("", UpgradeOption.BackThrust));
 
-            var shuffled = allOptions.OrderBy(_ => Random.Shared.Next()).ToArray();
+            Shuffle(allOptions, view.Rng);
+            var shuffled = allOptions.ToArray();
             int count = Math.Min(5, shuffled.Length);
 
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(shuffled[..count]));
+        }
+    }
+
+    private static void Shuffle<T>(List<T> items, Random rng)
+    {
+        for (int i = items.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (items[i], items[j]) = (items[j], items[i]);
         }
     }
 

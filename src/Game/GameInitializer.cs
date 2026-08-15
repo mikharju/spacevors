@@ -26,7 +26,7 @@ public static class GameInitializer
         var cameraEntity = em.CreateEntity();
         em.AddComponent(cameraEntity, new Camera(new Vector2(0f, 0f)));
 
-        Random rand = new Random(42);
+        var rand = em.Rng;
 
         // One close asteroid within initial view range
         {

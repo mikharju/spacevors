@@ -4,9 +4,19 @@ namespace Spacevors.Domain;
 
 public class EntityManager
 {
+    public const int DefaultRngSeed = 42;
+
     private readonly Dictionary<Type, object> _storages = new();
+    private readonly Random _rng;
     private int _nextId = 0;
     private float _elapsedTime = 0f;
+
+    public EntityManager(int seed = DefaultRngSeed)
+    {
+        _rng = new Random(seed);
+    }
+
+    public Random Rng => _rng;
 
     public int MaxEntityId => _nextId - 1;
 
@@ -285,7 +295,7 @@ public readonly struct ComponentQuery<T1>
         return list;
     }
 
-    public int Count() => _s1.Count;
+    public int Count() => _s1?.Count ?? 0;
 
     public (Entity Entity, T1 Value1) FirstOrDefault() => TryFirst(out var result) ? result : default;
 

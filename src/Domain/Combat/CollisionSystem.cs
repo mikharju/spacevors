@@ -376,7 +376,7 @@ public class CollisionSystem : GameSystem
             {
                 var pos = view.GetComponent<Position>(mineEntity);
                 var mine = view.GetComponent<EnemyMine>(mineEntity);
-                SpawnLootOnDeath(commands, pos.Value, mine.Size);
+                SpawnLootOnDeath(commands, pos.Value, mine.Size, view.Rng);
                 commands.Add(new DestroyEntityCommand(mineEntity));
             }
             else
@@ -397,19 +397,20 @@ public class CollisionSystem : GameSystem
             var remaining = _frameRemainingHealth.TryGetValue(shipEntity, out var r) ? r : -1;
             if (remaining <= 0)
             {
-                SpawnShipLootOnDeath(commands, data.shipPos);
+                SpawnShipLootOnDeath(commands, data.shipPos, view.Rng);
                 commands.Add(new RemoveComponentCommand<Health>(shipEntity));
                 commands.Add(new AddComponentCommand<Dead>(shipEntity, new Dead()));
                 view.TryGetComponent<Velocity>(shipEntity, out var deathVel);
                 Vector2 inheritedVel = deathVel.Value;
                 commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, data.hitPoint, data.shipRadius, data.graphicsId, inheritedVel)));
                 commands.AddEntity(new Position(data.hitPoint), new Explosion(data.shipRadius * 0.8f, 0.6f, 0.6f));
+                var rng = view.Rng;
                 for (int i = 0; i < 4; i++)
                 {
-                    float sparkAngle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
-                    float sparkSpeed = (data.shipRadius + 15f) / 0.7f * (0.8f + (float)Random.Shared.NextDouble() * 0.4f);
+                    float sparkAngle = (float)(rng.NextDouble() * MathF.PI * 2f);
+                    float sparkSpeed = (data.shipRadius + 15f) / 0.7f * (0.8f + (float)rng.NextDouble() * 0.4f);
                     Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
-                    float sparkLifetime = 0.7f + (float)Random.Shared.NextDouble() * 0.3f;
+                    float sparkLifetime = 0.7f + (float)rng.NextDouble() * 0.3f;
                     commands.AddEntity(new Position(data.hitPoint), new Velocity(sparkVel), new Spark(sparkLifetime, sparkLifetime));
                 }
             }
@@ -449,7 +450,7 @@ public class CollisionSystem : GameSystem
             int sparkCount = mineSize == MineSize.Large ? 7 : 3;
             for (int i = 0; i < sparkCount; i++)
             {
-                SpawnSpark(commands, position);
+                SpawnSpark(commands, position, view.Rng);
             }
         }
 
@@ -516,12 +517,12 @@ public class CollisionSystem : GameSystem
         commands.AddEntity(new Position(position), new Explosion(radius, 0.5f, 0.5f));
     }
 
-    private void SpawnSpark(CommandBuffer commands, Vector2 position)
+    private void SpawnSpark(CommandBuffer commands, Vector2 position, Random rng)
     {
-        float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
-        float speed = 50f + (float)Random.Shared.NextDouble() * 100f;
+        float angle = (float)(rng.NextDouble() * MathF.PI * 2f);
+        float speed = 50f + (float)rng.NextDouble() * 100f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
-        float sparkLifetime = 0.8f + (float)Random.Shared.NextDouble() * 0.6f;
+        float sparkLifetime = 0.8f + (float)rng.NextDouble() * 0.6f;
         commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
     }
 
@@ -767,28 +768,28 @@ public class CollisionSystem : GameSystem
         int sparkCount = mine.Size == MineSize.Large ? 10 : 5;
         for (int i = 0; i < sparkCount; i++)
         {
-            SpawnSpark(commands, minePos.Value);
+            SpawnSpark(commands, minePos.Value, view.Rng);
         }
     }
 
-    private void SpawnLootOnDeath(CommandBuffer commands, Vector2 position, MineSize mineSize)
+    private void SpawnLootOnDeath(CommandBuffer commands, Vector2 position, MineSize mineSize, Random rng)
     {
         int xpAmount = mineSize == MineSize.Small ? 1 : 2;
         float xpRadius = mineSize == MineSize.Small ? 6f : 9f;
 
         commands.AddEntity(new Position(position), new XpPickup(xpAmount, Radius: xpRadius));
 
-        if (Random.Shared.NextDouble() < 0.05)
+        if (rng.NextDouble() < 0.05)
         {
             commands.AddEntity(new Position(position), new HealthOrb(Radius: xpRadius + 2f));
         }
     }
 
-    private void SpawnShipLootOnDeath(CommandBuffer commands, Vector2 position)
+    private void SpawnShipLootOnDeath(CommandBuffer commands, Vector2 position, Random rng)
     {
         commands.AddEntity(new Position(position), new XpPickup(3, Radius: 18f));
 
-        if (Random.Shared.NextDouble() < 0.05)
+        if (rng.NextDouble() < 0.05)
         {
             commands.AddEntity(new Position(position), new HealthOrb(Radius: 20f));
         }

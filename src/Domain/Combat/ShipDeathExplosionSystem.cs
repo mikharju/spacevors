@@ -16,13 +16,13 @@ public class ShipDeathExplosionSystem : GameSystem
 
             if (explosion.TimeRemaining > SecondaryThreshold && newTimeRemaining <= SecondaryThreshold)
             {
-                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, enemyShip.Radius, explosion.InheritedVelocity);
+                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, enemyShip.Radius, explosion.InheritedVelocity, view.Rng);
                 ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: true);
             }
 
             if (explosion.TimeRemaining > FinalThreshold && newTimeRemaining <= FinalThreshold)
             {
-                SpawnFinalExplosion(commands, pos.Value, enemyShip.Radius, explosion.InheritedVelocity);
+                SpawnFinalExplosion(commands, pos.Value, enemyShip.Radius, explosion.InheritedVelocity, view.Rng);
                 ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: false);
                 commands.Add(new DestroyEntityCommand(entity));
             }
@@ -34,11 +34,11 @@ public class ShipDeathExplosionSystem : GameSystem
         }
     }
 
-    private void SpawnSecondaryExplosions(CommandBuffer commands, Vector2 shipPos, float shipRotation, float shipRadius, Vector2 inheritedVel)
+    private void SpawnSecondaryExplosions(CommandBuffer commands, Vector2 shipPos, float shipRotation, float shipRadius, Vector2 inheritedVel, Random rng)
     {
         for (int i = 0; i < 2; i++)
         {
-            float offsetAngle = shipRotation + (float)(Random.Shared.NextDouble() - 0.5f) * MathF.PI;
+            float offsetAngle = shipRotation + (float)(rng.NextDouble() - 0.5f) * MathF.PI;
             Vector2 impactPos = shipPos + new Vector2((float)Math.Sin(offsetAngle), -(float)Math.Cos(offsetAngle)) * shipRadius;
 
             commands.AddEntity(
@@ -50,12 +50,12 @@ public class ShipDeathExplosionSystem : GameSystem
             int sparkCount = 6;
             for (int j = 0; j < sparkCount; j++)
             {
-                SpawnSpark(commands, impactPos, shipRadius);
+                SpawnSpark(commands, impactPos, shipRadius, rng);
             }
         }
     }
 
-    private void SpawnFinalExplosion(CommandBuffer commands, Vector2 shipPos, float shipRadius, Vector2 inheritedVel)
+    private void SpawnFinalExplosion(CommandBuffer commands, Vector2 shipPos, float shipRadius, Vector2 inheritedVel, Random rng)
     {
         commands.AddEntity(
             new Position(shipPos),
@@ -66,7 +66,7 @@ public class ShipDeathExplosionSystem : GameSystem
         int sparkCount = (int)(shipRadius / 4f);
         for (int i = 0; i < sparkCount; i++)
         {
-            SpawnSpark(commands, shipPos, shipRadius);
+            SpawnSpark(commands, shipPos, shipRadius, rng);
         }
     }
 
@@ -77,7 +77,7 @@ public class ShipDeathExplosionSystem : GameSystem
             commands.Add(new AddComponentCommand<AngularVelocity>(entity, new AngularVelocity(currentAngVel.Value * 0.8f)));
         }
 
-        float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
+        float angle = (float)(view.Rng.NextDouble() * MathF.PI * 2f);
         float speed = lateralOnly ? 4f : 3f;
         Vector2 impulse = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
 
@@ -87,13 +87,13 @@ public class ShipDeathExplosionSystem : GameSystem
         }
     }
 
-    private void SpawnSpark(CommandBuffer commands, Vector2 position, float explosionRadius)
+    private void SpawnSpark(CommandBuffer commands, Vector2 position, float explosionRadius, Random rng)
     {
-        float angle = (float)(Random.Shared.NextDouble() * MathF.PI * 2f);
+        float angle = (float)(rng.NextDouble() * MathF.PI * 2f);
         float speed = (explosionRadius + 15f) / 0.7f;
-        float speedVariation = 0.8f + (float)Random.Shared.NextDouble() * 0.4f;
+        float speedVariation = 0.8f + (float)rng.NextDouble() * 0.4f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed * speedVariation, (float)Math.Sin(angle) * speed * speedVariation);
-        float sparkLifetime = 2.5f + (float)Random.Shared.NextDouble() * 0.5f;
+        float sparkLifetime = 2.5f + (float)rng.NextDouble() * 0.5f;
         commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
     }
 }
