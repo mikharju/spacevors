@@ -262,7 +262,7 @@ public static class SpaceVorsApp
                             int optionCount = options.Options.Length;
                             for (int i = 0; i < optionCount; i++)
                             {
-                                var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, GetW(), GetH());
+                                var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, optionCount, GetW(), GetH());
                                 if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                                 {
                                     selectedIndex = i;

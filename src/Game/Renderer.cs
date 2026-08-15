@@ -570,46 +570,40 @@ public static class Renderer
         }
     }
 
+    const int UpgradeCardWidth = 220;
+    const int UpgradeCardHeight = 140;
+    const int UpgradeCardSpacing = 10;
+
     public static void DrawUpgradeCards(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
 
-        Raylib.DrawText($"Level {playerLevel}", windowWidth / 2 - Raylib.MeasureText($"Level {playerLevel}", 36) / 2, 20, 36, new Color(255, 255, 255, 255));
-
-        int cardW = 196;
-        int cardH = 140;
-        int spacing = 10;
-        int maxCards = options?.Options?.Length ?? 2;
-        int totalW = cardW * maxCards + spacing * (maxCards - 1);
-        int startX = Math.Max(10, (windowWidth - totalW) / 2);
-        int startY = windowHeight / 2 - cardH / 2;
+        string levelText = $"Level {playerLevel}";
+        Raylib.DrawText(levelText, windowWidth / 2 - Raylib.MeasureText(levelText, 36) / 2, 20, 36, new Color(255, 255, 255, 255));
 
         if (options is { Options.Length: > 0 } opts)
         {
             for (int i = 0; i < opts.Options.Length; i++)
             {
                 var opt = opts.Options[i];
-                int x = startX + i * (cardW + spacing);
-                string key = (i + 1).ToString();
-                DrawCard(x, startY, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), key);
+                var (topLeft, _, _) = GetUpgradeCardRect(i, opts.Options.Length, windowWidth, windowHeight);
+                DrawCard((int)topLeft.X, (int)topLeft.Y, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), (i + 1).ToString());
             }
         }
 
-        int hintX = windowWidth / 2 - Raylib.MeasureText("Click a card or press keys", 16) / 2;
-        Raylib.DrawText("Click a card or press keys", hintX, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        string hint = "Click a card or press keys";
+        int hintX = windowWidth / 2 - Raylib.MeasureText(hint, 16) / 2;
+        Raylib.DrawText(hint, hintX, windowHeight / 2 + UpgradeCardHeight / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
-    public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int windowWidth, int windowHeight)
+    public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int windowWidth, int windowHeight)
     {
-        int cardW = 196;
-        int cardH = 140;
-        int spacing = 10;
-        int totalW = cardW * 5 + spacing * 4;
+        int totalW = UpgradeCardWidth * optionCount + UpgradeCardSpacing * (optionCount - 1);
         int startX = Math.Max(10, (windowWidth - totalW) / 2);
-        int startY = windowHeight / 2 - cardH / 2;
+        int startY = windowHeight / 2 - UpgradeCardHeight / 2;
 
-        int x = startX + index * (cardW + spacing);
-        return (new Vector2(x, startY), cardW, cardH);
+        int x = startX + index * (UpgradeCardWidth + UpgradeCardSpacing);
+        return (new Vector2(x, startY), UpgradeCardWidth, UpgradeCardHeight);
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetEngineCardRect(int index, int windowWidth, int windowHeight)
@@ -640,17 +634,16 @@ public static class Renderer
 
     private static void DrawCard(int x, int y, string label, string statValue, Color borderColor, string key)
     {
-        Raylib.DrawRectangle(x, y, 220, 140, new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, 220, 140, borderColor);
+        Raylib.DrawRectangle(x, y, UpgradeCardWidth, UpgradeCardHeight, new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, UpgradeCardWidth, UpgradeCardHeight, borderColor);
 
-        int keyWidth = Raylib.MeasureText(key, 18);
         Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
 
         int labelWidth = Raylib.MeasureText(label, 24);
-        Raylib.DrawText(label, x + 110 - labelWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
+        Raylib.DrawText(label, x + UpgradeCardWidth / 2 - labelWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
 
         int valueWidth = Raylib.MeasureText(statValue, 36);
-        Raylib.DrawText(statValue, x + 110 - valueWidth / 2, y + 75, 36, borderColor);
+        Raylib.DrawText(statValue, x + UpgradeCardWidth / 2 - valueWidth / 2, y + 75, 36, borderColor);
     }
 
     private static string GetUpgradeLabel(UpgradableOption option)
