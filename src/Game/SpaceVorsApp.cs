@@ -124,9 +124,10 @@ public static class SpaceVorsApp
                         var playerPos = em.GetComponent<Position>(playerEntity);
                         var playerRot = em.GetComponent<Rotation>(playerEntity);
                         var playerStats = em.GetComponent<Player>(playerEntity);
+                        var aimCam = em.GetComponent<Camera>(cameraEntity);
 
-                        float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - GetW() / 2f);
-                        float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - GetH() / 2f);
+                        float mouseWorldX = aimCam.Target.X + ((float)Raylib.GetMouseX() - GetW() / 2f);
+                        float mouseWorldY = aimCam.Target.Y + ((float)Raylib.GetMouseY() - GetH() / 2f);
                         Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
                         float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
                         float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
