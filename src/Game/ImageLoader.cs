@@ -11,6 +11,7 @@ public static class ImageLoader
     public static readonly int LargeAsteroidTextureCount = 6;
     public static Texture2D[]? AsteroidSmallTextures { get; private set; }
     public static Texture2D[]? AsteroidLargeTextures { get; private set; }
+    public static Texture2D? MineTexture { get; private set; }
 
     // Enemy ship textures keyed by filename stem (e.g. "enemy-1", "interceptor", "heavy-cannon")
     public static Dictionary<string, Texture2D>? EnemyShipTextures { get; private set; }
@@ -35,6 +36,10 @@ public static class ImageLoader
             largeAsteroidTexs[i] = Raylib.LoadTexture(largeAsteroidFiles[i]);
         }
         AsteroidLargeTextures = largeAsteroidTexs;
+
+        var mineFiles = Directory.GetFiles("assets/mines", "*.png").OrderBy(f => f).ToArray();
+        if (mineFiles.Length > 0)
+            MineTexture = Raylib.LoadTexture(mineFiles[0]);
 
         EnemyShipTextures = LoadDirectoryTextures("assets/enemy-ships");
         PlayerShipTextures = LoadDirectoryTextures("assets/player-ships");
@@ -73,6 +78,12 @@ public static class ImageLoader
                     Raylib.UnloadTexture(tex);
             }
             AsteroidLargeTextures = null;
+        }
+
+        if (MineTexture.HasValue && MineTexture.Value.Id != 0)
+        {
+            Raylib.UnloadTexture(MineTexture.Value);
+            MineTexture = null;
         }
 
         if (EnemyShipTextures != null)

@@ -440,7 +440,35 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            if (em.HasComponent<Health>(entity))
+            if (ImageLoader.MineTexture.HasValue && ImageLoader.MineTexture.Value.Id != 0)
+            {
+                var tex = ImageLoader.MineTexture.Value;
+                float drawDiameter = mine.Radius * 2f;
+                float scale = drawDiameter / tex.Width;
+                float destWidth = tex.Width * scale;
+                float destHeight = tex.Height * scale;
+
+                Raylib.DrawTexturePro(
+                    tex,
+                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    new Rectangle(cx, cy, destWidth, destHeight),
+                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                    0f,
+                    Color.White
+                );
+
+                if (em.HasComponent<Health>(entity))
+                {
+                    var health = em.GetComponent<Health>(entity);
+                    int alpha = health.Current >= 2 ? 180 : 255;
+                    Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, alpha));
+                }
+                else
+                {
+                    Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+                }
+            }
+            else if (em.HasComponent<Health>(entity))
             {
                 var health = em.GetComponent<Health>(entity);
                 int alpha = health.Current >= 2 ? 180 : 255;
@@ -451,7 +479,10 @@ public static class Renderer
                 Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 100, 100, 200));
             }
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+            if (!ImageLoader.MineTexture.HasValue || ImageLoader.MineTexture.Value.Id == 0)
+            {
+                Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+            }
         }
     }
 
