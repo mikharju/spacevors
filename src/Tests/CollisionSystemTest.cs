@@ -259,6 +259,41 @@ public class CollisionSystemTests
     }
 
     [Fact]
+    public void MineVsAsteroid_MultiCellMine_CorrectedOnce()
+    {
+        // A mine straddling a cell boundary occupies two cells. The grid must return it once,
+        // otherwise the position correction is applied twice. Compare against an identical setup
+        // shifted so the mine fits in one cell: results must match.
+        var (velA, deltaA) = RunMineVsAsteroid(mineX: -256f); // straddles boundary x=-256 -> 2 cells
+        var (velB, deltaB) = RunMineVsAsteroid(mineX: -192f); // single cell
+
+        Assert.True(Math.Abs(velA.X - velB.X) < 0.001f, $"Multi-cell mine velocity differs: {velA.X} vs {velB.X}");
+        Assert.True(Math.Abs(deltaA.X - deltaB.X) < 0.001f, $"Multi-cell mine correction differs: {deltaA.X} vs {deltaB.X}");
+    }
+
+    private (Vector2 MineVelocity, Vector2 PositionDelta) RunMineVsAsteroid(float mineX)
+    {
+        var (em, view, system) = Setup();
+        AddPlayer(em);
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(mineX - 30f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
+        em.AddComponent(asteroid, new Velocity(Vector2.Zero));
+
+        var mine = em.CreateEntity();
+        em.AddComponent(mine, new Position(new Vector2(mineX, 0f)));
+        em.AddComponent(mine, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
+        em.AddComponent(mine, new Velocity(Vector2.Zero));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        return (em.GetComponent<Velocity>(mine).Value, em.GetComponent<Position>(mine).Value - new Vector2(mineX, 0f));
+    }
+
+    [Fact]
     public void AmmoVsMine_PhysicsImpulseAndDamage()
     {
         var (em, view, system) = Setup();

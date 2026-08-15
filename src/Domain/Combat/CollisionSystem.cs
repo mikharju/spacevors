@@ -42,6 +42,7 @@ public class CollisionSystem : GameSystem
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
+        bool anyTruncated = false;
 
         view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -120,7 +121,8 @@ public class CollisionSystem : GameSystem
         {
             var asteroid = view.GetComponent<Asteroid>(aEntity);
             float aRadius = asteroid.Radius;
-            int count = _grid.GetQueryItems(aPos.Value, aRadius, queryBuffer);
+            int count = _grid.GetQueryItems(aPos.Value, aRadius, queryBuffer, out bool truncated);
+            if (truncated) anyTruncated = true;
 
             for (int i = 0; i < count; i++)
             {
@@ -132,7 +134,9 @@ public class CollisionSystem : GameSystem
                 ResolveCollision(view, aPos, bPos, aEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
             }
 
-            int count2 = _grid.GetQueryItems(aPos.Value, aRadius + 15f, queryBuffer);
+            int count2 = _grid.GetQueryItems(aPos.Value, aRadius + 15f, queryBuffer, out truncated);
+            if (truncated) anyTruncated = true;
+
             for (int i = 0; i < count2; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
@@ -152,7 +156,8 @@ public class CollisionSystem : GameSystem
         {
             var ship = view.GetComponent<EnemyShip>(sEntity);
             float aRadius = ship.Radius;
-            int count = _grid.GetQueryItems(sPos.Value, aRadius, queryBuffer);
+            int count = _grid.GetQueryItems(sPos.Value, aRadius, queryBuffer, out bool truncated);
+            if (truncated) anyTruncated = true;
 
             for (int i = 0; i < count; i++)
             {
@@ -164,7 +169,9 @@ public class CollisionSystem : GameSystem
                 ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
             }
 
-            int count2 = _grid.GetQueryItems(sPos.Value, aRadius + 15f, queryBuffer);
+            int count2 = _grid.GetQueryItems(sPos.Value, aRadius + 15f, queryBuffer, out truncated);
+            if (truncated) anyTruncated = true;
+
             for (int i = 0; i < count2; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
@@ -197,7 +204,8 @@ public class CollisionSystem : GameSystem
             Vector2 shipHitPos = default;
             float shipDistSq = float.MaxValue;
 
-            int count = _grid.GetQueryItems(ammoPos.Value, ammoRadius, queryBuffer);
+            int count = _grid.GetQueryItems(ammoPos.Value, ammoRadius, queryBuffer, out bool truncated);
+            if (truncated) anyTruncated = true;
 
             for (int i = 0; i < count; i++)
             {
@@ -317,6 +325,9 @@ public class CollisionSystem : GameSystem
         ammoDetectionSw.Stop();
 
         sw.Stop();
+        if (anyTruncated)
+            DiagnosticLogger.LogWarning("CollisionSystem: spatial query buffer truncated; some collisions may be missed");
+
         DiagnosticLogger.LogSystem("Collision: grid build", gridBuildSw.ElapsedTicks);
         DiagnosticLogger.LogSystem("Collision: asteroid collisions", asteroidSw.ElapsedTicks);
         DiagnosticLogger.LogSystem("Collision: ship collisions", shipSw.ElapsedTicks);
