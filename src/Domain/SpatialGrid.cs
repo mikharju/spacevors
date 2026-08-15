@@ -28,9 +28,11 @@ public class SpatialGrid
         float Radius,
         MineSize? Size = null);
 
+    // Reuses cell buckets across frames instead of reallocating them every tick.
     public void Clear()
     {
-        _cells.Clear();
+        foreach (var entries in _cells.Values)
+            entries.Clear();
     }
 
     public void Insert(Entity id, CollisionKind kind, Vector2 position, float radius, MineSize? size = null)

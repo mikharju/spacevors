@@ -8,27 +8,30 @@ public class PerformanceBenchmark
     [Fact]
     public void FullGameLoop_CollisionStressTests()
     {
+        // mustMeetBudget=false: exceeds budget today due to known CollisionSystem perf issues (CODE_REVIEW.md chunk 2); flip to true once fixed
         var scenarios = new[]
         {
-            ("5k ammo + 100 ships", 5000, 100, 0, 0),
-            //("500 ammo + 1k ships + 100 asteroids", 500, 1000, 100, 0),
-            // ("500 ammo + 100 ships + 1k asteroids", 500, 100, 1000, 0),
-            // ("3k mines (few others)", 0, 0, 0, 3000),
-            // ("1k of everything", 1000, 1000, 1000, 1000),
-            // ("15k ammo + 100 each other", 15000, 100, 100, 100),
+            ("5k ammo + 100 ships", 5000, 100, 0, 0, mustMeetBudget: true),
+            ("500 ammo + 1k ships + 100 asteroids", 500, 1000, 100, 0, mustMeetBudget: false),
+            ("500 ammo + 100 ships + 1k asteroids", 500, 100, 1000, 0, mustMeetBudget: false),
+            ("3k mines (few others)", 0, 0, 0, 3000, mustMeetBudget: true),
+            ("1k of everything", 1000, 1000, 1000, 1000, mustMeetBudget: false),
+            ("15k ammo + 100 each other", 15000, 100, 100, 100, mustMeetBudget: true),
         };
 
-        foreach (var (name, ammoCount, shipCount, asteroidCount, mineCount) in scenarios)
+        foreach (var (name, ammoCount, shipCount, asteroidCount, mineCount, mustMeetBudget) in scenarios)
         {
-            RunScenario(name, ammoCount, shipCount, asteroidCount, mineCount);
+            RunScenario(name, ammoCount, shipCount, asteroidCount, mineCount, mustMeetBudget);
         }
     }
 
-    private void RunScenario(string name, int ammoCount, int shipCount, int asteroidCount, int mineCount)
+    private void RunScenario(string name, int ammoCount, int shipCount, int asteroidCount, int mineCount, bool mustMeetBudget)
     {
         const int iterations = 3;
         const int framesPerIteration = 60;
-        const float deltaTime = 1f / 120f;
+        const int targetFps = 120;
+        const double frameBudgetMs = 1000.0 / targetFps;
+        const float deltaTime = 1f / targetFps;
 
         var allTimings = new List<Dictionary<string, double>>();
         var allFrameTimes = new List<double>();
@@ -156,38 +159,33 @@ public class PerformanceBenchmark
             {
                 var view = new WorldView(em);
                 var commands = new CommandBuffer();
+                double frameTime = 0;
+
+                void Record(string name, long ticks)
+                {
+                    double ms = ticks * 1000.0 / Stopwatch.Frequency;
+                    timings[name] = timings.GetValueOrDefault(name, 0) + ms;
+                    frameTime += ms;
+                }
 
                 // Phase 1: movementSystems
-                runner.RunPhase(view, commands, runner.MovementSystems, deltaTime, (name, ticks) =>
-                {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
-                });
+                runner.RunPhase(view, commands, runner.MovementSystems, deltaTime, Record);
                 commands.Apply(em);
 
                 // Phase 2: actionSystems
-                runner.RunPhase(view, commands, runner.ActionSystems, deltaTime, (name, ticks) =>
-                {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
-                });
+                runner.RunPhase(view, commands, runner.ActionSystems, deltaTime, Record);
                 commands.Apply(em);
 
                 // Phase 3: resolutionSystems
-                runner.RunPhase(view, commands, runner.ResolutionSystems, deltaTime, (name, ticks) =>
-                {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
-                });
+                runner.RunPhase(view, commands, runner.ResolutionSystems, deltaTime, Record);
                 commands.Apply(em);
 
                 // Phase 4: cleanupSystems
-                runner.RunPhase(view, commands, runner.CleanupSystems, deltaTime, (name, ticks) =>
-                {
-                    timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
-                });
+                runner.RunPhase(view, commands, runner.CleanupSystems, deltaTime, Record);
                 commands.Apply(em);
 
                 em.AddElapsedTime(deltaTime);
 
-                double frameTime = timings.Values.Sum();
                 allFrameTimes.Add(frameTime);
             }
 
@@ -207,5 +205,13 @@ public class PerformanceBenchmark
 
         double avgFrameTime = allFrameTimes.Average();
         Console.WriteLine($"  {("Total frame time"),-35} {avgFrameTime,6:F2}ms");
+
+        if (avgFrameTime >= frameBudgetMs)
+        {
+            string message = $"{name}: average frame time {avgFrameTime:F2}ms exceeds budget {frameBudgetMs:F2}ms ({targetFps} fps)";
+            if (mustMeetBudget)
+                Assert.Fail(message);
+            Console.WriteLine($"  [WARNING] {message}");
+        }
     }
 }

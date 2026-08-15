@@ -49,6 +49,17 @@ public static class Renderer
         Raylib.EndDrawing();
     }
 
+    private static bool IsOffScreen(float cx, float cy, float extent, int windowWidth, int windowHeight)
+    {
+        return cx < -extent || cx > windowWidth + extent || cy < -extent || cy > windowHeight + extent;
+    }
+
+    // Farthest corner distance of a box drawn centered on its middle.
+    private static float HalfDiagonal(float width, float height)
+    {
+        return 0.5f * MathF.Sqrt(width * width + height * height);
+    }
+
     private static void DrawStarfield(
         List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
         float camX, float camY, int windowWidth, int windowHeight)
@@ -88,14 +99,20 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
-
             float angleDeg = rot.Angle * 180f / MathF.PI;
             Texture2D[]? asteroidTexs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
 
             Texture2D? tex = null;
             if (asteroid.Variant < asteroidTexs!.Length)
                 tex = asteroidTexs[asteroid.Variant];
+
+            float extent = tex.HasValue
+                ? HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+                : HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
+
+            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
+
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
             if (tex.HasValue)
             {
@@ -132,12 +149,19 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
+            Texture2D[]? texs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
+            var tex = texs != null && asteroid.Variant < texs.Length ? texs[asteroid.Variant] : default;
+
+            float extent = tex.Id != 0
+                ? HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Height / tex.Width)
+                : HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
+
+            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
+
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-            Texture2D[]? texs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
-            if (texs != null && asteroid.Variant < texs.Length)
+            if (tex.Id != 0)
             {
-                var tex = texs[asteroid.Variant];
                 float drawDiameter = asteroid.Radius * 2f;
                 float scale = drawDiameter / tex.Width;
                 float destWidth = tex.Width * scale;
@@ -168,6 +192,8 @@ public static class Renderer
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            if (IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
 
             Color color;
             if (ammo.IsEnemy && ammo.Damage > 1)
@@ -205,6 +231,9 @@ public static class Renderer
 
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
             float currentRadius = explosion.Radius * (1f + (1f - lifeRatio));
+
+            if (IsOffScreen(cx, cy, currentRadius, windowWidth, windowHeight)) continue;
+
             int alpha = (int)(255f * lifeRatio);
 
             Color color;
@@ -240,6 +269,9 @@ public static class Renderer
 
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
+
+            if (IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
+
             int r = (int)(lifeRatio * 255);
             int g = (int)(lifeRatio * lifeRatio * 80);
             int b = 0;
@@ -260,6 +292,8 @@ public static class Renderer
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
             float turretSize = 8f;
+            if (IsOffScreen(cx, cy, turretSize / 2f, windowWidth, windowHeight)) continue;
+
             Raylib.DrawRectangle(
                 (int)(cx - turretSize / 2f),
                 (int)(cy - turretSize / 2f),
@@ -295,16 +329,27 @@ public static class Renderer
                 _ => null
             };
 
-            if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var tex) && tex.Id != 0)
+            Texture2D? tex = null;
+            if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var candidate) && candidate.Id != 0)
+                tex = candidate;
+
+            float extent = tex.HasValue
+                ? HalfDiagonal(enemyShip.Radius * 2f, enemyShip.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+                : enemyShip.Radius;
+
+            if (IsOffScreen(screenCx, screenCy, extent, windowWidth, windowHeight)) continue;
+
+            if (tex.HasValue)
             {
+                var t = tex.Value;
                 float drawDiameter = enemyShip.Radius * 2f;
-                float scale = drawDiameter / tex.Width;
-                float destWidth = tex.Width * scale;
-                float destHeight = tex.Height * scale;
+                float scale = drawDiameter / t.Width;
+                float destWidth = t.Width * scale;
+                float destHeight = t.Height * scale;
 
                 Raylib.DrawTexturePro(
-                    tex,
-                    new Rectangle(0f, 0f, tex.Width, tex.Height),
+                    t,
+                    new Rectangle(0f, 0f, t.Width, t.Height),
                     new Rectangle(screenCx, screenCy, destWidth, destHeight),
                     new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
                     angleDeg,
@@ -337,6 +382,11 @@ public static class Renderer
         {
             var shipPos = em.GetComponent<Position>(entity);
             var shipRot = em.GetComponent<Rotation>(entity);
+
+            float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+
+            if (IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
 
             float angle = shipRot.Angle;
             float size = enemyShip.Radius;
@@ -381,8 +431,6 @@ public static class Renderer
                 color
             );
 
-            float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
             float enemyTurretSize = 8f;
             Raylib.DrawRectangle(
                 (int)(cx - enemyTurretSize / 2f),
@@ -440,6 +488,13 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
+            Texture2D? mineTex = ImageLoader.MineTexture;
+            float extent = mineTex.HasValue && mineTex.Value.Id != 0
+                ? HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex.Value.Height / mineTex.Value.Width)
+                : mine.Radius;
+
+            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
+
             if (ImageLoader.MineTexture.HasValue && ImageLoader.MineTexture.Value.Id != 0)
             {
                 var tex = ImageLoader.MineTexture.Value;
@@ -496,6 +551,8 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
+            if (IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
+
             int alpha = pickup.Chased ? 255 : 180;
             Raylib.DrawCircle((int)cx, (int)cy, (int)pickup.Radius, new Color(50, 150, 255, alpha));
         }
@@ -510,6 +567,8 @@ public static class Renderer
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            if (IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)orb.Radius, new Color(50, 255, 100, 200));
         }
@@ -527,6 +586,9 @@ public static class Renderer
 
             float lifeRatio = spark.Lifetime / 0.6f;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
+
+            if (IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
+
             int alpha = (int)(lifeRatio * 255);
 
             Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
@@ -565,6 +627,8 @@ public static class Renderer
             float lifeRatio = marker.Lifetime / 0.5f;
             int alpha = (int)(255f * lifeRatio);
             int boxSize = 16;
+
+            if (IsOffScreen(cx, cy, boxSize / 2f, windowWidth, windowHeight)) continue;
 
             Raylib.DrawRectangleLines((int)cx - boxSize / 2, (int)cy - boxSize / 2, boxSize, boxSize, new Color(0, 255, 0, alpha));
         }
