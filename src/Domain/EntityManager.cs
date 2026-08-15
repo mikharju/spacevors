@@ -6,8 +6,13 @@ public class EntityManager
 {
     private readonly Dictionary<Type, object> _storages = new();
     private int _nextId = 0;
+    private float _elapsedTime = 0f;
 
     public int MaxEntityId => _nextId - 1;
+
+    public float ElapsedTime => _elapsedTime;
+
+    public void AddElapsedTime(float amount) => _elapsedTime += amount;
 
     public Entity CreateEntity()
     {

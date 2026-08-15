@@ -2,40 +2,48 @@ using Spacevors.Domain.Systems;
 
 namespace Spacevors.Domain;
 
-public static class SimulationRunner
+public sealed class SimulationRunner
 {
-    public static readonly GameSystem[] MovementSystems =
-    {
-        new PhysicsSystem(),
-        new BlueSparkHomeSystem(),
-        new PositionIntegrationSystem(),
-        new AmmoLifetimeSystem()
-    };
+    public GameSystem[] MovementSystems { get; }
+    public GameSystem[] ActionSystems { get; }
+    public GameSystem[] ResolutionSystems { get; }
+    public GameSystem[] CleanupSystems { get; }
 
-    public static readonly GameSystem[] ActionSystems =
+    public SimulationRunner()
     {
-        new TurretFiringSystem(),
-        new EnemyShipSpawnSystem()
-    };
+        MovementSystems = new GameSystem[]
+        {
+            new PhysicsSystem(),
+            new BlueSparkHomeSystem(),
+            new PositionIntegrationSystem(),
+            new AmmoLifetimeSystem()
+        };
 
-    public static readonly GameSystem[] ResolutionSystems =
-    {
-        new CollisionSystem(),
-        new PickupMagnetSystem(),
-        new LevelUpSystem(),
-        new ShipDeathExplosionSystem(),
-        new EffectSystem()
-    };
+        ActionSystems = new GameSystem[]
+        {
+            new TurretFiringSystem(),
+            new EnemyShipSpawnSystem()
+        };
 
-    public static readonly GameSystem[] CleanupSystems =
-    {
-        new MineDriftSystem(),
-        new MineRespawnSystem(),
-        new EnemyShipSystem(),
-        new CameraSystem()
-    };
+        ResolutionSystems = new GameSystem[]
+        {
+            new CollisionSystem(),
+            new PickupMagnetSystem(),
+            new LevelUpSystem(),
+            new ShipDeathExplosionSystem(),
+            new EffectSystem()
+        };
 
-    public static void RunPhase(
+        CleanupSystems = new GameSystem[]
+        {
+            new MineDriftSystem(),
+            new MineRespawnSystem(),
+            new EnemyShipSystem(),
+            new CameraSystem()
+        };
+    }
+
+    public void RunPhase(
         WorldView view,
         CommandBuffer commands,
         GameSystem[] phaseSystems,

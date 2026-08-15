@@ -34,7 +34,7 @@ public class MineRespawnSystem : GameSystem
 
         commands.AddEntity(new Position(new Vector2(mx, my)), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)Random.Shared.NextDouble() * 20f, mineAngle), new Health(2));
 
-        float elapsed = ElapsedTime;
+        float elapsed = view.ElapsedTime;
         float rampDuration = 180f;
         float progress = MathF.Min(elapsed / rampDuration, 1f);
         float currentMinInterval = MinInterval + (10 - MinInterval) * (1f - progress);

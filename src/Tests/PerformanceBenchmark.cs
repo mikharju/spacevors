@@ -32,14 +32,13 @@ public class PerformanceBenchmark
         const int framesPerIteration = 60;
         const float deltaTime = 1f / 120f;
 
-        GameSystem.ResetElapsedTime();
-
         var allTimings = new List<Dictionary<string, double>>();
         var allFrameTimes = new List<double>();
 
         for (int iter = 0; iter < iterations; iter++)
         {
             var em = new EntityManager();
+            var runner = new SimulationRunner();
 
             // Player at origin with some initial velocity
             var playerEntity = em.CreateEntity();
@@ -160,32 +159,34 @@ public class PerformanceBenchmark
                 var commands = new CommandBuffer();
 
                 // Phase 1: movementSystems
-                SimulationRunner.RunPhase(view, commands, SimulationRunner.MovementSystems, deltaTime, (name, ticks) =>
+                runner.RunPhase(view, commands, runner.MovementSystems, deltaTime, (name, ticks) =>
                 {
                     timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 2: actionSystems
-                SimulationRunner.RunPhase(view, commands, SimulationRunner.ActionSystems, deltaTime, (name, ticks) =>
+                runner.RunPhase(view, commands, runner.ActionSystems, deltaTime, (name, ticks) =>
                 {
                     timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 3: resolutionSystems
-                SimulationRunner.RunPhase(view, commands, SimulationRunner.ResolutionSystems, deltaTime, (name, ticks) =>
+                runner.RunPhase(view, commands, runner.ResolutionSystems, deltaTime, (name, ticks) =>
                 {
                     timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
 
                 // Phase 4: cleanupSystems
-                SimulationRunner.RunPhase(view, commands, SimulationRunner.CleanupSystems, deltaTime, (name, ticks) =>
+                runner.RunPhase(view, commands, runner.CleanupSystems, deltaTime, (name, ticks) =>
                 {
                     timings[name] = (timings.GetValueOrDefault(name, 0) + ticks * 1000.0 / Stopwatch.Frequency);
                 });
                 commands.Apply(em);
+
+                em.AddElapsedTime(deltaTime);
 
                 double frameTime = timings.Values.Sum();
                 allFrameTimes.Add(frameTime);

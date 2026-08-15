@@ -84,7 +84,7 @@ public static class SpaceVorsApp
             bool gameOver = false;
 
             float accumulator = 0f;
-            GameSystem.ResetElapsedTime();
+            var runner = new SimulationRunner();
 
             while (!Raylib.WindowShouldClose())
             {
@@ -186,20 +186,20 @@ public static class SpaceVorsApp
                         var view = new WorldView(em);
                         var commands = new CommandBuffer();
 
-                        SimulationRunner.RunPhase(view, commands, SimulationRunner.MovementSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
+                        runner.RunPhase(view, commands, runner.MovementSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
                         commands.Apply(em);
 
-                        SimulationRunner.RunPhase(view, commands, SimulationRunner.ActionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
+                        runner.RunPhase(view, commands, runner.ActionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
                         commands.Apply(em);
 
-                        SimulationRunner.RunPhase(view, commands, SimulationRunner.ResolutionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
+                        runner.RunPhase(view, commands, runner.ResolutionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
                         commands.Apply(em);
 
-                        SimulationRunner.RunPhase(view, commands, SimulationRunner.CleanupSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
+                        runner.RunPhase(view, commands, runner.CleanupSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
                         commands.Apply(em);
 
                         accumulator -= FixedDeltaTime;
-                        GameSystem.AddElapsedTime(FixedDeltaTime);
+                        em.AddElapsedTime(FixedDeltaTime);
                     }
 
                     if (!gameOver && em.HasComponent<Dead>(playerEntity))

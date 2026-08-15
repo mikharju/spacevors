@@ -11,6 +11,8 @@ public class WorldView
 
     public int MaxEntityId => _em.MaxEntityId;
 
+    public float ElapsedTime => _em.ElapsedTime;
+
     public ComponentStorage<T> GetStorage<T>() where T : notnull
         => _em.GetStorage<T>();
 

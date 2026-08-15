@@ -69,7 +69,7 @@ public class EnemyShipSpawnSystem : GameSystem
 
         commands.AddEntity(components);
 
-        float elapsed = ElapsedTime;
+        float elapsed = view.ElapsedTime;
         float rampDuration = 180f;
         float progress = MathF.Min(elapsed / rampDuration, 1f);
         float currentMinInterval = MinInterval + (5f - MinInterval) * (1f - progress);
