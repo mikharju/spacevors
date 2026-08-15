@@ -94,88 +94,105 @@ public static class SpaceVorsApp
                 if (Raylib.IsKeyPressed(KeyboardKey.F12))
                     Raylib.TakeScreenshot("screenshot.png");
 
+                if (gameOver && Raylib.IsKeyPressed(KeyboardKey.R))
+                {
+                    showingShipScreen = true;
+                    break;
+                }
+
                 float frameTime = (float)Raylib.GetFrameTime();
                 DiagnosticLogger.UpdateFps(frameTime);
 
                 bool hasPendingChoice = em.GetEntitiesWithComponents<PendingChoice>().Any();
 
+                // Player died on the level-up frame: drop the stale choice and show game over.
+                if (hasPendingChoice && em.HasComponent<Dead>(playerEntity))
+                {
+                    foreach (var (entity, _) in em.GetEntitiesWithComponents<PendingChoice>().ToList())
+                        em.DestroyEntity(entity);
+                    hasPendingChoice = false;
+                    gameOver = true;
+                }
+
                 if (!hasPendingChoice)
                 {
                     accumulator += frameTime;
 
-                    // Handle player input
-                    var playerPos = em.GetComponent<Position>(playerEntity);
-                    var playerRot = em.GetComponent<Rotation>(playerEntity);
-                    var playerStats = em.GetComponent<Player>(playerEntity);
-                    var angVel = em.GetComponent<AngularVelocity>(playerEntity);
-
-                    float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - GetW() / 2f);
-                    float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - GetH() / 2f);
-                    Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
-                    float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
-                    float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
-
-                    float cos = (float)Math.Cos(playerRot.Angle);
-                    float sin = (float)Math.Sin(playerRot.Angle);
-                    Vector2 thrustAccel = Vector2.Zero;
-
-                    // Forward thrust (W) — boost applies only to forward
-                    if (Raylib.IsKeyDown(KeyboardKey.W))
+                    if (!gameOver)
                     {
-                        float forwardForce = playerStats.Thrust;
-                        if (Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift))
-                            forwardForce *= playerStats.Boost;
-                        thrustAccel += new Vector2(sin * forwardForce, -cos * forwardForce);
-                    }
+                        // Handle player input
+                        var playerPos = em.GetComponent<Position>(playerEntity);
+                        var playerRot = em.GetComponent<Rotation>(playerEntity);
+                        var playerStats = em.GetComponent<Player>(playerEntity);
 
-                    // Backward thrust (S)
-                    if (Raylib.IsKeyDown(KeyboardKey.S))
-                    {
-                        thrustAccel += new Vector2(-sin * playerStats.BackThrust, cos * playerStats.BackThrust);
-                    }
+                        float mouseWorldX = playerPos.Value.X + ((float)Raylib.GetMouseX() - GetW() / 2f);
+                        float mouseWorldY = playerPos.Value.Y + ((float)Raylib.GetMouseY() - GetH() / 2f);
+                        Vector2 toMouse = new Vector2(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
+                        float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
+                        float targetAngle = distToMouse > 1f ? (float)Math.Atan2(toMouse.X, -toMouse.Y) : playerRot.Angle;
 
-                    // Left sideways thrust (A)
-                    if (Raylib.IsKeyDown(KeyboardKey.A))
-                    {
-                        thrustAccel += new Vector2(-cos * playerStats.SideThrust, -sin * playerStats.SideThrust);
-                    }
+                        float cos = (float)Math.Cos(playerRot.Angle);
+                        float sin = (float)Math.Sin(playerRot.Angle);
+                        Vector2 thrustAccel = Vector2.Zero;
 
-                    // Right sideways thrust (D)
-                    if (Raylib.IsKeyDown(KeyboardKey.D))
-                    {
-                        thrustAccel += new Vector2(cos * playerStats.SideThrust, sin * playerStats.SideThrust);
-                    }
+                        // Forward thrust (W) — boost applies only to forward
+                        if (Raylib.IsKeyDown(KeyboardKey.W))
+                        {
+                            float forwardForce = playerStats.Thrust;
+                            if (Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift))
+                                forwardForce *= playerStats.Boost;
+                            thrustAccel += new Vector2(sin * forwardForce, -cos * forwardForce);
+                        }
 
-                    em.AddComponent(playerEntity, new Acceleration(thrustAccel));
+                        // Backward thrust (S)
+                        if (Raylib.IsKeyDown(KeyboardKey.S))
+                        {
+                            thrustAccel += new Vector2(-sin * playerStats.BackThrust, cos * playerStats.BackThrust);
+                        }
 
-                    // Mouse aiming: set angular velocity toward cursor (rad/s)
-                    if (distToMouse > 1f)
-                    {
-                        float currentAngle = playerRot.Angle;
-                        float angleDiff = targetAngle - currentAngle;
+                        // Left sideways thrust (A)
+                        if (Raylib.IsKeyDown(KeyboardKey.A))
+                        {
+                            thrustAccel += new Vector2(-cos * playerStats.SideThrust, -sin * playerStats.SideThrust);
+                        }
 
-                        while (angleDiff > MathF.PI) angleDiff -= MathF.PI * 2f;
-                        while (angleDiff < -MathF.PI) angleDiff += MathF.PI * 2f;
+                        // Right sideways thrust (D)
+                        if (Raylib.IsKeyDown(KeyboardKey.D))
+                        {
+                            thrustAccel += new Vector2(cos * playerStats.SideThrust, sin * playerStats.SideThrust);
+                        }
 
-                        float newAngVel = Math.Clamp(angleDiff / FixedDeltaTime, -playerStats.RotationSpeed, playerStats.RotationSpeed);
-                        em.AddComponent(playerEntity, new AngularVelocity(newAngVel));
-                    }
+                        em.AddComponent(playerEntity, new Acceleration(thrustAccel));
 
-                    // Sync turret positions and rotations to player ship
-                    var playerTuples = em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>();
+                        // Mouse aiming: set angular velocity toward cursor (rad/s)
+                        if (distToMouse > 1f)
+                        {
+                            float currentAngle = playerRot.Angle;
+                            float angleDiff = targetAngle - currentAngle;
 
-                    foreach (var (turretEntity, turret, offset, arcOffset) in playerTuples)
-                    {
-                        if (turret.IsEnemy) continue;
-                        var rotatedOffset = new Vector2(
-                            offset.Value.X * cos - offset.Value.Y * sin,
-                            offset.Value.X * sin + offset.Value.Y * cos
-                        );
+                            while (angleDiff > MathF.PI) angleDiff -= MathF.PI * 2f;
+                            while (angleDiff < -MathF.PI) angleDiff += MathF.PI * 2f;
 
-                        Vector2 worldPos = playerPos.Value + rotatedOffset;
-                        float turretAngle = playerRot.Angle + arcOffset.Angle;
-                        em.AddComponent(turretEntity, new Position(worldPos));
-                        em.AddComponent(turretEntity, new Rotation(turretAngle));
+                            float newAngVel = Math.Clamp(angleDiff / FixedDeltaTime, -playerStats.RotationSpeed, playerStats.RotationSpeed);
+                            em.AddComponent(playerEntity, new AngularVelocity(newAngVel));
+                        }
+
+                        // Sync turret positions and rotations to player ship
+                        var playerTuples = em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>();
+
+                        foreach (var (turretEntity, turret, offset, arcOffset) in playerTuples)
+                        {
+                            if (turret.IsEnemy) continue;
+                            var rotatedOffset = new Vector2(
+                                offset.Value.X * cos - offset.Value.Y * sin,
+                                offset.Value.X * sin + offset.Value.Y * cos
+                            );
+
+                            Vector2 worldPos = playerPos.Value + rotatedOffset;
+                            float turretAngle = playerRot.Angle + arcOffset.Angle;
+                            em.AddComponent(turretEntity, new Position(worldPos));
+                            em.AddComponent(turretEntity, new Rotation(turretAngle));
+                        }
                     }
 
                     // Fixed timestep simulation

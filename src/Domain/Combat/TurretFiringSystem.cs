@@ -6,11 +6,14 @@ public class TurretFiringSystem : GameSystem
 {
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
+        bool playerDead = IsPlayerDead(view);
+
         var turrets = view.GetEntitiesWithComponents<Turret, Position, Rotation>().ToList();
 
         foreach (var (turretEntity, turret, turretPos, turretRot) in turrets)
         {
             if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
+            if (!turret.IsEnemy && playerDead) continue;
 
             var cooldown = CooldownHelper.GetCooldown(view, turretEntity);
 
@@ -35,6 +38,12 @@ public class TurretFiringSystem : GameSystem
                 commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(Math.Max(newCooldown, 0f))));
             }
         }
+    }
+
+    private static bool IsPlayerDead(WorldView view)
+    {
+        view.GetEntitiesWithComponents<Player>().TryFirst(out var player);
+        return player.Entity.Value >= 0 && view.TryGetComponent<Dead>(player.Entity, out _);
     }
 
     private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)

@@ -17,6 +17,7 @@ public class LevelUpSystem : GameSystem
         view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
         if (playerEntity.Value < 0) return;
+        if (view.TryGetComponent<Dead>(playerEntity, out _)) return;
 
         var playerPos = playerTuple.Value2;
 
