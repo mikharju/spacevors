@@ -259,6 +259,39 @@ public class CollisionSystemTests
     }
 
     [Fact]
+    public void EnemyShipVsAsteroid_PhysicsBounce()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
+        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, DetectionRange: 500f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, Damage: 1, GraphicsId: 0));
+        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Velocity(new Vector2(50f, 0f)));
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(-475f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
+        em.AddComponent(asteroid, new Velocity(Vector2.Zero));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.True(em.HasComponent<Velocity>(ship), "Ship should have Velocity after collision with asteroid");
+        Assert.True(em.HasComponent<Velocity>(asteroid), "Asteroid should have Velocity after collision with ship");
+
+        var shipVel = em.GetComponent<Velocity>(ship).Value;
+        var asteroidVel = em.GetComponent<Velocity>(asteroid).Value;
+
+        // Ship moving right hits stationary asteroid → ship slows, asteroid pushed right
+        Assert.True(shipVel.X < 50f, $"Ship should lose rightward speed, got {shipVel.X}");
+        Assert.True(asteroidVel.X > 0f, $"Asteroid should be pushed right (positive X), got {asteroidVel.X}");
+    }
+
+    [Fact]
     public void MineVsAsteroid_MultiCellMine_CorrectedOnce()
     {
         // A mine straddling a cell boundary occupies two cells. The grid must return it once,

@@ -43,6 +43,7 @@ public class CollisionSystem : GameSystem
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
         bool anyTruncated = false;
+        Span<SpatialGrid.SpatialItem> queryBuffer = stackalloc SpatialGrid.SpatialItem[256];
 
         view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -96,26 +97,21 @@ public class CollisionSystem : GameSystem
                 ResolveCollision(view, aPos, bPos, entity, playerEntity, ship.Radius, playerTuple.Value1.Radius, false, commands, 3000f);
             });
 
-            foreach (var (aEntity, aPos) in _asteroidPositions)
-            {
-                var asteroid = view.GetComponent<Asteroid>(aEntity);
-                float radiusSum2 = ship.Radius + asteroid.Radius;
-                var diff2 = pos.Value - aPos.Value;
-                float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
+            int asteroidCount = _grid.GetQueryItems(pos.Value, ship.Radius, queryBuffer, out bool truncated);
+            if (truncated) anyTruncated = true;
 
-                if (distSq2 < radiusSum2 * radiusSum2 && distSq2 >= 0.001f)
-                {
-                    var shipPos = view.GetComponent<Position>(entity);
-                    ResolveCollision(view, shipPos, aPos, entity, aEntity, ship.Radius, asteroid.Radius, true, commands, 3000f);
-                }
+            for (int i = 0; i < asteroidCount; i++)
+            {
+                ref readonly var candidate = ref queryBuffer[i];
+                if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
+
+                ResolveCollision(view, pos, new Position(candidate.Position), entity, candidate.Id, ship.Radius, candidate.Radius, true, commands, 3000f);
             }
         }
 
         gridBuildSw.Stop();
 
         var asteroidSw = Stopwatch.StartNew();
-
-        Span<SpatialGrid.SpatialItem> queryBuffer = stackalloc SpatialGrid.SpatialItem[256];
 
         foreach (var (aEntity, aPos) in _asteroidPositions)
         {
