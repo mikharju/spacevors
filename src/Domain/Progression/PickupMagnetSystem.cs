@@ -6,6 +6,7 @@ public class PickupMagnetSystem : GameSystem
 {
     const float MagnetAcceleration = 800f;
     const float MaxMagnetSpeed = 350f;
+    const int HealthOrbHealAmount = 3;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -23,6 +24,7 @@ public class PickupMagnetSystem : GameSystem
     private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
     {
         var playerStats = view.GetComponent<Player>(playerEntity);
+        int totalXpGained = 0;
 
         foreach (var (pickupEntity, pickup, pos) in view.GetEntitiesWithComponents<XpPickup, Position>())
         {
@@ -54,7 +56,7 @@ public class PickupMagnetSystem : GameSystem
             float collectionDist = playerStats.Radius + pickup.Radius;
             if (dist < collectionDist)
             {
-                ApplyXp(view, playerEntity, pickup.XpAmount, commands);
+                totalXpGained += pickup.XpAmount;
                 commands.Add(new DestroyEntityCommand(pickupEntity));
                 continue;
             }
@@ -67,11 +69,19 @@ public class PickupMagnetSystem : GameSystem
             commands.Add(new AddComponentCommand<Velocity>(pickupEntity, new Velocity(newVel)));
             commands.Add(new AddComponentCommand<XpPickup>(pickupEntity, new XpPickup(pickup.XpAmount, newLifetime, pickup.Radius, true)));
         }
+
+        if (totalXpGained > 0)
+        {
+            // Mutate directly so LevelUpSystem (same phase, runs later) reads the fresh value.
+            ref Player player = ref view.GetComponentRef<Player>(playerEntity);
+            player = player with { Xp = player.Xp + totalXpGained };
+        }
     }
 
     private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
     {
         var playerStats = view.GetComponent<Player>(playerEntity);
+        int totalHeal = 0;
 
         foreach (var (orbEntity, orb, pos) in view.GetEntitiesWithComponents<HealthOrb, Position>())
         {
@@ -106,35 +116,18 @@ public class PickupMagnetSystem : GameSystem
             float collectionDist = playerStats.Radius + orb.Radius;
             if (dist < collectionDist)
             {
-                ApplyHealth(view, playerEntity, commands);
+                totalHeal += HealthOrbHealAmount;
                 SpawnGreenExplosion(view, position: pos.Value, commands);
                 commands.Add(new DestroyEntityCommand(orbEntity));
             }
         }
-    }
 
-    private void ApplyXp(WorldView view, Entity playerEntity, int xpAmount, CommandBuffer commands)
-    {
-        var playerStats = view.GetComponent<Player>(playerEntity);
-        commands.Add(new AddComponentCommand<Player>(playerEntity, new Player(
-            playerStats.Thrust,
-            playerStats.SideThrust,
-            playerStats.BackThrust,
-            playerStats.Boost,
-            Radius: playerStats.Radius,
-            Xp: playerStats.Xp + xpAmount,
-            Level: playerStats.Level,
-            PickupRadius: playerStats.PickupRadius,
-            RotationSpeed: playerStats.RotationSpeed,
-            MaxHealth: playerStats.MaxHealth)));
-    }
-
-    private void ApplyHealth(WorldView view, Entity playerEntity, CommandBuffer commands)
-    {
-        var health = view.GetComponent<Health>(playerEntity);
-        var playerStats = view.GetComponent<Player>(playerEntity);
-        int healed = Math.Min(health.Current + 3, playerStats.MaxHealth);
-        commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed)));
+        if (totalHeal > 0)
+        {
+            var health = view.GetComponent<Health>(playerEntity);
+            int healed = Math.Min(health.Current + totalHeal, playerStats.MaxHealth);
+            commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed)));
+        }
     }
 
     private void SpawnGreenExplosion(WorldView view, Vector2 position, CommandBuffer commands)

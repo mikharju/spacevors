@@ -771,7 +771,7 @@ public class CollisionSystem : GameSystem
 
         commands.AddEntity(new Position(position), new XpPickup(xpAmount, Radius: xpRadius));
 
-        if (Random.Shared.NextDouble() < 0.5f)
+        if (Random.Shared.NextDouble() < 0.05)
         {
             commands.AddEntity(new Position(position), new HealthOrb(Radius: xpRadius + 2f));
         }
@@ -781,7 +781,7 @@ public class CollisionSystem : GameSystem
     {
         commands.AddEntity(new Position(position), new XpPickup(3, Radius: 18f));
 
-        if (Random.Shared.NextDouble() < 0.5f)
+        if (Random.Shared.NextDouble() < 0.05)
         {
             commands.AddEntity(new Position(position), new HealthOrb(Radius: 20f));
         }

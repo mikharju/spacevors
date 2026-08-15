@@ -4,6 +4,8 @@ namespace Spacevors.Domain.Systems;
 
 public class LevelUpSystem : GameSystem
 {
+    const int MilestoneLevelInterval = 5;
+
     private static readonly WeaponType[] AllNewWeapons = [
         WeaponType.RailGun,
         WeaponType.TwinChainGun,
@@ -23,22 +25,14 @@ public class LevelUpSystem : GameSystem
 
         if (playerStats.Xp >= xpThreshold)
         {
-            SpawnLevelUpChoice(view, playerEntity, playerPos.Value, commands);
-            commands.Add(new AddComponentCommand<Player>(playerEntity, new Player(
-                playerStats.Thrust,
-                playerStats.SideThrust,
-                playerStats.BackThrust,
-                playerStats.Boost,
-                Radius: playerStats.Radius,
-                Xp: playerStats.Xp,
-                Level: playerStats.Level + 1,
-                PickupRadius: playerStats.PickupRadius,
-                RotationSpeed: playerStats.RotationSpeed,
-                MaxHealth: playerStats.MaxHealth)));
+            int newLevel = playerStats.Level + 1;
+            bool isMilestoneLevel = newLevel % MilestoneLevelInterval == 0;
+            SpawnLevelUpChoice(view, playerEntity, playerPos.Value, isMilestoneLevel, commands);
+            commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
         }
     }
 
-    private void SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, CommandBuffer commands)
+    private void SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, bool isMilestoneLevel, CommandBuffer commands)
     {
         var turrets = new List<Turret>();
         foreach (var t in view.GetEntitiesWithComponents<Turret>())
@@ -50,9 +44,6 @@ public class LevelUpSystem : GameSystem
 
         var weaponNames = turrets.Select(t => t.WeaponName).Distinct().ToList();
         var allOptions = new List<UpgradableOption>();
-
-        int playerLevel = view.GetComponent<Player>(playerEntity).Level;
-        bool isMilestoneLevel = playerLevel % 5 == 0;
 
         if (isMilestoneLevel)
         {
