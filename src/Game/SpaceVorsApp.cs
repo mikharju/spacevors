@@ -117,6 +117,7 @@ public static class SpaceVorsApp
                 if (!hasPendingChoice)
                 {
                     accumulator += frameTime;
+                    bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
 
                     if (!gameOver)
                     {
@@ -194,6 +195,12 @@ public static class SpaceVorsApp
                             em.AddComponent(turretEntity, new Position(worldPos));
                             em.AddComponent(turretEntity, new Rotation(turretAngle));
                         }
+
+                        // Diagnostic only: force level-up to test the upgrade screen
+                        if (diagnostics && Raylib.IsKeyPressed(KeyboardKey.L))
+                        {
+                            em.AddComponent(playerEntity, playerStats with { Xp = playerStats.Level * 10 });
+                        }
                     }
 
                     // Fixed timestep simulation
@@ -227,7 +234,6 @@ public static class SpaceVorsApp
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
                     var gameFrameStart = Raylib.GetTime();
-                    bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
                     Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip, diagnostics);
 
                     float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
