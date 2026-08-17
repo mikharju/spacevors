@@ -19,37 +19,41 @@ public static class SpaceVorsApp
         Raylib.InitWindow(DefaultWindowWidth, DefaultWindowHeight, "SpaceVors");
 
         ImageLoader.LoadAssets();
+        Lighting.Init();
 
         int GetW() => Raylib.GetScreenWidth();
         int GetH() => Raylib.GetScreenHeight();
 
         ShipType chosenShip = ShipType.Scout;
         bool showingShipScreen = true;
+        var shipKeys = new[] { KeyboardKey.One, KeyboardKey.Two, KeyboardKey.Three, KeyboardKey.Four };
 
         while (!Raylib.WindowShouldClose())
         {
             if (showingShipScreen)
             {
-                bool pressed1 = Raylib.IsKeyPressed(KeyboardKey.One);
-                bool pressed2 = Raylib.IsKeyPressed(KeyboardKey.Two);
-                bool pressed3 = Raylib.IsKeyPressed(KeyboardKey.Three);
+                int selectedShipIndex = -1;
+                for (int i = 0; i < ShipType.All.Length && i < shipKeys.Length; i++)
+                {
+                    if (Raylib.IsKeyPressed(shipKeys[i]))
+                    {
+                        selectedShipIndex = i;
+                        break;
+                    }
+                }
 
-                if (pressed1) chosenShip = ShipType.Scout;
-                else if (pressed2) chosenShip = ShipType.Fighter;
-                else if (pressed3) chosenShip = ShipType.Heavy;
-
-                bool shipSelected = pressed1 || pressed2 || pressed3;
-                if (!shipSelected && Raylib.IsMouseButtonPressed(MouseButton.Left))
+                if (selectedShipIndex >= 0) chosenShip = ShipType.All[selectedShipIndex];
+                else if (Raylib.IsMouseButtonPressed(MouseButton.Left))
                 {
                     int mouseX = Raylib.GetMouseX();
                     int mouseY = Raylib.GetMouseY();
-                    for (int i = 0; i < 3; i++)
+                    for (int i = 0; i < ShipType.All.Length; i++)
                     {
                         var (topLeft, w, h) = Renderer.GetShipCardRect(i, GetW(), GetH());
                         if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                         {
-                            chosenShip = i switch { 0 => ShipType.Scout, 1 => ShipType.Fighter, _ => ShipType.Heavy };
-                            shipSelected = true;
+                            chosenShip = ShipType.All[i];
+                            selectedShipIndex = i;
                             break;
                         }
                     }
@@ -73,7 +77,7 @@ public static class SpaceVorsApp
                     Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
                 }
 
-                if (shipSelected)
+                if (selectedShipIndex >= 0)
                     showingShipScreen = false;
 
                 continue;
@@ -328,6 +332,7 @@ public static class SpaceVorsApp
             }
         }
 
+        Lighting.Shutdown();
         ImageLoader.UnloadAssets();
         Raylib.CloseWindow();
     }

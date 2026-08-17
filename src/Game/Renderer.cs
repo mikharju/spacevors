@@ -1,3 +1,4 @@
+using System.Linq;
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
@@ -941,63 +942,78 @@ public static class Renderer
         }
     }
 
+    const int ShipCardWidth = 340;
+    const int ShipCardHeight = 160;
+    const int ShipCardSpacing = 60;
+
     public static void DrawShipCards(int windowWidth, int windowHeight)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
 
-        var ships = new[] { ShipType.Scout, ShipType.Fighter, ShipType.Heavy };
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 3 + spacing * 2;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
+        var ships = ShipType.All;
+        var (startX, startY) = GetShipCardOrigin(windowWidth, windowHeight);
 
         for (int i = 0; i < ships.Length; i++)
         {
             var ship = ships[i];
             string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Weapon.Turrets.Count} turret{(ship.Weapon.Turrets.Count > 1 ? "s" : "")}";
             var borderColor = new Raylib_cs.Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
-            DrawShipCard(startX + i * (cardW + spacing), startY, ship.Name, stats, borderColor, $"{i + 1}");
+            DrawShipCard(startX + i * (ShipCardWidth + ShipCardSpacing), startY, ship.Name, stats, borderColor, $"{i + 1}");
 
-            var cardBottom = startY + cardH - 15;
-            DrawShipPreview((float)(startX + i * (cardW + spacing) + cardW / 2), cardBottom, ship, 1.6f);
+            var cardBottom = startY + ShipCardHeight - 15;
+            DrawShipPreview((float)(startX + i * (ShipCardWidth + ShipCardSpacing) + ShipCardWidth / 2), cardBottom, ship);
         }
 
-        Raylib.DrawText("Click a card or press 1, 2, 3", windowWidth / 2 - 140, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
+        string hint = $"Click a card or press {string.Join(", ", Enumerable.Range(1, ships.Length))}";
+        int hintWidth = Raylib.MeasureText(hint, 16);
+        Raylib.DrawText(hint, windowWidth / 2 - hintWidth / 2, windowHeight / 2 + ShipCardHeight / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
-    private static void DrawShipPreview(float cx, float cy, ShipType ship, float scale)
+    private static (int X, int Y) GetShipCardOrigin(int windowWidth, int windowHeight)
     {
-        if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(ship.Name.ToLower(), out var tex) && tex.Id != 0)
-        {
-            float drawDiameter = ship.Radius * 2f * scale;
-            float textureScale = drawDiameter / tex.Width;
-            float destWidth = tex.Width * textureScale;
-            float destHeight = tex.Height * textureScale;
+        int count = ShipType.All.Length;
+        int totalW = ShipCardWidth * count + ShipCardSpacing * (count - 1);
+        return ((windowWidth - totalW) / 2, windowHeight / 2 - ShipCardHeight / 2);
+    }
 
-            Raylib.DrawTexturePro(
-                tex,
-                new Rectangle(0f, 0f, tex.Width, tex.Height),
-                new Rectangle(cx, cy, destWidth, destHeight),
-                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                0f,
-                Color.White
-            );
-        }
+    private static void DrawShipPreview(float cx, float cy, ShipType ship)
+    {
+        const float PreviewZoom = 1.6f;
+        DrawShipSprite(ship, cx, cy, ship.Radius * 2f * PreviewZoom, 0f);
+    }
+
+    // Draws the ship sprite: lit (normal + depth maps) when available, otherwise flat texture.
+    private static void DrawShipSprite(ShipType ship, float cx, float cy, float diameter, float angleDeg)
+    {
+        string key = ship.Name.ToLower();
+
+        LitSprite? lit = null;
+        Texture2D? tex = null;
+        if (ImageLoader.PlayerShipLitSprites != null && ImageLoader.PlayerShipLitSprites.TryGetValue(key, out var litSprite))
+            lit = litSprite;
+        else if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(key, out var flat) && flat.Id != 0)
+            tex = flat;
+
+        Texture2D baseTex;
+        if (lit != null) baseTex = lit.Base;
+        else if (tex.HasValue) baseTex = tex.Value;
+        else return;
+        if (baseTex.Id == 0) return;
+
+        float scale = diameter / baseTex.Width;
+        var source = new Rectangle(0f, 0f, baseTex.Width, baseTex.Height);
+        var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
+        var origin = new System.Numerics.Vector2(dest.Width / 2f, dest.Height / 2f);
+
+        if (lit != null && Lighting.TryDraw(lit, source, dest, origin, angleDeg)) return;
+
+        Raylib.DrawTexturePro(baseTex, source, dest, origin, angleDeg, Color.White);
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetShipCardRect(int index, int windowWidth, int windowHeight)
     {
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 3 + spacing * 2;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
-
-        int x = startX + index * (cardW + spacing);
-        return (new Vector2(x, startY), cardW, cardH);
+        var (startX, startY) = GetShipCardOrigin(windowWidth, windowHeight);
+        return (new Vector2(startX + index * (ShipCardWidth + ShipCardSpacing), startY), ShipCardWidth, ShipCardHeight);
     }
 
     private static void DrawShipCard(int x, int y, string title, string details, Color borderColor, string key)
@@ -1028,22 +1044,7 @@ public static class Renderer
         float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
         float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-        if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(shipType.Name.ToLower(), out var tex) && tex.Id != 0)
-        {
-            float drawDiameter = shipType.Radius * 2f;
-            float scale = drawDiameter / tex.Width;
-            float destWidth = tex.Width * scale;
-            float destHeight = tex.Height * scale;
-
-            Raylib.DrawTexturePro(
-                tex,
-                new Rectangle(0f, 0f, tex.Width, tex.Height),
-                new Rectangle(screenCx, screenCy, destWidth, destHeight),
-                new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                angleDeg,
-                Color.White
-            );
-        }
+        DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg);
 
         if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
     }

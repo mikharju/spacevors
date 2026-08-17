@@ -128,6 +128,17 @@ Enemy variants.
 - Standard: unchanged (20px), red, baseline stats
 - All three spawn equally (~33% each)
 
+## Phase 5
+
+Dynamic lighting.
+
+- per-sprite normal + depth maps: `<name>-normals.png`, `<name>-depth.png` next to `<name>-texture.png`
+- GLSL shader (src/Game/Lighting.cs): directional light from top-right, self-shadowing via depth map
+- flat texture fallback when maps or shader are unavailable
+- Stage 1 (done): LitSprite matching in ImageLoader + tests
+- Stage 2 (done): Shadow ship (key 4), Lighting.Init/Shutdown/TryDraw, select screen + gameplay rendering
+- Stage 3: tuning — exposure/washout on bright textures, normal Y convention check, shadow strength
+
 ## Phase 6
 
 Content.

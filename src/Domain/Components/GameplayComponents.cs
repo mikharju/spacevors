@@ -149,4 +149,21 @@ public readonly record struct ShipType(
         WingSpread: 0.5f,
         MaxWeaponSlots: 3,
         PickupRadius: 230f);
+
+    public static ShipType Shadow { get; } = new(
+        "Shadow",
+        "Pursuit engines, railgun",
+        EngineLayout.Pursuit,
+        WeaponLoadout.RailGun,
+        MaxHealth: 10,
+        Radius: 58f,
+        DrawR: 140,
+        DrawG: 150,
+        DrawB: 170,
+        NoseLength: 58f,
+        WingSpread: 0.4f,
+        MaxWeaponSlots: 2,
+        PickupRadius: 160f);
+
+    public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow];
 }
