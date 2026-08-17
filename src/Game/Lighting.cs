@@ -34,10 +34,10 @@ public static class Lighting
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
         const vec3 LightDir = normalize(vec3(0.6, -0.6, 0.5));
-        const float AmbientLevel = 0.45;
+        const float AmbientLevel = 0.30;
         const float ShadowUvOffset = 0.02;
         const float ShadowDepthBias = 0.03;
-        const float ShadowDiffuseScale = 0.4;
+        const float ShadowDiffuseScale = 0.15;
 
         void main()
         {
