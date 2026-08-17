@@ -58,6 +58,16 @@ public static class DiagnosticLogger
         }
     }
 
+    public static void LogEvent(string tag, string message)
+    {
+        if (!_enabled) return;
+
+        lock (_lock)
+        {
+            Console.WriteLine($"[{tag}] {message}");
+        }
+    }
+
     public static void LogMouse(int x, int y, bool leftDown, bool rightDown, bool middleDown)
     {
         if (!_enabled) return;

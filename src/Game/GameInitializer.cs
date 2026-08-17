@@ -20,7 +20,12 @@ public static class GameInitializer
 
         em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
-        em.AddComponent(playerEntity, new WeaponSlots(shipType.Weapon.Turrets.Count, shipType.MaxWeaponSlots));
+
+        // A slot is one distinct weapon type (matches LevelUpSystem and AddNewWeaponTurret).
+        int usedSlots = shipType.Weapon.Turrets.Select(t => t.Weapon.Name).Distinct().Count();
+        em.AddComponent(playerEntity, new WeaponSlots(usedSlots, shipType.MaxWeaponSlots));
+
+        bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
 
         // Create camera
         var cameraEntity = em.CreateEntity();
@@ -28,15 +33,16 @@ public static class GameInitializer
 
         var rand = em.Rng;
 
-        // One close asteroid within initial view range
+        // One close asteroid within initial view range.
+        // Diagnostics: fixed position directly ahead of the ship so weapon firing is testable deterministically.
         {
             var asteroid = em.CreateEntity();
-            float angle = (float)(rand.NextDouble() * Math.PI * 2f);
-            float dist = 150f + (float)rand.NextDouble() * 1500f;
+            float angle = diagnostics ? 3f * MathF.PI / 2f : (float)(rand.NextDouble() * Math.PI * 2f);
+            float dist = diagnostics ? 300f : 150f + (float)rand.NextDouble() * 1500f;
             float ax = (float)Math.Cos(angle) * dist;
             float ay = (float)Math.Sin(angle) * dist;
-            float aSpeed = 15f + (float)rand.NextDouble() * 35f;
-            float aAngle = (float)(rand.NextDouble() * Math.PI * 2);
+            float aSpeed = diagnostics ? 10f : 15f + (float)rand.NextDouble() * 35f;
+            float aAngle = angle;
             AsteroidFactory.AddAsteroidComponents(em, asteroid, new Vector2(ax, ay), aSpeed, aAngle, rand);
         }
 

@@ -534,7 +534,11 @@ public static class SpaceVorsApp
     private static void AddNewWeaponTurret(EntityManager em, Entity playerEntity, string weaponName)
     {
         var slots = em.GetComponent<WeaponSlots>(playerEntity);
-        if (slots.Used >= slots.Max) return;
+        if (slots.Used >= slots.Max)
+        {
+            DiagnosticLogger.LogEvent("UPGRADE", $"new weapon {weaponName} skipped: no free weapon slots ({slots.Used}/{slots.Max})");
+            return;
+        }
 
         var playerPos = em.GetComponent<Position>(playerEntity);
         var playerRot = em.GetComponent<Rotation>(playerEntity);
@@ -557,5 +561,6 @@ public static class SpaceVorsApp
         em.AddComponent(turretEntity, new ArcOffset(definition.ArcOffset));
 
         em.AddComponent(playerEntity, new WeaponSlots(slots.Used + 1, slots.Max));
+        DiagnosticLogger.LogEvent("UPGRADE", $"added new weapon {weaponName} (slots {slots.Used + 1}/{slots.Max})");
     }
 }

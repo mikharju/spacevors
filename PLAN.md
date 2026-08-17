@@ -54,6 +54,10 @@ Goal:
 - Space: brake (optional)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
+### Diagnostics env vars (testing only)
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up
+- SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
+
 ## MVP
 
 - player ship
