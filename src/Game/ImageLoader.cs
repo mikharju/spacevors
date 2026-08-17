@@ -19,6 +19,10 @@ public static class ImageLoader
     // Player ship textures keyed by filename stem (e.g. "scout", "fighter", "heavy")
     public static Dictionary<string, Texture2D>? PlayerShipTextures { get; private set; }
 
+    // Lit sprites keyed by name prefix (e.g. "shadow" from shadow-texture/-normals/-depth.png)
+    public static Dictionary<string, LitSprite>? EnemyShipLitSprites { get; private set; }
+    public static Dictionary<string, LitSprite>? PlayerShipLitSprites { get; private set; }
+
     public static void LoadAssets()
     {
         var smallAsteroidFiles = Directory.GetFiles("assets/asteroids/small", "*.png").OrderBy(f => f).ToArray();
@@ -41,21 +45,42 @@ public static class ImageLoader
         if (mineFiles.Length > 0)
             MineTexture = Raylib.LoadTexture(mineFiles[0]);
 
-        EnemyShipTextures = LoadDirectoryTextures("assets/enemy-ships");
-        PlayerShipTextures = LoadDirectoryTextures("assets/player-ships");
+        var enemyShips = LoadShipTextures("assets/enemy-ships");
+        EnemyShipTextures = enemyShips.Flat;
+        EnemyShipLitSprites = enemyShips.Lit;
+
+        var playerShips = LoadShipTextures("assets/player-ships");
+        PlayerShipTextures = playerShips.Flat;
+        PlayerShipLitSprites = playerShips.Lit;
     }
 
-    private static Dictionary<string, Texture2D> LoadDirectoryTextures(string directory)
+    private static (Dictionary<string, Texture2D> Flat, Dictionary<string, LitSprite> Lit) LoadShipTextures(string directory)
     {
-        var dict = new Dictionary<string, Texture2D>();
-        if (!Directory.Exists(directory)) return dict;
+        var flat = new Dictionary<string, Texture2D>();
+        var lit = new Dictionary<string, LitSprite>();
+        if (!Directory.Exists(directory)) return (flat, lit);
 
-        foreach (var file in Directory.GetFiles(directory, "*.png"))
+        var byStem = new Dictionary<string, string>();
+        foreach (var file in Directory.GetFiles(directory, "*.png").OrderBy(f => f))
+            byStem[Path.GetFileNameWithoutExtension(file)] = file;
+
+        var consumed = new HashSet<string>();
+        foreach (var set in LitSpriteMatcher.Match(byStem.Keys))
         {
-            string stem = Path.GetFileNameWithoutExtension(file);
-            dict[stem] = Raylib.LoadTexture(file);
+            lit[set.Prefix] = new LitSprite(
+                Raylib.LoadTexture(byStem[set.BaseStem]),
+                Raylib.LoadTexture(byStem[set.NormalsStem]),
+                Raylib.LoadTexture(byStem[set.DepthStem]));
+            consumed.Add(set.BaseStem);
+            consumed.Add(set.NormalsStem);
+            consumed.Add(set.DepthStem);
         }
-        return dict;
+
+        foreach (var pair in byStem)
+            if (!consumed.Contains(pair.Key))
+                flat[pair.Key] = Raylib.LoadTexture(pair.Value);
+
+        return (flat, lit);
     }
 
     public static void UnloadAssets()
@@ -96,6 +121,9 @@ public static class ImageLoader
             EnemyShipTextures = null;
         }
 
+        UnloadLitSprites(EnemyShipLitSprites);
+        EnemyShipLitSprites = null;
+
         if (PlayerShipTextures != null)
         {
             foreach (var tex in PlayerShipTextures.Values)
@@ -104,6 +132,21 @@ public static class ImageLoader
                     Raylib.UnloadTexture(tex);
             }
             PlayerShipTextures = null;
+        }
+
+        UnloadLitSprites(PlayerShipLitSprites);
+        PlayerShipLitSprites = null;
+    }
+
+    private static void UnloadLitSprites(Dictionary<string, LitSprite>? litSprites)
+    {
+        if (litSprites == null) return;
+
+        foreach (var sprite in litSprites.Values)
+        {
+            if (sprite.Base.Id != 0) Raylib.UnloadTexture(sprite.Base);
+            if (sprite.Normals.Id != 0) Raylib.UnloadTexture(sprite.Normals);
+            if (sprite.Depth.Id != 0) Raylib.UnloadTexture(sprite.Depth);
         }
     }
 }
