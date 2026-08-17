@@ -311,8 +311,7 @@ public static class SpaceVorsApp
 
                     var pauseFrameStart = Raylib.GetTime();
                     bool pauseDiagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
-                    Renderer.Render(em, upgradeCamX, upgradeCamY, GetW(), GetH(), false, stars, clutter, playerEntity, chosenShip, pauseDiagnostics);
-                    Renderer.DrawUpgradeCards(GetW(), GetH(), upgradeOptions, playerLevel);
+                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, pauseDiagnostics, upgradeOptions, playerLevel);
 
                     float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
                     if (frameElapsed2 < MaxFrameTime)

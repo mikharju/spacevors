@@ -19,6 +19,44 @@ public static class Renderer
         bool diagnostics)
     {
         Raylib.BeginDrawing();
+        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
+
+        if (gameOver)
+        {
+            Raylib.DrawText("GAME OVER", windowWidth / 2 - 80, windowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
+        }
+
+        Raylib.EndDrawing();
+    }
+
+    public static void RenderUpgradePause(
+        EntityManager em,
+        float camX, float camY,
+        int windowWidth, int windowHeight,
+        List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
+        List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
+        Entity playerEntity,
+        ShipType shipType,
+        bool diagnostics,
+        PendingUpgradeOptions? upgradeOptions,
+        int playerLevel)
+    {
+        Raylib.BeginDrawing();
+        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
+        DrawUpgradeCards(windowWidth, windowHeight, upgradeOptions, playerLevel);
+        Raylib.EndDrawing();
+    }
+
+    private static void DrawScene(
+        EntityManager em,
+        float camX, float camY,
+        int windowWidth, int windowHeight,
+        List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
+        List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
+        Entity playerEntity,
+        ShipType shipType,
+        bool diagnostics)
+    {
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
         DrawStarfield(stars, camX, camY, windowWidth, windowHeight);
@@ -40,13 +78,6 @@ public static class Renderer
         {
             DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
         }
-
-        if (gameOver)
-        {
-            Raylib.DrawText("GAME OVER", windowWidth / 2 - 80, windowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
-        }
-
-        Raylib.EndDrawing();
     }
 
     private static bool IsOffScreen(float cx, float cy, float extent, int windowWidth, int windowHeight)
