@@ -52,6 +52,7 @@ Goal:
 - Shift: boost (forward only, 2.5x)
 - Mouse: aim (optional)
 - Space: brake (optional)
+- L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
 ## MVP
 
