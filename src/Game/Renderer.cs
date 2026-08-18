@@ -2,9 +2,9 @@ using System.Linq;
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
-using Spacevors.Game;
+using Spacevors.Domain.Systems;
 
-namespace Spacevors.Domain.Systems;
+namespace Spacevors.Game;
 
 public static class Renderer
 {
