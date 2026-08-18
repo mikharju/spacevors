@@ -16,6 +16,27 @@ public class LitSpriteMatcherTest
     }
 
     [Fact]
+    public void SingularNormal_Matches()
+    {
+        var sets = LitSpriteMatcher.Match(["scout-texture", "scout-normal", "scout-depth"]);
+
+        Assert.Single(sets);
+        Assert.Equal("scout", sets[0].Prefix);
+        Assert.Equal("scout-texture", sets[0].BaseStem);
+        Assert.Equal("scout-normal", sets[0].NormalsStem);
+        Assert.Equal("scout-depth", sets[0].DepthStem);
+    }
+
+    [Fact]
+    public void BothNormalForms_PrefersPlural()
+    {
+        var sets = LitSpriteMatcher.Match(["a-texture", "a-normals", "a-normal", "a-depth"]);
+
+        Assert.Single(sets);
+        Assert.Equal("a-normals", sets[0].NormalsStem);
+    }
+
+    [Fact]
     public void MissingNormals_NotMatched()
     {
         var sets = LitSpriteMatcher.Match(["shadow-texture", "shadow-depth"]);

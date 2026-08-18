@@ -7,6 +7,8 @@ public static class LitSpriteMatcher
 {
     public const string TextureSuffix = "-texture";
     public const string NormalsSuffix = "-normals";
+    // Some assets use the singular form.
+    public const string NormalAliasSuffix = "-normal";
     public const string DepthSuffix = "-depth";
 
     public sealed record Set(string Prefix, string BaseStem, string NormalsStem, string DepthStem);
@@ -21,11 +23,18 @@ public static class LitSpriteMatcher
             string prefix = stem[..^TextureSuffix.Length];
             if (prefix.Length == 0) continue;
 
-            string normalsStem = prefix + NormalsSuffix;
-            string depthStem = prefix + DepthSuffix;
-            if (present.Contains(normalsStem) && present.Contains(depthStem))
-                result.Add(new Set(prefix, stem, normalsStem, depthStem));
+            string? normalsStem = FindNormalsStem(present, prefix);
+            if (normalsStem == null || !present.Contains(prefix + DepthSuffix)) continue;
+
+            result.Add(new Set(prefix, stem, normalsStem, prefix + DepthSuffix));
         }
         return result;
+    }
+
+    private static string? FindNormalsStem(HashSet<string> present, string prefix)
+    {
+        foreach (var suffix in new[] { NormalsSuffix, NormalAliasSuffix })
+            if (present.Contains(prefix + suffix)) return prefix + suffix;
+        return null;
     }
 }

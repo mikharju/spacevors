@@ -32,32 +32,45 @@ public static class EnemyShipRenderer
                 _ => null
             };
 
-            Texture2D? tex = null;
-            if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var candidate) && candidate.Id != 0)
-                tex = candidate;
+            LitSprite? lit = null;
+            Texture2D? flat = null;
+            if (texKey != null && ImageLoader.EnemyShipLitSprites != null && ImageLoader.EnemyShipLitSprites.TryGetValue(texKey, out var litCandidate))
+                lit = litCandidate;
+            else if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var flatCandidate) && flatCandidate.Id != 0)
+                flat = flatCandidate;
 
-            float extent = tex.HasValue
-                ? RenderHelpers.HalfDiagonal(enemyShip.Radius * 2f, enemyShip.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+            Texture2D? baseTex = lit != null ? lit.Base : flat;
+            bool hasSprite = baseTex.HasValue && baseTex.Value.Id != 0;
+
+            float extent = hasSprite
+                ? RenderHelpers.HalfDiagonal(enemyShip.Radius * 2f, enemyShip.Radius * 2f * (float)baseTex!.Value.Height / baseTex.Value.Width)
                 : enemyShip.Radius;
 
             if (RenderHelpers.IsOffScreen(screenCx, screenCy, extent, windowWidth, windowHeight)) continue;
 
-            if (tex.HasValue)
+            if (hasSprite)
             {
-                var t = tex.Value;
+                var t = baseTex!.Value;
                 float drawDiameter = enemyShip.Radius * 2f;
                 float scale = drawDiameter / t.Width;
                 float destWidth = t.Width * scale;
                 float destHeight = t.Height * scale;
 
-                Raylib.DrawTexturePro(
-                    t,
+                bool drawn = lit != null && Lighting.TryDraw(
+                    lit,
                     new Rectangle(0f, 0f, t.Width, t.Height),
                     new Rectangle(screenCx, screenCy, destWidth, destHeight),
                     new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                    angleDeg,
-                    Color.White
-                );
+                    angleDeg);
+
+                if (!drawn)
+                    Raylib.DrawTexturePro(
+                        t,
+                        new Rectangle(0f, 0f, t.Width, t.Height),
+                        new Rectangle(screenCx, screenCy, destWidth, destHeight),
+                        new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
+                        angleDeg,
+                        Color.White);
             }
             else
             {
