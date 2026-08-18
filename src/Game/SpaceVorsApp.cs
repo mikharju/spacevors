@@ -84,6 +84,7 @@ public static class SpaceVorsApp
             }
 
             var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(chosenShip);
+            ThrusterFlameRenderer.Reset();
 
             bool gameOver = false;
 

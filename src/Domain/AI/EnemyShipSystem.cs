@@ -17,13 +17,21 @@ public class EnemyShipSystem : GameSystem
         foreach (var (shipEntity, ship, shipPos, currentRot) in view.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
             if (view.TryGetComponent<Dead>(shipEntity, out _)) continue;
-            if (!hasPlayer) continue;
+            if (!hasPlayer)
+            {
+                commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
+                continue;
+            }
 
             var playerPos = playerTuple.Value2;
 
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
-            if (distSq > ship.DetectionRange * ship.DetectionRange || distSq < 0.01f) continue;
+            if (distSq > ship.DetectionRange * ship.DetectionRange || distSq < 0.01f)
+            {
+                commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
+                continue;
+            }
 
             view.TryGetComponent<Velocity>(shipEntity, out var vel);
             var currentVel = vel.Value;
@@ -51,6 +59,7 @@ public class EnemyShipSystem : GameSystem
                     newAngVel = 0f;
                 }
                 commands.Add(new AddComponentCommand<AngularVelocity>(shipEntity, new AngularVelocity(newAngVel)));
+                commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
                 continue;
             }
 
@@ -72,7 +81,11 @@ public class EnemyShipSystem : GameSystem
                 commands.Add(new AddComponentCommand<Rotation>(shipEntity, new Rotation(currentRot.Angle + Math.Sign(angleDiff) * maxTurn)));
             }
 
-            if (dist <= ship.FiringRange) continue;
+            if (dist <= ship.FiringRange)
+            {
+                commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
+                continue;
+            }
 
             var targetAccel = toPlayerDir * ship.Acceleration;
             commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(targetAccel)));

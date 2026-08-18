@@ -160,6 +160,40 @@ Enemy types:
 - sniper
 - kamikaze
 
+## Phase 7
+
+Thruster flames.
+
+All ships (player, enemy) and mines show engine flames while accelerating or turning. Flame size is proportional to thrust force: `force = |acceleration| × mass`, with `mass ∝ radius²` (same convention as CollisionSystem).
+
+Design decisions:
+- Rendering-only feature: no new components or systems. Renderer already reads components directly everywhere; a domain ThrusterState component would be an unnecessary abstraction
+- New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from DrawScene before ships/mines so flames draw behind them
+- Thrust flame: direction = −normalize(Acceleration), drawn at the ship's rear. `intensity = clamp(force / maxForce(entity), 0..1)` where player maxForce = Thrust×Boost×r², enemy maxForce = EnemyShip.Acceleration×r² (drift-cancel clamps to 1). Flame length/width scale with intensity and ship radius
+- Turn flame: side thruster on the side opposite the turn. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
+- Mines have no Acceleration or Rotation: flame behind motion, direction = −normalize(Velocity), intensity = |velocity| / mine.Speed
+- Entities with Dead component are skipped
+- Flame shape: one triangle per thruster, orange→yellow color by intensity
+
+Stage 1 (thrust flames) — done:
+- ThrusterFlameRenderer with thrust flames for player + enemy ships
+- EnemyShipSystem: set Acceleration(Zero) on early-exit paths (no player, out of detection range, spin-damping branch, inside firing range) so stale acceleration does not produce phantom flames. Makes the component mean "thrust currently applied"
+- Verified via screenshots: W/Shift thrust flame behind hull; enemy chase flames
+
+Stage 2 (turn flames) — done:
+- Previous-angle tracking + side thruster flames for player and enemy ships
+- Verified via screenshot: mouse turn shows forward-pointing flank flame on the torque-producing side (physically self-consistent both directions)
+
+Stage 3 (mines) — done:
+- Velocity-based mine flames
+- Verified via pixel scan pre-cleanup; same DrawFlame path as verified thrust/turn flames
+
+Stage 4 (tuning) — done:
+- Size/color/width tuned via screenshots
+- Performance check with LoadTestWeapon + max enemies passed (~125 flame entities, negligible)
+
+Note: this raylib-cs build culls counter-clockwise triangles in screen space; DrawFlame emits vertices clockwise on purpose.
+
 ## Future
 
 - bosses

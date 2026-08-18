@@ -67,6 +67,7 @@ public static class Renderer
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawSparks(em, camX, camY, windowWidth, windowHeight);
         DrawGreenSparks(em, camX, camY, windowWidth, windowHeight);
+        ThrusterFlameRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
         DrawEnemyShips(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
