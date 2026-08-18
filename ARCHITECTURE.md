@@ -152,9 +152,18 @@ Examples:
 src/
 
     Game/
-        SpaceVorsApp.cs      -- game loop + input handling
-        GameInitializer.cs   -- entity setup + world generation
-        Renderer.cs          -- rendering logic
+        SpaceVorsApp.cs          -- game loop + input handling
+        GameInitializer.cs       -- entity setup + world generation
+        Renderer.cs              -- frame orchestration (scene composition)
+        BackgroundRenderer.cs    -- starfield + clutter layers
+        WorldRenderer.cs         -- world entities: asteroids, ammo, effects, pickups
+        EnemyShipRenderer.cs     -- enemy ship sprites + fallbacks
+        ShipSpriteRenderer.cs    -- player ship sprite (lit/flat)
+        ThrusterFlameRenderer.cs -- thruster flames
+        HudRenderer.cs           -- health bar + game over text
+        UpgradeMenuRenderer.cs   -- upgrade choice cards
+        ShipSelectRenderer.cs    -- ship selection cards
+        RenderHelpers.cs         -- shared screen-space culling helpers
 
     Domain/
         Components/          -- Loadout, TurretOffset, ArcOffset, PendingChoice, etc.
