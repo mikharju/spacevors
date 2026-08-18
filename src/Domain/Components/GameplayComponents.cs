@@ -152,8 +152,8 @@ public readonly record struct ShipType(
 
     public static ShipType Shadow { get; } = new(
         "Shadow",
-        "Pursuit engines, railgun",
-        EngineLayout.Pursuit,
+        "Balanced engines, railgun",
+        EngineLayout.Balanced,
         WeaponLoadout.RailGun,
         MaxHealth: 10,
         Radius: 58f,

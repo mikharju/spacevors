@@ -7,13 +7,14 @@ namespace Spacevors.Game;
 
 public static class ThrusterFlameRenderer
 {
-    const float ThrustBaseOffsetRatio = 0.75f;
+    const float ThrustBaseOffsetRatio = 1.0f;
     const float MaxThrustFlameLengthRatio = 1.2f;
     const float ThrustFlameHalfWidthRatio = 0.35f;
     const float TurnSideOffsetRatio = 0.6f;
     const float MaxTurnFlameLengthRatio = 0.8f;
     const float TurnFlameHalfWidthRatio = 0.25f;
-    const float MinFlameIntensity = 0.1f;
+    const float MinFlameIntensity = 0.05f;
+    const float MinVisibleFlameIntensity = 0.2f;
     const int FlameAlpha = 230;
 
     static readonly Dictionary<Entity, float> PrevAngles = new();
@@ -35,13 +36,15 @@ public static class ThrusterFlameRenderer
         foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
-            DrawShipFlames(em, entity, pos.Value, rot.Angle, player.Radius, player.Thrust * player.Boost, player.RotationSpeed, dt, camX, camY, windowWidth, windowHeight);
+            DrawPlayerThrustFlames(em, entity, pos.Value, rot.Angle, player, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, dt, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, ship, pos, rot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
-            DrawShipFlames(em, entity, pos.Value, rot.Angle, ship.Radius, ship.Acceleration, ship.TurnRate, dt, camX, camY, windowWidth, windowHeight);
+            DrawEnemyThrustFlame(em, entity, pos.Value, ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, dt, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
@@ -51,48 +54,66 @@ public static class ThrusterFlameRenderer
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;
 
-            float intensity = Math.Clamp(speed / mine.Speed, 0f, 1f);
-            if (intensity < MinFlameIntensity) continue;
-
             var n = v.Normalized;
             var dir = new Vector2(-n.X, -n.Y);
-            DrawFlame(
-                pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio,
-                dir,
-                mine.Radius * MaxThrustFlameLengthRatio * intensity,
-                mine.Radius * ThrustFlameHalfWidthRatio * intensity,
-                FlameColor(intensity), camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio, dir, mine.Radius, speed, mine.Speed, camX, camY, windowWidth, windowHeight);
         }
 
         PruneStaleKeys(em);
     }
 
-    private static void DrawShipFlames(
-        EntityManager em, Entity entity, Vector2 pos, float angle,
-        float radius, float maxAccel, float maxTurnRate, float dt,
+    private static void DrawPlayerThrustFlames(
+        EntityManager em, Entity entity, Vector2 pos, float angle, Player player,
         float camX, float camY, int windowWidth, int windowHeight)
     {
-        if (em.TryGetComponent<Acceleration>(entity, out var accel))
-        {
-            Vector2 a = accel.Value;
-            float mag = a.Magnitude;
-            if (mag > 0f && maxAccel > 0f)
-            {
-                float intensity = Math.Clamp(mag / maxAccel, 0f, 1f);
-                if (intensity >= MinFlameIntensity)
-                {
-                    var n = a.Normalized;
-                    var dir = new Vector2(-n.X, -n.Y);
-                    DrawFlame(
-                        pos + dir * radius * ThrustBaseOffsetRatio,
-                        dir,
-                        radius * MaxThrustFlameLengthRatio * intensity,
-                        radius * ThrustFlameHalfWidthRatio * intensity,
-                        FlameColor(intensity), camX, camY, windowWidth, windowHeight);
-                }
-            }
-        }
+        if (!em.TryGetComponent<Acceleration>(entity, out var accel)) return;
+        Vector2 a = accel.Value;
+        if (a.Magnitude <= 0f) return;
 
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+        var forward = new Vector2(sin, -cos);
+        var right = new Vector2(cos, sin);
+
+        float maxForce = player.Thrust * player.Boost;
+
+        float fwd = Vector2.Dot(a, forward);
+        if (fwd > 0f)
+        {
+            var dir = new Vector2(-forward.X, -forward.Y);
+            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, fwd, maxForce, camX, camY, windowWidth, windowHeight);
+        }
+        else if (fwd < 0f)
+            DrawThrustFlame(pos + forward * player.Radius * ThrustBaseOffsetRatio, forward, player.Radius, -fwd, maxForce, camX, camY, windowWidth, windowHeight);
+
+        float side = Vector2.Dot(a, right);
+        if (side > 0f)
+        {
+            var dir = new Vector2(-right.X, -right.Y);
+            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, side, maxForce, camX, camY, windowWidth, windowHeight);
+        }
+        else if (side < 0f)
+            DrawThrustFlame(pos + right * player.Radius * ThrustBaseOffsetRatio, right, player.Radius, -side, maxForce, camX, camY, windowWidth, windowHeight);
+    }
+
+    private static void DrawEnemyThrustFlame(
+        EntityManager em, Entity entity, Vector2 pos, float radius, float maxAccel,
+        float camX, float camY, int windowWidth, int windowHeight)
+    {
+        if (!em.TryGetComponent<Acceleration>(entity, out var accel)) return;
+        Vector2 a = accel.Value;
+        float mag = a.Magnitude;
+        if (mag <= 0f || maxAccel <= 0f) return;
+
+        var n = a.Normalized;
+        var dir = new Vector2(-n.X, -n.Y);
+        DrawThrustFlame(pos + dir * radius * ThrustBaseOffsetRatio, dir, radius, mag, maxAccel, camX, camY, windowWidth, windowHeight);
+    }
+
+    private static void DrawTurnFlame(
+        Entity entity, Vector2 pos, float angle, float radius, float maxTurnRate, float dt,
+        float camX, float camY, int windowWidth, int windowHeight)
+    {
         if (dt > 0f && maxTurnRate > 0f)
         {
             float turnIntensity = 0f;
@@ -123,6 +144,22 @@ public static class ThrusterFlameRenderer
         }
 
         PrevAngles[entity] = angle;
+    }
+
+    private static void DrawThrustFlame(
+        Vector2 basePos, Vector2 dir, float radius, float force, float maxForce,
+        float camX, float camY, int windowWidth, int windowHeight)
+    {
+        if (force <= 0f || maxForce <= 0f) return;
+        float ratio = force / maxForce;
+        if (ratio < MinFlameIntensity) return;
+        float intensity = Math.Clamp(ratio, MinVisibleFlameIntensity, 1f);
+
+        DrawFlame(
+            basePos, dir,
+            radius * MaxThrustFlameLengthRatio * intensity,
+            radius * ThrustFlameHalfWidthRatio * intensity,
+            FlameColor(intensity), camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawFlame(
