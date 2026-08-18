@@ -169,7 +169,7 @@ All ships (player, enemy) and mines show engine flames while accelerating or tur
 Design decisions:
 - Rendering-only feature: no new components or systems. Renderer already reads components directly everywhere; a domain ThrusterState component would be an unnecessary abstraction
 - New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from DrawScene before ships/mines so flames draw behind them
-- Thrust flame: direction = −normalize(Acceleration), drawn at the ship's rear. `intensity = clamp(force / maxForce(entity), 0..1)` where player maxForce = Thrust×Boost×r², enemy maxForce = EnemyShip.Acceleration×r² (drift-cancel clamps to 1). Flame length/width scale with intensity and ship radius
+- Thrust flame: one per active axis. All player axes are normalized by a single shared max (Thrust×Boost) so flame size reflects absolute thrust force across axes — main booster burns visibly larger than weak side/back thrusters; enemy flame is normalized by EnemyShip.Acceleration (drift-cancel stays below the gate). Flames passing the gate render at least MinVisibleFlameIntensity size so weak thrusters stay visible; flame base sits at the hull edge (radius × 1.0) so small flames are not hidden behind large ships. Direction = −normalize(axis acceleration). Flame length/width scale with intensity and ship radius
 - Turn flame: side thruster on the side opposite the turn. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
 - Mines have no Acceleration or Rotation: flame behind motion, direction = −normalize(Velocity), intensity = |velocity| / mine.Speed
 - Entities with Dead component are skipped
@@ -178,7 +178,7 @@ Design decisions:
 Stage 1 (thrust flames) — done:
 - ThrusterFlameRenderer with thrust flames for player + enemy ships
 - EnemyShipSystem: set Acceleration(Zero) on early-exit paths (no player, out of detection range, spin-damping branch, inside firing range) so stale acceleration does not produce phantom flames. Makes the component mean "thrust currently applied"
-- Verified via screenshots: W/Shift thrust flame behind hull; enemy chase flames
+- Verified via screenshots (Shadow, Balanced engines): W/Shift forward flame behind hull visibly larger than A/D side flames and S retro-burner (min visible size); enemy chase flames
 
 Stage 2 (turn flames) — done:
 - Previous-angle tracking + side thruster flames for player and enemy ships
