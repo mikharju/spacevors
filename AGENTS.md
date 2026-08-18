@@ -51,6 +51,7 @@ For every task:
 3. Keep the project compiling.
 4. Verify behavior.
 5. Update PLAN.md if needed.
+6. Do not commit or push any changes to git, only reading git diffs logs and such non change operations are allowed.
 
 Never mix unrelated changes.
 
