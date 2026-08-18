@@ -24,7 +24,7 @@ public class AmmoLifetimeSystem : GameSystem
             }
             else
             {
-                ammo = new Ammo(ammo.Velocity, ammo.Radius, newLifetime, ammo.IsEnemy, ammo.Damage);
+                ammo = new Ammo(ammo.Velocity, ammo.Radius, newLifetime, ammo.IsEnemy, ammo.Damage, ammo.Color);
             }
         }
 

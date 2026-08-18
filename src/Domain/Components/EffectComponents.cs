@@ -8,13 +8,13 @@ public readonly record struct Spark(float Lifetime, float InitialLifetime = 1.4f
 
 public readonly record struct BlueSpark(float Lifetime);
 
-public readonly record struct GreenSpark(float Lifetime);
+public readonly record struct GreenSpark(float Lifetime, float InitialLifetime = 0.6f);
 
 public readonly record struct HealthOrb(float Lifetime = 30f, float Radius = 8f);
 
 public readonly record struct XpPickup(int XpAmount, float Lifetime = 30f, float Radius = 6f, bool Chased = false);
 
-public readonly record struct DebugMarker(float Lifetime);
+public readonly record struct DebugMarker(float Lifetime, float InitialLifetime = 0.5f);
 
 public readonly record struct ShipDeathExplosion(
     float TimeRemaining,

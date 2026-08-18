@@ -9,7 +9,6 @@ public static class SpaceVorsApp
 {
     public const int MaxFps = 120;
     const float FixedDeltaTime = 1f / MaxFps;
-    const float MaxFrameTime = 1f / MaxFps;
     const int DefaultWindowWidth = 1920;
     const int DefaultWindowHeight = 1024;
 
@@ -17,6 +16,7 @@ public static class SpaceVorsApp
     {
         Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
         Raylib.InitWindow(DefaultWindowWidth, DefaultWindowHeight, "SpaceVors");
+        Raylib.SetTargetFPS(MaxFps);
 
         ImageLoader.LoadAssets();
         Lighting.Init();
@@ -65,17 +65,10 @@ public static class SpaceVorsApp
                 if (Raylib.IsKeyPressed(KeyboardKey.F12))
                     Raylib.TakeScreenshot("screenshot.png");
 
-                var frameStart = Raylib.GetTime();
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
                 Renderer.DrawShipCards(GetW(), GetH());
                 Raylib.EndDrawing();
-
-                float frameElapsed = (float)(Raylib.GetTime() - frameStart);
-                if (frameElapsed < MaxFrameTime)
-                {
-                    Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
-                }
 
                 if (selectedShipIndex >= 0)
                     showingShipScreen = false;
@@ -83,7 +76,7 @@ public static class SpaceVorsApp
                 continue;
             }
 
-            var (em, playerEntity, cameraEntity, turretEntities, stars, clutter) = GameInitializer.Initialize(chosenShip);
+            var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(chosenShip);
             ThrusterFlameRenderer.Reset();
 
             bool gameOver = false;
@@ -238,14 +231,7 @@ public static class SpaceVorsApp
                     }
 
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
-                    var gameFrameStart = Raylib.GetTime();
                     Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip, diagnostics);
-
-                    float frameElapsed = (float)(Raylib.GetTime() - gameFrameStart);
-                    if (frameElapsed < MaxFrameTime)
-                    {
-                        Thread.Sleep((int)((MaxFrameTime - frameElapsed) * 1000));
-                    }
                 }
                 else
                 {
@@ -320,15 +306,8 @@ public static class SpaceVorsApp
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
-                    var pauseFrameStart = Raylib.GetTime();
                     bool pauseDiagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
                     Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, pauseDiagnostics, upgradeOptions, playerLevel);
-
-                    float frameElapsed2 = (float)(Raylib.GetTime() - pauseFrameStart);
-                    if (frameElapsed2 < MaxFrameTime)
-                    {
-                        Thread.Sleep((int)((MaxFrameTime - frameElapsed2) * 1000));
-                    }
                 }
             }
         }

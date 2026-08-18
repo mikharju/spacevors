@@ -7,7 +7,7 @@ namespace Spacevors.Game;
 
 public static class GameInitializer
 {
-    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<Entity> turretEntities, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType)
+    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType)
     {
         var em = new EntityManager();
 
@@ -123,9 +123,7 @@ public static class GameInitializer
             }
         }
 
-        // Turret entities based on weapon loadout choice
-        var turretEntities = new List<Entity>();
-
+        // Create turret entities from the ship's weapons
         foreach (var def in shipType.Weapon.Turrets)
         {
             var turretEntity = em.CreateEntity();
@@ -134,8 +132,6 @@ public static class GameInitializer
             em.AddComponent(turretEntity, new Turret(Weapon: def.Weapon.Stats, WeaponName: def.Weapon.Name, ArcAngle: def.ArcAngle, Range: def.Range));
             em.AddComponent(turretEntity, new TurretOffset(def.Offset));
             em.AddComponent(turretEntity, new ArcOffset(def.ArcOffset));
-
-            turretEntities.Add(turretEntity);
         }
 
         // Background starfield with parallax layers
@@ -182,6 +178,6 @@ public static class GameInitializer
             clutter.Add((new Vector2(x, y), w, h, color));
         }
 
-        return (em, playerEntity, cameraEntity, turretEntities, stars, clutter);
+        return (em, playerEntity, cameraEntity, stars, clutter);
     }
 }

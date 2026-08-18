@@ -12,7 +12,9 @@ public readonly record struct Weapon(
     public float EffectiveAmmoSpeed => AmmoSpeed * UpgradeProjectileSpeedMultiplier;
 }
 
-public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetime, bool IsEnemy = false, int Damage = 1);
+public enum AmmoColor { Yellow, Green, Blue, Red }
+
+public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetime, bool IsEnemy = false, int Damage = 1, AmmoColor Color = AmmoColor.Yellow);
 
 public readonly record struct FireCooldown(float Timer);
 

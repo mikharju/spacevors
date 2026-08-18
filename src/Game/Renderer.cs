@@ -105,7 +105,7 @@ public static class Renderer
             cx = ((cx % windowWidth) + windowWidth) % windowWidth;
             cy = ((cy % windowHeight) + windowHeight) % windowHeight;
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)size, color);
+            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(1f, size), color);
         }
     }
 
@@ -173,49 +173,6 @@ public static class Renderer
                 );
             }
         }
-
-        foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
-        {
-            if (em.HasComponent<Rotation>(entity)) continue;
-
-            var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
-
-            Texture2D[]? texs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
-            var tex = texs != null && asteroid.Variant < texs.Length ? texs[asteroid.Variant] : default;
-
-            float extent = tex.Id != 0
-                ? HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Height / tex.Width)
-                : HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
-
-            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
-
-            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
-
-            if (tex.Id != 0)
-            {
-                float drawDiameter = asteroid.Radius * 2f;
-                float scale = drawDiameter / tex.Width;
-                float destWidth = tex.Width * scale;
-                float destHeight = tex.Height * scale;
-
-                Raylib.DrawTexturePro(
-                    tex,
-                    new Rectangle(0f, 0f, tex.Width, tex.Height),
-                    new Rectangle(cx, cy, destWidth, destHeight),
-                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                    0f,
-                    Color.White
-                );
-            }
-            else
-            {
-                float rx = cx - asteroid.Radius;
-                float ry = cy - asteroid.Radius;
-                Raylib.DrawRectangle((int)rx, (int)ry, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2), new Color(120, 120, 130, 255));
-            }
-        }
     }
 
     private static void DrawAmmo(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -228,27 +185,13 @@ public static class Renderer
 
             if (IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
 
-            Color color;
-            if (ammo.IsEnemy && ammo.Damage > 1)
+            Color color = ammo.Color switch
             {
-                color = new Color(255, 80, 80, 255);
-            }
-            else if (ammo.IsEnemy)
-            {
-                color = new Color(255, 230, 100, 255);
-            }
-            else if (ammo.Radius >= 5f)
-            {
-                color = new Color(80, 255, 80, 255);
-            }
-            else if (ammo.Radius >= 3.7f)
-            {
-                color = new Color(100, 180, 255, 255);
-            }
-            else
-            {
-                color = new Color(255, 230, 100, 255);
-            }
+                AmmoColor.Green => new Color(80, 255, 80, 255),
+                AmmoColor.Blue => new Color(100, 180, 255, 255),
+                AmmoColor.Red => new Color(255, 80, 80, 255),
+                _ => new Color(255, 230, 100, 255)
+            };
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, color);
         }
@@ -617,7 +560,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            float lifeRatio = spark.Lifetime / 0.6f;
+            float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
 
             if (IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
@@ -657,7 +600,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            float lifeRatio = marker.Lifetime / 0.5f;
+            float lifeRatio = marker.Lifetime / marker.InitialLifetime;
             int alpha = (int)(255f * lifeRatio);
             int boxSize = 16;
 
@@ -712,32 +655,6 @@ public static class Renderer
 
         int x = startX + index * (cardW + UpgradeCardSpacing);
         return (new Vector2(x, startY), cardW, UpgradeCardHeight);
-    }
-
-    public static (Vector2 topLeft, int Width, int Height) GetEngineCardRect(int index, int windowWidth, int windowHeight)
-    {
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 3 + spacing * 2;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
-
-        int x = startX + index * (cardW + spacing);
-        return (new Vector2(x, startY), cardW, cardH);
-    }
-
-    public static (Vector2 topLeft, int Width, int Height) GetLoadoutCardRect(int index, int windowWidth, int windowHeight)
-    {
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 2 + spacing;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
-
-        int x = index == 0 ? startX : startX + cardW + spacing;
-        return (new Vector2(x, startY), cardW, cardH);
     }
 
     private static void DrawCard(int x, int y, int width, int height, string label, string statValue, Color borderColor, string key, bool hovered)
@@ -845,103 +762,6 @@ public static class Renderer
         UpgradeOption.BackThrust => "+10%",
         _ => "?"
     };
-
-    public static void DrawEngineCards(int windowWidth, int windowHeight)
-    {
-        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
-
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 3 + spacing * 2;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
-
-        DrawEngineCard(startX, startY, "Balanced", 
-            "Forward: 400 · Side: 80 · Back: 80\nWell-rounded thrust in all directions",
-            new Color(50, 150, 255, 255), "1");
-
-        DrawEngineCard(startX + cardW + spacing, startY, "Maneuverable", 
-            "Forward: 250 · Side: 20 · Back: 200\nStrong reverse, weak forward and sideways",
-            new Color(80, 200, 100, 255), "2");
-
-        DrawEngineCard(startX + (cardW + spacing) * 2, startY, "Pursuit", 
-            "Forward: 400 · Side: 7 · Back: 350\nFull forward, very strong reverse",
-            new Color(200, 150, 50, 255), "3");
-
-        Raylib.DrawText("Click a card or press 1, 2, 3", windowWidth / 2 - 140, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
-    }
-
-    private static void DrawEngineCard(int x, int y, string title, string details, Color borderColor, string key)
-    {
-        Raylib.DrawRectangle(x, y, 340, 160, new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, 340, 160, borderColor);
-
-        int keyWidth = Raylib.MeasureText(key, 18);
-        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
-
-        int titleWidth = Raylib.MeasureText(title, 24);
-        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
-
-        string[] lines = details.Split('\n');
-        for (int i = 0; i < lines.Length; i++)
-        {
-            int lineW = Raylib.MeasureText(lines[i], 16);
-            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
-        }
-    }
-
-    public static void DrawLoadoutCards(int windowWidth, int windowHeight)
-    {
-        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 180));
-
-        var loadouts = new[] { WeaponLoadout.MachineGun, WeaponLoadout.Shotgun };
-        int cardW = 340;
-        int cardH = 160;
-        int spacing = 60;
-        int totalW = cardW * 2 + spacing;
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - cardH / 2;
-
-        for (int i = 0; i < loadouts.Length; i++)
-        {
-            var loadout = loadouts[i];
-            string turretInfo = $"{loadout.Turrets.Count} turret{(loadout.Turrets.Count > 1 ? "s" : "")}";
-            foreach (var t in loadout.Turrets)
-            {
-                if (t.ArcAngle < MathF.PI / 2f)
-                    turretInfo += $" · {(int)(t.ArcAngle * 180f / MathF.PI)}° arc";
-            }
-            var primaryWeapon = loadout.Turrets[0].Weapon.Stats;
-            string weaponInfo = $"{loadout.Turrets[0].Weapon.Name}";
-            if (primaryWeapon.PelletCount > 1)
-                weaponInfo += $" · {primaryWeapon.PelletCount} pellets";
-            string details = $"{turretInfo}\nFire Rate: {(int)primaryWeapon.FireRate} · Ammo Speed: {(int)primaryWeapon.AmmoSpeed}";
-
-            DrawLoadoutCard(startX + i * (cardW + spacing), startY, loadout.Name, details, new Color(50, 150, 255, 255), $"{i + 4}");
-        }
-
-        Raylib.DrawText("Click a card or press 4, 5", windowWidth / 2 - 90, windowHeight / 2 + cardH / 2 + 30, 16, new Color(200, 200, 200, 255));
-    }
-
-    private static void DrawLoadoutCard(int x, int y, string title, string details, Color borderColor, string key)
-    {
-        Raylib.DrawRectangle(x, y, 340, 160, new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, 340, 160, borderColor);
-
-        int keyWidth = Raylib.MeasureText(key, 18);
-        Raylib.DrawText(key, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
-
-        int titleWidth = Raylib.MeasureText(title, 24);
-        Raylib.DrawText(title, x + 170 - titleWidth / 2, y + 35, 24, new Color(255, 255, 255, 255));
-
-        string[] lines = details.Split('\n');
-        for (int i = 0; i < lines.Length; i++)
-        {
-            int lineW = Raylib.MeasureText(lines[i], 16);
-            Raylib.DrawText(lines[i], x + 170 - lineW / 2, y + 75 + i * 20, 16, new Color(200, 200, 200, 255));
-        }
-    }
 
     const int ShipCardWidth = 340;
     const int ShipCardHeight = 160;

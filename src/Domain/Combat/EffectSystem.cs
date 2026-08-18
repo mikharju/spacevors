@@ -54,7 +54,7 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<GreenSpark>(entity, new GreenSpark(newLifetime)));
+                commands.Add(new AddComponentCommand<GreenSpark>(entity, new GreenSpark(newLifetime, spark.InitialLifetime)));
             }
         }
 
@@ -90,7 +90,7 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<DebugMarker>(entity, new DebugMarker(newLifetime)));
+                commands.Add(new AddComponentCommand<DebugMarker>(entity, new DebugMarker(newLifetime, marker.InitialLifetime)));
             }
         }
 

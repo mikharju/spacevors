@@ -347,8 +347,9 @@ public class TurretFiringSystem : GameSystem
 
             float ammoRadius = GetAmmoRadius(turret);
             int damage = turret.Weapon.Damage;
+            var ammoColor = GetAmmoColor(turret, damage);
 
-            commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage));
+            commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor));
         }
 
         if (turret.Weapon.KickbackForce > 0)
@@ -377,6 +378,18 @@ public class TurretFiringSystem : GameSystem
             "RailGun" => 3.75f,
             "AcidBubbleSpray" => 5f,
             _ => 2.5f
+        };
+    }
+
+    private static AmmoColor GetAmmoColor(Turret turret, int damage)
+    {
+        if (turret.IsEnemy) return damage > 1 ? AmmoColor.Red : AmmoColor.Yellow;
+
+        return turret.WeaponName switch
+        {
+            "RailGun" => AmmoColor.Blue,
+            "AcidBubbleSpray" => AmmoColor.Green,
+            _ => AmmoColor.Yellow
         };
     }
 

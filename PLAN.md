@@ -37,11 +37,8 @@ Goal:
 
 ## Controls
 
-### Engine selection (start)
-- 1/2/3: choose engine layout
-
-### Weapon selection (after engine)
-- 4/5: choose weapon layout
+### Ship selection (start)
+- 1/2/3/4 or click: choose ship
 
 ### In-game
 - W: forward thrust

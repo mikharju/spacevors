@@ -100,8 +100,6 @@ public readonly record struct ShipType(
     byte DrawR,
     byte DrawG,
     byte DrawB,
-    float NoseLength,
-    float WingSpread,
     int MaxWeaponSlots,
     float PickupRadius)
 {
@@ -115,8 +113,6 @@ public readonly record struct ShipType(
         DrawR: 80,
         DrawG: 220,
         DrawB: 80,
-        NoseLength: 46f,
-        WingSpread: 0.35f,
         MaxWeaponSlots: 1,
         PickupRadius: 120f);
 
@@ -130,8 +126,6 @@ public readonly record struct ShipType(
         DrawR: 100,
         DrawG: 160,
         DrawB: 255,
-        NoseLength: 58f,
-        WingSpread: 0.4f,
         MaxWeaponSlots: 2,
         PickupRadius: 160f);
 
@@ -145,8 +139,6 @@ public readonly record struct ShipType(
         DrawR: 230,
         DrawG: 80,
         DrawB: 70,
-        NoseLength: 84f,
-        WingSpread: 0.5f,
         MaxWeaponSlots: 3,
         PickupRadius: 230f);
 
@@ -160,8 +152,6 @@ public readonly record struct ShipType(
         DrawR: 140,
         DrawG: 150,
         DrawB: 170,
-        NoseLength: 58f,
-        WingSpread: 0.4f,
         MaxWeaponSlots: 2,
         PickupRadius: 160f);
 
