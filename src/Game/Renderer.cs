@@ -24,7 +24,7 @@ public static class Renderer
 
         if (gameOver)
         {
-            Raylib.DrawText("GAME OVER", windowWidth / 2 - 80, windowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
+            HudRenderer.DrawGameOverText(windowWidth, windowHeight);
         }
 
         Raylib.EndDrawing();
@@ -60,8 +60,7 @@ public static class Renderer
     {
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
-        DrawStarfield(stars, camX, camY, windowWidth, windowHeight);
-        DrawClutter(clutter, camX, camY, windowWidth, windowHeight);
+        BackgroundRenderer.Draw(stars, clutter, camX, camY, windowWidth, windowHeight);
         DrawAsteroids(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
@@ -74,53 +73,11 @@ public static class Renderer
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
-        DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
+        HudRenderer.DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
 
         if (diagnostics)
         {
             DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
-        }
-    }
-
-    private static bool IsOffScreen(float cx, float cy, float extent, int windowWidth, int windowHeight)
-    {
-        return cx < -extent || cx > windowWidth + extent || cy < -extent || cy > windowHeight + extent;
-    }
-
-    // Farthest corner distance of a box drawn centered on its middle.
-    private static float HalfDiagonal(float width, float height)
-    {
-        return 0.5f * MathF.Sqrt(width * width + height * height);
-    }
-
-    private static void DrawStarfield(
-        List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
-        float camX, float camY, int windowWidth, int windowHeight)
-    {
-        foreach (var (pos, size, color, parallax) in stars)
-        {
-            float cx = pos.X - camX * parallax + windowWidth / 2f;
-            float cy = pos.Y - camY * parallax + windowHeight / 2f;
-
-            cx = ((cx % windowWidth) + windowWidth) % windowWidth;
-            cy = ((cy % windowHeight) + windowHeight) % windowHeight;
-
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(1f, size), color);
-        }
-    }
-
-    private static void DrawClutter(
-        List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
-        float camX, float camY, int windowWidth, int windowHeight)
-    {
-        foreach (var (pos, width, height, color) in clutter)
-        {
-            float cx = pos.X - camX + windowWidth / 2f;
-            float cy = pos.Y - camY + windowHeight / 2f;
-
-            if (cx < -width || cx > windowWidth + width || cy < -height || cy > windowHeight + height) continue;
-
-            Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - height / 2f), (int)width, (int)height, color);
         }
     }
 
@@ -140,10 +97,10 @@ public static class Renderer
                 tex = asteroidTexs[asteroid.Variant];
 
             float extent = tex.HasValue
-                ? HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
-                : HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
+                ? RenderHelpers.HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+                : RenderHelpers.HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
 
-            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
@@ -183,7 +140,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            if (IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
 
             Color color = ammo.Color switch
             {
@@ -208,7 +165,7 @@ public static class Renderer
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
             float currentRadius = explosion.Radius * (1f + (1f - lifeRatio));
 
-            if (IsOffScreen(cx, cy, currentRadius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, currentRadius, windowWidth, windowHeight)) continue;
 
             int alpha = (int)(255f * lifeRatio);
 
@@ -246,7 +203,7 @@ public static class Renderer
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
 
-            if (IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
 
             int r = (int)(lifeRatio * 255);
             int g = (int)(lifeRatio * lifeRatio * 80);
@@ -268,7 +225,7 @@ public static class Renderer
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
             float turretSize = 8f;
-            if (IsOffScreen(cx, cy, turretSize / 2f, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, turretSize / 2f, windowWidth, windowHeight)) continue;
 
             Raylib.DrawRectangle(
                 (int)(cx - turretSize / 2f),
@@ -310,10 +267,10 @@ public static class Renderer
                 tex = candidate;
 
             float extent = tex.HasValue
-                ? HalfDiagonal(enemyShip.Radius * 2f, enemyShip.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+                ? RenderHelpers.HalfDiagonal(enemyShip.Radius * 2f, enemyShip.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
                 : enemyShip.Radius;
 
-            if (IsOffScreen(screenCx, screenCy, extent, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(screenCx, screenCy, extent, windowWidth, windowHeight)) continue;
 
             if (tex.HasValue)
             {
@@ -362,7 +319,7 @@ public static class Renderer
             float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
             float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
 
-            if (IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
 
             float angle = shipRot.Angle;
             float size = enemyShip.Radius;
@@ -466,10 +423,10 @@ public static class Renderer
 
             Texture2D? mineTex = ImageLoader.MineTexture;
             float extent = mineTex.HasValue && mineTex.Value.Id != 0
-                ? HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex.Value.Height / mineTex.Value.Width)
+                ? RenderHelpers.HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex.Value.Height / mineTex.Value.Width)
                 : mine.Radius;
 
-            if (IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
             if (ImageLoader.MineTexture.HasValue && ImageLoader.MineTexture.Value.Id != 0)
             {
@@ -527,7 +484,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            if (IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
 
             int alpha = pickup.Chased ? 255 : 180;
             Raylib.DrawCircle((int)cx, (int)cy, (int)pickup.Radius, new Color(50, 150, 255, alpha));
@@ -544,7 +501,7 @@ public static class Renderer
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            if (IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
             Raylib.DrawCircle((int)cx, (int)cy, (int)orb.Radius, new Color(50, 255, 100, 200));
         }
@@ -563,33 +520,12 @@ public static class Renderer
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
 
-            if (IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
 
             int alpha = (int)(lifeRatio * 255);
 
             Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
         }
-    }
-
-    private static void DrawHealthBar(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight)
-    {
-        var playerHealth = em.GetComponent<Health>(playerEntity);
-        var playerStats = em.GetComponent<Player>(playerEntity);
-        int barWidth = (int)(windowWidth * 0.12f);
-        int barHeight = 14;
-        int paddingX = (int)(windowWidth * 0.015f);
-        int paddingY = (int)(windowHeight * 0.02f);
-        float healthPercent = Math.Clamp((float)playerHealth.Current / playerStats.MaxHealth, 0f, 1f);
-
-        Raylib.DrawRectangle(paddingX, paddingY, barWidth, barHeight, new Color(50, 50, 50, 255));
-        int filledWidth = (int)(barWidth * healthPercent);
-        Color healthColor = filledWidth > barWidth / 3 ? new Color(80, 255, 80, 255) : new Color(255, 60, 60, 255);
-        Raylib.DrawRectangle(paddingX, paddingY, filledWidth, barHeight, healthColor);
-        Raylib.DrawRectangleLines(paddingX, paddingY, barWidth, barHeight, new Color(180, 180, 180, 255));
-
-        string text = $"{playerHealth.Current}/{playerStats.MaxHealth}";
-        int textWidth = Raylib.MeasureText(text, 14);
-        Raylib.DrawText(text, paddingX + (barWidth - textWidth) / 2, paddingY + (barHeight - 14) / 2, 14, new Color(255, 255, 255, 255));
     }
 
     private static void DrawDebugMarkers(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -604,7 +540,7 @@ public static class Renderer
             int alpha = (int)(255f * lifeRatio);
             int boxSize = 16;
 
-            if (IsOffScreen(cx, cy, boxSize / 2f, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, boxSize / 2f, windowWidth, windowHeight)) continue;
 
             Raylib.DrawRectangleLines((int)cx - boxSize / 2, (int)cy - boxSize / 2, boxSize, boxSize, new Color(0, 255, 0, alpha));
         }
