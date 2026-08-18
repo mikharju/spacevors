@@ -49,7 +49,7 @@ public static class SpaceVorsApp
                     int mouseY = Raylib.GetMouseY();
                     for (int i = 0; i < ShipType.All.Length; i++)
                     {
-                        var (topLeft, w, h) = Renderer.GetShipCardRect(i, GetW(), GetH());
+                        var (topLeft, w, h) = ShipSelectRenderer.GetShipCardRect(i, GetW(), GetH());
                         if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                         {
                             chosenShip = ShipType.All[i];
@@ -67,7 +67,7 @@ public static class SpaceVorsApp
 
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                Renderer.DrawShipCards(GetW(), GetH());
+                ShipSelectRenderer.DrawShipCards(GetW(), GetH());
                 Raylib.EndDrawing();
 
                 if (selectedShipIndex >= 0)
@@ -260,7 +260,7 @@ public static class SpaceVorsApp
                             int optionCount = options.Options.Length;
                             for (int i = 0; i < optionCount; i++)
                             {
-                                var (topLeft, w, h) = Renderer.GetUpgradeCardRect(i, optionCount, GetW(), GetH());
+                                var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, optionCount, GetW(), GetH());
                                 if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                                 {
                                     selectedIndex = i;
