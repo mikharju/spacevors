@@ -15,7 +15,7 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly List<Entity> _entitiesToDestroy = new();
-    private readonly List<(Vector2 Position, MineSize Size)> _effectsToSpawn = new();
+    private readonly List<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
     private readonly List<(Entity ammo, Entity target, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
     private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
@@ -264,7 +264,7 @@ public class CollisionSystem : GameSystem
             {
                 var asteroid = view.GetComponent<Asteroid>(closestAsteroidHit.Value);
                 ResolveAmmoVsAsteroid(view, ammoEntity, ammo, closestAsteroidHit.Value, asteroid, commands);
-                _effectsToSpawn.Add((ammoPos.Value, MineSize.Small));
+                _effectsToSpawn.Add((ammoPos.Value, MineType.Small));
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
@@ -278,7 +278,7 @@ public class CollisionSystem : GameSystem
                 }
                 _frameRemainingHealth[closestMineHit.Value] -= ammo.Damage;
                 _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
-                _effectsToSpawn.Add((mineHitPos!, mineHitSize!.Value));
+                _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
 
             if (closestShipHit.HasValue)
@@ -314,7 +314,7 @@ public class CollisionSystem : GameSystem
                 _frameRemainingHealth[playerEntity] = remaining;
             }
             _frameRemainingHealth[playerEntity] -= ammo.Damage;
-            _effectsToSpawn.Add((playerPos.Value, MineSize.Small));
+            _effectsToSpawn.Add((playerPos.Value, MineType.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
 
@@ -336,7 +336,8 @@ public class CollisionSystem : GameSystem
             var minePosComp = view.GetComponent<Position>(mineEntity);
             var ammoPosComp = view.GetComponent<Position>(ammoEntity);
 
-            float mineRadius = mineSize == MineSize.Large ? 15f : 7.5f;
+            var mineType = MineType.FromSize(mineSize);
+            float mineRadius = mineType.Radius;
             const float AmmoMass = 1f;
             float mineMass = MathF.PI * mineRadius * mineRadius;
             float totalInvMass = 1f / AmmoMass + 1f / mineMass;
@@ -376,7 +377,7 @@ public class CollisionSystem : GameSystem
             {
                 var pos = view.GetComponent<Position>(mineEntity);
                 var mine = view.GetComponent<EnemyMine>(mineEntity);
-                SpawnLootOnDeath(commands, pos.Value, mine.Size, view.Rng);
+                SpawnLootOnDeath(commands, pos.Value, MineType.FromSize(mine.Size), view.Rng);
                 commands.Add(new DestroyEntityCommand(mineEntity));
             }
             else
@@ -444,11 +445,10 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        foreach (var (position, mineSize) in _effectsToSpawn.Distinct())
+        foreach (var (position, mineType) in _effectsToSpawn.Distinct())
         {
-            SpawnExplosion(commands, position, mineSize);
-            int sparkCount = mineSize == MineSize.Large ? 7 : 3;
-            for (int i = 0; i < sparkCount; i++)
+            SpawnExplosion(commands, position, mineType);
+            for (int i = 0; i < mineType.HitSparkCount; i++)
             {
                 SpawnSpark(commands, position, view.Rng);
             }
@@ -511,10 +511,9 @@ public class CollisionSystem : GameSystem
 
 
 
-    private void SpawnExplosion(CommandBuffer commands, Vector2 position, MineSize mineSize)
+    private void SpawnExplosion(CommandBuffer commands, Vector2 position, MineType mineType)
     {
-        float radius = mineSize == MineSize.Large ? 30f : 15f;
-        commands.AddEntity(new Position(position), new Explosion(radius, 0.5f, 0.5f));
+        commands.AddEntity(new Position(position), new Explosion(mineType.ExplosionRadius, 0.5f, 0.5f));
     }
 
     private void SpawnSpark(CommandBuffer commands, Vector2 position, Random rng)
@@ -760,28 +759,25 @@ public class CollisionSystem : GameSystem
         _frameRemainingHealth[playerEntity] -= 3;
 
         var normal = diff / (float)Math.Sqrt(distSq);
-        float explosionForce = mine.Size == MineSize.Large ? 240f : 120f;
-        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + normal * explosionForce;
+        var mineType = MineType.FromSize(mine.Size);
+        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + normal * mineType.PlayerContactForce;
 
         SetCollisionVelocity(playerEntity, playerVel);
 
-        int sparkCount = mine.Size == MineSize.Large ? 10 : 5;
+        int sparkCount = mineType.PlayerContactSparkCount;
         for (int i = 0; i < sparkCount; i++)
         {
             SpawnSpark(commands, minePos.Value, view.Rng);
         }
     }
 
-    private void SpawnLootOnDeath(CommandBuffer commands, Vector2 position, MineSize mineSize, Random rng)
+    private void SpawnLootOnDeath(CommandBuffer commands, Vector2 position, MineType mineType, Random rng)
     {
-        int xpAmount = mineSize == MineSize.Small ? 1 : 2;
-        float xpRadius = mineSize == MineSize.Small ? 6f : 9f;
-
-        commands.AddEntity(new Position(position), new XpPickup(xpAmount, Radius: xpRadius));
+        commands.AddEntity(new Position(position), new XpPickup(mineType.XpAmount, Radius: mineType.XpPickupRadius));
 
         if (rng.NextDouble() < 0.05)
         {
-            commands.AddEntity(new Position(position), new HealthOrb(Radius: xpRadius + 2f));
+            commands.AddEntity(new Position(position), new HealthOrb(Radius: mineType.XpPickupRadius + 2f));
         }
     }
 
