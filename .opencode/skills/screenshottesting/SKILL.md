@@ -38,6 +38,15 @@ language: bash
 
 ---
 
+## Evaluate feasibility
+
+Before screenshot testing is attempted, evaluate whether the test case is likely to be  
+reliably replicated in such a test. If the answer is not clear yes:
+- First consider if some functionality could be added to diagnostics mode allowing the case to be replicated reliably
+- If still not clearly reliable, consider testing harness or synthetic test
+
+---
+
 ## How to Run the Program Headlessly
 
 Always set these two environment variables before launching:
