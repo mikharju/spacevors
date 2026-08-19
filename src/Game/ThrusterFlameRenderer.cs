@@ -11,8 +11,9 @@ public static class ThrusterFlameRenderer
     const float MaxThrustFlameLengthRatio = 1.2f;
     const float ThrustFlameHalfWidthRatio = 0.35f;
     const float TurnSideOffsetRatio = 0.6f;
-    const float MaxTurnFlameLengthRatio = 0.8f;
-    const float TurnFlameHalfWidthRatio = 0.25f;
+    const float TurnRearOffsetRatio = 0.7f;
+    const float MaxTurnFlameLengthRatio = 0.5f;
+    const float TurnFlameHalfWidthRatio = 0.12f;
     const float MinFlameIntensity = 0.05f;
     const float MinVisibleFlameIntensity = 0.2f;
     const int FlameAlpha = 230;
@@ -134,9 +135,11 @@ public static class ThrusterFlameRenderer
                 var forward = new Vector2(sin, -cos);
                 var right = new Vector2(cos, sin);
 
+                // Exhaust trails backward from the rear corner on the opposite side of the turn.
+                var basePos = pos - forward * radius * TurnRearOffsetRatio - right * radius * TurnSideOffsetRatio * sideSign;
                 DrawFlame(
-                    pos + right * (radius * TurnSideOffsetRatio) * sideSign,
-                    forward,
+                    basePos,
+                    new Vector2(-forward.X, -forward.Y),
                     radius * MaxTurnFlameLengthRatio * turnIntensity,
                     radius * TurnFlameHalfWidthRatio * turnIntensity,
                     FlameColor(turnIntensity), camX, camY, windowWidth, windowHeight);
