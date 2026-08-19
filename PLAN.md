@@ -168,7 +168,7 @@ Design decisions:
 - Rendering-only feature: no new components or systems. Renderer already reads components directly everywhere; a domain ThrusterState component would be an unnecessary abstraction
 - New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from DrawScene before ships/mines so flames draw behind them
 - Thrust flame: one per active axis. All player axes are normalized by a single shared max (Thrust×Boost) so flame size reflects absolute thrust force across axes — main booster burns visibly larger than weak side/back thrusters; enemy flame is normalized by EnemyShip.Acceleration (drift-cancel stays below the gate). Flames passing the gate render at least MinVisibleFlameIntensity size so weak thrusters stay visible; flame base sits at the hull edge (radius × 1.0) so small flames are not hidden behind large ships. Direction = −normalize(axis acceleration). Flame length/width scale with intensity and ship radius
-- Turn flame: exhaust trails backward from the rear corner on the side opposite the turn (a forward-pointing flame hides behind the hull and only shows through sprite gaps). Kept smaller than main thrust flames. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
+- Turn flame: diagonal RCS pair fires while turning — front thruster on the side opposite the turn, rear thruster on the turn's side (turning right = left-front + right-rear). Front flame points forward from the nose corner; rear flame trails backward. Both are very small, sized like a weak lateral thrust flame (MinVisibleFlameIntensity scale) so they do not compete with the main booster. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
 - Mines have no Acceleration or Rotation: flame behind motion, direction = −normalize(Velocity), intensity = |velocity| / mine.Speed
 - Entities with Dead component are skipped
 - Flame shape: one triangle per thruster, orange→yellow color by intensity
@@ -180,7 +180,7 @@ Stage 1 (thrust flames) — done:
 
 Stage 2 (turn flames) — done:
 - Previous-angle tracking + side thruster flames for player and enemy ships
-- Verified via screenshot: mouse turn shows forward-pointing flank flame on the torque-producing side (physically self-consistent both directions)
+- Verified via screenshots + pixel analysis (Shadow, Fighter mid-turn): diagonal pair appears at the correct corners for the turn direction; flames small relative to main thrust flame
 
 Stage 3 (mines) — done:
 - Velocity-based mine flames
