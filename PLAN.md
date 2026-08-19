@@ -135,6 +135,7 @@ Dynamic lighting.
 - Stage 1 (done): LitSprite matching in ImageLoader + tests
 - Stage 2 (done): Shadow ship (key 4), Lighting.Init/Shutdown/TryDraw, select screen + gameplay rendering
 - Stage 3: tuning — exposure/washout on bright textures, normal Y convention check, shadow strength
+- In `Lighting.TryDraw`, `BeginShaderMode` must run before the map `Set*` calls: its batch flush clears raylib's texture-unit registry, so maps set earlier are lost and the sprite renders with the previous lit sprite's maps (verified against raylib 6.0)
 
 ## Phase 6
 

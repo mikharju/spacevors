@@ -105,11 +105,14 @@ public static class Lighting
         if (!IsReady || _shader == null) return false;
 
         var shader = _shader.Value;
+        // BeginShaderMode must come first: its batch flush clears raylib's texture-unit registry,
+        // so map uniforms set before it are lost on an empty flush and the sprite renders with
+        // the previous lit sprite's normal/depth maps.
+        Raylib.BeginShaderMode(shader);
         Raylib.SetShaderValueTexture(shader, _normalMapLoc, sprite.Normals);
         Raylib.SetShaderValueTexture(shader, _depthMapLoc, sprite.Depth);
         Raylib.SetShaderValue(shader, _angleRadLoc, angleDeg * MathF.PI / 180f, ShaderUniformDataType.Float);
 
-        Raylib.BeginShaderMode(shader);
         Raylib.DrawTexturePro(sprite.Base, source, dest, origin, angleDeg, Color.White);
         Raylib.EndShaderMode();
         return true;
