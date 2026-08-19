@@ -88,15 +88,15 @@ public static class GameInitializer
             float variantRoll = (float)rand.NextDouble();
             if (variantRoll < 0.333f)
             {
-                EnemyShipFactory.AddInterceptorComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f);
+                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.Interceptor);
             }
             else if (variantRoll < 0.666f)
             {
-                EnemyShipFactory.AddHeavyCannonComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f);
+                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.HeavyCannon);
             }
             else
             {
-                EnemyShipFactory.AddEnemyShipComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f);
+                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.Default);
             }
         }
 
@@ -111,15 +111,15 @@ public static class GameInitializer
             float variantRoll = (float)rand.NextDouble();
             if (variantRoll < 0.333f)
             {
-                EnemyShipFactory.AddInterceptorComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f);
+                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.Interceptor);
             }
             else if (variantRoll < 0.666f)
             {
-                EnemyShipFactory.AddHeavyCannonComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f);
+                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.HeavyCannon);
             }
             else
             {
-                EnemyShipFactory.AddEnemyShipComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f);
+                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.Default);
             }
         }
 

@@ -1,12 +1,13 @@
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
-using Spacevors.Domain.Systems;
 
 namespace Spacevors.Game;
 
 public static class EnemyShipRenderer
 {
+    private static readonly Color FallbackShipColor = new(180, 60, 60, 255);
+
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         if (ImageLoader.EnemyShipTextures == null)
@@ -24,13 +25,7 @@ public static class EnemyShipRenderer
             float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
             float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-            string? texKey = enemyShip.GraphicsId switch
-            {
-                EnemyShipFactory.DefaultGraphicsId => "enemy-1",
-                EnemyShipFactory.InterceptorGraphicsId => "interceptor",
-                EnemyShipFactory.HeavyCannonGraphicsId => "heavy-cannon",
-                _ => null
-            };
+            string? texKey = EnemyShipType.FromGraphicsId(enemyShip.GraphicsId)?.TextureKey;
 
             LitSprite? lit = null;
             Texture2D? flat = null;
@@ -126,25 +121,11 @@ public static class EnemyShipRenderer
             float tx3 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
             float ty3 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
 
-            Color color;
-            if (enemyShip.Damage > 1)
-            {
-                color = new Color(180, 60, 60, 255);
-            }
-            else if (enemyShip.Radius < 18f)
-            {
-                color = new Color(180, 80, 255, 255);
-            }
-            else
-            {
-                color = new Color(255, 80, 80, 255);
-            }
-
             Raylib.DrawTriangle(
                 new System.Numerics.Vector2(tx1, ty1),
                 new System.Numerics.Vector2(tx2, ty2),
                 new System.Numerics.Vector2(tx3, ty3),
-                color
+                FallbackShipColor
             );
 
             float enemyTurretSize = 8f;

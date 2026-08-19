@@ -59,15 +59,15 @@ public class EnemyShipSpawnSystem : GameSystem
         IInitialComponent[] components;
         if (variantRoll < 0.333f)
         {
-            components = EnemyShipFactory.CreateInterceptorComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f, EnemyShipType.Interceptor);
         }
         else if (variantRoll < 0.666f)
         {
-            components = EnemyShipFactory.CreateHeavyCannonComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f, EnemyShipType.HeavyCannon);
         }
         else
         {
-            components = EnemyShipFactory.CreateEnemyShipComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f);
+            components = EnemyShipFactory.CreateComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f, EnemyShipType.Default);
         }
 
         commands.AddEntity(components);
