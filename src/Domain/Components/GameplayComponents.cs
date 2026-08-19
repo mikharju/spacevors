@@ -72,9 +72,9 @@ public readonly record struct WeaponType(
 
     // Phase 2 weapons
     public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 900f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 100), AmmoRadius: 3.75f, Color: AmmoColor.Blue, AddOn: new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 500f, AutoTarget: false));
-    public static WeaponType TwinChainGun { get; } = new("TwinChainGun", new(14f, 550f, 3f, 1, Scatter: 0.015f, Damage: 1), AddOn: new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 360f, AutoTarget: false));
+    public static WeaponType TwinChainGun { get; } = new("TwinChainGun", new(14f, 550f, 3f, 1, Scatter: 0.015f, Damage: 1), AddOn: new(new Vector2(-12f, 0f), ArcOffset: 0f, MathF.PI / 8f, 360f, AutoTarget: false));
     public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1), AmmoRadius: 5f, Color: AmmoColor.Green, AddOn: new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 250f, AutoTarget: false));
-    public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1), AddOn: new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f));
+    public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1), AddOn: new(Vector2.Zero, ArcOffset: MathF.PI, MathF.PI * 3 / 2f, 280f));
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1));
 
     public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, TwinChainGun, AcidBubbleSpray, PointDefenceTurret, LoadTestWeapon];
@@ -112,14 +112,14 @@ public readonly record struct WeaponLoadout(
         new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 2000f, WeaponType.RailGun, AutoTarget: false)]);
 
     public static WeaponLoadout TwinChainGun { get; } = new("TwinChainGun", [
-        new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false),
-        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false)]);
+        new(new Vector2(-12f, 0f), ArcOffset: 0f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false),
+        new(new Vector2(12f, 0f), ArcOffset: 0f, MathF.PI / 8f, 1360f, WeaponType.TwinChainGun, AutoTarget: false)]);
 
     public static WeaponLoadout AcidBubbleSpray { get; } = new("AcidBubbleSpray", [
         new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 650f, WeaponType.AcidBubbleSpray, AutoTarget: false)]);
 
     public static WeaponLoadout PointDefenceTurret { get; } = new("PointDefenceTurret", [
-        new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 680f, WeaponType.PointDefenceTurret)]);
+        new(Vector2.Zero, ArcOffset: MathF.PI, MathF.PI * 3 / 2f, 680f, WeaponType.PointDefenceTurret)]);
 
     public static WeaponLoadout LoadTestWeapon { get; } = new("LoadTestWeapon", [
         new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 580f, WeaponType.LoadTestWeapon)]);
