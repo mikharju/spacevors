@@ -146,16 +146,5 @@ public static class UpgradeMenuRenderer
         };
     }
 
-    private static string GetUpgradeValue(UpgradeOption option) => option switch
-    {
-        UpgradeOption.FireRate => "+15%",
-        UpgradeOption.ProjectileSpeed => "+30%",
-        UpgradeOption.PickupRadius => "+20%",
-        UpgradeOption.Hp => "+2",
-        UpgradeOption.ForwardAcceleration => "+10%",
-        UpgradeOption.TurnSpeed => "+10%",
-        UpgradeOption.SideThrust => "+10%",
-        UpgradeOption.BackThrust => "+10%",
-        _ => "?"
-    };
+    private static string GetUpgradeValue(UpgradeOption option) => UpgradeDefinition.For(option).DisplayValue;
 }

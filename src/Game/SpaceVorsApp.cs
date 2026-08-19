@@ -336,13 +336,15 @@ public static class SpaceVorsApp
             return;
         }
 
+        var def = UpgradeDefinition.For(upgrade.Stat);
+
         switch (upgrade.Stat)
         {
             case UpgradeOption.FireRate:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
                     int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
-                    float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * 1.15f : turret.Weapon.FireRate;
+                    float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * def.Multiplier : turret.Weapon.FireRate;
 
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
@@ -358,7 +360,7 @@ public static class SpaceVorsApp
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
                     em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * 1.3f, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
+                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * def.Multiplier, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
@@ -377,7 +379,7 @@ public static class SpaceVorsApp
                     playerStats.Radius,
                     playerStats.Xp,
                     playerStats.Level,
-                    playerStats.PickupRadius * 1.2f,
+                    playerStats.PickupRadius * def.Multiplier,
                     playerStats.RotationSpeed));
                 break;
 
@@ -388,7 +390,7 @@ public static class SpaceVorsApp
                         Weapon: turret.Weapon,
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
-                        Range: turret.Range * 1.15f,
+                        Range: turret.Range * def.Multiplier,
                         AutoTarget: true,
                         IsEnemy: turret.IsEnemy));
                 }
@@ -398,7 +400,7 @@ public static class SpaceVorsApp
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
                     em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * 1.15f, turret.Weapon.Damage),
+                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * def.Multiplier, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
                         Range: turret.Range,
@@ -410,7 +412,7 @@ public static class SpaceVorsApp
             case UpgradeOption.Damage:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    int newDamage = turret.Weapon.Damage + 1;
+                    int newDamage = turret.Weapon.Damage + def.Additive;
 
                     if (newDamage > turret.Weapon.Damage)
                     {
@@ -428,13 +430,13 @@ public static class SpaceVorsApp
             case UpgradeOption.Hp:
                 if (!em.HasComponent<Health>(playerEntity)) break;
                 var currentHealth = em.GetComponent<Health>(playerEntity);
-                em.AddComponent(playerEntity, new Health(currentHealth.Current + 2));
+                em.AddComponent(playerEntity, new Health(currentHealth.Current + def.Additive));
                 em.AddComponent(playerEntity, new Player(
                     playerStats.Thrust,
                     playerStats.SideThrust,
                     playerStats.BackThrust,
                     playerStats.Boost,
-                    playerStats.MaxHealth + 2,
+                    playerStats.MaxHealth + def.Additive,
                     playerStats.Radius,
                     playerStats.Xp,
                     playerStats.Level,
@@ -445,7 +447,7 @@ public static class SpaceVorsApp
             case UpgradeOption.ForwardAcceleration:
                 {
                     var stats = em.GetComponent<Player>(playerEntity);
-                    float newThrust = stats.Thrust * 1.1f;
+                    float newThrust = stats.Thrust * def.Multiplier;
                     em.AddComponent(playerEntity, new Player(
                         newThrust,
                         stats.SideThrust,
@@ -463,7 +465,7 @@ public static class SpaceVorsApp
             case UpgradeOption.TurnSpeed:
                 {
                     var stats = em.GetComponent<Player>(playerEntity);
-                    float newRotationSpeed = stats.RotationSpeed * 1.1f;
+                    float newRotationSpeed = stats.RotationSpeed * def.Multiplier;
                     em.AddComponent(playerEntity, new Player(
                         stats.Thrust,
                         stats.SideThrust,
@@ -481,7 +483,7 @@ public static class SpaceVorsApp
             case UpgradeOption.SideThrust:
                 {
                     var stats = em.GetComponent<Player>(playerEntity);
-                    float newSideThrust = stats.SideThrust * 1.1f;
+                    float newSideThrust = stats.SideThrust * def.Multiplier;
                     em.AddComponent(playerEntity, new Player(
                         stats.Thrust,
                         newSideThrust,
@@ -499,7 +501,7 @@ public static class SpaceVorsApp
             case UpgradeOption.BackThrust:
                 {
                     var stats = em.GetComponent<Player>(playerEntity);
-                    float newBackThrust = stats.BackThrust * 1.1f;
+                    float newBackThrust = stats.BackThrust * def.Multiplier;
                     em.AddComponent(playerEntity, new Player(
                         stats.Thrust,
                         stats.SideThrust,
