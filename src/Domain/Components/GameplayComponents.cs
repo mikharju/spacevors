@@ -55,17 +55,23 @@ public readonly record struct WeaponStats(
 
 public readonly record struct WeaponType(
     string Name,
-    WeaponStats Stats)
+    WeaponStats Stats,
+    float AmmoRadius = 2.5f,
+    AmmoColor Color = AmmoColor.Yellow)
 {
     public static WeaponType MachineGun { get; } = new("MachineGun", new(8f, 420f, 10f, 1, Scatter: 0.033f, Damage: 1));
     public static WeaponType Shotgun { get; } = new("Shotgun", new(2f, 350f, 2.5f, 3, Scatter: 0.04f, Damage: 1));
 
     // Phase 2 weapons
-    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 900f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 100));
+    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 900f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 100), AmmoRadius: 3.75f, Color: AmmoColor.Blue);
     public static WeaponType TwinChainGun { get; } = new("TwinChainGun", new(14f, 550f, 3f, 1, Scatter: 0.015f, Damage: 1));
-    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1));
+    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1), AmmoRadius: 5f, Color: AmmoColor.Green);
     public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1));
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1));
+
+    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, TwinChainGun, AcidBubbleSpray, PointDefenceTurret, LoadTestWeapon];
+
+    public static WeaponType? FromName(string name) => All.FirstOrDefault(w => w.Name == name);
 }
 
 public readonly record struct TurretDefinition(

@@ -366,31 +366,22 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
+    private const float DefaultAmmoRadius = 2.5f;
+
     private static float GetAmmoRadius(Turret turret)
     {
-        if (turret.IsEnemy)
-        {
-            return 2.5f;
-        }
+        if (turret.IsEnemy) return DefaultAmmoRadius;
 
-        return turret.WeaponName switch
-        {
-            "RailGun" => 3.75f,
-            "AcidBubbleSpray" => 5f,
-            _ => 2.5f
-        };
+        var type = WeaponType.FromName(turret.WeaponName);
+        return type?.AmmoRadius ?? DefaultAmmoRadius;
     }
 
     private static AmmoColor GetAmmoColor(Turret turret, int damage)
     {
         if (turret.IsEnemy) return damage > 1 ? AmmoColor.Red : AmmoColor.Yellow;
 
-        return turret.WeaponName switch
-        {
-            "RailGun" => AmmoColor.Blue,
-            "AcidBubbleSpray" => AmmoColor.Green,
-            _ => AmmoColor.Yellow
-        };
+        var type = WeaponType.FromName(turret.WeaponName);
+        return type?.Color ?? AmmoColor.Yellow;
     }
 
     private static float SolveQuadratic(float a, float b, float c)
