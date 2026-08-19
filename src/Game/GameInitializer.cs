@@ -85,19 +85,8 @@ public static class GameInitializer
             float sSpeed = 20f + (float)rand.NextDouble() * 15f;
             float sAngle = (float)(rand.NextDouble() * Math.PI * 2);
 
-            float variantRoll = (float)rand.NextDouble();
-            if (variantRoll < 0.333f)
-            {
-                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.Interceptor);
-            }
-            else if (variantRoll < 0.666f)
-            {
-                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.HeavyCannon);
-            }
-            else
-            {
-                EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, EnemyShipType.Default);
-            }
+            var enemyShipType = EnemyShipFactory.PickRandomType(rand);
+            EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, enemyShipType);
         }
 
         // Spawn two enemy ships at screen edges just inside view range
@@ -108,19 +97,8 @@ public static class GameInitializer
             float ey = 150f * side;
             float eAngle = (float)(Math.PI / 4f * side);
 
-            float variantRoll = (float)rand.NextDouble();
-            if (variantRoll < 0.333f)
-            {
-                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.Interceptor);
-            }
-            else if (variantRoll < 0.666f)
-            {
-                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.HeavyCannon);
-            }
-            else
-            {
-                EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, EnemyShipType.Default);
-            }
+            var enemyShipType = EnemyShipFactory.PickRandomType(rand);
+            EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, enemyShipType);
         }
 
         // Create turret entities from the ship's weapons

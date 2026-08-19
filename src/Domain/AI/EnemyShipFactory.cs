@@ -5,6 +5,17 @@ namespace Spacevors.Domain.Systems;
 
 public static class EnemyShipFactory
 {
+    private const float InterceptorThreshold = 0.333f;
+    private const float HeavyCannonThreshold = 0.666f;
+
+    public static EnemyShipType PickRandomType(Random rng)
+    {
+        float roll = (float)rng.NextDouble();
+        if (roll < InterceptorThreshold) return EnemyShipType.Interceptor;
+        if (roll < HeavyCannonThreshold) return EnemyShipType.HeavyCannon;
+        return EnemyShipType.Default;
+    }
+
     public static void AddComponents(EntityManager em, Entity entity, Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type)
     {
         em.AddComponent(entity, new Position(position));
