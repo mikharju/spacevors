@@ -83,4 +83,49 @@ public class LitSpriteMatcherTest
 
         Assert.Empty(sets);
     }
+
+    [Fact]
+    public void PlainBase_WithNormalsAndDepth_Matches()
+    {
+        var sets = LitSpriteMatcher.Match(["large-asteroid-2", "large-asteroid-2-normals", "large-asteroid-2-depth"]);
+
+        Assert.Single(sets);
+        Assert.Equal("large-asteroid-2", sets[0].Prefix);
+        Assert.Equal("large-asteroid-2", sets[0].BaseStem);
+        Assert.Equal("large-asteroid-2-normals", sets[0].NormalsStem);
+        Assert.Equal("large-asteroid-2-depth", sets[0].DepthStem);
+    }
+
+    [Fact]
+    public void TexturePreferredOverPlainBase()
+    {
+        var sets = LitSpriteMatcher.Match(["a", "a-texture", "a-normals", "a-depth"]);
+
+        Assert.Single(sets);
+        Assert.Equal("a-texture", sets[0].BaseStem);
+    }
+
+    [Fact]
+    public void PlainBase_MissingDepth_NotMatched()
+    {
+        var sets = LitSpriteMatcher.Match(["x", "x-normals"]);
+
+        Assert.Empty(sets);
+    }
+
+    [Fact]
+    public void MixedTextureAndPlainBases_AllMatched()
+    {
+        var stems = new[]
+        {
+            "small-1-texture", "small-1-normals", "small-1-depth",
+            "large-2", "large-2-normals", "large-2-depth"
+        };
+
+        var sets = LitSpriteMatcher.Match(stems);
+
+        Assert.Equal(2, sets.Count);
+        Assert.Contains(sets, s => s.Prefix == "small-1" && s.BaseStem == "small-1-texture");
+        Assert.Contains(sets, s => s.Prefix == "large-2" && s.BaseStem == "large-2");
+    }
 }

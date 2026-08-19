@@ -132,6 +132,7 @@ Dynamic lighting.
 - per-sprite normal + depth maps: `<name>-normals.png`, `<name>-depth.png` next to `<name>-texture.png`
 - GLSL shader (src/Game/Lighting.cs): directional light from top-right, self-shadowing via depth map
 - flat texture fallback when maps or shader are unavailable
+- Asteroids (small + large) load as lit sprites through the same matcher; a set's base may be `<name>-texture.png` or a plain `<name>.png`. The loader scans only top-level files, so `not-in-use/` subfolders are ignored. Variant count = number of loaded bases (`Asteroid.Small/LargeVariantCount`)
 - Stage 1 (done): LitSprite matching in ImageLoader + tests
 - Stage 2 (done): Shadow ship (key 4), Lighting.Init/Shutdown/TryDraw, select screen + gameplay rendering
 - Stage 3: tuning — exposure/washout on bright textures, normal Y convention check, shadow strength

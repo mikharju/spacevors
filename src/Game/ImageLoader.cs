@@ -7,10 +7,9 @@ namespace Spacevors.Game;
 
 public static class ImageLoader
 {
-    public static readonly int SmallAsteroidTextureCount = 6;
-    public static readonly int LargeAsteroidTextureCount = 6;
-    public static Texture2D[]? AsteroidSmallTextures { get; private set; }
-    public static Texture2D[]? AsteroidLargeTextures { get; private set; }
+    // Indexed by Asteroid.Variant, ordered by base name.
+    public static AsteroidSprite[]? AsteroidSmallSprites { get; private set; }
+    public static AsteroidSprite[]? AsteroidLargeSprites { get; private set; }
     public static Texture2D? MineTexture { get; private set; }
 
     // Enemy ship textures keyed by filename stem (e.g. "enemy-1", "interceptor", "heavy-cannon")
@@ -25,36 +24,42 @@ public static class ImageLoader
 
     public static void LoadAssets()
     {
-        var smallAsteroidFiles = Directory.GetFiles("assets/asteroids/small", "*.png").OrderBy(f => f).ToArray();
-        var smallAsteroidTexs = new Texture2D[Math.Min(smallAsteroidFiles.Length, SmallAsteroidTextureCount)];
-        for (int i = 0; i < smallAsteroidTexs.Length; i++)
-        {
-            smallAsteroidTexs[i] = Raylib.LoadTexture(smallAsteroidFiles[i]);
-        }
-        AsteroidSmallTextures = smallAsteroidTexs;
-
-        var largeAsteroidFiles = Directory.GetFiles("assets/asteroids/large", "*.png").OrderBy(f => f).ToArray();
-        var largeAsteroidTexs = new Texture2D[Math.Min(largeAsteroidFiles.Length, LargeAsteroidTextureCount)];
-        for (int i = 0; i < largeAsteroidTexs.Length; i++)
-        {
-            largeAsteroidTexs[i] = Raylib.LoadTexture(largeAsteroidFiles[i]);
-        }
-        AsteroidLargeTextures = largeAsteroidTexs;
+        AsteroidSmallSprites = LoadAsteroidSprites("assets/asteroids/small");
+        AsteroidLargeSprites = LoadAsteroidSprites("assets/asteroids/large");
 
         var mineFiles = Directory.GetFiles("assets/mines", "*.png").OrderBy(f => f).ToArray();
         if (mineFiles.Length > 0)
             MineTexture = Raylib.LoadTexture(mineFiles[0]);
 
-        var enemyShips = LoadShipTextures("assets/enemy-ships");
+        var enemyShips = LoadSpriteSets("assets/enemy-ships");
         EnemyShipTextures = enemyShips.Flat;
         EnemyShipLitSprites = enemyShips.Lit;
 
-        var playerShips = LoadShipTextures("assets/player-ships");
+        var playerShips = LoadSpriteSets("assets/player-ships");
         PlayerShipTextures = playerShips.Flat;
         PlayerShipLitSprites = playerShips.Lit;
     }
 
-    private static (Dictionary<string, Texture2D> Flat, Dictionary<string, LitSprite> Lit) LoadShipTextures(string directory)
+    // One sprite per asteroid variant, ordered by base name so the Variant index is stable.
+    private static AsteroidSprite[]? LoadAsteroidSprites(string directory)
+    {
+        var (flat, lit) = LoadSpriteSets(directory);
+        if (lit.Count == 0 && flat.Count == 0) return null;
+
+        var keys = lit.Keys.Concat(flat.Keys).Distinct().OrderBy(k => k, StringComparer.Ordinal).ToList();
+        var sprites = new AsteroidSprite[keys.Count];
+        for (int i = 0; i < keys.Count; i++)
+        {
+            string key = keys[i];
+            sprites[i] = lit.TryGetValue(key, out var litSprite)
+                ? new AsteroidSprite(litSprite, null)
+                : new AsteroidSprite(null, flat[key]);
+        }
+        return sprites;
+    }
+
+    // Discovers lit sets (base + normals + depth) and remaining flat textures in a directory.
+    private static (Dictionary<string, Texture2D> Flat, Dictionary<string, LitSprite> Lit) LoadSpriteSets(string directory)
     {
         var flat = new Dictionary<string, Texture2D>();
         var lit = new Dictionary<string, LitSprite>();
@@ -85,25 +90,11 @@ public static class ImageLoader
 
     public static void UnloadAssets()
     {
-        if (AsteroidSmallTextures != null)
-        {
-            foreach (var tex in AsteroidSmallTextures)
-            {
-                if (tex.Id != 0)
-                    Raylib.UnloadTexture(tex);
-            }
-            AsteroidSmallTextures = null;
-        }
+        UnloadAsteroidSprites(AsteroidSmallSprites);
+        AsteroidSmallSprites = null;
 
-        if (AsteroidLargeTextures != null)
-        {
-            foreach (var tex in AsteroidLargeTextures)
-            {
-                if (tex.Id != 0)
-                    Raylib.UnloadTexture(tex);
-            }
-            AsteroidLargeTextures = null;
-        }
+        UnloadAsteroidSprites(AsteroidLargeSprites);
+        AsteroidLargeSprites = null;
 
         if (MineTexture.HasValue && MineTexture.Value.Id != 0)
         {
@@ -147,6 +138,24 @@ public static class ImageLoader
             if (sprite.Base.Id != 0) Raylib.UnloadTexture(sprite.Base);
             if (sprite.Normals.Id != 0) Raylib.UnloadTexture(sprite.Normals);
             if (sprite.Depth.Id != 0) Raylib.UnloadTexture(sprite.Depth);
+        }
+    }
+
+    private static void UnloadAsteroidSprites(AsteroidSprite[]? sprites)
+    {
+        if (sprites == null) return;
+
+        foreach (var sprite in sprites)
+        {
+            LitSprite? lit = sprite.Lit;
+            if (lit != null)
+            {
+                if (lit.Base.Id != 0) Raylib.UnloadTexture(lit.Base);
+                if (lit.Normals.Id != 0) Raylib.UnloadTexture(lit.Normals);
+                if (lit.Depth.Id != 0) Raylib.UnloadTexture(lit.Depth);
+            }
+            if (sprite.Flat.HasValue && sprite.Flat.Value.Id != 0)
+                Raylib.UnloadTexture(sprite.Flat.Value);
         }
     }
 }

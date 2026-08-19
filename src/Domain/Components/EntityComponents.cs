@@ -70,8 +70,8 @@ public readonly record struct MineType(
 
 public readonly record struct Asteroid(bool IsSmall, float Radius, byte Variant = 0)
 {
-    public const int SmallVariantCount = 6;
-    public const int LargeVariantCount = 6;
+    public const int SmallVariantCount = 3;
+    public const int LargeVariantCount = 3;
 }
 
 public readonly record struct Camera(Vector2 Target);

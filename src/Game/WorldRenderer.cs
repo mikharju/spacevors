@@ -38,46 +38,48 @@ public static class WorldRenderer
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
             float angleDeg = rot.Angle * 180f / MathF.PI;
-            Texture2D[]? asteroidTexs = asteroid.IsSmall ? ImageLoader.AsteroidSmallTextures : ImageLoader.AsteroidLargeTextures;
+            AsteroidSprite? sprite = GetAsteroidSprite(asteroid);
+            Texture2D? baseTex = sprite?.Lit?.Base ?? sprite?.Flat;
 
-            Texture2D? tex = null;
-            if (asteroid.Variant < asteroidTexs!.Length)
-                tex = asteroidTexs[asteroid.Variant];
-
-            float extent = tex.HasValue
-                ? RenderHelpers.HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)tex.Value.Height / tex.Value.Width)
+            float extent = baseTex.HasValue && baseTex.Value.Id != 0
+                ? RenderHelpers.HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f * (float)baseTex.Value.Height / baseTex.Value.Width)
                 : RenderHelpers.HalfDiagonal(asteroid.Radius * 2f, asteroid.Radius * 2f);
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
 
-            if (tex.HasValue)
-            {
-                float drawDiameter = asteroid.Radius * 2f;
-                float scale = drawDiameter / tex.Value.Width;
-                float destWidth = tex.Value.Width * scale;
-                float destHeight = tex.Value.Height * scale;
-
-                Raylib.DrawTexturePro(
-                    tex.Value,
-                    new Rectangle(0f, 0f, tex.Value.Width, tex.Value.Height),
-                    new Rectangle(cx, cy, destWidth, destHeight),
-                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                    angleDeg,
-                    Color.White
-                );
-            }
+            if (baseTex.HasValue && baseTex.Value.Id != 0)
+                DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
             else
-            {
                 Raylib.DrawRectanglePro(
                     new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
                     new System.Numerics.Vector2(asteroid.Radius, asteroid.Radius),
                     angleDeg,
                     new Color(200, 200, 210, 255)
                 );
-            }
         }
+    }
+
+    private static AsteroidSprite? GetAsteroidSprite(Asteroid asteroid)
+    {
+        var sprites = asteroid.IsSmall ? ImageLoader.AsteroidSmallSprites : ImageLoader.AsteroidLargeSprites;
+        if (sprites == null || asteroid.Variant >= sprites.Length) return null;
+        return sprites[asteroid.Variant];
+    }
+
+    // Lit when the variant has normal + depth maps, otherwise a flat texture.
+    private static void DrawAsteroidSprite(AsteroidSprite? sprite, Texture2D baseTex, float cx, float cy, float diameter, float angleDeg)
+    {
+        float scale = diameter / baseTex.Width;
+        var source = new Rectangle(0f, 0f, baseTex.Width, baseTex.Height);
+        var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
+        var origin = new System.Numerics.Vector2(dest.Width / 2f, dest.Height / 2f);
+
+        LitSprite? lit = sprite?.Lit;
+        bool drawn = lit != null && Lighting.TryDraw(lit, source, dest, origin, angleDeg);
+        if (!drawn)
+            Raylib.DrawTexturePro(baseTex, source, dest, origin, angleDeg, Color.White);
     }
 
     private static void DrawAmmo(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
