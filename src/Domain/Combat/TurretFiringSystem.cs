@@ -83,13 +83,8 @@ public class TurretFiringSystem : GameSystem
             view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
             Entity playerEntity = playerTuple.Entity;
 
-            float firingRangeSq = 90000f;
-            if (view.TryGetComponent<EnemyShip>(turretEntity, out var enemyShip))
-            {
-                firingRangeSq = enemyShip.FiringRange * enemyShip.FiringRange;
-            }
-
-            if (playerEntity.Value >= 0 && view.TryGetComponent<EnemyShip>(turretEntity, out var es))
+            if (playerEntity.Value >= 0 && view.TryGetComponent<EnemyShip>(turretEntity, out var es)
+                && view.TryGetComponent<Player>(playerEntity, out var player))
             {
                 Vector2 enemyVelocity = Vector2.Zero;
                 if (view.TryGetComponent<Velocity>(turretEntity, out var vel))
@@ -97,13 +92,23 @@ public class TurretFiringSystem : GameSystem
                     enemyVelocity = vel.Value;
                 }
 
+                float reach = es.FiringRange + player.Radius;
+                float reachSq = reach * reach;
+                float halfArc = turret.ArcAngle / 2f;
+
                 foreach (var (_, _, playerVel) in view.GetEntitiesWithComponents<Player, Velocity>())
                 {
                     var playerPos = view.GetComponent<Position>(playerEntity);
                     Vector2 relPos = playerPos.Value - turretPos;
                     float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-                    if (distSq > firingRangeSq || distSq < 0.001f) continue;
+                    if (distSq < 0.001f || distSq > reachSq) continue;
+
+                    // Engage when any part of the hull is inside the firing cone.
+                    float dist = MathF.Sqrt(distSq);
+                    float angularMargin = MathF.Asin(Math.Clamp(player.Radius / dist, -1f, 1f));
+                    Vector2 toCenterDir = relPos / dist;
+                    if (Vector2.Dot(forwardDir, toCenterDir) < MathF.Cos(halfArc + angularMargin)) continue;
 
                     Vector2 relVel = playerVel.Value - enemyVelocity;
                     float ammoSpeed = es.TurretAmmoSpeed;
@@ -118,18 +123,13 @@ public class TurretFiringSystem : GameSystem
                     var toPredicted = predictedPos - turretPos;
                     float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
 
-                    if (distToPredictedSq > firingRangeSq) continue;
+                    if (distToPredictedSq > reachSq) continue;
 
-                    Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (es.TurretAmmoSpeed * travelTime);
-                    float dot = Vector2.Dot(forwardDir, aimDir);
-                    if (dot < cosHalfArc) continue;
-
-                    nearestTarget = (aimDir, predictedPos, 10f);
+                    Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (ammoSpeed * travelTime);
+                    nearestTarget = (aimDir, predictedPos, player.Radius);
                     nearestDistSq = distSq;
                 }
             }
-
-            CheckTargets(view.GetEntitiesWithComponents<EnemyMine>(), m => m.Radius, firingRangeSq);
         }
 
         return nearestTarget;
@@ -343,6 +343,10 @@ public class TurretFiringSystem : GameSystem
                     ammoVel += vel.Value;
                     break;
                 }
+            }
+            else if (view.TryGetComponent<Velocity>(turretEntity, out var shipVel))
+            {
+                ammoVel += shipVel.Value;
             }
 
             float ammoRadius = GetAmmoRadius(turret);
