@@ -188,6 +188,9 @@ Domain never references infrastructure.
 
 Keep systems small and deterministic.
 
+Keep data organized with other related data. 
+For example: All ship related data in record structs related to ship, no ship colors or such in far away switch statements.
+
 ## Performance
 
 ComponentStorage<T> uses compact arrays with swap-pop deletion for O(1) removal.
