@@ -527,25 +527,19 @@ public static class SpaceVorsApp
             return;
         }
 
-        var playerPos = em.GetComponent<Position>(playerEntity);
-        var playerRot = em.GetComponent<Rotation>(playerEntity);
+        var type = WeaponType.FromName(weaponName);
+        if (type is not { } weapon || weapon.AddOn is not { } mount)
+            throw new InvalidOperationException($"Unknown weapon: {weaponName}");
 
-        TurretDefinition definition = weaponName switch
-        {
-            "RailGun" => new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 500f, WeaponType.RailGun, AutoTarget: false),
-            "TwinChainGun" => new(new Vector2(-12f, 0f), ArcOffset: MathF.PI / 4f, MathF.PI / 8f, 360f, WeaponType.TwinChainGun, AutoTarget: false),
-            "AcidBubbleSpray" => new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 250f, WeaponType.AcidBubbleSpray, AutoTarget: false),
-            "PointDefenceTurret" => new(Vector2.Zero, ArcOffset: -MathF.PI / 4f, MathF.PI * 3 / 4f, 280f, WeaponType.PointDefenceTurret),
-            _ => throw new InvalidOperationException($"Unknown weapon: {weaponName}")
-        };
+        var playerPos = em.GetComponent<Position>(playerEntity);
 
         var turretEntity = em.CreateEntity();
         Vector2 worldPos = playerPos.Value;
         em.AddComponent(turretEntity, new Position(worldPos));
-        em.AddComponent(turretEntity, new Rotation(definition.ArcOffset));
-        em.AddComponent(turretEntity, new Turret(Weapon: definition.Weapon.Stats, WeaponName: definition.Weapon.Name, ArcAngle: definition.ArcAngle, Range: definition.Range, AutoTarget: definition.AutoTarget));
-        em.AddComponent(turretEntity, new TurretOffset(definition.Offset));
-        em.AddComponent(turretEntity, new ArcOffset(definition.ArcOffset));
+        em.AddComponent(turretEntity, new Rotation(mount.ArcOffset));
+        em.AddComponent(turretEntity, new Turret(Weapon: weapon.Stats, WeaponName: weapon.Name, ArcAngle: mount.ArcAngle, Range: mount.Range, AutoTarget: mount.AutoTarget));
+        em.AddComponent(turretEntity, new TurretOffset(mount.Offset));
+        em.AddComponent(turretEntity, new ArcOffset(mount.ArcOffset));
 
         em.AddComponent(playerEntity, new WeaponSlots(slots.Used + 1, slots.Max));
         DiagnosticLogger.LogEvent("UPGRADE", $"added new weapon {weaponName} (slots {slots.Used + 1}/{slots.Max})");

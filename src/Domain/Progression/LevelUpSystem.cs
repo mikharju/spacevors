@@ -8,11 +8,7 @@ public class LevelUpSystem : GameSystem
     const string DiagnosticEnvVar = "SPACEVORS_DIAGNOSTIC";
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
-    private static readonly WeaponType[] AllNewWeapons = [
-        WeaponType.RailGun,
-        WeaponType.TwinChainGun,
-        WeaponType.AcidBubbleSpray,
-        WeaponType.PointDefenceTurret];
+    private static readonly WeaponType[] AllNewWeapons = WeaponType.AddOnWeapons;
 
     // Diagnostics only: fixed upgrade sequence consumed one entry per level-up.
     private readonly UpgradableOption[]? _scriptedUpgrades;
