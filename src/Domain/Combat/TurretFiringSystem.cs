@@ -360,17 +360,23 @@ public class TurretFiringSystem : GameSystem
         {
             Vector2 kickbackDir = new Vector2(-ammoDir.X, -ammoDir.Y);
             var playerTuples = view.GetEntitiesWithComponents<Player>().ToList();
-            foreach (var (playerEntity, _) in playerTuples)
+            foreach (var (playerEntity, player) in playerTuples)
             {
                 if (view.TryGetComponent<Velocity>(playerEntity, out var currentVel))
                 {
-                    commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(currentVel.Value + kickbackDir * turret.Weapon.KickbackForce)));
+                    float kickback = turret.Weapon.KickbackForce * KickbackScale(player.Radius);
+                    commands.Add(new AddComponentCommand<Velocity>(playerEntity, new Velocity(currentVel.Value + kickbackDir * kickback)));
                 }
             }
         }
     }
 
     private const float DefaultAmmoRadius = 2.5f;
+
+    // Radius stands in for mass: bigger ships recoil less. The lightest ship keeps 2/3 of base kickback.
+    private static readonly float LightestShipRadius = ShipType.All.Min(t => t.Radius);
+
+    private static float KickbackScale(float radius) => (2f / 3f) * LightestShipRadius / radius;
 
     private static float GetAmmoRadius(Turret turret)
     {

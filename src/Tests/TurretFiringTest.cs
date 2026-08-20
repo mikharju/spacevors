@@ -57,6 +57,48 @@ public class TurretFiringTest
         Assert.True(ammoCount > 0, $"Expected ammo to be created, but got {ammoCount}");
     }
 
+    [Fact]
+    public void TestKickbackScalesWithShipRadius()
+    {
+        // Lightest ship (radius 46) gets 2/3 of base kickback; double the radius halves it again.
+        float light = KickbackAfterShot(radius: 46f);
+        float heavy = KickbackAfterShot(radius: 92f);
+
+        Assert.Equal(20f, light, precision: 5); // 30 * 2/3
+        Assert.Equal(10f, heavy, precision: 5); // 30 * 2/3 / 2
+    }
+
+    private static float KickbackAfterShot(float radius)
+    {
+        var em = new EntityManager();
+
+        var playerEntity = em.CreateEntity();
+        em.AddComponent(playerEntity, new Position(new Vector2(100f, 100f)));
+        em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
+        em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 10, Radius: radius, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
+
+        var turretEntity = em.CreateEntity();
+        em.AddComponent(turretEntity, new Position(Vector2.Zero));
+        em.AddComponent(turretEntity, new Rotation(0f));
+        em.AddComponent(turretEntity, new Turret(
+            Weapon: new WeaponStats(FireRate: 5f, AmmoSpeed: 500f, KickbackForce: 30f, PelletCount: 1, Scatter: 0.05f),
+            WeaponName: "TestWeapon",
+            ArcAngle: MathF.PI / 4f,
+            Range: 300f));
+
+        var asteroidEntity = em.CreateEntity();
+        em.AddComponent(asteroidEntity, new Position(new Vector2(0f, -100f)));
+        em.AddComponent(asteroidEntity, new Velocity(Vector2.Zero));
+        em.AddComponent(asteroidEntity, new Asteroid(IsSmall: false, Radius: 30f));
+
+        var commands = new CommandBuffer();
+        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+        commands.Apply(em);
+
+        // Shot goes down (-Y), so kickback pushes the player up (+Y).
+        return em.GetComponent<Velocity>(playerEntity).Value.Y;
+    }
+
     [Theory]
     [InlineData("TwinChainGun", 0f, -100f, true)]     // forward: fires
     [InlineData("TwinChainGun", 0f, 100f, false)]     // backward: no fire
