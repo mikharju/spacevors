@@ -60,12 +60,12 @@ public class TurretFiringTest
     [Fact]
     public void TestKickbackScalesWithShipRadius()
     {
-        // Lightest ship (radius 46) gets 2/3 of base kickback; double the radius halves it again.
+        // Lightest ship (radius 46) gets 2/3 of base kickback; double the radius means 8x the mass.
         float light = KickbackAfterShot(radius: 46f);
         float heavy = KickbackAfterShot(radius: 92f);
 
         Assert.Equal(20f, light, precision: 5); // 30 * 2/3
-        Assert.Equal(10f, heavy, precision: 5); // 30 * 2/3 / 2
+        Assert.Equal(2.5f, heavy, precision: 5); // 30 * 2/3 / 8
     }
 
     private static float KickbackAfterShot(float radius)

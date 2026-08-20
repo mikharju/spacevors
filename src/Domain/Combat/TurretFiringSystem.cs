@@ -373,10 +373,14 @@ public class TurretFiringSystem : GameSystem
 
     private const float DefaultAmmoRadius = 2.5f;
 
-    // Radius stands in for mass: bigger ships recoil less. The lightest ship keeps 2/3 of base kickback.
+    // Ships are treated as spheres, so mass scales with r^3: bigger ships recoil much less. The lightest ship keeps 2/3 of base kickback.
     private static readonly float LightestShipRadius = ShipType.All.Min(t => t.Radius);
 
-    private static float KickbackScale(float radius) => (2f / 3f) * LightestShipRadius / radius;
+    private static float KickbackScale(float radius)
+    {
+        float ratio = LightestShipRadius / radius;
+        return (2f / 3f) * ratio * ratio * ratio;
+    }
 
     private static float GetAmmoRadius(Turret turret)
     {
