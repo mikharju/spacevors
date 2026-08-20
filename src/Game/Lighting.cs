@@ -46,6 +46,8 @@ public static class Lighting
         const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
         // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
         const float MaxPointLightContribution = 1.0f;
+        // Lights sit this many px above the scene plane (toward viewer), so flat surfaces still receive light.
+        const float PointLightHeight = 80.0f;
 
         void main()
         {
@@ -70,14 +72,18 @@ public static class Lighting
 
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
 
-            // Point lights add a warm radial glow on top of the directional light.
+            // Point lights add a warm glow on top of the directional light, shaded by sprite normals.
             float pointLight = 0.0;
             for (int i = 0; i < MaxPointLights; i++) {
                 vec4 light = uLights[i];
                 if (light.w <= 0.0 || light.z <= 0.0) continue;
                 float dist = distance(gl_FragCoord.xy, light.xy);
                 float fall = 1.0 - smoothstep(0.0, light.z, dist);
-                pointLight += light.w * fall * fall;
+                // gl_FragCoord and light positions are GL space (y up); normalScreen is y down.
+                vec2 dGl = light.xy - gl_FragCoord.xy;
+                vec3 toLight = normalize(vec3(dGl.x, -dGl.y, PointLightHeight));
+                float facing = max(dot(normalScreen, toLight), 0.0);
+                pointLight += light.w * fall * fall * facing;
             }
             pointLight = min(pointLight, MaxPointLightContribution);
 

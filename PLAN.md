@@ -208,6 +208,7 @@ Design decisions:
   - Ship death explosions (initial + secondary + final) and mine blasts — all use the existing Explosion component; rare and large, included first. Ammo hits do NOT spawn Explosion components (only sparks), so there is no per-shot light to limit
   - Thruster flames — numerous (up to ~125 in load test); fill remaining slots after explosions and are dropped first under pressure. Gives engine glow on nearby hulls/rocks without unbounded cost
 - Intensity fades with effect life (lifeRatio); radius maps from Explosion.Radius / flame size; one shared warm tint for all lights keeps uniform count low (per-light color is an optional refinement)
+- Point lights shade with sprite normals: per-light Lambertian term against `normalScreen` (light direction y-flipped from GL space, light elevated `PointLightHeight` px toward viewer so flat surfaces stay lit). No depth-map occlusion for point lights — would need 16 extra depth fetches per lit pixel for dubious benefit
 - CPU gathers the list once per frame and uploads it once (K vec4s). No new draw calls: the per-sprite batch flush already exists in Lighting.TryDraw, so adding lights changes only fragment work + a few uniforms
 
 Stage 1 (shader plumbing) — done: `uLights[16]` vec4 array (screen pos xy with GL bottom-left origin, radius z, intensity w); `Lighting.BeginFrame` + `AddLight`; one `SetShaderValueV` upload per lit-sprite draw; idle screenshot pixel-identical to pre-change baseline at zero lights
