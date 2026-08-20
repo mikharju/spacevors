@@ -47,6 +47,23 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: The press+release can land between two input polls (frame ~8 ms at 120 fps); per-frame `IsMouseButtonPressed` then never sees the transition.
 - **Fix / Prevention**: Send explicit slow clicks: `xdotool mousemove X Y mousedown 1; sleep 0.3; xdotool mouseup 1`.
 
+## 7. Stale binary after a failed rebuild (silent)
+
+- **Symptom**: A test program "behaved" completely differently from its source (exited early, missing output); changes appeared to have no effect.
+- **Cause**: `dotnet build` had failed (compile error), but the launch step still ran — executing the *previous* binary silently. Piping build output through `tail -1` hid the failure.
+- **Fix / Prevention**: Always check for "Build succeeded" (or a non-zero exit code) before launching; don't truncate build output when iterating on scratch programs.
+
+## 8. xdotool window search only finds live windows
+
+- **Symptom**: `xdotool search --name <title>` returned nothing, so `windowfocus`/input targeting failed with "Invalid window".
+- **Cause**: The target process had already exited (short-lived test program); its X window is gone. Chasing the missing window wasted time.
+- **Fix / Prevention**: Check `pgrep -x <procname>` FIRST; only search for windows of processes confirmed alive.
+
+## 9. No window focus needed for xdotool input
+
+- **Symptom/Note**: `xdotool windowactivate` fails on Xvfb ("windowmanager claims not to support _NET_ACTIVE_WINDOW") — but plain `xdotool key ...` still works anyway.
+- **Cause**: GLFW grabs X input focus when it creates the window, even without a window manager. The failed activate is harmless; don't add workarounds for it.
+
 ## General workflow that works
 
 ```bash
