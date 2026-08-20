@@ -8,14 +8,15 @@ namespace Spacevors.Game;
 // click a card or press Enter to select it. Number keys 1-9 pick directly.
 public sealed class ShipSelectScreen
 {
-    const int CardWidth = 340;
-    const int CardHeight = 160;
+    const int CardWidth = 600;
+    const int CardHeight = 300; // fits the largest ship preview (Heavy) plus text column
+    const int ShipPanelWidth = 300; // left area reserved for the ship preview
+    const int TextGap = 20; // gap between ship panel and text column
     const int CardSpacing = 60;
     const int ListTopMargin = 70;
     const int ListBottomMargin = 90; // room for the hint line
     const int ScrollbarWidth = 10;
     const int ScrollbarGap = 20;
-    const float NavInitialDelay = 0.25f;
     const float NavRepeatInterval = 0.1f;
     const float WheelScrollPixelsPerUnit = 120f; // wheel events arrive as small notch values
 
@@ -24,7 +25,6 @@ public sealed class ShipSelectScreen
     int _highlightedIndex;
     float _scrollOffset;
     float _navTimer;
-    bool _hasStepped;
 
     // Returns the chosen ship when a selection is made this frame.
     public ShipType? Update(int windowWidth, int windowHeight)
@@ -83,8 +83,7 @@ public sealed class ShipSelectScreen
             var borderColor = i == _highlightedIndex ? new Color(255, 255, 255, 255) : new Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
             DrawShipCard(listX, y, ship.Name, stats, borderColor, i < DigitKeys.Length ? $"{i + 1}" : "", i == _highlightedIndex);
 
-            float cardBottom = y + CardHeight - 15;
-            DrawShipPreview((float)(listX + CardWidth / 2), cardBottom, ship);
+            DrawShipPreview((float)(listX + ShipPanelWidth / 2), (float)y + CardHeight / 2f, ship);
         }
 
         DrawScrollbar(windowWidth, windowHeight);
@@ -105,17 +104,29 @@ public sealed class ShipSelectScreen
         if (step == 0)
         {
             _navTimer = 0f;
-            _hasStepped = false;
             return;
         }
 
-        // Step once on press, then repeat while held.
-        _navTimer += Raylib.GetFrameTime();
-        float delay = _hasStepped ? NavRepeatInterval : NavInitialDelay;
-        if (_navTimer < delay) return;
+        // Step immediately on press, then repeat while held.
+        bool pressed = step < 0
+            ? Raylib.IsKeyPressed(KeyboardKey.Up) || Raylib.IsKeyPressed(KeyboardKey.W) || Raylib.IsKeyPressed(KeyboardKey.Left) || Raylib.IsKeyPressed(KeyboardKey.A)
+            : Raylib.IsKeyPressed(KeyboardKey.Down) || Raylib.IsKeyPressed(KeyboardKey.S) || Raylib.IsKeyPressed(KeyboardKey.Right) || Raylib.IsKeyPressed(KeyboardKey.D);
 
+        if (pressed)
+        {
+            StepHighlight(step, shipCount, windowHeight);
+            _navTimer = 0f;
+            return;
+        }
+
+        _navTimer += Raylib.GetFrameTime();
+        if (_navTimer < NavRepeatInterval) return;
         _navTimer = 0f;
-        _hasStepped = true;
+        StepHighlight(step, shipCount, windowHeight);
+    }
+
+    void StepHighlight(int step, int shipCount, int windowHeight)
+    {
         _highlightedIndex = Math.Clamp(_highlightedIndex + step, 0, shipCount - 1);
         EnsureHighlightedVisible(windowHeight);
     }
@@ -178,17 +189,14 @@ public sealed class ShipSelectScreen
         Raylib.DrawRectangle(x, y, CardWidth, CardHeight, highlighted ? new Color(48, 48, 64, 255) : new Color(35, 35, 45, 255));
         Raylib.DrawRectangleLines(x, y, CardWidth, CardHeight, borderColor);
 
+        int textX = x + ShipPanelWidth + TextGap;
         if (keyLabel.Length > 0)
-            Raylib.DrawText(keyLabel, x + 10, y + 10, 18, new Color(200, 200, 200, 255));
+            Raylib.DrawText(keyLabel, textX, y + 70, 18, new Color(200, 200, 200, 255));
 
-        int titleWidth = Raylib.MeasureText(title, 24);
-        Raylib.DrawText(title, x + CardWidth / 2 - titleWidth / 2, y + 30, 24, new Color(255, 255, 255, 255));
+        Raylib.DrawText(title, textX, y + 105, 24, new Color(255, 255, 255, 255));
 
         string[] lines = details.Split('\n');
         for (int i = 0; i < lines.Length; i++)
-        {
-            int lineW = Raylib.MeasureText(lines[i], 16);
-            Raylib.DrawText(lines[i], x + CardWidth / 2 - lineW / 2, y + 65 + i * 20, 16, new Color(200, 200, 200, 255));
-        }
+            Raylib.DrawText(lines[i], textX, y + 155 + i * 26, 16, new Color(200, 200, 200, 255));
     }
 }
