@@ -10,6 +10,8 @@ public class EnemyShipSpawnSystem : GameSystem
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
+    public const float MinFollowFactor = 0.7f;
+    private const float MaxFollowFactor = 1.0f;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -33,29 +35,19 @@ public class EnemyShipSpawnSystem : GameSystem
         Vector2 playerVel = playerVelComp.Value;
 
         float velMagnitude = playerVel.Magnitude;
-        if (velMagnitude < 0.1f) return;
+        if (velMagnitude < SpawnPlacement.MinDirectionalSpeed) return;
 
-        Vector2 velocityDir = playerVel / velMagnitude;
-
-        float randomAngle = (float)(rng.NextDouble() * MathF.PI / 2f - MathF.PI / 4f);
-
-        float cosA = (float)Math.Cos(randomAngle);
-        float sinA = (float)Math.Sin(randomAngle);
-        Vector2 spawnDir = new Vector2(
-            velocityDir.X * cosA - velocityDir.Y * sinA,
-            velocityDir.X * sinA + velocityDir.Y * sinA
-        );
-
-        float spawnDist = 500f + (float)rng.NextDouble() * 500f;
-        Vector2 testSpawnPos = new(
-            playerPos.Value.X + spawnDir.X * spawnDist,
-            playerPos.Value.Y + spawnDir.Y * spawnDist
-        );
+        Vector2 spawnDir = SpawnPlacement.ForwardDirection(playerVel / velMagnitude, rng);
+        Vector2 testSpawnPos = SpawnPlacement.OutsideScreen(playerPos.Value, view.ViewportSize, spawnDir);
 
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
         var enemyShipType = EnemyShipFactory.PickRandomType(rng);
-        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, Vector2.Zero, (float)(rng.NextDouble() * Math.PI * 2f), 0f, enemyShipType);
+        float followFactor = MinFollowFactor + (float)rng.NextDouble() * (MaxFollowFactor - MinFollowFactor);
+        Vector2 initialVel = playerVel * followFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
+        float facingAngle = SpawnPlacement.AngleFromTo(testSpawnPos, playerPos.Value);
+
+        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType);
 
         commands.AddEntity(components);
 

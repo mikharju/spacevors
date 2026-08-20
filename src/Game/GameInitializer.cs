@@ -7,7 +7,10 @@ namespace Spacevors.Game;
 
 public static class GameInitializer
 {
-    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType)
+    private const int InitialMineCount = 15;
+    private const int InitialEnemyShipCount = 6;
+
+    public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType, Vector2 viewportSize)
     {
         var em = new EntityManager();
 
@@ -59,46 +62,29 @@ public static class GameInitializer
             AsteroidFactory.AddAsteroidComponents(em, asteroid, new Vector2(ax, ay), aSpeed, aAngle, rand);
         }
 
-        // Spawn enemy mines around the player
-        for (int i = 0; i < 15; i++)
+        // Spawn enemy mines just outside the screen around the player
+        for (int i = 0; i < InitialMineCount; i++)
         {
             var mine = em.CreateEntity();
-            float angle = (float)(rand.NextDouble() * Math.PI * 2f);
-            float dist = 300f + (float)rand.NextDouble() * 3000f;
-            float mx = (float)Math.Cos(angle) * dist;
-            float my = (float)Math.Sin(angle) * dist;
+            Vector2 dir = SpawnPlacement.AnyDirection(rand);
+            Vector2 minePos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
             MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
-            em.AddComponent(mine, new Position(new Vector2(mx, my)));
+            em.AddComponent(mine, new Position(minePos));
             em.AddComponent(mine, new Velocity(Vector2.Zero));
-            em.AddComponent(mine, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, angle));
+            em.AddComponent(mine, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, (float)(rand.NextDouble() * Math.PI * 2)));
             em.AddComponent(mine, new Health(2));
         }
 
-        // Spawn enemy ships around the player
-        for (int i = 0; i < 4; i++)
+        // Spawn enemy ships just outside the screen, drifting in toward the player
+        for (int i = 0; i < InitialEnemyShipCount; i++)
         {
             var ship = em.CreateEntity();
-            float angle = (float)(rand.NextDouble() * Math.PI * 2f);
-            float dist = 1500f + (float)rand.NextDouble() * 2000f;
-            float sx = (float)Math.Cos(angle) * dist;
-            float sy = (float)Math.Sin(angle) * dist;
-            float sSpeed = 20f + (float)rand.NextDouble() * 15f;
-            float sAngle = (float)(rand.NextDouble() * Math.PI * 2);
+            Vector2 dir = SpawnPlacement.AnyDirection(rand);
+            Vector2 spawnPos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
+            Vector2 initialVel = (Vector2.Zero - spawnPos).Normalized * SpawnPlacement.DriftSpeed;
 
             var enemyShipType = EnemyShipFactory.PickRandomType(rand);
-            EnemyShipFactory.AddComponents(em, ship, new Vector2(sx, sy), new Vector2((float)Math.Cos(sAngle) * sSpeed, (float)Math.Sin(sAngle) * sSpeed), sAngle, (float)(rand.NextDouble() - 0.5f) * 1f, enemyShipType);
-        }
-
-        // Spawn two enemy ships at screen edges just inside view range
-        for (int side = -1; side <= 1; side += 2)
-        {
-            var edgeShip = em.CreateEntity();
-            float ex = side * 900f;
-            float ey = 150f * side;
-            float eAngle = (float)(Math.PI / 4f * side);
-
-            var enemyShipType = EnemyShipFactory.PickRandomType(rand);
-            EnemyShipFactory.AddComponents(em, edgeShip, new Vector2(ex, ey), Vector2.Zero, eAngle + MathF.PI, 0f, enemyShipType);
+            EnemyShipFactory.AddComponents(em, ship, spawnPos, initialVel, SpawnPlacement.AngleFromTo(spawnPos, Vector2.Zero), 0f, enemyShipType);
         }
 
         // Create turret entities from the ship's weapons

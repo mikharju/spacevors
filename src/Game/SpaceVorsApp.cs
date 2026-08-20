@@ -44,7 +44,7 @@ public static class SpaceVorsApp
                 continue;
             }
 
-            var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(chosenShip);
+            var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(chosenShip, new Vector2(GetW(), GetH()));
             ThrusterFlameRenderer.Reset();
 
             bool gameOver = false;
@@ -182,7 +182,7 @@ public static class SpaceVorsApp
                     {
                         DiagnosticLogger.LogFrameStart();
 
-                        var view = new WorldView(em);
+                        var view = new WorldView(em) { ViewportSize = new Vector2(GetW(), GetH()) };
                         var commands = new CommandBuffer();
 
                         runner.RunPhase(view, commands, runner.MovementSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));

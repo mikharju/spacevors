@@ -117,6 +117,14 @@ Difficulty scaling.
 - mine respawn system with increasing frequency
 - max 100 active enemy ships, ~23 mines cap
 
+### Off-screen spawning
+
+Enemies and mines never pop in on screen; they spawn just outside the current viewport (`SpawnPlacement.OutsideScreen`, margin 60px past the edge — viewport size flows from the window into `WorldView.ViewportSize` each tick, so resizing is handled).
+
+- Enemy ships: forward quadrant (±45° of player velocity); initial velocity = 70–100% of player velocity + 40 px/s drift toward the player; face the player at spawn. The existing drift-cancel AI brakes them into a chase
+- Mines: forward quadrant while the player moves, any direction while stationary (no meaningful "front"); zero initial velocity, MineDriftSystem pulls them in as before
+- Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter
+
 ## Phase 4c
 
 Enemy variants.

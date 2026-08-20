@@ -2,6 +2,9 @@ namespace Spacevors.Domain;
 
 public class WorldView
 {
+    // Matches the game's default window size; used when no real viewport is supplied (tests, headless).
+    public static readonly Vector2 DefaultViewportSize = new(1920f, 1024f);
+
     private readonly EntityManager _em;
 
     public WorldView(EntityManager em)
@@ -10,6 +13,8 @@ public class WorldView
     }
 
     public int MaxEntityId => _em.MaxEntityId;
+
+    public Vector2 ViewportSize { get; set; } = DefaultViewportSize;
 
     public float ElapsedTime => _em.ElapsedTime;
 

@@ -25,16 +25,20 @@ public class MineRespawnSystem : GameSystem
 
         var rng = view.Rng;
         var playerPos = view.GetComponent<Position>(playerEntity);
+        view.TryGetComponent<Velocity>(playerEntity, out var playerVelComp);
+        Vector2 playerVel = playerVelComp.Value;
 
-        float angle = (float)(rng.NextDouble() * Math.PI * 2f);
-        float dist = 300f + (float)rng.NextDouble() * 3000f;
-        float mx = playerPos.Value.X + (float)Math.Cos(angle) * dist;
-        float my = playerPos.Value.Y + (float)Math.Sin(angle) * dist;
+        // No meaningful "front" while the player is stationary: spawn in any direction.
+        Vector2 spawnDir = playerVel.Magnitude >= SpawnPlacement.MinDirectionalSpeed
+            ? SpawnPlacement.ForwardDirection(playerVel / playerVel.Magnitude, rng)
+            : SpawnPlacement.AnyDirection(rng);
+
+        Vector2 minePos = SpawnPlacement.OutsideScreen(playerPos.Value, view.ViewportSize, spawnDir);
         float mineAngle = (float)(rng.NextDouble() * Math.PI * 2);
 
         MineSize mSize = rng.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
 
-        commands.AddEntity(new Position(new Vector2(mx, my)), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)rng.NextDouble() * 20f, mineAngle), new Health(2));
+        commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)rng.NextDouble() * 20f, mineAngle), new Health(2));
 
         float elapsed = view.ElapsedTime;
         float rampDuration = 180f;
