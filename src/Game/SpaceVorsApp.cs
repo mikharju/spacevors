@@ -67,6 +67,7 @@ public static class SpaceVorsApp
 
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(new Color(15, 15, 25, 255));
+                Lighting.BeginFrame(0f, 0f, GetW(), GetH());
                 ShipSelectRenderer.DrawShipCards(GetW(), GetH());
                 Raylib.EndDrawing();
 
@@ -198,6 +199,14 @@ public static class SpaceVorsApp
                         if (diagnostics && Raylib.IsKeyPressed(KeyboardKey.L))
                         {
                             em.AddComponent(playerEntity, playerStats with { Xp = playerStats.Level * 10 });
+                        }
+
+                        // Diagnostic only: spawn a test explosion on the fixed test asteroid to verify lighting
+                        if (diagnostics && Raylib.IsKeyPressed(KeyboardKey.M))
+                        {
+                            var testExplosion = em.CreateEntity();
+                            em.AddComponent(testExplosion, new Position(new Vector2(0f, -300f)));
+                            em.AddComponent(testExplosion, new Explosion(80f, 1.5f, 1.5f));
                         }
                     }
 

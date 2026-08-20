@@ -39,6 +39,14 @@ public static class Lighting
         const float ShadowDepthBias = 0.03;
         const float ShadowDiffuseScale = 0.15;
 
+        // Point lights: xy screen pos (GL origin bottom-left), z radius px, w intensity.
+        // Slots with zero radius or intensity are skipped, so unused slots stay inert.
+        const int MaxPointLights = 16;
+        uniform vec4 uLights[MaxPointLights];
+        const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
+        // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
+        const float MaxPointLightContribution = 1.0f;
+
         void main()
         {
             vec4 baseColor = texture(texture0, fragTexCoord);
@@ -61,11 +69,26 @@ public static class Lighting
             float shadowed = 1.0 - smoothstep(-ShadowDepthBias, ShadowDepthBias, depthHere - depthTowardLight);
 
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
-            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse);
+
+            // Point lights add a warm radial glow on top of the directional light.
+            float pointLight = 0.0;
+            for (int i = 0; i < MaxPointLights; i++) {
+                vec4 light = uLights[i];
+                if (light.w <= 0.0 || light.z <= 0.0) continue;
+                float dist = distance(gl_FragCoord.xy, light.xy);
+                float fall = 1.0 - smoothstep(0.0, light.z, dist);
+                pointLight += light.w * fall * fall;
+            }
+            pointLight = min(pointLight, MaxPointLightContribution);
+
+            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight;
 
             finalColor = vec4(lit, baseColor.a) * fragColor;
         }
         """;
+
+    // Must match the shader's MaxPointLights.
+    const int MaxPointLights = 16;
 
     public static bool IsReady { get; private set; }
 
@@ -73,6 +96,37 @@ public static class Lighting
     static int _normalMapLoc;
     static int _depthMapLoc;
     static int _angleRadLoc;
+    static int _lightsLoc;
+
+    // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
+    static readonly System.Numerics.Vector4[] PointLights = new System.Numerics.Vector4[MaxPointLights];
+    static int _pointLightCount;
+    static float _camX;
+    static float _camY;
+    static int _windowWidth;
+    static int _windowHeight;
+
+    // Resets the light list for a new frame. Must be called once per frame before any lit draw,
+    // even on frames with no lights (e.g. ship select), so stale lights do not leak across screens.
+    public static void BeginFrame(float camX, float camY, int windowWidth, int windowHeight)
+    {
+        _camX = camX;
+        _camY = camY;
+        _windowWidth = windowWidth;
+        _windowHeight = windowHeight;
+        Array.Clear(PointLights);
+        _pointLightCount = 0;
+    }
+
+    // Adds a point light in world coordinates (1 unit = 1 px). Dropped when the list is full.
+    public static void AddLight(Vector2 worldPos, float radius, float intensity)
+    {
+        if (_pointLightCount >= MaxPointLights || radius <= 0f || intensity <= 0f) return;
+
+        float screenX = worldPos.X - _camX + _windowWidth / 2f;
+        float screenYGl = _windowHeight - (worldPos.Y - _camY + _windowHeight / 2f);
+        PointLights[_pointLightCount++] = new System.Numerics.Vector4(screenX, screenYGl, radius, intensity);
+    }
 
     public static void Init()
     {
@@ -87,6 +141,7 @@ public static class Lighting
         _normalMapLoc = Raylib.GetShaderLocation(shader, "normalMap");
         _depthMapLoc = Raylib.GetShaderLocation(shader, "depthMap");
         _angleRadLoc = Raylib.GetShaderLocation(shader, "angleRad");
+        _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
         IsReady = true;
     }
 
@@ -112,6 +167,7 @@ public static class Lighting
         Raylib.SetShaderValueTexture(shader, _normalMapLoc, sprite.Normals);
         Raylib.SetShaderValueTexture(shader, _depthMapLoc, sprite.Depth);
         Raylib.SetShaderValue(shader, _angleRadLoc, angleDeg * MathF.PI / 180f, ShaderUniformDataType.Float);
+        Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, MaxPointLights);
 
         Raylib.DrawTexturePro(sprite.Base, source, dest, origin, angleDeg, Color.White);
         Raylib.EndShaderMode();

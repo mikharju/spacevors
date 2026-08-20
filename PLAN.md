@@ -50,9 +50,10 @@ Goal:
 - Mouse: aim (optional)
 - Space: brake (optional)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
+- M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
 ### Diagnostics env vars (testing only)
-- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion
 - SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
 
 ## MVP
@@ -192,6 +193,29 @@ Stage 4 (tuning) — done:
 - Performance check with LoadTestWeapon + max enemies passed (~125 flame entities, negligible)
 
 Note: this raylib-cs build culls counter-clockwise triangles in screen space; DrawFlame emits vertices clockwise on purpose.
+
+## Phase 8
+
+Dynamic point lights (additional light sources).
+
+Extends the Phase 5 lighting shader with a fixed set of per-frame point lights so explosions and thruster flames illuminate nearby lit sprites (ships + asteroids). Flat/fallback path unchanged.
+
+Design decisions:
+- Point lights live in the existing Lighting fragment shader as a uniform array `uLights[MAX_LIGHTS]` (world pos, radius, intensity) plus a shared warm tint; per-fragment cost is O(MAX_LIGHTS), independent of entity count
+- MAX_LIGHTS fixed at 16. Emitter entities may exceed it; the list fills in priority order and overflow is dropped (no sorting). The cap is what keeps GPU + uniform cost bounded as the world grows toward 10k/100k objects
+- Only lit sprites respond (player/enemy ships, asteroids). Mines/ammo/sparks/pickups stay flat — they are not drawn through the shader
+- Light sources, by priority:
+  - Ship death explosions (initial + secondary + final) and mine blasts — all use the existing Explosion component; rare and large, included first. Ammo hits do NOT spawn Explosion components (only sparks), so there is no per-shot light to limit
+  - Thruster flames — numerous (up to ~125 in load test); fill remaining slots after explosions and are dropped first under pressure. Gives engine glow on nearby hulls/rocks without unbounded cost
+- Intensity fades with effect life (lifeRatio); radius maps from Explosion.Radius / flame size; one shared warm tint for all lights keeps uniform count low (per-light color is an optional refinement)
+- CPU gathers the list once per frame and uploads it once (K vec4s). No new draw calls: the per-sprite batch flush already exists in Lighting.TryDraw, so adding lights changes only fragment work + a few uniforms
+
+Stage 1 (shader plumbing) — done: `uLights[16]` vec4 array (screen pos xy with GL bottom-left origin, radius z, intensity w); `Lighting.BeginFrame` + `AddLight`; one `SetShaderValueV` upload per lit-sprite draw; idle screenshot pixel-identical to pre-change baseline at zero lights
+Stage 2 (explosion lights) — done: new `LightGatherer.Collect` gathers Explosion entities first (radius grows as the effect fades, intensity = lifeRatio); screenshots confirm ship deaths + mine blasts light nearby asteroid/player hull and fade out
+Stage 3 (thruster flame lights, capped) — done: player/enemy/mines add a light at the flame base behind the hull after explosions; screen+radius culling on CPU; overflow drops thrusters first. No proximity-to-player bias in v1
+Stage 4 (tuning) — done: `MaxPointLightContribution` 1.0, `ThrustLightIntensity` 0.8 via screenshots (boost glow clearly visible, unboosted subtle); A/B perf check with Scout LoadTestWeapon under software rendering (deterministic seed 42): steady-state avg fps 116.3 → 115.7 — no regression
+
+Cheaper alternative if K-growth must be zero: make thruster flames self-emissive only (brighten the flame sprite / additive halo) instead of scene lights. Loses "flames light nearby rocks" but removes the largest emitter from the cap entirely.
 
 ## Future
 

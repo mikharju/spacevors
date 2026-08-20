@@ -58,6 +58,9 @@ public static class Renderer
     {
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
+        Lighting.BeginFrame(camX, camY, windowWidth, windowHeight);
+        LightGatherer.Collect(em, camX, camY, windowWidth, windowHeight);
+
         BackgroundRenderer.Draw(stars, clutter, camX, camY, windowWidth, windowHeight);
         WorldRenderer.Draw(em, playerEntity, shipType, diagnostics, camX, camY, windowWidth, windowHeight);
         HudRenderer.DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
