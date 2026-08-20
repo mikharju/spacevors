@@ -138,8 +138,7 @@ public static class UpgradeMenuRenderer
             ("MachineGun", UpgradeOption.ProjectileSpeed) => "machine gun projectile speed",
             ("Shotgun", UpgradeOption.FireRate) => "side shot attack speed",
             ("Shotgun", UpgradeOption.ProjectileSpeed) => "side shot projectile speed",
-            (_, UpgradeOption.AutoTargetRange) => "auto target range",
-            (_, UpgradeOption.ShotLifetime) => "shot lifetime",
+            (_, UpgradeOption.Range) => $"{option.WeaponName} range",
             (_, UpgradeOption.Damage) => $"{option.WeaponName} damage",
             (_, UpgradeOption.PickupRadius) => "pickup radius",
             _ => $"{option.WeaponName} {option.Stat}"

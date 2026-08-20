@@ -100,6 +100,7 @@ public class LevelUpSystem : GameSystem
             {
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
+                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
             }
 
             var firstWeapon = weaponNames[0];

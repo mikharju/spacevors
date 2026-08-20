@@ -359,27 +359,14 @@ public static class SpaceVorsApp
                     playerStats.RotationSpeed));
                 break;
 
-            case UpgradeOption.AutoTargetRange:
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName && t.Value.AutoTarget))
-                {
-                    em.AddComponent(turretEntity, new Turret(
-                        Weapon: turret.Weapon,
-                        WeaponName: turret.WeaponName,
-                        ArcAngle: turret.ArcAngle,
-                        Range: turret.Range * def.Multiplier,
-                        AutoTarget: true,
-                        IsEnemy: turret.IsEnemy));
-                }
-                break;
-
-            case UpgradeOption.ShotLifetime:
+            case UpgradeOption.Range:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
                     em.AddComponent(turretEntity, new Turret(
                         Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * def.Multiplier, turret.Weapon.Damage),
                         WeaponName: turret.WeaponName,
                         ArcAngle: turret.ArcAngle,
-                        Range: turret.Range,
+                        Range: turret.Range * def.Multiplier,
                         AutoTarget: turret.AutoTarget,
                         IsEnemy: turret.IsEnemy));
                 }

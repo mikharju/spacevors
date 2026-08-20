@@ -8,8 +8,9 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Symptom**: Copied screenshots contained content from an *earlier* frame/shot; two "different" shots were byte-identical (`md5sum` equal); led to false conclusions like "scrolling did nothing".
 - **Cause**: `TakeScreenshot("screenshot.png")` runs inside the game's input phase and its log lines are block-buffered when stdout is redirected to a file, so both the file content and `app.log` can lag behind what actually happened. A short `sleep 1; cp screenshot.png` can grab stale data.
 - **Fix / Prevention**:
-  - The raylib-cs port also writes an auto-incremented unique file per shot: `screenshot000.png`, `screenshot001.png`, ... Read those instead of copying `screenshot.png`.
-  - Verify with `md5sum` before trusting a screenshot; identical hashes = same frame.
+  - Each F12 shot in a game run produces two files: an auto-incremented unique copy `screenshot0NN.png` (per-process counter, starts at 000) and an updated `screenshot.png` holding the latest frame. Either is safe to read; verify with `md5sum` before trusting it (identical hashes = same frame).
+  - The exact mechanism lives in the stripped native raylib lib and was not reproducible from tight-loop test programs — don't chase it, just handle both file patterns.
+  - Clean up both patterns when done: `rm screenshot*.png`.
   - Don't trust `tail app.log` for "did the last event happen" — check filesystem artifacts (numbered files) instead.
 
 ## 2. Leftover game processes / windows from earlier test runs
