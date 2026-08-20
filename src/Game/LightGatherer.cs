@@ -4,8 +4,9 @@ using Spacevors.Domain.Systems;
 
 namespace Spacevors.Game;
 
-// Fills Lighting's per-frame point light list. Explosions are added first so they keep their
-// slots when the list is full; thruster lights fill whatever remains and are dropped under pressure.
+// Fills Lighting's per-frame point light list in priority order (highest first): explosions,
+// player main thrusters (forward/backward), player side thrusters, enemy thrusters.
+// Lights added later lose their slots when the list is full.
 public static class LightGatherer
 {
     const float ExplosionLightRadiusScale = 2.5f; // light spills past the visible fireball
@@ -17,7 +18,7 @@ public static class LightGatherer
     public static void Collect(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
         CollectExplosionLights(em, camX, camY, windowWidth, windowHeight);
-        CollectThrustLights(em, camX, camY, windowWidth, windowHeight);
+        CollectThrustLights(em);
     }
 
     static void CollectExplosionLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -35,13 +36,21 @@ public static class LightGatherer
         }
     }
 
-    static void CollectThrustLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    static void CollectThrustLights(EntityManager em)
     {
-        foreach (var (entity, player, pos) in em.GetEntitiesWithComponents<Player, Position>())
+        foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
             if (!em.TryGetComponent<Acceleration>(entity, out var accel)) continue;
-            AddThrustLight(pos.Value, accel.Value, player.Thrust * player.Boost, player.Radius);
+
+            // Main thrusters outrank side thrusters when the light list is full.
+            float sin = (float)Math.Sin(rot.Angle);
+            float cos = (float)Math.Cos(rot.Angle);
+            Vector2 forwardDir = new Vector2(sin, -cos);
+
+            float mainAccel = Vector2.Dot(accel.Value, forwardDir);
+            AddThrustLight(pos.Value, forwardDir * mainAccel, MathF.Max(player.Thrust * player.Boost, player.BackThrust), player.Radius);
+            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, player.SideThrust, player.Radius);
         }
 
         foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())

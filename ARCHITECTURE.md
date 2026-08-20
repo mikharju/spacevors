@@ -162,7 +162,7 @@ src/
         ThrusterFlameRenderer.cs -- thruster flames
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
-        ShipSelectRenderer.cs    -- ship selection cards
+        ShipSelectScreen.cs      -- ship selection screen (scrollable list + input)
         RenderHelpers.cs         -- shared screen-space culling helpers
 
     Domain/
@@ -198,3 +198,7 @@ ComponentStorage<T> uses compact arrays with swap-pop deletion for O(1) removal.
 Iteration is O(count) instead of O(N log N).
 
 Entity IDs remain stable across compaction.
+
+## Troubleshooting
+
+Check TROUBLE_SHOOTING.md for problems encountered in the past. When encountering new problems, update TROUBLE_SHOOTING.md.

@@ -26,53 +26,20 @@ public static class SpaceVorsApp
 
         ShipType chosenShip = ShipType.Scout;
         bool showingShipScreen = true;
-        var shipKeys = new[] { KeyboardKey.One, KeyboardKey.Two, KeyboardKey.Three, KeyboardKey.Four };
+        var shipSelect = new ShipSelectScreen();
 
         while (!Raylib.WindowShouldClose())
         {
             if (showingShipScreen)
             {
-                int selectedShipIndex = -1;
-                for (int i = 0; i < ShipType.All.Length && i < shipKeys.Length; i++)
+                var chosen = shipSelect.Update(GetW(), GetH());
+                shipSelect.Draw(GetW(), GetH());
+
+                if (chosen is { } selected)
                 {
-                    if (Raylib.IsKeyPressed(shipKeys[i]))
-                    {
-                        selectedShipIndex = i;
-                        break;
-                    }
-                }
-
-                if (selectedShipIndex >= 0) chosenShip = ShipType.All[selectedShipIndex];
-                else if (Raylib.IsMouseButtonPressed(MouseButton.Left))
-                {
-                    int mouseX = Raylib.GetMouseX();
-                    int mouseY = Raylib.GetMouseY();
-                    for (int i = 0; i < ShipType.All.Length; i++)
-                    {
-                        var (topLeft, w, h) = ShipSelectRenderer.GetShipCardRect(i, GetW(), GetH());
-                        if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
-                        {
-                            chosenShip = ShipType.All[i];
-                            selectedShipIndex = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (Raylib.IsKeyPressed(KeyboardKey.F11))
-                    Raylib.ToggleFullscreen();
-
-                if (Raylib.IsKeyPressed(KeyboardKey.F12))
-                    Raylib.TakeScreenshot("screenshot.png");
-
-                Raylib.BeginDrawing();
-                Raylib.ClearBackground(new Color(15, 15, 25, 255));
-                Lighting.BeginFrame(0f, 0f, GetW(), GetH());
-                ShipSelectRenderer.DrawShipCards(GetW(), GetH());
-                Raylib.EndDrawing();
-
-                if (selectedShipIndex >= 0)
+                    chosenShip = selected;
                     showingShipScreen = false;
+                }
 
                 continue;
             }

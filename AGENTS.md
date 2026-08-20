@@ -54,6 +54,10 @@ For every task:
 
 Never mix unrelated changes.
 
+Check TROUBLE_SHOOTING.md for problems encountered before and and avoid
+similar problems. When encountering new problems, update TROUBLE_SHOOTING.md
+with solutions.
+
 ## Communication
 
 Be concise.
