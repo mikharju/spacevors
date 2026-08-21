@@ -189,22 +189,27 @@ public static class WorldRenderer
 
     private static void DrawMines(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        Texture2D? mineTex = ImageLoader.MineTexture;
+        bool hasTexture = mineTex.HasValue && mineTex.Value.Id != 0;
+
         foreach (var (entity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
         {
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
-            Texture2D? mineTex = ImageLoader.MineTexture;
-            float extent = mineTex.HasValue && mineTex.Value.Id != 0
-                ? RenderHelpers.HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex.Value.Height / mineTex.Value.Width)
+            float extent = hasTexture
+                ? RenderHelpers.HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex!.Value.Height / mineTex.Value.Width)
                 : mine.Radius;
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
-            if (ImageLoader.MineTexture.HasValue && ImageLoader.MineTexture.Value.Id != 0)
+            bool hasHealth = em.HasComponent<Health>(entity);
+            int healthAlpha = hasHealth && em.GetComponent<Health>(entity).Current >= 2 ? 180 : 255;
+
+            if (hasTexture)
             {
-                var tex = ImageLoader.MineTexture.Value;
+                var tex = mineTex!.Value;
                 float drawDiameter = mine.Radius * 2f;
                 float scale = drawDiameter / tex.Width;
                 float destWidth = tex.Width * scale;
@@ -219,30 +224,16 @@ public static class WorldRenderer
                     Color.White
                 );
 
-                if (em.HasComponent<Health>(entity))
-                {
-                    var health = em.GetComponent<Health>(entity);
-                    int alpha = health.Current >= 2 ? 180 : 255;
-                    Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, alpha));
-                }
-                else
-                {
-                    Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
-                }
-            }
-            else if (em.HasComponent<Health>(entity))
-            {
-                var health = em.GetComponent<Health>(entity);
-                int alpha = health.Current >= 2 ? 180 : 255;
-                Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 60, 60, alpha));
+                Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, healthAlpha));
             }
             else
             {
-                Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 100, 100, 200));
-            }
+                // No-texture fallback: red disc plus a bright core so mines stay readable.
+                if (hasHealth)
+                    Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 60, 60, healthAlpha));
+                else
+                    Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 100, 100, 200));
 
-            if (!ImageLoader.MineTexture.HasValue || ImageLoader.MineTexture.Value.Id == 0)
-            {
                 Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
             }
         }

@@ -21,6 +21,8 @@ public static class SpaceVorsApp
         ImageLoader.LoadAssets();
         Lighting.Init();
 
+        bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+
         int GetW() => Raylib.GetScreenWidth();
         int GetH() => Raylib.GetScreenHeight();
 
@@ -30,6 +32,12 @@ public static class SpaceVorsApp
 
         while (!Raylib.WindowShouldClose())
         {
+            if (Raylib.IsKeyPressed(KeyboardKey.F11))
+                Raylib.ToggleFullscreen();
+
+            if (Raylib.IsKeyPressed(KeyboardKey.F12))
+                Raylib.TakeScreenshot("screenshot.png");
+
             if (showingShipScreen)
             {
                 var chosen = shipSelect.Update(GetW(), GetH());
@@ -54,12 +62,6 @@ public static class SpaceVorsApp
 
             while (!Raylib.WindowShouldClose())
             {
-                if (Raylib.IsKeyPressed(KeyboardKey.F11))
-                    Raylib.ToggleFullscreen();
-
-                if (Raylib.IsKeyPressed(KeyboardKey.F12))
-                    Raylib.TakeScreenshot("screenshot.png");
-
                 if (gameOver && Raylib.IsKeyPressed(KeyboardKey.R))
                 {
                     showingShipScreen = true;
@@ -83,7 +85,6 @@ public static class SpaceVorsApp
                 if (!hasPendingChoice)
                 {
                     accumulator += frameTime;
-                    bool diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
 
                     if (!gameOver)
                     {
@@ -282,8 +283,7 @@ public static class SpaceVorsApp
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
-                    bool pauseDiagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
-                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, pauseDiagnostics, upgradeOptions, playerLevel);
+                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, upgradeOptions, playerLevel);
                 }
             }
         }

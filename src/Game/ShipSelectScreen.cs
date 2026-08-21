@@ -29,9 +29,6 @@ public sealed class ShipSelectScreen
     // Returns the chosen ship when a selection is made this frame.
     public ShipType? Update(int windowWidth, int windowHeight)
     {
-        if (Raylib.IsKeyPressed(KeyboardKey.F11)) Raylib.ToggleFullscreen();
-        if (Raylib.IsKeyPressed(KeyboardKey.F12)) Raylib.TakeScreenshot("screenshot.png");
-
         var ships = ShipType.All;
         SetScroll(_scrollOffset, windowHeight); // re-clamp after window resizes
 

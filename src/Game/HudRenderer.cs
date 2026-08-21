@@ -29,6 +29,8 @@ public static class HudRenderer
 
     public static void DrawGameOverText(int windowWidth, int windowHeight)
     {
-        Raylib.DrawText("GAME OVER", windowWidth / 2 - 80, windowHeight / 2 - 20, 40, new Color(255, 255, 255, 255));
+        const string Text = "GAME OVER";
+        const int FontSize = 40;
+        Raylib.DrawText(Text, windowWidth / 2 - Raylib.MeasureText(Text, FontSize) / 2, windowHeight / 2 - 20, FontSize, new Color(255, 255, 255, 255));
     }
 }

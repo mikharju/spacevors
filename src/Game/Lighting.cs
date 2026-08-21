@@ -139,6 +139,7 @@ public static class Lighting
         var shader = Raylib.LoadShaderFromMemory(VertexShader, FragmentShader);
         if (!Raylib.IsShaderValid(shader))
         {
+            Raylib.UnloadShader(shader);
             DiagnosticLogger.LogEvent("LIGHTING", "shader failed to compile; falling back to flat sprites");
             return;
         }

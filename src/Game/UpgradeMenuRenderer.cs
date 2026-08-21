@@ -42,6 +42,8 @@ public static class UpgradeMenuRenderer
 
     public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int windowWidth, int windowHeight)
     {
+        if (optionCount <= 0) return (new Vector2(0, 0), 0, 0);
+
         int cardW = Math.Max(UpgradeCardMinWidth, Math.Min(
             UpgradeCardMaxWidth,
             (windowWidth - 2 * UpgradeCardSideMargin - UpgradeCardSpacing * (optionCount - 1)) / optionCount));

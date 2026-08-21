@@ -72,18 +72,16 @@ public static class EnemyShipRenderer
                 DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight, diagnostics);
             }
 
-            float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
             float enemyTurretSize = 8f;
             Raylib.DrawRectangle(
-                (int)(cx - enemyTurretSize / 2f),
-                (int)(cy - enemyTurretSize / 2f),
+                (int)(screenCx - enemyTurretSize / 2f),
+                (int)(screenCy - enemyTurretSize / 2f),
                 (int)enemyTurretSize,
                 (int)enemyTurretSize,
                 new Color(255, 140, 30, 255)
             );
 
-            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
         }
     }
 

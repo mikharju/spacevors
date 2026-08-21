@@ -24,21 +24,28 @@ public static class ImageLoader
 
     public static void LoadAssets()
     {
-        AsteroidSmallSprites = LoadAsteroidSprites("assets/asteroids/small");
-        AsteroidLargeSprites = LoadAsteroidSprites("assets/asteroids/large");
+        AsteroidSmallSprites = LoadAsteroidSprites(AssetPath("assets/asteroids/small"));
+        AsteroidLargeSprites = LoadAsteroidSprites(AssetPath("assets/asteroids/large"));
 
-        var mineFiles = Directory.GetFiles("assets/mines", "*.png").OrderBy(f => f).ToArray();
-        if (mineFiles.Length > 0)
-            MineTexture = Raylib.LoadTexture(mineFiles[0]);
+        string minesDir = AssetPath("assets/mines");
+        if (Directory.Exists(minesDir))
+        {
+            var mineFiles = Directory.GetFiles(minesDir, "*.png").OrderBy(f => f).ToArray();
+            if (mineFiles.Length > 0)
+                MineTexture = Raylib.LoadTexture(mineFiles[0]);
+        }
 
-        var enemyShips = LoadSpriteSets("assets/enemy-ships");
+        var enemyShips = LoadSpriteSets(AssetPath("assets/enemy-ships"));
         EnemyShipTextures = enemyShips.Flat;
         EnemyShipLitSprites = enemyShips.Lit;
 
-        var playerShips = LoadSpriteSets("assets/player-ships");
+        var playerShips = LoadSpriteSets(AssetPath("assets/player-ships"));
         PlayerShipTextures = playerShips.Flat;
         PlayerShipLitSprites = playerShips.Lit;
     }
+
+    // Resolves against the app directory so assets load regardless of the working directory.
+    static string AssetPath(string relative) => Path.Combine(AppContext.BaseDirectory, relative);
 
     // One sprite per asteroid variant, ordered by base name so the Variant index is stable.
     private static AsteroidSprite[]? LoadAsteroidSprites(string directory)
