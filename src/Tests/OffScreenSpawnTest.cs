@@ -87,7 +87,7 @@ public class OffScreenSpawnTest
         Assert.True(Vector2.Dot(vel - playerVel, inward) > 0f, $"velocity {vel} does not drift toward the player relative to it");
 
         float diff = (vel - playerVel).Magnitude;
-        float maxDiff = (1f - EnemyShipSpawnSystem.MinFollowFactor) * playerVel.Magnitude + SpawnPlacement.DriftSpeed + Eps;
+        float maxDiff = (1f - EnemyShipSpawnSystem.FollowFactor) * playerVel.Magnitude + SpawnPlacement.DriftSpeed + Eps;
         Assert.True(diff <= maxDiff, $"velocity {vel} is not near player velocity {playerVel} (diff={diff})");
     }
 

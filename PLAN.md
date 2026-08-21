@@ -121,7 +121,7 @@ Difficulty scaling.
 
 Enemies and mines never pop in on screen; they spawn just outside the current viewport (`SpawnPlacement.OutsideScreen`, margin 60px past the edge — viewport size flows from the window into `WorldView.ViewportSize` each tick, so resizing is handled).
 
-- Enemy ships: forward quadrant (±45° of player velocity); initial velocity = 70–100% of player velocity + 40 px/s drift toward the player; face the player at spawn. The existing drift-cancel AI brakes them into a chase
+- Enemy ships: forward quadrant (±45° of player velocity); initial velocity = half of player velocity + 40 px/s drift toward the player; face the player at spawn. Inheriting only half means fast players close on spawns quicker and slowing down doesn't fling enemies away. The existing drift-cancel AI brakes them into a chase
 - Mines: forward quadrant while the player moves, any direction while stationary (no meaningful "front"); zero initial velocity, MineDriftSystem pulls them in as before
 - Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter
 

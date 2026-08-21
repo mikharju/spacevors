@@ -10,8 +10,7 @@ public class EnemyShipSpawnSystem : GameSystem
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
-    public const float MinFollowFactor = 0.7f;
-    private const float MaxFollowFactor = 1.0f;
+    public const float FollowFactor = 0.5f;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -43,8 +42,7 @@ public class EnemyShipSpawnSystem : GameSystem
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
         var enemyShipType = EnemyShipFactory.PickRandomType(rng);
-        float followFactor = MinFollowFactor + (float)rng.NextDouble() * (MaxFollowFactor - MinFollowFactor);
-        Vector2 initialVel = playerVel * followFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
+        Vector2 initialVel = playerVel * FollowFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
         float facingAngle = SpawnPlacement.AngleFromTo(testSpawnPos, playerPos.Value);
 
         IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType);
