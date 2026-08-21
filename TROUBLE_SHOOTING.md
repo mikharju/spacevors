@@ -71,7 +71,7 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: An unpaired `xdotool keydown X` (e.g. an interrupted hold sequence) leaves the key DOWN at the X server level — this state persists across client processes. Xvfb auto-repeats held keys, flooding the event queue; other clients' synthetic keypresses get dropped while the stuck key's `IsKeyDown` stays true forever.
 - **Fix / Prevention**:
   - Prefer atomic `xdotool key X`; when holding is needed, always pair `keydown`/`keyup` (even on error paths).
-  - If input mysteriously dies or UI drifts: release everything — `DISPLAY=:99 xdotool keyup w a s d Up Down Left Right Return Escape F12`. Note xdotool keysym names are case-sensitive X names (`Up`, `Return`, not `up`/`enter`).
+   - If input mysteriously dies or UI drifts: release everything — `DISPLAY=:99 xdotool keyup w a s d Up Down Left Right Return Escape F12`. Note xdotool keysym names are case-sensitive X names (`Up`, `Return`, not `up`/`enter`; shift is `shift`, NOT `LeftShift` — the bad name is only reported as "Ignoring it", so the key silently never goes down).
   - Nuclear option: restart Xvfb to reset keyboard state.
 
 ## 11. Resolving assets against `AppContext.BaseDirectory` silently loses all textures
@@ -79,6 +79,18 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Symptom**: After switching asset loading from CWD-relative paths to `AppContext.BaseDirectory`, the game ran but every sprite fell back (no ship previews on the select screen, rectangle asteroids) with no error logged.
 - **Cause**: `BaseDirectory` is the build output dir (`src/Game/bin/Debug/net10.0/`), which did not contain an `assets/` folder — nothing in the csproj copied it there. CWD-relative paths only "worked" when launching from the repo root, masking the dependency.
 - **Fix / Prevention**: Game.csproj has `<None Include="..\..\assets\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="assets" />`. When adding new asset folders, they are picked up automatically; verify with `find src/Game/bin/Debug/net10.0/assets -type f` after a build. Launching the binary from an unrelated CWD (e.g. `/tmp`) is the test that proves resolution is correct.
+
+## 12. Fast synthetic key taps get lost (same race as mouse clicks)
+
+- **Symptom**: `xdotool key F12` / `key l` intermittently produced no effect at all — e.g. 0 of 3 screenshot presses registered during gameplay, while the same press worked on another screen; a single tap sometimes also appears to "double-fire" (see entry 1: each shot writes both a numbered file and an updated `screenshot.png`).
+- **Cause**: Same as entry 6 — a quick press+release can land inside one input poll batch, so the per-frame edge-triggered `IsKeyPressed` never sees the transition. It is timing luck, not screen-dependent (once F11/F12 handling runs in both game loops).
+- **Fix / Prevention**: For keys that must register reliably, hold them: `xdotool keydown F12; sleep 0.15; xdotool keyup F12` (~13 frames at 120 fps guarantees the edge is polled while down). Plain `xdotool key X` is fine for navigation keys where a miss just means retrying.
+
+## 13. Re-reading an overwritten image file can show stale content
+
+- **Symptom**: Cropped a new screenshot into the same output filename as an earlier crop, read it back, and saw the *previous* image (e.g. "GAME OVER" text that was not in the source frame); later crops of the same source file showed different content, contradicting the first read.
+- **Cause**: The Read tool appears to cache by file path; overwriting a file and re-reading it can return the cached older bytes even though `md5sum` on disk shows new content.
+- **Fix / Prevention**: Give every crop/derivative image a unique filename (include the source screenshot number, e.g. `tight_008.png`). Never overwrite-and-reread; if in doubt, verify with `md5sum` and re-read under a fresh name.
 
 ## General workflow that works
 

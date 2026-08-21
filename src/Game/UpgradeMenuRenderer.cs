@@ -15,7 +15,7 @@ public static class UpgradeMenuRenderer
     const int UpgradeCardValueFontSize = 36;
     const int MaxUpgradeLabelLines = 3;
 
-    public static void Draw(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1)
+    public static void Draw(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1, int hoveredIndex = -1)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 215));
 
@@ -24,14 +24,11 @@ public static class UpgradeMenuRenderer
 
         if (options is { Options.Length: > 0 } opts)
         {
-            int mouseX = Raylib.GetMouseX();
-            int mouseY = Raylib.GetMouseY();
             for (int i = 0; i < opts.Options.Length; i++)
             {
                 var opt = opts.Options[i];
                 var (topLeft, w, h) = GetUpgradeCardRect(i, opts.Options.Length, windowWidth, windowHeight);
-                bool hovered = mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h;
-                DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), (i + 1).ToString(), hovered);
+                DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), (i + 1).ToString(), i == hoveredIndex);
             }
         }
 

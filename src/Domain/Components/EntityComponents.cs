@@ -10,7 +10,10 @@ public readonly record struct Player(
     int Xp = 0,
     int Level = 1,
     float PickupRadius = 60f,
-    float RotationSpeed = 5f);
+    float RotationSpeed = 5f)
+{
+    public float MaxThrustForce => MathF.Max(Thrust * Boost, MathF.Max(SideThrust, BackThrust));
+}
 
 public readonly record struct EnemyShip(
     float Radius,

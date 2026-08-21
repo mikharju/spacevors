@@ -38,11 +38,12 @@ public static class Renderer
         ShipType shipType,
         bool diagnostics,
         PendingUpgradeOptions? upgradeOptions,
-        int playerLevel)
+        int playerLevel,
+        int hoveredIndex)
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
-        UpgradeMenuRenderer.Draw(windowWidth, windowHeight, upgradeOptions, playerLevel);
+        UpgradeMenuRenderer.Draw(windowWidth, windowHeight, upgradeOptions, playerLevel, hoveredIndex);
         Raylib.EndDrawing();
     }
 

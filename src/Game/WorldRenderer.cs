@@ -113,7 +113,7 @@ public static class WorldRenderer
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
-            float currentRadius = explosion.Radius * (1f + (1f - lifeRatio));
+            float currentRadius = explosion.CurrentRadius;
 
             if (RenderHelpers.IsOffScreen(cx, cy, currentRadius, windowWidth, windowHeight)) continue;
 

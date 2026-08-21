@@ -1,6 +1,9 @@
 namespace Spacevors.Domain.Components;
 
-public readonly record struct Explosion(float Radius, float Lifetime, float InitialLifetime = 0.5f);
+public readonly record struct Explosion(float Radius, float Lifetime, float InitialLifetime = 0.5f)
+{
+    public float CurrentRadius => Radius * (1f + (1f - Lifetime / InitialLifetime));
+}
 
 public readonly record struct UpgradeExplosion(float Radius, float Lifetime);
 

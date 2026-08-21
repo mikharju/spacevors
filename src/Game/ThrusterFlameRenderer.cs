@@ -19,34 +19,20 @@ public static class ThrusterFlameRenderer
     const float MinVisibleFlameIntensity = 0.2f;
     const int FlameAlpha = 230;
 
-    static readonly Dictionary<Entity, float> PrevAngles = new();
-    static readonly List<Entity> StaleKeys = new();
-    static float LastDrawTime = -1f;
-
-    public static void Reset()
-    {
-        PrevAngles.Clear();
-        LastDrawTime = -1f;
-    }
-
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        float now = (float)Raylib.GetTime();
-        float dt = now - LastDrawTime;
-        LastDrawTime = now;
-
         foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
             DrawPlayerThrustFlames(em, entity, pos.Value, rot.Angle, player, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, dt, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, ship, pos, rot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
             DrawEnemyThrustFlame(em, entity, pos.Value, ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, dt, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
@@ -60,8 +46,6 @@ public static class ThrusterFlameRenderer
             var dir = new Vector2(-n.X, -n.Y);
             DrawThrustFlame(pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio, dir, mine.Radius, speed, mine.Speed, camX, camY, windowWidth, windowHeight);
         }
-
-        PruneStaleKeys(em);
     }
 
     private static void DrawPlayerThrustFlames(
@@ -77,7 +61,7 @@ public static class ThrusterFlameRenderer
         var forward = new Vector2(sin, -cos);
         var right = new Vector2(cos, sin);
 
-        float maxForce = player.Thrust * player.Boost;
+        float maxForce = player.MaxThrustForce;
 
         float fwd = Vector2.Dot(a, forward);
         if (fwd > 0f)
@@ -113,43 +97,30 @@ public static class ThrusterFlameRenderer
     }
 
     private static void DrawTurnFlame(
-        Entity entity, Vector2 pos, float angle, float radius, float maxTurnRate, float dt,
+        EntityManager em, Entity entity, Vector2 pos, float angle, float radius, float maxTurnRate,
         float camX, float camY, int windowWidth, int windowHeight)
     {
-        if (dt > 0f && maxTurnRate > 0f)
-        {
-            float turnIntensity = 0f;
-            int sideSign = 0;
+        if (maxTurnRate <= 0f || !em.TryGetComponent<AngularVelocity>(entity, out var angVel)) return;
 
-            if (PrevAngles.TryGetValue(entity, out float prevAngle))
-            {
-                float delta = NormalizeAngle(angle - prevAngle);
-                float turnRate = delta / dt;
-                turnIntensity = Math.Clamp(Math.Abs(turnRate) / maxTurnRate, 0f, 1f);
-                sideSign = turnRate > 0f ? 1 : -1;
-            }
+        float turnIntensity = Math.Clamp(MathF.Abs(angVel.Value) / maxTurnRate, 0f, 1f);
+        if (turnIntensity < MinFlameIntensity) return;
+        int sideSign = angVel.Value > 0f ? 1 : -1;
 
-            if (turnIntensity >= MinFlameIntensity && sideSign != 0)
-            {
-                float cos = MathF.Cos(angle);
-                float sin = MathF.Sin(angle);
-                var forward = new Vector2(sin, -cos);
-                var right = new Vector2(cos, sin);
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+        var forward = new Vector2(sin, -cos);
+        var right = new Vector2(cos, sin);
 
-                // Diagonal RCS pair: front thruster on the side opposite the turn, rear thruster on the turn's side.
-                float length = radius * MaxTurnFlameLengthRatio * turnIntensity;
-                float halfWidth = radius * TurnFlameHalfWidthRatio * turnIntensity;
-                var color = FlameColor(turnIntensity);
+        // Diagonal RCS pair: front thruster on the side opposite the turn, rear thruster on the turn's side.
+        float length = radius * MaxTurnFlameLengthRatio * turnIntensity;
+        float halfWidth = radius * TurnFlameHalfWidthRatio * turnIntensity;
+        var color = FlameColor(turnIntensity);
 
-                var frontPos = pos + forward * radius * TurnFrontOffsetRatio - right * radius * TurnSideOffsetRatio * sideSign;
-                DrawFlame(frontPos, forward, length, halfWidth, color, camX, camY, windowWidth, windowHeight);
+        var frontPos = pos + forward * radius * TurnFrontOffsetRatio - right * radius * TurnSideOffsetRatio * sideSign;
+        DrawFlame(frontPos, forward, length, halfWidth, color, camX, camY, windowWidth, windowHeight);
 
-                var rearPos = pos - forward * radius * TurnRearOffsetRatio + right * radius * TurnSideOffsetRatio * sideSign;
-                DrawFlame(rearPos, new Vector2(-forward.X, -forward.Y), length, halfWidth, color, camX, camY, windowWidth, windowHeight);
-            }
-        }
-
-        PrevAngles[entity] = angle;
+        var rearPos = pos - forward * radius * TurnRearOffsetRatio + right * radius * TurnSideOffsetRatio * sideSign;
+        DrawFlame(rearPos, new Vector2(-forward.X, -forward.Y), length, halfWidth, color, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawThrustFlame(
@@ -200,23 +171,4 @@ public static class ThrusterFlameRenderer
         return new Color(255, green, blue, FlameAlpha);
     }
 
-    private static void PruneStaleKeys(EntityManager em)
-    {
-        foreach (var key in PrevAngles.Keys)
-        {
-            if (!em.HasComponent<Rotation>(key)) StaleKeys.Add(key);
-        }
-
-        for (int i = 0; i < StaleKeys.Count; i++)
-            PrevAngles.Remove(StaleKeys[i]);
-
-        StaleKeys.Clear();
-    }
-
-    private static float NormalizeAngle(float angle)
-    {
-        while (angle > MathF.PI) angle -= 2f * MathF.PI;
-        while (angle < -MathF.PI) angle += 2f * MathF.PI;
-        return angle;
-    }
 }

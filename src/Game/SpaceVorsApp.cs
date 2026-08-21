@@ -26,17 +26,22 @@ public static class SpaceVorsApp
         int GetW() => Raylib.GetScreenWidth();
         int GetH() => Raylib.GetScreenHeight();
 
-        ShipType chosenShip = ShipType.Scout;
-        bool showingShipScreen = true;
-        var shipSelect = new ShipSelectScreen();
-
-        while (!Raylib.WindowShouldClose())
+        void HandleGlobalKeys()
         {
             if (Raylib.IsKeyPressed(KeyboardKey.F11))
                 Raylib.ToggleFullscreen();
 
             if (Raylib.IsKeyPressed(KeyboardKey.F12))
                 Raylib.TakeScreenshot("screenshot.png");
+        }
+
+        ShipType chosenShip = ShipType.Scout;
+        bool showingShipScreen = true;
+        var shipSelect = new ShipSelectScreen();
+
+        while (!Raylib.WindowShouldClose())
+        {
+            HandleGlobalKeys();
 
             if (showingShipScreen)
             {
@@ -53,15 +58,17 @@ public static class SpaceVorsApp
             }
 
             var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(chosenShip, new Vector2(GetW(), GetH()));
-            ThrusterFlameRenderer.Reset();
 
             bool gameOver = false;
+            bool wasPaused = false;
 
             float accumulator = 0f;
             var runner = new SimulationRunner();
 
             while (!Raylib.WindowShouldClose())
             {
+                HandleGlobalKeys();
+
                 if (gameOver && Raylib.IsKeyPressed(KeyboardKey.R))
                 {
                     showingShipScreen = true;
@@ -81,6 +88,14 @@ public static class SpaceVorsApp
                     hasPendingChoice = false;
                     gameOver = true;
                 }
+
+                // Entering pause: stop the ship's thrusters so flames/lights don't burn behind the menu.
+                if (hasPendingChoice && !wasPaused)
+                {
+                    em.RemoveComponent<Acceleration>(playerEntity);
+                    em.RemoveComponent<AngularVelocity>(playerEntity);
+                }
+                wasPaused = hasPendingChoice;
 
                 if (!hasPendingChoice)
                 {
@@ -213,6 +228,27 @@ public static class SpaceVorsApp
                 else
                 {
                     // Game is paused — no simulation runs. Only handle choice input.
+                    em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
+                    PendingUpgradeOptions? upgradeOptions = null;
+                    if (pendingTuple.Entity.Value >= 0)
+                        upgradeOptions = pendingTuple.Value2;
+
+                    int hoveredIndex = -1;
+                    if (upgradeOptions is { Options.Length: > 0 } opts)
+                    {
+                        int mouseX = Raylib.GetMouseX();
+                        int mouseY = Raylib.GetMouseY();
+                        for (int i = 0; i < opts.Options.Length; i++)
+                        {
+                            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, opts.Options.Length, GetW(), GetH());
+                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                            {
+                                hoveredIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
                     int selectedIndex = -1;
 
                     for (int i = 1; i <= 5; i++)
@@ -225,27 +261,8 @@ public static class SpaceVorsApp
                         }
                     }
 
-                    bool clicked = Raylib.IsMouseButtonPressed(MouseButton.Left);
-                    if (clicked && selectedIndex < 0)
-                    {
-                        int mouseX = Raylib.GetMouseX();
-                        int mouseY = Raylib.GetMouseY();
-                        em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
-                        if (choiceTuple.Entity.Value >= 0)
-                        {
-                            var options = choiceTuple.Value2;
-                            int optionCount = options.Options.Length;
-                            for (int i = 0; i < optionCount; i++)
-                            {
-                                var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, optionCount, GetW(), GetH());
-                                if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
-                                {
-                                    selectedIndex = i;
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    if (selectedIndex < 0 && Raylib.IsMouseButtonPressed(MouseButton.Left))
+                        selectedIndex = hoveredIndex;
 
                     if (selectedIndex >= 0)
                     {
@@ -265,13 +282,6 @@ public static class SpaceVorsApp
                             em.DestroyEntity(entity);
                     }
 
-                    em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
-                    PendingUpgradeOptions? upgradeOptions = null;
-                    if (pendingTuple.Entity.Value >= 0)
-                    {
-                        upgradeOptions = pendingTuple.Value2;
-                    }
-
                     int playerLevel = 1;
                     var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
                     if (playerTuple.Entity.Value >= 0)
@@ -283,7 +293,7 @@ public static class SpaceVorsApp
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
-                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, upgradeOptions, playerLevel);
+                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, upgradeOptions, playerLevel, hoveredIndex);
                 }
             }
         }

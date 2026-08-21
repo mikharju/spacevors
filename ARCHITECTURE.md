@@ -121,7 +121,7 @@ Game pauses during upgrade choice; resumes after selection.
 
 Simulation uses a fixed timestep.
 
-Rendering interpolates if necessary.
+Rendering draws the latest simulated state; no interpolation between ticks.
 
 ## Physics
 

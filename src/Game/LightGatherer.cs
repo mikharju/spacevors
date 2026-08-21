@@ -29,7 +29,7 @@ public static class LightGatherer
             Vector2 p = pos.Value;
 
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
-            float radius = explosion.Radius * (1f + (1f - lifeRatio)) * ExplosionLightRadiusScale;
+            float radius = explosion.CurrentRadius * ExplosionLightRadiusScale;
             if (!IsInLightRange(p, radius, camX, camY, windowWidth, windowHeight)) continue;
 
             Lighting.AddLight(p, radius, lifeRatio * ExplosionLightIntensity);
@@ -48,9 +48,11 @@ public static class LightGatherer
             float cos = (float)Math.Cos(rot.Angle);
             Vector2 forwardDir = new Vector2(sin, -cos);
 
+            float maxForce = player.MaxThrustForce;
+
             float mainAccel = Vector2.Dot(accel.Value, forwardDir);
-            AddThrustLight(pos.Value, forwardDir * mainAccel, MathF.Max(player.Thrust * player.Boost, player.BackThrust), player.Radius);
-            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, player.SideThrust, player.Radius);
+            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius);
+            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius);
         }
 
         foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())

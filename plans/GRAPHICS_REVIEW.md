@@ -8,13 +8,10 @@ Overall the system is clean (off-screen culling via `IsOffScreen`/`HalfDiagonal`
 
 ## Status (checked 2026-08-21)
 
-Fixed: 20 · Open: 7 (incl. 4 post-review findings below)
+Fixed: 25 · Open: 1
 
 Remaining work:
-- Upgrade menu renderer still polls mouse for hover state (`UpgradeMenuRenderer.cs:29-30`)
-- ARCHITECTURE.md:124 interpolation claim still neither implemented nor corrected
-- Nit: per-entity second Position lookup in draw loops (deferred — measure first)
-- Post-review findings: turn flames estimated from render-time deltas + static `PrevAngles` state; side/back flame vs light normalization mismatch; duplicated explosion growth formula; stale `Acceleration` during upgrade pause (see "Post-review findings")
+- Nit: per-entity second Position lookup in draw loops (deferred — measure first; see "Suggested order of work")
 
 ## Findings
 
@@ -73,13 +70,13 @@ Remaining work:
 
 - **[architecture] `Renderer.cs:688-689` — input read inside the renderer.**
   `DrawUpgradeCards` calls `GetMouseX/Y` for hover state. Input belongs in the app/input layer; rendering should receive state, not poll devices.
-  Fix: pass hovered-card index (or mouse pos) into `DrawUpgradeCards`.
-  **Open** — `UpgradeMenuRenderer.Draw` still polls `Raylib.GetMouseX()/GetMouseY()` for hover (UpgradeMenuRenderer.cs:27-28).
+   Fix: pass hovered-card index (or mouse pos) into `DrawUpgradeCards`.
+   **Fixed** — hover computed in the pause branch of `SpaceVorsApp.Main` (mouse + `GetUpgradeCardRect` loop → `hoveredIndex`, reused for click selection) and passed through `Renderer.RenderUpgradePause` into `UpgradeMenuRenderer.Draw(windowWidth, windowHeight, options, playerLevel, hoveredIndex)`; mouse polling removed from the renderer.
 
 - **[doc-drift] no render interpolation despite ARCHITECTURE.md:124.**
   "Rendering interpolates if necessary" is not implemented — the renderer reads post-tick component state. Fine at a locked 120 Hz, but on high-refresh displays some frames show duplicate state and the documented design doesn't match code.
-  Fix: implement prev/current interpolation or correct ARCHITECTURE.md (prefer fixing the doc if interpolation isn't wanted).
-  **Open** — ARCHITECTURE.md:124 still says "Rendering interpolates if necessary."; no interpolation in code.
+   Fix: implement prev/current interpolation or correct ARCHITECTURE.md (prefer fixing the doc if interpolation isn't wanted).
+   **Fixed** — ARCHITECTURE.md now states rendering draws the latest simulated state with no interpolation between ticks, matching the fixed-timestep code.
 
 - **[robustness] `ImageLoader.cs:28` — relative asset paths depend on CWD.**
   `"assets/..."` resolves against the working directory; running from anywhere else silently loses all textures and every fallback kicks in with no warning.
@@ -125,33 +122,37 @@ Issues introduced by graphics work after the original review (lit ships/asteroid
 
 - **[design] `ThrusterFlameRenderer.cs:22-24, 115-153` — turn flames estimated from render-time angle deltas.**
   Static `PrevAngles` dict + `Raylib.GetTime()` dt means the renderer holds per-entity state across frames and flame intensity depends on render frame timing (varies with refresh rate / dropped frames), not simulation. The domain already maintains an authoritative `AngularVelocity` for both player and enemy ships.
-  Fix: read `AngularVelocity` in `DrawTurnFlame`; delete `PrevAngles`, `PruneStaleKeys`, and the dt tracking.
+   Fix: read `AngularVelocity` in `DrawTurnFlame`; delete `PrevAngles`, `PruneStaleKeys`, and the dt tracking.
+   **Fixed** — `DrawTurnFlame` reads `AngularVelocity` (intensity = clamp(|angVel| / max turn rate), side from its sign); `PrevAngles`, `StaleKeys`, render-time dt, `Reset()`, `PruneStaleKeys`, and `NormalizeAngle` all deleted.
 
 - **[consistency] `ThrusterFlameRenderer.cs:80` vs `LightGatherer.cs:52-53` — side/back thrust normalized by different max forces.**
-  The flame renderer divides all player flames (fwd, back, side) by `Thrust * Boost`; the light gatherer uses `max(Thrust*Boost, BackThrust)` for main and `SideThrust` for side. On every current ship retro/side flames are pinned at minimum visible intensity (e.g. Scout 80/1000 = 0.08 → clamped to 0.2), and a retroburn shows a flame but no point light (0.08 < `MinThrustLightRatio` 0.1).
-  Fix: normalize by per-direction max force (forward `Thrust*Boost`, backward `BackThrust`, side `SideThrust`) in both places.
+   The flame renderer divides all player flames (fwd, back, side) by `Thrust * Boost`; the light gatherer uses `max(Thrust*Boost, BackThrust)` for main and `SideThrust` for side. On every current ship retro/side flames are pinned at minimum visible intensity (e.g. Scout 80/1000 = 0.08 → clamped to 0.2), and a retroburn shows a flame but no point light (0.08 < `MinThrustLightRatio` 0.1).
+   Fix: normalize by per-direction max force (forward `Thrust*Boost`, backward `BackThrust`, side `SideThrust`) in both places.
+   **Fixed** — all player thrust directions are normalized by one common reference, `Player.MaxThrustForce` = max of the three thruster powers, used identically by `ThrusterFlameRenderer.DrawPlayerThrustFlames` and `LightGatherer.CollectThrustLights`. Note: a first pass normalized each direction by its *own* max force, which made full retro/side thrust render at maximum flame size — wrong, since weak RCS thrusters must look smaller than the main engine unless upgraded past it. The common reference keeps flames and lights consistent and scales correctly as upgrades raise side/back power above main.
 
 - **[maintainability] `WorldRenderer.cs:116` + `LightGatherer.cs:32` — explosion growth formula duplicated.**
-  Both compute `Radius * (1 + (1 - lifeRatio))`. New instance of the "domain data encoded twice" pattern flagged for ammo colors; change one side and light radius desyncs from the visible fireball.
-  Fix: single source (helper or method on `Explosion`).
+   Both compute `Radius * (1 + (1 - lifeRatio))`. New instance of the "domain data encoded twice" pattern flagged for ammo colors; change one side and light radius desyncs from the visible fireball.
+   Fix: single source (helper or method on `Explosion`).
+   **Fixed** — `Explosion.CurrentRadius` property (EffectComponents.cs) is the single source; both `WorldRenderer.DrawExplosions` and `LightGatherer.CollectExplosionLights` use it.
 
 ### Nit
 
 - **F11/F12 handling duplicated in both screens.** Keep it in one place.
-  **Fixed** — handled once at the top of the outer loop in `SpaceVorsApp.Main` (SpaceVorsApp.cs:35-39); removed from `ShipSelectScreen.Update` and the gameplay loop.
+   **Fixed** — single `HandleGlobalKeys()` helper (SpaceVorsApp.cs) called from the top of *both* loops: the outer loop covers the ship-select screen, the inner loop covers gameplay/pause. Note: an earlier pass moved the checks to the outer loop only, which silently disabled F11/F12 during gameplay (the outer loop doesn't iterate while the inner loop runs); verified by screenshot test in all three states.
 - **Stale `Acceleration` during upgrade pause** — input/sim stop but the last-added component remains, so flames + point lights keep rendering on a frozen ship behind the menu overlay (visible through the 215-alpha dim). Decide: intentional frozen look, or clear acceleration when entering pause.
+   **Fixed** — decided: clear-on-pause. On entering upgrade pause `SpaceVorsApp.Main` removes `Acceleration` and `AngularVelocity` from the player entity (`wasPaused` edge), so flames/lights stop behind the menu; input re-adds them on the first frame after resume. Verified by screenshot (no flame/light artifacts behind the overlay while thrusting at pause).
 
 Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager._nextId` never reuses IDs), and the clockwise-winding comment at `ThrusterFlameRenderer.cs:184` matches raylib's backface culling behavior.
 
 ## Suggested order of work (remaining, updated 2026-08-21)
 
-Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirectory` paths, `ship-test-1.png` deletion, `Lighting.Init` shader unload, `DrawMines` single check (double-circle fallback kept), and the nit batch (GAME OVER `MeasureText`, `GetUpgradeCardRect` guard, EnemyShipRenderer cx/cy reuse, diagnostics env var cached at startup, F11/F12 deduped to one place).
+Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirectory` paths, `ship-test-1.png` deletion, `Lighting.Init` shader unload, `DrawMines` single check (double-circle fallback kept), the nit batch (GAME OVER `MeasureText`, `GetUpgradeCardRect` guard, EnemyShipRenderer cx/cy reuse, diagnostics env var cached at startup, F11/F12 deduped to one place — later corrected to both loops via `HandleGlobalKeys()`), and all five post-review items:
+1. Explosion growth formula → single source `Explosion.CurrentRadius`
+2. Stale `Acceleration` during upgrade pause → clear-on-pause (remove `Acceleration` + `AngularVelocity`)
+3. ThrusterFlameRenderer cleanup → turn flames from `AngularVelocity`, static state deleted, all thrust directions normalized by common `Player.MaxThrustForce` reference in renderer and LightGatherer
+4. Upgrade menu input → `hoveredIndex` computed in SpaceVorsApp and passed into the renderer (mouse polling removed)
+5. ARCHITECTURE.md:124 corrected to match fixed-timestep rendering
 
 Remaining, smallest first:
 
-1. Explosion growth formula: single source shared by `WorldRenderer.DrawExplosions` and `LightGatherer.CollectExplosionLights`
-2. Stale `Acceleration` during upgrade pause: decide frozen look vs clear-on-pause, then implement
-3. ThrusterFlameRenderer cleanup: read `AngularVelocity` for turn flames (delete `PrevAngles`/`PruneStaleKeys`/render-time dt); normalize side/back flame intensity by per-direction max force to match LightGatherer
-4. Upgrade menu input: pass hovered-card index (or mouse pos) into `UpgradeMenuRenderer.Draw` from SpaceVorsApp — the app already reads the mouse for click hit-testing, so hover state can be computed there too
-5. Correct ARCHITECTURE.md:124 ("Rendering interpolates if necessary") to match actual fixed-timestep rendering — prefer fixing the doc over implementing interpolation
-6. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
+1. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
