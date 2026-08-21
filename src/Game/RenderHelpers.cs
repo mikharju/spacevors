@@ -1,3 +1,5 @@
+using Raylib_cs;
+
 namespace Spacevors.Game;
 
 internal static class RenderHelpers
@@ -12,4 +14,8 @@ internal static class RenderHelpers
     {
         return 0.5f * MathF.Sqrt(width * width + height * height);
     }
+
+    public static Rectangle FullSource(Texture2D tex) => new(0f, 0f, tex.Width, tex.Height);
+
+    public static System.Numerics.Vector2 CenterOrigin(Rectangle rect) => new(rect.Width / 2f, rect.Height / 2f);
 }

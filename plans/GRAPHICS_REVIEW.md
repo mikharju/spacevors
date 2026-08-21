@@ -186,7 +186,22 @@ Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager
    | lit-200-L16 | 8.843             |
 
    Per-sprite marginal cost: flat ~6–10 µs, lit ~9.5–10.8 µs; lit carries a near-fixed offset over flat (~2.3 ms at N=50 growing to ~3.5 ms at N=800) plus light-count-dependent fragment cost (L4 +0.42 ms, L16 +1.25 ms at N=200). The bench cycles 13 distinct base textures, so even the flat baseline flushes per sprite — the lit overhead above is on top of that shared cost.
-   **Open** — next step: batch lit draws per sprite variant under one shader-mode block (maps + light array uploaded once per block instead of per sprite). Probe finding that shapes the design: in this raylib build, shader uniforms are applied at batch-flush time, so per-sprite uniform sets leak across draws inside a shared block — per-instance data must travel with the vertices.
+   **Fixed** — batched lit draws per sprite variant under one shader-mode block (`Lighting.BeginDraw/Draw/EndDraw` + `LitGroupRenderer`): maps and the light array upload once per block instead of per sprite; per-instance rotation moved from a uniform to vertex-color packing (16-bit fixed-point in the tint's RG channels) because this raylib build applies uniforms at batch-flush time, so per-sprite uniform sets leak across draws inside a shared block. After numbers (same machine; flat path is byte-identical code and varies ±0.3 ms run-to-run on llvmpipe):
+
+   | scenario    | baseline ms/frame | after ms/frame | delta        |
+   |-------------|-------------------|----------------|--------------|
+   | flat-50     | 3.430             | 3.2–3.7        | unchanged*   |
+   | flat-200    | 4.364             | 4.5–4.7        | unchanged*   |
+   | flat-800    | 10.125            | 9.9–10.3       | unchanged*   |
+   | lit-50-L0   | 5.753             | 5.6–5.9        | -0.1 ms      |
+   | lit-200-L0  | 7.174             | 6.3–6.4        | -0.8 ms (-12%) |
+   | lit-800-L0  | 13.663            | 8.05           | -5.6 ms (-41%) |
+   | lit-200-L4  | 7.590             | 6.6–6.7        | -0.9 ms (-12%) |
+   | lit-200-L16 | 8.843             | 7.82           | -1.0 ms (-12%) |
+
+   *flat scenarios exercise no Lighting code; deltas are run-to-run noise. Lit per-sprite marginal cost (N=50→800) dropped from ~10.5 µs to ~3.3 µs (~3×); the remainder is DrawTexturePro batch work itself.
+   Correctness: `RenderBench probe` renders a 2-variant/4-angle scene through both the legacy per-sprite path (frozen oracle shader kept in RenderBench) and the new grouped path — pixel diff maxChannelDelta=1 (rounding), avg≈0.
+   Tradeoffs accepted: within a layer, draw order is now grouped by variant instead of entity order (no depth sorting exists either way; only affects overlapping same-layer sprites of different variants); enemy turret dots/diagnostics circles draw in a post-pass on top of all enemy sprites instead of interleaved per entity.
 
 ## Suggested order of work (remaining, updated 2026-08-21)
 
@@ -200,4 +215,3 @@ Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirector
 Remaining, smallest first:
 
 1. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
-2. `Lighting.TryDraw` per-sprite shader-mode overhead — profiled in RenderBench (see Perf section); batching fix next

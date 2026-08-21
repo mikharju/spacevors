@@ -6,6 +6,8 @@ namespace Spacevors.Game;
 
 public static class EnemyShipRenderer
 {
+    const float TurretSize = 8f;
+
     private static readonly Color FallbackShipColor = new(180, 60, 60, 255);
 
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
@@ -15,6 +17,10 @@ public static class EnemyShipRenderer
             DrawEnemyShipsFallback(em, camX, camY, windowWidth, windowHeight, diagnostics);
             return;
         }
+
+        var litDraws = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
+        var turretRects = new List<(int X, int Y)>();
+        var diagnosticCircles = new List<(int X, int Y, int Radius)>();
 
         foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
         {
@@ -48,41 +54,31 @@ public static class EnemyShipRenderer
                 var t = baseTex!.Value;
                 float drawDiameter = enemyShip.Radius * 2f;
                 float scale = drawDiameter / t.Width;
-                float destWidth = t.Width * scale;
-                float destHeight = t.Height * scale;
+                var dest = new Rectangle(screenCx, screenCy, t.Width * scale, t.Height * scale);
 
-                bool drawn = lit != null && Lighting.TryDraw(
-                    lit,
-                    new Rectangle(0f, 0f, t.Width, t.Height),
-                    new Rectangle(screenCx, screenCy, destWidth, destHeight),
-                    new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                    angleDeg);
-
-                if (!drawn)
-                    Raylib.DrawTexturePro(
-                        t,
-                        new Rectangle(0f, 0f, t.Width, t.Height),
-                        new Rectangle(screenCx, screenCy, destWidth, destHeight),
-                        new System.Numerics.Vector2(destWidth / 2f, destHeight / 2f),
-                        angleDeg,
-                        Color.White);
+                if (lit != null)
+                    LitGroupRenderer.Add(litDraws, lit, dest, angleDeg);
+                else
+                    Raylib.DrawTexturePro(t, RenderHelpers.FullSource(t), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
             }
             else
             {
                 DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight, diagnostics);
             }
 
-            float enemyTurretSize = 8f;
-            Raylib.DrawRectangle(
-                (int)(screenCx - enemyTurretSize / 2f),
-                (int)(screenCy - enemyTurretSize / 2f),
-                (int)enemyTurretSize,
-                (int)enemyTurretSize,
-                new Color(255, 140, 30, 255)
-            );
+            turretRects.Add(((int)(screenCx - TurretSize / 2f), (int)(screenCy - TurretSize / 2f)));
 
-            if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
+            if (diagnostics) diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
         }
+
+        LitGroupRenderer.Draw(litDraws);
+
+        foreach (var (x, y) in turretRects)
+            Raylib.DrawRectangle(x, y, (int)TurretSize, (int)TurretSize, new Color(255, 140, 30, 255));
+
+        if (diagnostics)
+            foreach (var (x, y, radius) in diagnosticCircles)
+                Raylib.DrawCircle(x, y, radius, new Color(255, 165, 0, 60));
     }
 
     private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
@@ -126,12 +122,11 @@ public static class EnemyShipRenderer
                 FallbackShipColor
             );
 
-            float enemyTurretSize = 8f;
             Raylib.DrawRectangle(
-                (int)(cx - enemyTurretSize / 2f),
-                (int)(cy - enemyTurretSize / 2f),
-                (int)enemyTurretSize,
-                (int)enemyTurretSize,
+                (int)(cx - TurretSize / 2f),
+                (int)(cy - TurretSize / 2f),
+                (int)TurretSize,
+                (int)TurretSize,
                 new Color(255, 140, 30, 255)
             );
 

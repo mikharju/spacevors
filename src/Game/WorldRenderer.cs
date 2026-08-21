@@ -31,6 +31,9 @@ public static class WorldRenderer
 
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
+        var litDraws = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
+        var diagnosticCircles = new List<(int X, int Y, int Radius)>();
+
         foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
         {
             var pos = em.GetComponent<Position>(entity);
@@ -47,10 +50,10 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
-            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)asteroid.Radius, new Color(255, 0, 0, 60));
+            if (diagnostics) diagnosticCircles.Add(((int)cx, (int)cy, (int)asteroid.Radius));
 
             if (baseTex.HasValue && baseTex.Value.Id != 0)
-                DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
+                DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg, litDraws);
             else
                 Raylib.DrawRectanglePro(
                     new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
@@ -59,6 +62,12 @@ public static class WorldRenderer
                     new Color(200, 200, 210, 255)
                 );
         }
+
+        LitGroupRenderer.Draw(litDraws);
+
+        if (diagnostics)
+            foreach (var (x, y, radius) in diagnosticCircles)
+                Raylib.DrawCircle(x, y, radius, new Color(255, 0, 0, 60));
     }
 
     private static AsteroidSprite? GetAsteroidSprite(Asteroid asteroid)
@@ -68,18 +77,16 @@ public static class WorldRenderer
         return sprites[asteroid.Variant];
     }
 
-    // Lit when the variant has normal + depth maps, otherwise a flat texture.
-    private static void DrawAsteroidSprite(AsteroidSprite? sprite, Texture2D baseTex, float cx, float cy, float diameter, float angleDeg)
+    // Lit when the variant has normal + depth maps (collected for batched drawing), otherwise a flat texture.
+    private static void DrawAsteroidSprite(AsteroidSprite? sprite, Texture2D baseTex, float cx, float cy, float diameter, float angleDeg, Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> litDraws)
     {
         float scale = diameter / baseTex.Width;
-        var source = new Rectangle(0f, 0f, baseTex.Width, baseTex.Height);
         var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
-        var origin = new System.Numerics.Vector2(dest.Width / 2f, dest.Height / 2f);
 
-        LitSprite? lit = sprite?.Lit;
-        bool drawn = lit != null && Lighting.TryDraw(lit, source, dest, origin, angleDeg);
-        if (!drawn)
-            Raylib.DrawTexturePro(baseTex, source, dest, origin, angleDeg, Color.White);
+        if (sprite?.Lit is { } lit)
+            LitGroupRenderer.Add(litDraws, lit, dest, angleDeg);
+        else
+            Raylib.DrawTexturePro(baseTex, RenderHelpers.FullSource(baseTex), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
     }
 
     private static void DrawAmmo(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)

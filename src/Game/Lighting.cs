@@ -30,7 +30,8 @@ public static class Lighting
         uniform sampler2D texture0;
         uniform sampler2D normalMap;
         uniform sampler2D depthMap;
-        uniform float angleRad;
+
+        const float TwoPi = 6.28318530718;
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
         const vec3 LightDir = normalize(vec3(0.6, -0.6, 0.5));
@@ -51,6 +52,13 @@ public static class Lighting
 
         void main()
         {
+            // Per-sprite rotation is packed into the vertex color: RG hold a 16-bit fixed-point
+            // angle over [0, 2pi), A holds opacity. Shader uniforms are global at batch-flush time
+            // in this raylib build, so per-instance data must travel with the vertices.
+            int rByte = int(round(fragColor.r * 255.0));
+            int gByte = int(round(fragColor.g * 255.0));
+            float angleRad = float(rByte * 256 + gByte) / 65535.0 * TwoPi;
+
             vec4 baseColor = texture(texture0, fragTexCoord);
 
             // Normal map is tangent space with +Y up in image; screen y points down.
@@ -89,7 +97,8 @@ public static class Lighting
 
             vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight;
 
-            finalColor = vec4(lit, baseColor.a) * fragColor;
+            // RGB of the vertex color carries the packed angle, so only its alpha tints.
+            finalColor = vec4(lit, baseColor.a * fragColor.a);
         }
         """;
 
@@ -98,16 +107,9 @@ public static class Lighting
 
     public static bool IsReady { get; private set; }
 
-    // Exposed for the RenderBench shared-block probe.
-    internal static Shader ActiveShader => _shader!.Value;
-    internal static int NormalMapLocation => _normalMapLoc;
-    internal static int DepthMapLocation => _depthMapLoc;
-    internal static int AngleRadLocation => _angleRadLoc;
-
     static Shader? _shader;
     static int _normalMapLoc;
     static int _depthMapLoc;
-    static int _angleRadLoc;
     static int _lightsLoc;
 
     // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
@@ -153,7 +155,6 @@ public static class Lighting
         _shader = shader;
         _normalMapLoc = Raylib.GetShaderLocation(shader, "normalMap");
         _depthMapLoc = Raylib.GetShaderLocation(shader, "depthMap");
-        _angleRadLoc = Raylib.GetShaderLocation(shader, "angleRad");
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
         IsReady = true;
     }
@@ -166,24 +167,39 @@ public static class Lighting
         IsReady = false;
     }
 
-    // Draws the lit sprite with the lighting shader. Returns false when the shader is unavailable,
-    // so callers can fall back to drawing sprite.Base as a flat texture.
-    public static bool TryDraw(LitSprite sprite, Rectangle source, Rectangle dest, System.Numerics.Vector2 origin, float angleDeg)
+    // Begins a block of lit draws that all share one sprite variant (one normal/depth map pair).
+    // Shader uniforms are global at batch-flush time in this raylib build, so mixing variants in
+    // one block renders earlier sprites with later ones' maps. Returns false when the shader is
+    // unavailable; callers then draw flat fallbacks for the whole group.
+    public static bool BeginDraw(LitSprite sprite)
     {
         if (!IsReady || _shader == null) return false;
 
         var shader = _shader.Value;
         // BeginShaderMode must come first: its batch flush clears raylib's texture-unit registry,
-        // so map uniforms set before it are lost on an empty flush and the sprite renders with
-        // the previous lit sprite's normal/depth maps.
+        // so map uniforms set before it are lost on an empty flush.
         Raylib.BeginShaderMode(shader);
         Raylib.SetShaderValueTexture(shader, _normalMapLoc, sprite.Normals);
         Raylib.SetShaderValueTexture(shader, _depthMapLoc, sprite.Depth);
-        Raylib.SetShaderValue(shader, _angleRadLoc, angleDeg * MathF.PI / 180f, ShaderUniformDataType.Float);
         Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, MaxPointLights);
-
-        Raylib.DrawTexturePro(sprite.Base, source, dest, origin, angleDeg, Color.White);
-        Raylib.EndShaderMode();
         return true;
+    }
+
+    // Draws one lit sprite inside a BeginDraw/EndDraw block. The rotation angle is packed into the
+    // vertex color (see shader) because per-instance uniforms would leak across draws in the block.
+    public static void Draw(LitSprite sprite, Rectangle dest, float angleDeg)
+        => Raylib.DrawTexturePro(sprite.Base, RenderHelpers.FullSource(sprite.Base), dest, RenderHelpers.CenterOrigin(dest), angleDeg, EncodeAngle(angleDeg));
+
+    public static void EndDraw()
+    {
+        if (_shader != null) Raylib.EndShaderMode();
+    }
+
+    // Packs a rotation angle into the vertex color RG channels as 16-bit fixed-point over [0, 360).
+    static Color EncodeAngle(float angleDeg)
+    {
+        float normalized = ((angleDeg % 360f) + 360f) % 360f / 360f;
+        int packed = (int)MathF.Round(normalized * 65535f);
+        return new Color(packed >> 8, packed & 0xFF, 255, 255);
     }
 }

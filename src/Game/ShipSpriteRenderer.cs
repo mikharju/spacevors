@@ -24,12 +24,18 @@ public static class ShipSpriteRenderer
         if (baseTex.Id == 0) return;
 
         float scale = diameter / baseTex.Width;
-        var source = new Rectangle(0f, 0f, baseTex.Width, baseTex.Height);
         var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
-        var origin = new System.Numerics.Vector2(dest.Width / 2f, dest.Height / 2f);
 
-        if (lit != null && Lighting.TryDraw(lit, source, dest, origin, angleDeg)) return;
+        if (lit != null && Lighting.BeginDraw(lit))
+        {
+            Lighting.Draw(lit, dest, angleDeg);
+            Lighting.EndDraw();
+            return;
+        }
 
-        Raylib.DrawTexturePro(baseTex, source, dest, origin, angleDeg, Color.White);
+        DrawFlat(baseTex, dest, angleDeg);
     }
+
+    static void DrawFlat(Texture2D baseTex, Rectangle dest, float angleDeg)
+        => Raylib.DrawTexturePro(baseTex, RenderHelpers.FullSource(baseTex), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
 }
