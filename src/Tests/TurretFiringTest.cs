@@ -144,7 +144,7 @@ public class TurretFiringTest
         em.AddComponent(shipEntity, new Position(shipPos));
         em.AddComponent(shipEntity, new Velocity(shipVel));
         em.AddComponent(shipEntity, new Rotation(shipAngle));
-        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, DetectionRange: 1200f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
+        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
         em.AddComponent(shipEntity, new Turret(Weapon: new WeaponStats(1.5f, 200f, KickbackForce: 0f, PelletCount: 1, Scatter: 0f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: 1200f, IsEnemy: true));
 
         var playerEntity = em.CreateEntity();

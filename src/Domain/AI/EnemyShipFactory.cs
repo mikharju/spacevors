@@ -42,8 +42,8 @@ public static class EnemyShipFactory
     }
 
     private static EnemyShip BuildEnemyShip(EnemyShipType type) =>
-        new(type.Radius, type.Speed, type.TurnRate, type.DetectionRange, type.FiringRange, type.TurretFireRate, type.TurretAmmoSpeed, type.Acceleration, type.Health, type.GraphicsId);
+        new(type.Radius, type.Speed, type.TurnRate, type.FiringRange, type.TurretFireRate, type.TurretAmmoSpeed, type.Acceleration, type.Health, type.GraphicsId);
 
     private static Turret BuildTurret(EnemyShipType type) =>
-        new(Weapon: new WeaponStats(type.TurretFireRate, type.TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: type.DetectionRange, IsEnemy: true);
+        new(Weapon: new WeaponStats(type.TurretFireRate, type.TurretAmmoSpeed, KickbackForce: 0f, PelletCount: 1, Scatter: 0.05f), WeaponName: "EnemyWeapon", ArcAngle: MathF.PI / 8f, Range: type.FiringRange, IsEnemy: true);
 }

@@ -19,7 +19,6 @@ public readonly record struct EnemyShip(
     float Radius,
     float Speed,
     float TurnRate,
-    float DetectionRange,
     float FiringRange,
     float TurretFireRate,
     float TurretAmmoSpeed,
@@ -33,16 +32,15 @@ public readonly record struct EnemyShipType(
     float Radius,
     float Speed,
     float TurnRate,
-    float DetectionRange,
     float FiringRange,
     float TurretFireRate,
     float TurretAmmoSpeed,
     float Acceleration,
     int Health)
 {
-    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 1200f, 700f, 1.5f, 200f, 45.0f, 3);
-    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 1200f, 700f, 0.6f, 200f, 85f, 2);
-    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 1200f, 700f, 0.8f, 160f, 45.0f, 5);
+    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 3);
+    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 2);
+    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 5);
 
     public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon];
 

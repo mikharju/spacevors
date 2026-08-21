@@ -27,7 +27,7 @@ public class EnemyShipSystem : GameSystem
 
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
-            if (distSq > ship.DetectionRange * ship.DetectionRange || distSq < 0.01f)
+            if (distSq < 0.01f)
             {
                 commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
                 continue;

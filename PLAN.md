@@ -122,6 +122,7 @@ Difficulty scaling.
 Enemies and mines never pop in on screen; they spawn just outside the current viewport (`SpawnPlacement.OutsideScreen`, margin 60px past the edge — viewport size flows from the window into `WorldView.ViewportSize` each tick, so resizing is handled).
 
 - Enemy ships: forward quadrant (±45° of player velocity); initial velocity = half of player velocity + 40 px/s drift toward the player; face the player at spawn. Inheriting only half means fast players close on spawns quicker and slowing down doesn't fling enemies away. The existing drift-cancel AI brakes them into a chase
+- No detection range: every enemy ship always turns toward the player and accelerates after it from any distance, capped at its own (slowish) Speed. Ships that spawn or drift out of view keep chasing and come back into view instead of coasting away forever
 - Mines: forward quadrant while the player moves, any direction while stationary (no meaningful "front"); zero initial velocity, MineDriftSystem pulls them in as before
 - Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter
 
@@ -185,7 +186,7 @@ Design decisions:
 
 Stage 1 (thrust flames) — done:
 - ThrusterFlameRenderer with thrust flames for player + enemy ships
-- EnemyShipSystem: set Acceleration(Zero) on early-exit paths (no player, out of detection range, spin-damping branch, inside firing range) so stale acceleration does not produce phantom flames. Makes the component mean "thrust currently applied"
+- EnemyShipSystem: set Acceleration(Zero) on early-exit paths (no player, overlapping player, spin-damping branch, inside firing range) so stale acceleration does not produce phantom flames. Makes the component mean "thrust currently applied"
 - Verified via screenshots (Shadow, Balanced engines): W/Shift forward flame behind hull visibly larger than A/D side flames and S retro-burner (min visible size); enemy chase flames
 
 Stage 2 (turn flames) — done:
