@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Raylib_cs;
+using Spacevors.Domain;
 
 namespace Spacevors.Game;
 
@@ -79,10 +80,7 @@ public static class ImageLoader
         var consumed = new HashSet<string>();
         foreach (var set in LitSpriteMatcher.Match(byStem.Keys))
         {
-            lit[set.Prefix] = new LitSprite(
-                Raylib.LoadTexture(byStem[set.BaseStem]),
-                Raylib.LoadTexture(byStem[set.NormalsStem]),
-                Raylib.LoadTexture(byStem[set.DepthStem]));
+            lit[set.Prefix] = LoadLitSet(set, byStem, directory);
             consumed.Add(set.BaseStem);
             consumed.Add(set.NormalsStem);
             consumed.Add(set.DepthStem);
@@ -93,6 +91,24 @@ public static class ImageLoader
                 flat[pair.Key] = Raylib.LoadTexture(pair.Value);
 
         return (flat, lit);
+    }
+
+    // Maps are sampled with the base texture's normalized UVs, so a pure resolution difference is fine;
+    // a size mismatch still warns because differently-framed maps would misregister silently.
+    private static LitSprite LoadLitSet(LitSpriteMatcher.Set set, Dictionary<string, string> byStem, string directory)
+    {
+        var baseTex = Raylib.LoadTexture(byStem[set.BaseStem]);
+        var normalsTex = Raylib.LoadTexture(byStem[set.NormalsStem]);
+        var depthTex = Raylib.LoadTexture(byStem[set.DepthStem]);
+
+        if (normalsTex.Width != baseTex.Width || normalsTex.Height != baseTex.Height ||
+            depthTex.Width != baseTex.Width || depthTex.Height != baseTex.Height)
+            DiagnosticLogger.LogWarning(
+                $"lit set '{set.Prefix}' in {Path.GetFileName(directory)}: maps " +
+                $"{normalsTex.Width}x{normalsTex.Height}/{depthTex.Width}x{depthTex.Height}, base {baseTex.Width}x{baseTex.Height}; " +
+                "regenerate maps at the base dimensions");
+
+        return new LitSprite(baseTex, normalsTex, depthTex);
     }
 
     public static void UnloadAssets()

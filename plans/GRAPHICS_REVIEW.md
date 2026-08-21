@@ -8,7 +8,7 @@ Overall the system is clean (off-screen culling via `IsOffScreen`/`HalfDiagonal`
 
 ## Status (checked 2026-08-21)
 
-Fixed: 25 · Open: 1
+Fixed: 26 · Open: 1
 
 Remaining work:
 - Nit: per-entity second Position lookup in draw loops (deferred — measure first; see "Suggested order of work")
@@ -143,6 +143,16 @@ Issues introduced by graphics work after the original review (lit ships/asteroid
    **Fixed** — decided: clear-on-pause. On entering upgrade pause `SpaceVorsApp.Main` removes `Acceleration` and `AngularVelocity` from the player entity (`wasPaused` edge), so flames/lights stop behind the menu; input re-adds them on the first frame after resume. Verified by screenshot (no flame/light artifacts behind the overlay while thrusting at pause).
 
 Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager._nextId` never reuses IDs), and the clockwise-winding comment at `ThrusterFlameRenderer.cs:184` matches raylib's backface culling behavior.
+
+## External review findings (checked 2026-08-21)
+
+### Major
+
+- **[correctness] normal/depth map dimensions do not match their base texture.**
+  Four sets mismatch: small-1 (base 574×524, maps 524×478), interceptor (945×926 vs 926×907), fighter (851×937 vs 930×1024), heavy (922×913 vs 1024×1014). The review claimed this misregisters lighting because the shader samples maps with the base texture's UVs.
+  Investigation: all four pairs have matching aspect ratios (within 0.1%) and visually identical framing — they are different resolutions of the same crop. Both maps and base are sampled in normalized [0,1] UV space, so registration is correct; only map resolution differs. Rejecting these sets (the review's primary recommendation) would disable working lighting on 4 of 13 lit sprites — a regression.
+   Fix: warn at load time instead, so genuinely differently-framed maps are diagnosable rather than silently misregistering. Regenerating the four mismatched maps at base dimensions is the remaining asset-side cleanup (warnings will then stop firing).
+   **Fixed** — `ImageLoader.LoadLitSet` logs via `DiagnosticLogger.LogWarning` on a size mismatch; no rejection/fallback.
 
 ## Suggested order of work (remaining, updated 2026-08-21)
 
