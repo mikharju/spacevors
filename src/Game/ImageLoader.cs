@@ -81,14 +81,23 @@ public static class ImageLoader
         foreach (var set in LitSpriteMatcher.Match(byStem.Keys))
         {
             lit[set.Prefix] = LoadLitSet(set, byStem, directory);
-            consumed.Add(set.BaseStem);
-            consumed.Add(set.NormalsStem);
-            consumed.Add(set.DepthStem);
+            // Alternate variants of a matched prefix (e.g. foo.png next to foo-texture.png) stay consumed.
+            foreach (string stem in LitSpriteMatcher.VariantStems(set.Prefix))
+                if (byStem.ContainsKey(stem))
+                    consumed.Add(stem);
         }
 
         foreach (var pair in byStem)
-            if (!consumed.Contains(pair.Key))
-                flat[pair.Key] = Raylib.LoadTexture(pair.Value);
+        {
+            if (consumed.Contains(pair.Key)) continue;
+            // Map files without a complete set would otherwise be drawn as ordinary textures.
+            if (LitSpriteMatcher.IsMapFile(pair.Key))
+            {
+                DiagnosticLogger.LogWarning($"skipped map file '{pair.Key}.png' in {Path.GetFileName(directory)}: no complete lit set");
+                continue;
+            }
+            flat[pair.Key] = Raylib.LoadTexture(pair.Value);
+        }
 
         return (flat, lit);
     }

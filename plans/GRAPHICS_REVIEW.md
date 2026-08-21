@@ -159,6 +159,13 @@ Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager
    Fix: pass the viewport into `CollectThrustLights` and reject out-of-range lights before adding.
    **Fixed** — `LightGatherer.AddThrustLight` takes camX/camY/window size and culls with the same `IsInLightRange` explosions use (light position + light radius, so glows reaching into the screen are kept).
 
+### Minor
+
+- **[design] lit-set loading can load duplicate/alternate files as flat textures.**
+  `LoadSpriteSets` marked only the exact matched stems consumed, so a directory containing both `foo.png` and `foo-texture.png` (or `-normal` alongside `-normals`) would load the unused variant as a flat texture; incomplete sets had their normal/depth maps loaded — and drawn — as ordinary textures. Latent: no current asset triggers it (all four sprite dirs contain complete, non-overlapping sets).
+   Fix: consume every stem variant of a matched prefix; skip map files whose set did not match, with a warning.
+   **Fixed** — `LitSpriteMatcher.VariantStems`/`IsMapFile`; `ImageLoader.LoadSpriteSets` consumes all variants and never loads unmatched `-normals/-normal/-depth` files as flat textures (covered by new matcher tests).
+
 ## Suggested order of work (remaining, updated 2026-08-21)
 
 Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirectory` paths, `ship-test-1.png` deletion, `Lighting.Init` shader unload, `DrawMines` single check (double-circle fallback kept), the nit batch (GAME OVER `MeasureText`, `GetUpgradeCardRect` guard, EnemyShipRenderer cx/cy reuse, diagnostics env var cached at startup, F11/F12 deduped to one place — later corrected to both loops via `HandleGlobalKeys()`), and all five post-review items:

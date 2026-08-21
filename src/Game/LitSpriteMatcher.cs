@@ -51,6 +51,19 @@ public static class LitSpriteMatcher
         return null;
     }
 
+    // True when the stem is a normal or depth map file; such files are never plain textures.
+    public static bool IsMapFile(string stem) => StripSuffix(stem) != null && !stem.EndsWith(TextureSuffix, StringComparison.Ordinal);
+
+    // Every stem a lit set for this prefix may occupy; all are consumed once the set matches.
+    public static string[] VariantStems(string prefix) => new[]
+    {
+        prefix,
+        prefix + TextureSuffix,
+        prefix + NormalsSuffix,
+        prefix + NormalAliasSuffix,
+        prefix + DepthSuffix
+    };
+
     // Returns the stem without its map suffix, or null when the stem is not a map file.
     private static string? StripSuffix(string stem)
     {

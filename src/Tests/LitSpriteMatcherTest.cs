@@ -114,6 +114,24 @@ public class LitSpriteMatcherTest
     }
 
     [Fact]
+    public void IsMapFile_DetectsNormalAndDepthFiles()
+    {
+        Assert.True(LitSpriteMatcher.IsMapFile("a-normals"));
+        Assert.True(LitSpriteMatcher.IsMapFile("a-normal"));
+        Assert.True(LitSpriteMatcher.IsMapFile("a-depth"));
+        Assert.False(LitSpriteMatcher.IsMapFile("a-texture"));
+        Assert.False(LitSpriteMatcher.IsMapFile("a"));
+    }
+
+    [Fact]
+    public void VariantStems_CoversAllBaseAndMapForms()
+    {
+        Assert.Equal(
+            new[] { "a", "a-texture", "a-normals", "a-normal", "a-depth" },
+            LitSpriteMatcher.VariantStems("a"));
+    }
+
+    [Fact]
     public void MixedTextureAndPlainBases_AllMatched()
     {
         var stems = new[]
