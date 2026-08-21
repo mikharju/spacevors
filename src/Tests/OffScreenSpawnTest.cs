@@ -142,7 +142,11 @@ public class OffScreenSpawnTest
         float halfH = viewport.Y * 0.5f;
 
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
+        {
             Assert.False(IsInside(pos.Value, halfW, halfH), $"initial ship at {pos.Value} is inside the screen");
+            Assert.True(pos.Value.Magnitude >= GameInitializer.InitialShipMinDistance - Eps,
+                $"initial ship at {pos.Value} is closer than {GameInitializer.InitialShipMinDistance} to the player");
+        }
 
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
             Assert.False(IsInside(pos.Value, halfW, halfH), $"initial mine at {pos.Value} is inside the screen");

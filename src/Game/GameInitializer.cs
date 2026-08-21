@@ -9,6 +9,8 @@ public static class GameInitializer
 {
     private const int InitialMineCount = 15;
     private const int InitialEnemyShipCount = 6;
+    public const float InitialShipMinDistance = 1600f;
+    public const float InitialShipMaxDistance = 3200f;
 
     public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType, Vector2 viewportSize)
     {
@@ -75,12 +77,14 @@ public static class GameInitializer
             em.AddComponent(mine, new Health(2));
         }
 
-        // Spawn enemy ships just outside the screen, drifting in toward the player
+        // Spawn enemy ships well outside the screen (beyond firing range), drifting in toward the player
         for (int i = 0; i < InitialEnemyShipCount; i++)
         {
             var ship = em.CreateEntity();
             Vector2 dir = SpawnPlacement.AnyDirection(rand);
+            float dist = InitialShipMinDistance + (float)rand.NextDouble() * (InitialShipMaxDistance - InitialShipMinDistance);
             Vector2 spawnPos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
+            if (spawnPos.Magnitude < dist) spawnPos = dir * dist;
             Vector2 initialVel = (Vector2.Zero - spawnPos).Normalized * SpawnPlacement.DriftSpeed;
 
             var enemyShipType = EnemyShipFactory.PickRandomType(rand);

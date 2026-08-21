@@ -124,7 +124,7 @@ Enemies and mines never pop in on screen; they spawn just outside the current vi
 - Enemy ships: forward quadrant (±45° of player velocity); initial velocity = half of player velocity + 40 px/s drift toward the player; face the player at spawn. Inheriting only half means fast players close on spawns quicker and slowing down doesn't fling enemies away. The existing drift-cancel AI brakes them into a chase
 - No detection range: every enemy ship always turns toward the player and accelerates after it from any distance, capped at its own (slowish) Speed. Ships that spawn or drift out of view keep chasing and come back into view instead of coasting away forever
 - Mines: forward quadrant while the player moves, any direction while stationary (no meaningful "front"); zero initial velocity, MineDriftSystem pulls them in as before
-- Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter
+- Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter. Initial enemy ships additionally spawn at 1600–3200px from the player (never closer than just outside the screen), so they start beyond firing range and give the player a grace period before the first contact
 
 ## Phase 4c
 
