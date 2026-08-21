@@ -8,10 +8,12 @@ Overall the system is clean (off-screen culling via `IsOffScreen`/`HalfDiagonal`
 
 ## Status (checked 2026-08-21)
 
-Fixed: 27 · Open: 1
+Fixed: 28 · Open: 2
 
 Remaining work:
 - Nit: per-entity second Position lookup in draw loops (deferred — measure first; see "Suggested order of work")
+- Perf: `Lighting.TryDraw` per-sprite shader-mode overhead (deferred — measure first)
+- Asset: regenerate the four mismatched lit maps (small-1, interceptor, fighter, heavy) at base dimensions so the load-time warnings stop firing
 
 ## Findings
 
@@ -166,6 +168,12 @@ Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager
    Fix: consume every stem variant of a matched prefix; skip map files whose set did not match, with a warning.
    **Fixed** — `LitSpriteMatcher.VariantStems`/`IsMapFile`; `ImageLoader.LoadSpriteSets` consumes all variants and never loads unmatched `-normals/-normal/-depth` files as flat textures (covered by new matcher tests).
 
+### Perf (deferred)
+
+- **[perf] `Lighting.TryDraw` is expensive per sprite.**
+  Every lit draw does BeginShaderMode + four uniform sets (including the full 16×vec4 light-array upload) + DrawTexturePro + EndShaderMode — a batch flush and redundant light-array re-upload per sprite. The fragment loop itself is bounded at 16 lights; the CPU/render-state overhead around each sprite is the first suspect if lit sprites reach hundreds/thousands (the 10k-object goal).
+   **Open (deferred)** — measure first per AGENTS.md, matching the review's own recommendation ("wouldn't redesign this yet unless profiling shows it matters"). If it matters, batching all lit draws under one shader mode (light array set once per frame) is the obvious next step; that requires drawing lit sprites contiguously, so it is a render-loop restructure, not a tweak.
+
 ## Suggested order of work (remaining, updated 2026-08-21)
 
 Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirectory` paths, `ship-test-1.png` deletion, `Lighting.Init` shader unload, `DrawMines` single check (double-circle fallback kept), the nit batch (GAME OVER `MeasureText`, `GetUpgradeCardRect` guard, EnemyShipRenderer cx/cy reuse, diagnostics env var cached at startup, F11/F12 deduped to one place — later corrected to both loops via `HandleGlobalKeys()`), and all five post-review items:
@@ -178,3 +186,4 @@ Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirector
 Remaining, smallest first:
 
 1. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
+2. `Lighting.TryDraw` per-sprite shader-mode overhead — deferred; profile before restructuring lit draws into one batched shader mode
