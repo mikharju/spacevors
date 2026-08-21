@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,15 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Domain\Domain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="RenderBench" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Raylib-cs" Version="8.0.0" />
+    <ProjectReference Include="..\Game\Game.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -98,6 +98,12 @@ public static class Lighting
 
     public static bool IsReady { get; private set; }
 
+    // Exposed for the RenderBench shared-block probe.
+    internal static Shader ActiveShader => _shader!.Value;
+    internal static int NormalMapLocation => _normalMapLoc;
+    internal static int DepthMapLocation => _depthMapLoc;
+    internal static int AngleRadLocation => _angleRadLoc;
+
     static Shader? _shader;
     static int _normalMapLoc;
     static int _depthMapLoc;

@@ -172,7 +172,21 @@ Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager
 
 - **[perf] `Lighting.TryDraw` is expensive per sprite.**
   Every lit draw does BeginShaderMode + four uniform sets (including the full 16×vec4 light-array upload) + DrawTexturePro + EndShaderMode — a batch flush and redundant light-array re-upload per sprite. The fragment loop itself is bounded at 16 lights; the CPU/render-state overhead around each sprite is the first suspect if lit sprites reach hundreds/thousands (the 10k-object goal).
-   **Open (deferred)** — measure first per AGENTS.md, matching the review's own recommendation ("wouldn't redesign this yet unless profiling shows it matters"). If it matters, batching all lit draws under one shader mode (light array set once per frame) is the obvious next step; that requires drawing lit sprites contiguously, so it is a render-loop restructure, not a tweak.
+   **Measured** — `src/RenderBench` renders N grid-placed sprites headless and reports ms/frame. Run under Xvfb with llvmpipe software GL, so absolute numbers are inflated vs real hardware; before/after comparisons on the same machine remain valid. Baseline (per-sprite `TryDraw` path):
+
+   | scenario    | baseline ms/frame |
+   |-------------|-------------------|
+   | flat-50     | 3.430             |
+   | flat-200    | 4.364             |
+   | flat-800    | 10.125            |
+   | lit-50-L0   | 5.753             |
+   | lit-200-L0  | 7.174             |
+   | lit-800-L0  | 13.663            |
+   | lit-200-L4  | 7.590             |
+   | lit-200-L16 | 8.843             |
+
+   Per-sprite marginal cost: flat ~6–10 µs, lit ~9.5–10.8 µs; lit carries a near-fixed offset over flat (~2.3 ms at N=50 growing to ~3.5 ms at N=800) plus light-count-dependent fragment cost (L4 +0.42 ms, L16 +1.25 ms at N=200). The bench cycles 13 distinct base textures, so even the flat baseline flushes per sprite — the lit overhead above is on top of that shared cost.
+   **Open** — next step: batch lit draws per sprite variant under one shader-mode block (maps + light array uploaded once per block instead of per sprite). Probe finding that shapes the design: in this raylib build, shader uniforms are applied at batch-flush time, so per-sprite uniform sets leak across draws inside a shared block — per-instance data must travel with the vertices.
 
 ## Suggested order of work (remaining, updated 2026-08-21)
 
@@ -186,4 +200,4 @@ Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirector
 Remaining, smallest first:
 
 1. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
-2. `Lighting.TryDraw` per-sprite shader-mode overhead — deferred; profile before restructuring lit draws into one batched shader mode
+2. `Lighting.TryDraw` per-sprite shader-mode overhead — profiled in RenderBench (see Perf section); batching fix next
