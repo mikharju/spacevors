@@ -18,7 +18,7 @@ public static class LightGatherer
     public static void Collect(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
         CollectExplosionLights(em, camX, camY, windowWidth, windowHeight);
-        CollectThrustLights(em);
+        CollectThrustLights(em, camX, camY, windowWidth, windowHeight);
     }
 
     static void CollectExplosionLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -36,7 +36,7 @@ public static class LightGatherer
         }
     }
 
-    static void CollectThrustLights(EntityManager em)
+    static void CollectThrustLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
         foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
         {
@@ -51,15 +51,15 @@ public static class LightGatherer
             float maxForce = player.MaxThrustForce;
 
             float mainAccel = Vector2.Dot(accel.Value, forwardDir);
-            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius);
-            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius);
+            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
             if (!em.TryGetComponent<Acceleration>(entity, out var accel)) continue;
-            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius);
+            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
@@ -68,12 +68,12 @@ public static class LightGatherer
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;
-            AddThrustLight(pos.Value, v, mine.Speed, mine.Radius);
+            AddThrustLight(pos.Value, v, mine.Speed, mine.Radius, camX, camY, windowWidth, windowHeight);
         }
     }
 
     // Light sits at the flame base: behind the hull, opposite the thrust direction.
-    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, float radius)
+    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, float radius, float camX, float camY, int windowWidth, int windowHeight)
     {
         if (maxAccel <= 0f) return;
         float mag = accel.Magnitude;
@@ -81,7 +81,11 @@ public static class LightGatherer
         if (mag <= 0f || ratio < MinThrustLightRatio) return;
 
         var dir = new Vector2(-accel.Normalized.X, -accel.Normalized.Y);
-        Lighting.AddLight(pos + dir * radius, radius * ThrustLightRadiusRatio, Math.Clamp(ratio, 0f, 1f) * ThrustLightIntensity);
+        Vector2 lightPos = pos + dir * radius;
+        float lightRadius = radius * ThrustLightRadiusRatio;
+        if (!IsInLightRange(lightPos, lightRadius, camX, camY, windowWidth, windowHeight)) return;
+
+        Lighting.AddLight(lightPos, lightRadius, Math.Clamp(ratio, 0f, 1f) * ThrustLightIntensity);
     }
 
     static bool IsInLightRange(Vector2 worldPos, float radius, float camX, float camY, int windowWidth, int windowHeight)

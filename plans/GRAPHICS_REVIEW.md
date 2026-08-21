@@ -8,7 +8,7 @@ Overall the system is clean (off-screen culling via `IsOffScreen`/`HalfDiagonal`
 
 ## Status (checked 2026-08-21)
 
-Fixed: 26 · Open: 1
+Fixed: 27 · Open: 1
 
 Remaining work:
 - Nit: per-entity second Position lookup in draw loops (deferred — measure first; see "Suggested order of work")
@@ -153,6 +153,11 @@ Not issues (verified): `PrevAngles` is safe from entity-ID reuse (`EntityManager
   Investigation: all four pairs have matching aspect ratios (within 0.1%) and visually identical framing — they are different resolutions of the same crop. Both maps and base are sampled in normalized [0,1] UV space, so registration is correct; only map resolution differs. Rejecting these sets (the review's primary recommendation) would disable working lighting on 4 of 13 lit sprites — a regression.
    Fix: warn at load time instead, so genuinely differently-framed maps are diagnosable rather than silently misregistering. Regenerating the four mismatched maps at base dimensions is the remaining asset-side cleanup (warnings will then stop firing).
    **Fixed** — `ImageLoader.LoadLitSet` logs via `DiagnosticLogger.LogWarning` on a size mismatch; no rejection/fallback.
+
+- **[perf] off-screen thruster lights consume the 16-light budget.**
+  `CollectExplosionLights` culls via `IsInLightRange`, but `AddThrustLight` added every player/enemy/mine light with no camera/radius culling, so off-screen entities could steal slots from on-screen enemy/mine thrusters (player lights are safe — they are added first and the camera follows the player). PLAN.md's point-light Stage 3 promises "screen+radius culling on CPU".
+   Fix: pass the viewport into `CollectThrustLights` and reject out-of-range lights before adding.
+   **Fixed** — `LightGatherer.AddThrustLight` takes camX/camY/window size and culls with the same `IsInLightRange` explosions use (light position + light radius, so glows reaching into the screen are kept).
 
 ## Suggested order of work (remaining, updated 2026-08-21)
 
