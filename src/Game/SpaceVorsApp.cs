@@ -61,6 +61,13 @@ public static class SpaceVorsApp
 
             bool gameOver = false;
             bool wasPaused = false;
+            bool showStats = false;
+
+            int GetPlayerLevel(EntityManager em)
+            {
+                var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
+                return playerTuple.Entity.Value >= 0 ? em.GetComponent<Player>(playerTuple.Entity).Level : 1;
+            }
 
             float accumulator = 0f;
             var runner = new SimulationRunner();
@@ -89,15 +96,23 @@ public static class SpaceVorsApp
                     gameOver = true;
                 }
 
+                if (gameOver) showStats = false;
+
+                // Tab toggles the stats screen (also while picking an upgrade).
+                // Escape is not used: raylib's default exit key would close the window.
+                if (!gameOver && Raylib.IsKeyPressed(KeyboardKey.Tab)) showStats = !showStats;
+
+                bool paused = hasPendingChoice || showStats;
+
                 // Entering pause: stop the ship's thrusters so flames/lights don't burn behind the menu.
-                if (hasPendingChoice && !wasPaused)
+                if (paused && !wasPaused)
                 {
                     em.RemoveComponent<Acceleration>(playerEntity);
                     em.RemoveComponent<AngularVelocity>(playerEntity);
                 }
-                wasPaused = hasPendingChoice;
+                wasPaused = paused;
 
-                if (!hasPendingChoice)
+                if (!paused)
                 {
                     accumulator += frameTime;
 
@@ -225,6 +240,11 @@ public static class SpaceVorsApp
                     var renderCam = em.GetComponent<Camera>(cameraEntity);
                     Renderer.Render(em, renderCam.Target.X, renderCam.Target.Y, GetW(), GetH(), gameOver, stars, clutter, playerEntity, chosenShip, diagnostics);
                 }
+                else if (showStats)
+                {
+                    var statsCam = em.GetComponent<Camera>(cameraEntity);
+                    Renderer.RenderStats(em, (float)statsCam.Target.X, (float)statsCam.Target.Y, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, chosenShip.Name, GetPlayerLevel(em));
+                }
                 else
                 {
                     // Game is paused — no simulation runs. Only handle choice input.
@@ -236,11 +256,12 @@ public static class SpaceVorsApp
                     int hoveredIndex = -1;
                     if (upgradeOptions is { Options.Length: > 0 } opts)
                     {
+                        int contentLeft = StatsScreenRenderer.SidePanelReservedWidth;
                         int mouseX = Raylib.GetMouseX();
                         int mouseY = Raylib.GetMouseY();
                         for (int i = 0; i < opts.Options.Length; i++)
                         {
-                            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, opts.Options.Length, GetW(), GetH());
+                            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, opts.Options.Length, contentLeft, 0, GetW() - contentLeft, GetH());
                             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                             {
                                 hoveredIndex = i;
@@ -282,12 +303,7 @@ public static class SpaceVorsApp
                             em.DestroyEntity(entity);
                     }
 
-                    int playerLevel = 1;
-                    var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
-                    if (playerTuple.Entity.Value >= 0)
-                    {
-                        playerLevel = em.GetComponent<Player>(playerTuple.Entity).Level;
-                    }
+                    int playerLevel = GetPlayerLevel(em);
 
                     var upgradeCam = em.GetComponent<Camera>(cameraEntity);
                     float upgradeCamX = (float)upgradeCam.Target.X;
@@ -323,6 +339,9 @@ public static class SpaceVorsApp
         }
 
         var def = UpgradeDefinition.For(upgrade.Stat);
+
+        var counts = em.TryGetComponent<UpgradeCounts>(playerEntity, out var existingCounts) ? existingCounts : UpgradeCounts.Empty;
+        em.AddComponent(playerEntity, counts.Increment(upgrade.Stat, upgrade.WeaponName));
 
         switch (upgrade.Stat)
         {

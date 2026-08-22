@@ -43,7 +43,35 @@ public static class Renderer
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
-        UpgradeMenuRenderer.Draw(windowWidth, windowHeight, upgradeOptions, playerLevel, hoveredIndex);
+
+        if (upgradeOptions is not null)
+        {
+            UpgradeMenuRenderer.Draw(windowWidth, windowHeight, upgradeOptions, playerLevel, hoveredIndex, contentLeft: StatsScreenRenderer.SidePanelReservedWidth);
+            StatsScreenRenderer.DrawSidePanel(em, playerEntity, windowWidth, windowHeight);
+        }
+        else
+        {
+            UpgradeMenuRenderer.Draw(windowWidth, windowHeight, upgradeOptions, playerLevel, hoveredIndex);
+        }
+
+        Raylib.EndDrawing();
+    }
+
+    public static void RenderStats(
+        EntityManager em,
+        float camX, float camY,
+        int windowWidth, int windowHeight,
+        List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
+        List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
+        Entity playerEntity,
+        ShipType shipType,
+        bool diagnostics,
+        string shipName,
+        int playerLevel)
+    {
+        Raylib.BeginDrawing();
+        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
+        StatsScreenRenderer.DrawOverlay(em, playerEntity, shipName, playerLevel, windowWidth, windowHeight);
         Raylib.EndDrawing();
     }
 

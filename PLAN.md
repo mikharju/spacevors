@@ -49,6 +49,7 @@ Goal:
 - Shift: boost (forward only, 2.5x)
 - Mouse: aim (optional)
 - Space: brake (optional)
+- Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded. During upgrade selection a compact version is always visible as a left side panel next to the cards
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
@@ -107,6 +108,7 @@ Progression.
 - level-ups
 - upgrades
 - enemy spawning
+- ship stats screen (Tab): every upgradeable stat with current value + times upgraded (`UpgradeCounts` component, incremented in `ApplyUpgrade`); side panel next to the cards while picking an upgrade
 
 ## Phase 4b
 

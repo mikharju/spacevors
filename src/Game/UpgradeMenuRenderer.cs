@@ -15,38 +15,40 @@ public static class UpgradeMenuRenderer
     const int UpgradeCardValueFontSize = 36;
     const int MaxUpgradeLabelLines = 3;
 
-    public static void Draw(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1, int hoveredIndex = -1)
+    public static void Draw(int windowWidth, int windowHeight, PendingUpgradeOptions? options = null, int playerLevel = 1, int hoveredIndex = -1, int contentLeft = 0)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 215));
 
+        int areaWidth = windowWidth - contentLeft;
+        int centerX = contentLeft + areaWidth / 2;
+
         string levelText = $"Level {playerLevel}";
-        Raylib.DrawText(levelText, windowWidth / 2 - Raylib.MeasureText(levelText, 36) / 2, 20, 36, new Color(255, 255, 255, 255));
+        Raylib.DrawText(levelText, centerX - Raylib.MeasureText(levelText, 36) / 2, 20, 36, new Color(255, 255, 255, 255));
 
         if (options is { Options.Length: > 0 } opts)
         {
             for (int i = 0; i < opts.Options.Length; i++)
             {
                 var opt = opts.Options[i];
-                var (topLeft, w, h) = GetUpgradeCardRect(i, opts.Options.Length, windowWidth, windowHeight);
+                var (topLeft, w, h) = GetUpgradeCardRect(i, opts.Options.Length, contentLeft, 0, areaWidth, windowHeight);
                 DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), (i + 1).ToString(), i == hoveredIndex);
             }
         }
 
         string hint = "Click a card or press keys";
-        int hintX = windowWidth / 2 - Raylib.MeasureText(hint, 16) / 2;
-        Raylib.DrawText(hint, hintX, windowHeight / 2 + UpgradeCardHeight / 2 + 30, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText(hint, centerX - Raylib.MeasureText(hint, 16) / 2, windowHeight / 2 + UpgradeCardHeight / 2 + 30, 16, new Color(200, 200, 200, 255));
     }
 
-    public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int windowWidth, int windowHeight)
+    public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int areaLeft, int areaTop, int areaWidth, int areaHeight)
     {
         if (optionCount <= 0) return (new Vector2(0, 0), 0, 0);
 
         int cardW = Math.Max(UpgradeCardMinWidth, Math.Min(
             UpgradeCardMaxWidth,
-            (windowWidth - 2 * UpgradeCardSideMargin - UpgradeCardSpacing * (optionCount - 1)) / optionCount));
+            (areaWidth - 2 * UpgradeCardSideMargin - UpgradeCardSpacing * (optionCount - 1)) / optionCount));
         int totalW = cardW * optionCount + UpgradeCardSpacing * (optionCount - 1);
-        int startX = (windowWidth - totalW) / 2;
-        int startY = windowHeight / 2 - UpgradeCardHeight / 2;
+        int startX = areaLeft + (areaWidth - totalW) / 2;
+        int startY = areaTop + (areaHeight - UpgradeCardHeight) / 2;
 
         int x = startX + index * (cardW + UpgradeCardSpacing);
         return (new Vector2(x, startY), cardW, UpgradeCardHeight);
