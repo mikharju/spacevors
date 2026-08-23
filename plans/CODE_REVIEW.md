@@ -73,6 +73,44 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 | 4 | Presentation layer | done (2026-08-15), re-reviewed (2026-08-23) |
 | 5 | Cross-cutting & docs | done (2026-08-23) |
 
+## Priority list for open issues (2026-08-23)
+
+Consolidated from the per-chunk re-reviews below; line numbers verified against code on 2026-08-23. Fixed-issue history stays in each chunk's "Re-review" section — this list tracks only what remains. Suggested order of attack: #1 (one-line fix, real bug), then the cheap dead-code cleanup (#6), then #2–#5 before any further scale work.
+
+### P0 — Correctness (fix first)
+
+1. **Health orbs never expire** — `PickupMagnetSystem.cs:88-93` computes `newLifetime` but never writes it back; the destroy branch is dead code, so orbs persist forever → unbounded entity growth + screen clutter in long runs. Fix: add `AddComponentCommand<HealthOrb>(orbEntity, new HealthOrb(newLifetime, orb.Radius))`, same pattern as XpPickup at :47/:53. (Chunks 2/3.)
+
+### P1 — Performance (threatens the 10k@120fps goal)
+
+2. **Per-frame allocations in lit-draw batching** — `WorldRenderer.cs:34-35` and `EnemyShipRenderer.cs:21-23` allocate a Dictionary + lists every frame; thousands of allocs/frame at scale. Reuse static buffers (SpatialGrid pattern). (Chunk 4.)
+3. **Unbounded accumulator → spiral of death** — `SpaceVorsApp.cs:117`, no clamp on `accumulator += frameTime`. (Chunk 4.)
+4. **Per-frame allocations in combat hot path** — CollisionSystem fresh dicts per frame (`mineDamageMap` :366, `shipDeathData` :389) + LINQ `.Distinct()` (:440,:448); TurretFiringSystem per-frame `.ToList()` (:11). (Chunk 2.)
+5. **Redundant component lookups** — WorldRenderer.cs:214-215, :253/:270/:286 (HasComponent+GetComponent); GetPlayerLevel queries all Players via LINQ though `playerEntity` is in scope (SpaceVorsApp.cs:68-69). (Chunk 4.)
+
+### P2 — Maintainability / robustness
+
+6. **Dead code** (AGENTS.md says remove immediately; one cheap commit): `UpgradeExplosion` (EffectComponents.cs:8), `EngineLayout.Maneuverable` (GameplayComponents.cs:70), `WeaponLoadout.MachineGun`/`.Shotgun` (:126-131), unused `Weapon` struct (CombatComponents.cs:3-13), `MaxEntityId` (EntityManager.cs:21, WorldView.cs:15), dead branches (`protectedEntities`, `mineDamageMap`, `ResolveCircleVsCircle`).
+7. **`SpaceVorsApp.Main` ~300 lines** (:15-307) — extract upgrade selection, game-over/restart, input. (Chunk 4.)
+8. **ApplyUpgrade ~190 lines** + always-true guard (SpaceVorsApp.cs:396) + verbose record rebuilds copying ~8 unchanged fields. (Chunk 4.)
+9. **Mixed write patterns** — app layer writes components directly (input :164/:176, turret sync :192-193); document or unify the contract. (Chunks 2/4.)
+10. **Ammo-loop `continue` skips remaining checks if a target lacks Health** (CollisionSystem.cs:273,:286) — unreachable today (all mines spawn with `Health(2)` at MineRespawnSystem.cs:41, all ships via EnemyShipFactory.cs:27), but fragile; make each hit check independent. (Chunk 2.)
+11. **Zero-turret level consumption** — LevelUpSystem.cs:59 returns without spawning a choice, but Update() still consumes XP and bumps the level (:34-40). (Chunk 3.)
+12. **ECS core smells** — EntityManager 628 lines; CommandProcessor reflection dispatch intercepting `RemoveComponentCommand<T>` (CommandProcessor.cs:28-32); unbounded `_entityIdToSlot` + `MaxEntities=20_000` magic number (ComponentStorage.cs:7); DestroyEntity scans all storages. (Chunk 1.)
+13. **Magic numbers** — GameInitializer starfield/clutter (:108-147) + `Boost: 2.5f` (:26); CollisionSystem mass/epsilon/mine-damage; GetMaxWeaponSlots fallback 3 (LevelUpSystem.cs:177).
+14. **DiagnosticLogger Console I/O in Domain** — LogMouse :71-79, game-specific LogAllEnemyShips :83-97; move to Game or no-op interface. (Chunk 1.)
+15. **Lighting mutable static state + BeginFrame/BeginDraw/EndDraw protocol** (Lighting.cs:116-121); UpgradeMenuRenderer hardcodes weapon-name strings (:146-149). (Chunk 4.)
+16. **xunit 2.9.3 + runner.visualstudio 3.0.2 mismatch** (Tests.csproj:13-14) — latent test-infra breakage; align versions. (Chunk 4.)
+17. Smaller: turrets sync to pre-step transform (SpaceVorsApp.cs:179-194); Vector2.Magnitude/SolveQuadratic double math; CoolDownHelper file/class mismatch + 2 lookups; ComponentQuery<T1> redundant lookup; sentinel coupling (~7 sites, `IsNull` unused in production); misleading "CleanupSystems" phase name (SimulationRunner.cs:37-43); copy-pasted difficulty ramp; confusing mine cap (TargetMineCount+15=23); dead `effectivePickupRadius` param; no-op XpPickup false→false writes; EnemyShipSystem stale-accel integration + spin-stop damping duplication; MineDrift per-mine lookup + blend duplication (k=3 vs k=6).
+
+### P3 — Docs & nits (one batch commit)
+
+18. **Doc drift fixes** (all verified 2026-08-23): ARCHITECTURE.md project layout + loadout section; PLAN.md controls table (Q/E/Space unimplemented), Phase 4c enemy stats, Phase 7 flame note, Phase 5/8 `TryDraw` refs; SHIP_TYPES.md ships list (Shadow missing, Fighter is RailGun) + milestone HP text (+2 not +5); LOOT_DROPS.md UI description (5 cards, keys 1–5) + "additive" → multiplicative ×1.2; functional-ecs.md historical notes; GRAPHICS_REVIEW.md status header (Open: 2 → 1).
+19. **F12 screenshot.png not gitignored** (+ TROUBLE_SHOOTING #1's numbered-file claim unverified — confirm, then fix doc or add .gitignore entry).
+20. One-frame flash after upgrade selection (SpaceVorsApp.cs:252-254/:289-290); DrawPlayerShip no fallback on missing texture (ShipSpriteRenderer.cs:23-24); AGENTS.md typo "and and" (:57).
+
+**Excluded:** Scout's `LoadTestWeapon` — documented intentional for load testing (GameplayComponents.cs:174); keep tracking until a real Scout loadout lands.
+
 ## Findings
 
 ### Chunk 1 — Core ECS infrastructure (2026-08-15)
