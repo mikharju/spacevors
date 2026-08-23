@@ -5,6 +5,13 @@ namespace Spacevors.Game;
 // Groups lit draws by sprite variant so each variant renders under one shader-mode block.
 public static class LitGroupRenderer
 {
+    // Reuses per-frame buffers instead of reallocating every tick (SpatialGrid pattern).
+    public static void Clear(Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> groups)
+    {
+        foreach (var list in groups.Values)
+            list.Clear();
+    }
+
     public static void Add(Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> groups, LitSprite lit, Rectangle dest, float angleDeg)
     {
         if (!groups.TryGetValue(lit, out var list))
@@ -22,6 +29,9 @@ public static class LitGroupRenderer
     {
         foreach (var (lit, draws) in groups)
         {
+            // Reused buffers keep variants with no draws this frame; skip their shader-mode toggle.
+            if (draws.Count == 0) continue;
+
             if (!Lighting.BeginDraw(lit))
             {
                 foreach (var (dest, angleDeg) in draws)

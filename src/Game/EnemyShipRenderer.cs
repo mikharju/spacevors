@@ -9,18 +9,21 @@ public static class EnemyShipRenderer
     const float TurretSize = 8f;
 
     private static readonly Color FallbackShipColor = new(180, 60, 60, 255);
+    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
+    private static readonly List<(int X, int Y)> _turretRects = new();
+    private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
+        LitGroupRenderer.Clear(_litDraws);
+        _turretRects.Clear();
+        _diagnosticCircles.Clear();
+
         if (ImageLoader.EnemyShipTextures == null)
         {
             DrawEnemyShipsFallback(em, camX, camY, windowWidth, windowHeight, diagnostics);
             return;
         }
-
-        var litDraws = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
-        var turretRects = new List<(int X, int Y)>();
-        var diagnosticCircles = new List<(int X, int Y, int Radius)>();
 
         foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
         {
@@ -57,7 +60,7 @@ public static class EnemyShipRenderer
                 var dest = new Rectangle(screenCx, screenCy, t.Width * scale, t.Height * scale);
 
                 if (lit != null)
-                    LitGroupRenderer.Add(litDraws, lit, dest, angleDeg);
+                    LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg);
                 else
                     Raylib.DrawTexturePro(t, RenderHelpers.FullSource(t), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
             }
@@ -66,18 +69,18 @@ public static class EnemyShipRenderer
                 DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight, diagnostics);
             }
 
-            turretRects.Add(((int)(screenCx - TurretSize / 2f), (int)(screenCy - TurretSize / 2f)));
+            _turretRects.Add(((int)(screenCx - TurretSize / 2f), (int)(screenCy - TurretSize / 2f)));
 
-            if (diagnostics) diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
+            if (diagnostics) _diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
         }
 
-        LitGroupRenderer.Draw(litDraws);
+        LitGroupRenderer.Draw(_litDraws);
 
-        foreach (var (x, y) in turretRects)
+        foreach (var (x, y) in _turretRects)
             Raylib.DrawRectangle(x, y, (int)TurretSize, (int)TurretSize, new Color(255, 140, 30, 255));
 
         if (diagnostics)
-            foreach (var (x, y, radius) in diagnosticCircles)
+            foreach (var (x, y, radius) in _diagnosticCircles)
                 Raylib.DrawCircle(x, y, radius, new Color(255, 165, 0, 60));
     }
 

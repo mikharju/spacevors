@@ -6,6 +6,9 @@ namespace Spacevors.Game;
 
 public static class WorldRenderer
 {
+    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
+    private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
+
     public static void Draw(
         EntityManager em, Entity playerEntity, ShipType shipType, bool diagnostics,
         float camX, float camY, int windowWidth, int windowHeight)
@@ -31,8 +34,8 @@ public static class WorldRenderer
 
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
-        var litDraws = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
-        var diagnosticCircles = new List<(int X, int Y, int Radius)>();
+        LitGroupRenderer.Clear(_litDraws);
+        _diagnosticCircles.Clear();
 
         foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
         {
@@ -50,10 +53,10 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
-            if (diagnostics) diagnosticCircles.Add(((int)cx, (int)cy, (int)asteroid.Radius));
+            if (diagnostics) _diagnosticCircles.Add(((int)cx, (int)cy, (int)asteroid.Radius));
 
             if (baseTex.HasValue && baseTex.Value.Id != 0)
-                DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg, litDraws);
+                DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
             else
                 Raylib.DrawRectanglePro(
                     new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
@@ -63,10 +66,10 @@ public static class WorldRenderer
                 );
         }
 
-        LitGroupRenderer.Draw(litDraws);
+        LitGroupRenderer.Draw(_litDraws);
 
         if (diagnostics)
-            foreach (var (x, y, radius) in diagnosticCircles)
+            foreach (var (x, y, radius) in _diagnosticCircles)
                 Raylib.DrawCircle(x, y, radius, new Color(255, 0, 0, 60));
     }
 
@@ -78,13 +81,13 @@ public static class WorldRenderer
     }
 
     // Lit when the variant has normal + depth maps (collected for batched drawing), otherwise a flat texture.
-    private static void DrawAsteroidSprite(AsteroidSprite? sprite, Texture2D baseTex, float cx, float cy, float diameter, float angleDeg, Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> litDraws)
+    private static void DrawAsteroidSprite(AsteroidSprite? sprite, Texture2D baseTex, float cx, float cy, float diameter, float angleDeg)
     {
         float scale = diameter / baseTex.Width;
         var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
 
         if (sprite?.Lit is { } lit)
-            LitGroupRenderer.Add(litDraws, lit, dest, angleDeg);
+            LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg);
         else
             Raylib.DrawTexturePro(baseTex, RenderHelpers.FullSource(baseTex), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
     }
