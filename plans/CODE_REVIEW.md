@@ -75,18 +75,18 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 
 ## Priority list for open issues (2026-08-23)
 
-Consolidated from the per-chunk re-reviews below; line numbers verified against code on 2026-08-23. Fixed-issue history stays in each chunk's "Re-review" section — this list tracks only what remains. Suggested order of attack: #1 (one-line fix, real bug), then the cheap dead-code cleanup (#6), then #2–#5 before any further scale work.
+Consolidated from the per-chunk re-reviews below; line numbers verified against code on 2026-08-23. Fixed-issue history stays in each chunk's "Re-review" section — this list tracks only what remains. P0 #1 and all of P1 (#2–#5) were fixed on 2026-08-23 (commits 98875aa, cb4f5a2, 710329c, de0afc8, 218a725). Suggested order of attack: the cheap dead-code cleanup (#6), then the remaining P2 items before any further scale work.
 
 ### P0 — Correctness (fix first)
 
-1. **Health orbs never expire** — `PickupMagnetSystem.cs:88-93` computes `newLifetime` but never writes it back; the destroy branch is dead code, so orbs persist forever → unbounded entity growth + screen clutter in long runs. Fix: add `AddComponentCommand<HealthOrb>(orbEntity, new HealthOrb(newLifetime, orb.Radius))`, same pattern as XpPickup at :47/:53. (Chunks 2/3.)
+1. ~~**Health orbs never expire**~~ — **fixed 2026-08-23** (`PickupMagnetSystem.cs` now writes back the aged `HealthOrb`; regression test in `PickupMagnetTest.cs`). Commit 98875aa. (Chunks 2/3.)
 
 ### P1 — Performance (threatens the 10k@120fps goal)
 
-2. **Per-frame allocations in lit-draw batching** — `WorldRenderer.cs:34-35` and `EnemyShipRenderer.cs:21-23` allocate a Dictionary + lists every frame; thousands of allocs/frame at scale. Reuse static buffers (SpatialGrid pattern). (Chunk 4.)
-3. **Unbounded accumulator → spiral of death** — `SpaceVorsApp.cs:117`, no clamp on `accumulator += frameTime`. (Chunk 4.)
-4. **Per-frame allocations in combat hot path** — CollisionSystem fresh dicts per frame (`mineDamageMap` :366, `shipDeathData` :389) + LINQ `.Distinct()` (:440,:448); TurretFiringSystem per-frame `.ToList()` (:11). (Chunk 2.)
-5. **Redundant component lookups** — WorldRenderer.cs:214-215, :253/:270/:286 (HasComponent+GetComponent); GetPlayerLevel queries all Players via LINQ though `playerEntity` is in scope (SpaceVorsApp.cs:68-69). (Chunk 4.)
+2. ~~**Per-frame allocations in lit-draw batching**~~ — **fixed 2026-08-23**: static buffers reused across frames, cleared per frame (`LitGroupRenderer.Clear`). Commit cb4f5a2. (Chunk 4.)
+3. ~~**Unbounded accumulator → spiral of death**~~ — **fixed 2026-08-23**: `accumulator` clamped to `MaxAccumulator = 0.25s`. Commit 710329c. (Chunk 4.)
+4. ~~**Per-frame allocations in combat hot path**~~ — **fixed 2026-08-23**: CollisionSystem dicts are cleared fields, `.Distinct()` replaced by HashSet dedup; TurretFiringSystem iterates the query directly. Commit de0afc8. (Chunk 2.)
+5. ~~**Redundant component lookups**~~ — **fixed 2026-08-23**: `TryGetComponent` in WorldRenderer draw paths; GetPlayerLevel uses in-scope `playerEntity`. Commit 218a725. (Chunk 4.)
 
 ### P2 — Maintainability / robustness
 
@@ -257,10 +257,10 @@ Consolidated from the per-chunk re-reviews below; line numbers verified against 
 
 **New issues:**
 - **[minor/correctness] Ammo loop `continue`s past remaining checks when a hit target lacks Health.** `CollisionSystem.cs:273, :286` — if the mine/ship has no Health component, the whole rest of that ammo's iteration is skipped, including enemy-ammo-vs-player damage (`:299+`). One missing component silently disables player damage from that projectile. Scope the handling instead of `continue`.
-- **[minor/perf] Per-frame allocations in CollisionSystem.** `mineDamageMap` (`:366`) and `shipDeathData` (`:389`) are fresh dictionaries every frame instead of cleared fields like the other accumulators; `_entitiesToDestroy.Distinct()` (`:440`) and `_effectsToSpawn.Distinct()` (`:448`) use LINQ (allocation + hashing) on the hot path.
-- **[minor/gameplay] Health orbs never expire.** `PickupMagnetSystem.ProcessHealthOrbs` computes `newLifetime` and destroys on expiry (`:88-93`) but never writes the aged `HealthOrb` back for surviving orbs (unlike XpPickup, which is rewritten with `newLifetime` at `:47/:53/:70`) — Lifetime stays at its initial value forever. Write the aged component or delete the field.
+- ~~**[minor/perf] Per-frame allocations in CollisionSystem.**~~ **Fixed 2026-08-23**: `mineDamageMap`/`shipDeathData` are cleared fields like the other accumulators; `_entitiesToDestroy`/`_effectsToSpawn` are HashSets that dedupe at insertion (no LINQ `.Distinct()`). Commit de0afc8.
+- ~~**[minor/gameplay] Health orbs never expire.**~~ **Fixed 2026-08-23**: `ProcessHealthOrbs` writes back the aged `HealthOrb(newLifetime, orb.Radius)` for surviving orbs (see Chunk 3 re-review). Commit 98875aa.
 - **[nit/dead code] Unused types:** `UpgradeExplosion` (`EffectComponents.cs:8`), `EngineLayout.Maneuverable` (`GameplayComponents.cs:70`), loadouts `WeaponLoadout.MachineGun` / `WeaponLoadout.Shotgun` (`GameplayComponents.cs:126-131`) — no references (grep).
-- **[nit/perf] `TurretFiringSystem.Update` does `.ToList()` over all turrets per frame** (`:11`) — allocation proportional to enemy ship count; iterate the query directly.
+- ~~**[nit/perf] `TurretFiringSystem.Update` does `.ToList()` over all turrets per frame**~~ **Fixed 2026-08-23**: iterates the turret query directly (commands are deferred to phase end, so no structural mutation during iteration). Commit de0afc8.
 - **[nit] `SolveQuadratic` uses double math** (`Math.Abs`, `(float)Math.Sqrt`, `TurretFiringSystem.cs:403-412`).
 
 ### Chunk 3 — AI, progression & support (2026-08-15)
@@ -341,7 +341,7 @@ Resolved cross-chunk question from Chunks 1–2: commands are applied **per phas
 - **[Minor] Phase naming** — unchanged: "CleanupSystems" still holds core AI + both spawners + camera (`SimulationRunner.cs:37-43`).
 
 **New issues:**
-- **[minor/correctness] Health orbs never expire (aged value discarded).** `ProcessHealthOrbs` computes `newLifetime` and destroys on expiry (`PickupMagnetSystem.cs:88-93`) but never rewrites the orb with it — Lifetime stays at its initial 30f forever, so the expiry branch is dead. (See also Chunk 2 new issues.)
+- ~~**[minor/correctness] Health orbs never expire (aged value discarded).**~~ **Fixed 2026-08-23**: `ProcessHealthOrbs` now writes back the aged `HealthOrb(newLifetime, orb.Radius)` for surviving orbs and skips already-collected ones; regression test `PickupMagnetTest.HealthOrb_LifetimeDecaysAndExpires`. Commit 98875aa. (See also Chunk 2 new issues.)
 - **[nit] EnemyShipSystem duplicates spin-stop damping** between `:53-64` and `ApplySpinStop` (`:107-122`); `ApplyRotationTowardPlayer` recomputes toPlayer/dist the caller already has and re-fetches Position via `GetComponent` (`:128`).
 - **[nit] `LevelUpSystem.GetMaxWeaponSlots` fallback magic number 3** (`:177`) — should come from ShipType/WeaponSlots.
 - **[nit] MineRespawnSystem interval constants are `int`** used in float math (`:9-10, :46-47`) while EnemyShipSpawnSystem uses `float`.
@@ -449,7 +449,7 @@ Dependency direction verified clean: Domain has zero Raylib references (grep), G
 **Still open:**
 - **[Minor] Turrets sync to pre-step player transform** — unchanged in shape: turret Position/Rotation written once per render frame before the fixed-step loop (`SpaceVorsApp.cs:179-194`), so turrets lag the hull on multi-step frames.
 - ~~**[Minor] No interpolation despite ARCHITECTURE.md**~~ — **resolved by doc change**: ARCHITECTURE.md:124 now states "Rendering draws the latest simulated state; no interpolation between ticks", matching the code (no previous-state storage anywhere). Motion stutter on slow machines remains as a documented tradeoff, not drift.
-- **[Minor] Unbounded accumulator → spiral of death** — `accumulator += frameTime` with no clamp (`SpaceVorsApp.cs:117`).
+- ~~**[Minor] Unbounded accumulator → spiral of death**~~ — **fixed 2026-08-23**: `accumulator` clamped to named `MaxAccumulator = 0.25s`, so a hitch costs at most ~30 catch-up steps instead of freezing (`SpaceVorsApp.cs:14, :119`). Commit 710329c.
 - **[Minor] Mixed write patterns extend into the app layer** — input still writes Acceleration/AngularVelocity directly via AddComponent (`:164, :176`) and turret sync writes Position/Rotation (`:192-193`); contract undocumented (same as Chunk 2's finding).
 - **[Nit] Magic numbers in GameInitializer** — partially fixed: spawn counts/distances now named constants (`:10-13`), but the starfield/clutter block still has inline magic numbers (`:108-147`) and `Boost: 2.5f` (`:26`).
 - **[Nit] ApplyUpgrade always-true guard** — `if (newDamage > turret.Weapon.Damage)` still present (`SpaceVorsApp.cs:396`); switch cases still rebuild Player/Turret records copying ~8 unchanged fields each (ApplyUpgrade is now ~190 lines).
@@ -459,12 +459,12 @@ Dependency direction verified clean: Domain has zero Raylib references (grep), G
 - **[Nit] xunit version mismatch** — still xunit 2.9.3 + xunit.runner.visualstudio 3.0.2 (`Tests.csproj:13-14`).
 
 **New issues:**
-- **[minor/perf] Per-frame allocations in the lit-draw batching path.** `DrawAsteroids` allocates a fresh `Dictionary<LitSprite, List<...>>` + diagnostic list every frame (`WorldRenderer.cs:34-35`); `EnemyShipRenderer.Draw` does the same (`:21-23`). Key count is bounded by variant count, but each list holds one tuple per visible sprite → thousands of allocations/frame at 10k objects. Fix: reuse static buffers cleared per frame (same pattern as SpatialGrid's bucket reuse).
+- ~~**[minor/perf] Per-frame allocations in the lit-draw batching path.**~~ **Fixed 2026-08-23**: `WorldRenderer`/`EnemyShipRenderer` keep static per-variant buffers cleared at frame start; `LitGroupRenderer.Clear` + empty-group guard. Commit cb4f5a2.
 - **[minor] `SpaceVorsApp.Main` is ~300 lines** (`SpaceVorsApp.cs:15-307`) — breaches "keep functions short"; upgrade-selection handling (`:248-300`), game-over/restart, and input could each be extracted.
-- **[minor] Redundant component lookups in render paths.** DrawMines does HasComponent<Health> + GetComponent<Health> (`WorldRenderer.cs:214-215`); DrawXpPickups/DrawHealthOrbs/DrawGreenSparks do a redundant HasComponent<Position> before GetComponent (`:253, :270, :286`) — one TryGetComponent each would do.
+- ~~**[minor] Redundant component lookups in render paths.**~~ **Fixed 2026-08-23**: DrawMines/DrawXpPickups/DrawHealthOrbs/DrawGreenSparks each use a single `TryGetComponent`. Commit 218a725.
 - **[nit] `Lighting` holds mutable static state** (PointLights array + camera/window fields, `Lighting.cs:116-121`) with a BeginFrame/BeginDraw/EndDraw protocol that is easy to break; it also uploads all 16 light slots per variant block (`:184`). Acceptable for a single-threaded renderer, but note alongside the static-state findings in Chunks 1–3.
 - **[nit] UpgradeMenuRenderer hardcodes weapon-name strings** "MachineGun"/"Shotgun" in `GetUpgradeLabel` (`UpgradeMenuRenderer.cs:146-149`) — fragile coupling to WeaponType names; derive labels from weapon data instead.
-- **[nit] GetPlayerLevel queries all Players via LINQ FirstOrDefault + sentinel check** (`SpaceVorsApp.cs:68-69`) although `playerEntity` is in scope at both call sites — just use `em.GetComponent<Player>(playerEntity).Level`.
+- ~~**[nit] GetPlayerLevel queries all Players via LINQ FirstOrDefault + sentinel check**~~ **Fixed 2026-08-23**: reads the in-scope `playerEntity` directly via `TryGetComponent`. Commit 218a725.
 - **[note] New headless render benchmark** `RenderBench/Program.cs` (357 lines) with a pixel oracle that keeps the legacy per-sprite shader as a frozen copy (`:174-259`) — good practice; delete the oracle + legacy shaders once the per-sprite path is gone for good (the comment says so).
 
 **Cross-chunk resolutions & notes for Chunk 5:**
