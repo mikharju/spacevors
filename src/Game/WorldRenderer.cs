@@ -214,8 +214,8 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
-            bool hasHealth = em.HasComponent<Health>(entity);
-            int healthAlpha = hasHealth && em.GetComponent<Health>(entity).Current >= 2 ? 180 : 255;
+            bool hasHealth = em.TryGetComponent<Health>(entity, out var mineHealth);
+            int healthAlpha = hasHealth && mineHealth.Current >= 2 ? 180 : 255;
 
             if (hasTexture)
             {
@@ -253,9 +253,7 @@ public static class WorldRenderer
     {
         foreach (var (entity, pickup) in em.GetEntitiesWithComponents<XpPickup>())
         {
-            if (!em.HasComponent<Position>(entity)) continue;
-
-            var pos = em.GetComponent<Position>(entity);
+            if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
@@ -270,9 +268,7 @@ public static class WorldRenderer
     {
         foreach (var (entity, orb) in em.GetEntitiesWithComponents<HealthOrb>())
         {
-            if (!em.HasComponent<Position>(entity)) continue;
-
-            var pos = em.GetComponent<Position>(entity);
+            if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 
@@ -286,9 +282,7 @@ public static class WorldRenderer
     {
         foreach (var (entity, spark) in em.GetEntitiesWithComponents<GreenSpark>())
         {
-            if (!em.HasComponent<Position>(entity)) continue;
-
-            var pos = em.GetComponent<Position>(entity);
+            if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
             float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
 

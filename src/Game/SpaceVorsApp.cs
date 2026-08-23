@@ -68,8 +68,7 @@ public static class SpaceVorsApp
 
             int GetPlayerLevel(EntityManager em)
             {
-                var playerTuple = em.GetEntitiesWithComponents<Player>().FirstOrDefault();
-                return playerTuple.Entity.Value >= 0 ? em.GetComponent<Player>(playerTuple.Entity).Level : 1;
+                return em.TryGetComponent<Player>(playerEntity, out var player) ? player.Level : 1;
             }
 
             float accumulator = 0f;
