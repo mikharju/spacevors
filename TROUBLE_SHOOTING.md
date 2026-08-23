@@ -110,6 +110,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: `LevelUpSystem` created the PickupRadius option with `weaponNames[0]`, so `ApplyUpgrade` stored the count under `(PickupRadius, "MachineGun")` while the stats screen looks up ship-level stats with an empty weapon name. The label rendering masked it (pickup radius labels ignore the weapon name).
 - **Fix / Prevention**: Ship-level upgrade options (Hp, thrusts, turn speed, pickup radius) must use `""` as weapon name — it is the count-tracking key. When adding new upgrade options, verify the stats screen count column increments (scripted run with SPACEVORS_DIAG_UPGRADES + Tab screenshot).
 
+## 17. Transient `dotnet build` CLR crash with exit code 0
+
+- **Symptom**: Build output ends in "Fatal error. / Internal CLR error. (0x80131506)" but the command exits 0, so a chained `&& dotnet test --no-build` runs against *stale* binaries and can pass while testing old code.
+- **Cause**: Transient toolchain crash (seen once on this machine); a plain re-run builds fine. The exit code does not reflect the failure when output is piped through `tail`.
+- **Fix / Prevention**: Treat any build whose output lacks "Build succeeded" as failed — re-run until it prints, then re-run tests even if an earlier `--no-build` pass already went green (same discipline as entry 7).
+
   ## General workflow that works
 
 ```bash
