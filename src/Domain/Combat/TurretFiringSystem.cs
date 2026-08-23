@@ -8,9 +8,8 @@ public class TurretFiringSystem : GameSystem
     {
         bool playerDead = IsPlayerDead(view);
 
-        var turrets = view.GetEntitiesWithComponents<Turret, Position, Rotation>().ToList();
-
-        foreach (var (turretEntity, turret, turretPos, turretRot) in turrets)
+        // Commands are deferred to phase end, so the query can be iterated directly.
+        foreach (var (turretEntity, turret, turretPos, turretRot) in view.GetEntitiesWithComponents<Turret, Position, Rotation>())
         {
             if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
             if (!turret.IsEnemy && playerDead) continue;

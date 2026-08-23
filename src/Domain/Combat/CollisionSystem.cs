@@ -14,17 +14,19 @@ public class CollisionSystem : GameSystem
     private const float Slop = 1.0f;
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
-    private readonly List<Entity> _entitiesToDestroy = new();
-    private readonly List<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
+    private readonly HashSet<Entity> _entitiesToDestroy = new();
+    private readonly HashSet<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
     private readonly List<(Entity ammo, Entity target, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
     private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
     // Per-frame collision state accumulators (fixes deferred command overwrite bug)
-    private Dictionary<Entity, Vector2> _collisionVelocities = new();
-    private Dictionary<Entity, Vector2> _positionCorrections = new();
-    private Dictionary<Entity, float> _angularVelocityAccumulator = new();
-    private Dictionary<Entity, int> _frameRemainingHealth = new();
+    private readonly Dictionary<Entity, Vector2> _collisionVelocities = new();
+    private readonly Dictionary<Entity, Vector2> _positionCorrections = new();
+    private readonly Dictionary<Entity, float> _angularVelocityAccumulator = new();
+    private readonly Dictionary<Entity, int> _frameRemainingHealth = new();
+    private readonly Dictionary<Entity, int> _mineDamageTotals = new();
+    private readonly Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)> _shipDeathData = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -42,6 +44,8 @@ public class CollisionSystem : GameSystem
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
+        _mineDamageTotals.Clear();
+        _shipDeathData.Clear();
         bool anyTruncated = false;
         Span<SpatialGrid.SpatialItem> queryBuffer = stackalloc SpatialGrid.SpatialItem[256];
 
@@ -363,14 +367,13 @@ public class CollisionSystem : GameSystem
             _entitiesToDestroy.Add(ammoEntity);
         }
 
-        var mineDamageMap = new Dictionary<Entity, int>();
         foreach (var (_, mineEntity, _, _, ammoDamage, _) in _ammoToMineHits)
         {
-            if (!mineDamageMap.TryGetValue(mineEntity, out var d)) mineDamageMap[mineEntity] = 0;
-            mineDamageMap[mineEntity] += ammoDamage;
+            if (!_mineDamageTotals.TryGetValue(mineEntity, out var d)) _mineDamageTotals[mineEntity] = 0;
+            _mineDamageTotals[mineEntity] += ammoDamage;
         }
 
-        foreach (var (mineEntity, totalDamage) in mineDamageMap)
+        foreach (var (mineEntity, totalDamage) in _mineDamageTotals)
         {
             var remaining = _frameRemainingHealth[mineEntity];
             if (remaining <= 0)
@@ -386,14 +389,13 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        var shipDeathData = new Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)>();
         foreach (var (_, shipEntity, hitPoint, shipPos, _, shipRadius, graphicsId) in _ammoToShipHits)
         {
-            if (!shipDeathData.ContainsKey(shipEntity))
-                shipDeathData[shipEntity] = (hitPoint, shipPos, shipRadius, graphicsId);
+            if (!_shipDeathData.ContainsKey(shipEntity))
+                _shipDeathData[shipEntity] = (hitPoint, shipPos, shipRadius, graphicsId);
         }
 
-        foreach (var (shipEntity, data) in shipDeathData)
+        foreach (var (shipEntity, data) in _shipDeathData)
         {
             var remaining = _frameRemainingHealth.TryGetValue(shipEntity, out var r) ? r : -1;
             if (remaining <= 0)
@@ -437,7 +439,7 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        foreach (var entity in _entitiesToDestroy.Distinct())
+        foreach (var entity in _entitiesToDestroy)
         {
             if (!protectedEntities.Contains(entity))
             {
@@ -445,7 +447,7 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        foreach (var (position, mineType) in _effectsToSpawn.Distinct())
+        foreach (var (position, mineType) in _effectsToSpawn)
         {
             SpawnExplosion(commands, position, mineType);
             for (int i = 0; i < mineType.HitSparkCount; i++)
