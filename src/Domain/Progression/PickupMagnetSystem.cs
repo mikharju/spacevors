@@ -119,7 +119,10 @@ public class PickupMagnetSystem : GameSystem
                 totalHeal += HealthOrbHealAmount;
                 SpawnGreenExplosion(view, position: pos.Value, commands);
                 commands.Add(new DestroyEntityCommand(orbEntity));
+                continue;
             }
+
+            commands.Add(new AddComponentCommand<HealthOrb>(orbEntity, new HealthOrb(newLifetime, orb.Radius)));
         }
 
         if (totalHeal > 0)
