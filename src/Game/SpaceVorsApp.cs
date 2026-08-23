@@ -9,6 +9,9 @@ public static class SpaceVorsApp
 {
     public const int MaxFps = 120;
     const float FixedDeltaTime = 1f / MaxFps;
+
+    // Cap catch-up work after a hitch (window drag, GC pause) instead of running dozens of steps in one frame.
+    const float MaxAccumulator = 0.25f;
     const int DefaultWindowWidth = 1920;
     const int DefaultWindowHeight = 1024;
 
@@ -114,7 +117,7 @@ public static class SpaceVorsApp
 
                 if (!paused)
                 {
-                    accumulator += frameTime;
+                    accumulator = Math.Min(accumulator + frameTime, MaxAccumulator);
 
                     if (!gameOver)
                     {
