@@ -104,7 +104,13 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: The app never calls `Raylib.SetExitKey(0)`, so raylib's default exit key (Escape) is active and checked via `WindowShouldClose()`. Any in-game use of Escape competes with it — whichever runs first wins, and the window-close check runs at loop top.
 - **Fix / Prevention**: Don't bind Escape to UI actions unless you also call `Raylib.SetExitKey(0)` at init (which then removes Esc-to-quit entirely). The stats screen uses Tab for both open and close.
 
- ## General workflow that works
+## 16. Ship-level upgrade options must use an empty weapon name
+
+- **Symptom**: Stats screen showed `x0` for pickup radius after upgrading it (the stat value itself changed correctly). Found while screenshot-verifying the upgrade-count column.
+- **Cause**: `LevelUpSystem` created the PickupRadius option with `weaponNames[0]`, so `ApplyUpgrade` stored the count under `(PickupRadius, "MachineGun")` while the stats screen looks up ship-level stats with an empty weapon name. The label rendering masked it (pickup radius labels ignore the weapon name).
+- **Fix / Prevention**: Ship-level upgrade options (Hp, thrusts, turn speed, pickup radius) must use `""` as weapon name — it is the count-tracking key. When adding new upgrade options, verify the stats screen count column increments (scripted run with SPACEVORS_DIAG_UPGRADES + Tab screenshot).
+
+  ## General workflow that works
 
 ```bash
 # 1. Ensure clean state

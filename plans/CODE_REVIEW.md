@@ -67,11 +67,11 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 
 | Chunk | Topic | Status |
 |-------|-------|--------|
-| 1 | Core ECS infrastructure | done (2026-08-15) |
-| 2 | Combat & physics systems | done (2026-08-15) |
-| 3 | AI, progression & support | done (2026-08-15) |
-| 4 | Presentation layer | done (2026-08-15) |
-| 5 | Cross-cutting & docs | pending |
+| 1 | Core ECS infrastructure | done (2026-08-15), re-reviewed (2026-08-23) |
+| 2 | Combat & physics systems | done (2026-08-15), re-reviewed (2026-08-23) |
+| 3 | AI, progression & support | done (2026-08-15), re-reviewed (2026-08-23) |
+| 4 | Presentation layer | done (2026-08-15), re-reviewed (2026-08-23) |
+| 5 | Cross-cutting & docs | done (2026-08-23) |
 
 ## Findings
 
@@ -122,6 +122,34 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 - **Sentinel coupling:** `Entity.Null == -1` leaks into systems (`CollisionSystem.cs:48` checks `playerEntity.Value >= 0`). Prefer an explicit `IsNull`.
 - **Test gaps:** no SpatialGrid test for multi-cell duplicate results or buffer truncation; no test that entity-id growth/compaction keeps `_entityIdToSlot` consistent after many creates.
 
+#### Re-review (2026-08-23)
+
+**Fixed since 2026-08-15:**
+- **[Major] SpatialGrid silent truncation** — `GetQueryItems` now has an `out bool truncated` param (`SpatialGrid.cs:61`); `CollisionSystem` aggregates it and warns once per frame (`CollisionSystem.cs:325`). Tests added.
+- **[Major] Multi-cell duplicates** — deduped inside the grid via a reused `_seen` HashSet (`SpatialGrid.cs:9,80`); callers no longer need to dedupe. Tests `Query_MultiCellEntity_ReturnsItExactlyOnce`, `Query_MultipleEntities_ReturnsEachOnce`.
+- **[Major/perf] SpatialGrid per-frame allocations** — `Clear()` now reuses cell buckets instead of recreating them (`SpatialGrid.cs:32-36`).
+- **[Major/design] Static `GameSystem.ElapsedTime`** — gone. Elapsed time lives on `EntityManager` (`EntityManager.cs:12,25`) and flows through `WorldView` (`WorldView.cs:19`); `System.cs` is now a 6-line abstract class.
+- **[Determinism infra] World-owned seeded RNG** — `EntityManager.Rng` (seed param, default 42) exposed via `WorldView.Rng`; `Random.Shared` no longer appears anywhere in src/ (grep). Closes the determinism findings of Chunks 1–3 at the infrastructure level.
+- **[Nit/test gap] SpatialGrid tests** for multi-cell duplicates and buffer truncation now exist (`SpatialGridTest.cs:70-143`).
+
+**Still open:**
+- **[Major/perf/correctness] `CommandProcessor.cs:28-32` reflection dispatch** — unchanged; still intercepts `RemoveComponentCommand<T>` before the `IApplyCommand` branch at :33. `ReflectionTest.cs` remains but now tests `EntityManager.AddComponent` via reflection, not the processor path (the production reflection branch is untested).
+- **[Major/perf/design] Unbounded `_entityIdToSlot` / no id recycling** — partially mitigated: `Clear()` now resets `_nextId = 0` (`EntityManager.cs:200`), so memory is bounded per simulation lifetime instead of across simulations. Within one long session ids still grow monotonically (ammo churn) and the index array never shrinks. `MaxEntities = 20_000` magic number remains (`ComponentStorage.cs:7`).
+- **[Minor] `DestroyEntity` scans all storages** — unchanged (`EntityManager.cs:32-41`).
+- **[Minor] `Vector2.Magnitude` double math, no `LengthSquared()`** — unchanged (`Vector2.cs:10`).
+- **[Minor] `DiagnosticLogger` in Domain doing I/O** — unchanged; `LogMouse` still present (`:71-79`) and a new game-specific `LogAllEnemyShips` was added (`:83-97`), deepening the coupling.
+- **[Minor] `ComponentQuery<T1>` redundant lookup** — unchanged (`EntityManager.cs:257-263`).
+- **[Minor→mitigated] `WorldView` pass-through** — no longer pure pass-through (carries `ViewportSize`, exposes world services `Rng`/`ElapsedTime`), but still exposes mutating `GetStorage<T>` / `GetComponentRef<T>`.
+- **[Nit] `CoolDownHelper.cs` file/class name mismatch** — unchanged; helper also does Has+Get = 2 lookups where one `TryGetComponent` would do (`CoolDownHelper.cs:7-10`).
+- **[Nit] `EntityManager.cs` size** — now 628 lines (was 613); still one file of duplicated query boilerplate.
+- **[Nit] Sentinel coupling** — `Entity.IsNull` was added but production code still uses `.Value >= 0` in 7 places (`CollisionSystem.cs:50`, `EnemyShipSystem.cs:15`, `MineDriftSystem.cs:11`, `BlueSparkHomeSystem.cs:11`, `EnemyShipSpawnSystem.cs:21`, `TurretFiringSystem.cs:46,86`); `IsNull` is only used in tests.
+- **[Nit/test gap] No test** that `_entityIdToSlot` stays consistent after many creates (id growth).
+
+**New issues:**
+- **[nit/dead code] `MaxEntityId` has zero consumers.** Defined at `EntityManager.cs:21`, forwarded by `WorldView.cs:15`, used nowhere (grep incl. tests) → delete both.
+- **[nit/perf] `CommandBuffer.Apply` allocates a new `CommandProcessor` per apply** (`Commands.cs:134`). The processor is stateless — reuse one instance or inline `Process`.
+- **[nit] `SpatialGrid._cells` never shrinks.** Empty lists for cells no longer touched accumulate for the session's lifetime (bounded by world extent; acceptable, but note alongside the bucket-reuse fix).
+
 ### Chunk 2 — Combat & physics systems (2026-08-15)
 
 #### Major
@@ -168,6 +196,34 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 - **Test gaps:** no regression test for multi-cell duplicate candidates (Major #3) or buffer truncation; `TurretFiringTest.cs` is a single smoke test — no coverage of arc culling, prediction, cooldown decay, or enemy turrets; no test that EffectSystem/AmmoLifetime destroy expired entities.
 
 **Cross-chunk notes:** Chunk 3 must verify SimulationRunner applies the CommandBuffer after all systems (validates safety of the mixed direct-mutation + deferred-command patterns) and check `EnemyShipSpawnSystem`/`MineRespawnSystem` for more `Random.Shared`. Chunk 4: `SpaceVorsApp.cs:212, 295` read env vars per frame — same fix as Minor #3.
+
+#### Re-review (2026-08-23)
+
+**Fixed since 2026-08-15:**
+- **[Major] O(n²) ship×asteroid loop** — now a spatial-grid query with `Kind == Asteroid` filter and the real rSum check inside `ResolveCollision` (`CollisionSystem.cs:100-109`); candidate positions come from the grid item, no per-candidate `GetComponent`.
+- **[Major] Duplicate mine candidates double-applying correction** — fixed at the root by grid-level dedup (Chunk 1) plus a regression test `MineVsAsteroid_MultiCellMine_CorrectedOnce` (`CollisionSystemTest.cs:295`). Collision resolution also now accumulates velocities/position-corrections in per-frame dictionaries and flushes once via commands (`FlushCollisions`, `CollisionSystem.cs:497-510`), fixing last-write-wins overwrites when one entity collides multiple times in a frame; covered by `TwoMinesVsPlayer_BothHitInOneFrame`, `TwoAmmoVsEnemyShip_*`, etc.
+- **[Major/determinism] `Random.Shared` in loot/explosions** — gone; all paths use the world RNG (`CollisionSystem.cs:380,401,408,453,770`, `ShipDeathExplosionSystem.cs:19,25,80`).
+- **[Minor/test gap] TurretFiringTest was a single smoke test** — now 8 tests covering add-on weapon arc culling, enemy hull-edge engagement and range, lead prediction with velocity inheritance, kickback scaling (`TurretFiringTest.cs:60-222`). CollisionSystemTest gained multi-hit-per-frame and mine/ship physics-bounce coverage.
+- **[Minor] Player turrets firing after death** (old Chunk 4 Minor #5) — `TurretFiringSystem.cs:16` now skips non-enemy turrets when the player is dead.
+
+**Still open:**
+- **[Major/gameplay] Scout ships with LoadTestWeapon** (`GameplayComponents.cs:174`) — unchanged, but now carries an explicit comment "Intentionally kept while development is ongoing so manual load testing is easy". Still 8000 pellets/shot + kickback 100 for the default ship; keep tracking until a real Scout loadout lands.
+- **[Minor] Mixed write patterns** — `EffectSystem` still issues one `AddComponentCommand` per effect entity per frame (`EffectSystem.cs:21,39,57,75,93`) while `AmmoLifetimeSystem.cs:27` and `PositionIntegrationSystem.cs:27` mutate via ref. The "pick one rule" question is still unanswered.
+- **[Minor] Redundant third target loop** — now in *both* `FindTargetWithPrediction` (`TurretFiringSystem.cs:227-245`) and `FindTargetWithoutPrediction` (`:288-305`); every enemy ship has a Velocity (`EnemyShipFactory.cs:22,35`). ~76 lines to delete.
+- **[Minor] Env var read per turret per shot** — unchanged (`TurretFiringSystem.cs:29`).
+- **[Minor] Dead/confused logic in CollisionSystem:** `protectedEntities` still filters nothing (`:424-426, :440-446` — `_entitiesToDestroy` only ever contains ammo); `mineDamageMap` still redundant and its `totalDamage` value is never even read (`:366-371`, a HashSet would do); `ResolveCircleVsCircle` still only called with bEntity = player (`:75`) so the Asteroid/EnemyShip branches at `:542-551` are dead.
+- **[Minor] PhysicsSystem** — `TryGetComponent<Velocity>` result still ignored (`PhysicsSystem.cs:17`); angle still integrated with pre-damping angVel while storing the damped value (`:44`, one-frame lag).
+- **[Minor] Redundant lookups in TurretFiringSystem:** EnemyShip TryGetComponent twice per shot (`:86, :329`); "get first player" `foreach…break` repeated at `:62-66, :99-105` (with a `GetComponent<Position>` inside the loop), `:341-345`; kickback does `GetEntitiesWithComponents<Player>().ToList()` per shot (`:362`).
+- **[Minor] Magic numbers:** ship mass override `3000f` (`CollisionSystem.cs:97,108,178`); epsilon `0.001f` ~7× in CollisionSystem + ~5× in TurretFiring; mine damage to player hardcoded to 3 (`:759`); mine proximity band `aRadius + 15f` (`:133, :168`). Ammo radius/color now come from `WeaponType` data (improved) but are still keyed by the redundant `Turret.WeaponName` string alongside `WeaponStats` (`CombatComponents.cs:21-27`).
+- **[Nit] `Weapon` record struct still unused** (`CombatComponents.cs:3-13`) → delete.
+
+**New issues:**
+- **[minor/correctness] Ammo loop `continue`s past remaining checks when a hit target lacks Health.** `CollisionSystem.cs:273, :286` — if the mine/ship has no Health component, the whole rest of that ammo's iteration is skipped, including enemy-ammo-vs-player damage (`:299+`). One missing component silently disables player damage from that projectile. Scope the handling instead of `continue`.
+- **[minor/perf] Per-frame allocations in CollisionSystem.** `mineDamageMap` (`:366`) and `shipDeathData` (`:389`) are fresh dictionaries every frame instead of cleared fields like the other accumulators; `_entitiesToDestroy.Distinct()` (`:440`) and `_effectsToSpawn.Distinct()` (`:448`) use LINQ (allocation + hashing) on the hot path.
+- **[minor/gameplay] Health orbs never expire.** `PickupMagnetSystem.ProcessHealthOrbs` computes `newLifetime` and destroys on expiry (`:88-93`) but never writes the aged `HealthOrb` back for surviving orbs (unlike XpPickup, which is rewritten with `newLifetime` at `:47/:53/:70`) — Lifetime stays at its initial value forever. Write the aged component or delete the field.
+- **[nit/dead code] Unused types:** `UpgradeExplosion` (`EffectComponents.cs:8`), `EngineLayout.Maneuverable` (`GameplayComponents.cs:70`), loadouts `WeaponLoadout.MachineGun` / `WeaponLoadout.Shotgun` (`GameplayComponents.cs:126-131`) — no references (grep).
+- **[nit/perf] `TurretFiringSystem.Update` does `.ToList()` over all turrets per frame** (`:11`) — allocation proportional to enemy ship count; iterate the query directly.
+- **[nit] `SolveQuadratic` uses double math** (`Math.Abs`, `(float)Math.Sqrt`, `TurretFiringSystem.cs:403-412`).
 
 ### Chunk 3 — AI, progression & support (2026-08-15)
 
@@ -222,6 +278,36 @@ Resolved cross-chunk question from Chunks 1–2: commands are applied **per phas
 - **Benchmark is not reproducible end-to-end:** it seeds `new Random(42)` for layout, but the systems it runs use `Random.Shared` for spawning/loot.
 
 **Cross-chunk notes for Chunk 4:** verify Game.cs/SpaceVorsApp applies commands per phase like the benchmark; check whether GameInitializer's local `rand` (used at lines 85–116) is seeded; find where PendingChoice/PendingUpgradeOptions are consumed and destroyed (upgrade application, player-death edge case); env-var reads at SpaceVorsApp.cs:212/295.
+
+#### Re-review (2026-08-23)
+
+**Fixed since 2026-08-15:**
+- **[Major] PickupMagnetSystem lost XP/heal updates** — fixed. Deltas are accumulated locally per frame and Player.Xp is mutated directly via ref (`PickupMagnetSystem.cs:73-78`), with a comment documenting that LevelUpSystem (same phase, later) reads the fresh value.
+- **[Major] LevelUpSystem clobbered same-frame XP / off-by-one milestone** — fixed as a consequence of the above; milestone now computed from `newLevel` (`LevelUpSystem.cs:37`).
+- **[Major/design] Shared static system instances** — fixed. `SimulationRunner` is now an instance class constructing fresh systems per simulation (`SimulationRunner.cs:12-44`); benchmark creates one per iteration. Timer/elapsed state no longer leaks across runs.
+- **[Major/perf/test] Benchmark did not measure the goal / wrong frame time** — fixed. Six scenarios up to 15k objects re-enabled (`PerformanceBenchmark.cs:12-20`), per-frame `frameTime` reset each frame (`:162, :189`), and a real budget check: `mustMeetBudget` → `Assert.Fail`, else warning (`:209-215`). Three scenarios currently exceed the 8.3ms budget and are honestly marked `mustMeetBudget: false` with a pointer to this review (`:11, :15, :16, :18`).
+- **[Minor] Health orbs had no max-health clamp** — fixed: `Math.Min(health.Current + totalHeal, playerStats.MaxHealth)` (`PickupMagnetSystem.cs:128`); heal amount is a named constant (`:9`).
+- **[Minor] `OrderBy(Random.Shared.Next())` fake shuffle** — fixed with proper Fisher-Yates using the world RNG (`LevelUpSystem.cs:162-169`).
+- **[Minor] Unseeded `Random.Shared` in spawn/choice paths** — gone; all spawners/factories take `view.Rng` (also closes Chunk 3's "benchmark not reproducible end-to-end" nit — layout and runtime spawning now share the seeded world RNG).
+- **[Minor, part] Homing pattern / player lookup** — BlueSparkHomeSystem fixed: early return without a player + single Position fetch before the loop (`BlueSparkHomeSystem.cs:13-15`). Spawn placement extracted into shared `SpawnPlacement` helper (new file) used by both spawners.
+
+**Still open:**
+- **[Minor] Spawning gated on player speed** — unchanged (`EnemyShipSpawnSystem.cs:37`, via `SpawnPlacement.MinDirectionalSpeed`); a stationary player spawns no ships. MineRespawnSystem handles the stationary case explicitly (`MineRespawnSystem.cs:31-34`) — consider matching that behavior or documenting the difference.
+- **[Minor] Copy-pasted difficulty ramp** — still duplicated between `EnemyShipSpawnSystem.cs:52-56` and `MineRespawnSystem.cs:43-47` (improved: named Min/MaxInterval constants, but the 180s ramp shape + inline end-values are copy-pasted).
+- **[Minor] Confusing mine cap** — unchanged: `activeMines >= TargetMineCount + 15` (`MineRespawnSystem.cs:20`).
+- **[Minor] PickupMagnetSystem dead parameter** — `effectivePickupRadius` still unused in both methods (`:24, :81`); they re-read `playerStats.PickupRadius`.
+- **[Minor, part] Redundant XpPickup writes** — improved (Chased only written on real transitions at `:53`, lifetime-carrying write at `:70`), but the no-op false→false write for every out-of-radius unchased pickup remains (`:45-49`) → still one command/frame per idle pickup.
+- **[Minor] Level-up with zero turrets still consumes the level** — unchanged: the Level-increment command is added at `LevelUpSystem.cs:39` regardless of the early return in `SpawnLevelUpChoice` (`:59`).
+- **[Minor] EnemyShipSystem integrates velocity with stale acceleration** — unchanged (`EnemyShipSystem.cs:93-102`: re-reads pre-command Acceleration after issuing a new one).
+- **[Minor, part] Homing blend duplicated** — MineDriftSystem still fetches player Position per mine and uses `continue` instead of early return (`MineDriftSystem.cs:15-16`); the exponential-blend home-toward-player is still copy-pasted (k=3 there vs k=6 in BlueSparkHomeSystem) with no shared helper.
+- **[Minor] Phase naming** — unchanged: "CleanupSystems" still holds core AI + both spawners + camera (`SimulationRunner.cs:37-43`).
+
+**New issues:**
+- **[minor/correctness] Health orbs never expire (aged value discarded).** `ProcessHealthOrbs` computes `newLifetime` and destroys on expiry (`PickupMagnetSystem.cs:88-93`) but never rewrites the orb with it — Lifetime stays at its initial 30f forever, so the expiry branch is dead. (See also Chunk 2 new issues.)
+- **[nit] EnemyShipSystem duplicates spin-stop damping** between `:53-64` and `ApplySpinStop` (`:107-122`); `ApplyRotationTowardPlayer` recomputes toPlayer/dist the caller already has and re-fetches Position via `GetComponent` (`:128`).
+- **[nit] `LevelUpSystem.GetMaxWeaponSlots` fallback magic number 3** (`:177`) — should come from ShipType/WeaponSlots.
+- **[nit] MineRespawnSystem interval constants are `int`** used in float math (`:9-10, :46-47`) while EnemyShipSpawnSystem uses `float`.
+- **[note] LevelUpSystem now carries diagnostic state** (`_scriptedUpgrades`, `_scriptIndex`, env-var parsing at construction, `:13-20, :123-138`). Safe today because SimulationRunner builds fresh instances per simulation; if the app ever reuses a runner across restarts, `_scriptIndex` would persist.
 
 ### Chunk 4 — Presentation layer & project files (2026-08-15)
 
@@ -304,4 +390,97 @@ Dependency direction verified clean: Domain has zero Raylib references (grep), G
 - PendingChoice/PendingUpgradeOptions lifecycle: created together by LevelUpSystem (`AddEntity`, `LevelUpSystem.cs:83,106`); consumed and destroyed only in SpaceVorsApp's pause branch (`:258-274`). Edge case: death race (Minor #1). No other consumers.
 - Env-var reads confirmed at `SpaceVorsApp.cs:212, 295` — per-frame, same fix as Chunk 2 Minor #3 (static readonly).
 - ARCHITECTURE.md drift to verify in Chunk 5: main-loop section describes "Loadout selection … Forward or Broadside" but the actual flow is ship select (Scout/Fighter/Heavy) with engine stats baked into ShipType; dead Renderer card functions corroborate the old design. Also "Rendering interpolates if necessary" is unimplemented (Minor #3).
+
+#### Re-review (2026-08-23)
+
+**Fixed since 2026-08-15:**
+- **[Major] Mouse aim vs lagging camera** — mouse world coords now computed from `aimCam.Target`, the same value rendering uses (`SpaceVorsApp.cs:127-128` vs `:240-241`).
+- **[Major] "Hit points" upgrade healed current instead of max** — `Player.MaxHealth` added; the Hp case raises both `Health.Current + 2` and `MaxHealth + 2` (`SpaceVorsApp.cs:409-423`) and the bar clamps to [0,1] against MaxHealth (`HudRenderer.cs:17`).
+- **[Major] Upgrade-card hit rects mismatched drawn cards** — draw (`UpgradeMenuRenderer.cs:31`) and hover test (`StatsScreenRenderer.cs:66`) both use one shared `GetUpgradeCardRect` based on the actual option count (`UpgradeMenuRenderer.cs:40-59`); card size is derived from window width, no fixed 220×140.
+- **[Major] No viewport culling** — every entity draw path now culls via `RenderHelpers.IsOffScreen` after computing screen coords (WorldRenderer.cs:51,100,125,163,185,212,259,276,295,315; EnemyShipRenderer.cs:50,94; ThrusterFlameRenderer.cs:152; BackgroundRenderer.cs:42).
+- **[Major] Coarse Thread.Sleep pacing** — gone (grep); `Raylib.SetTargetFPS(MaxFps)` handles pacing (`SpaceVorsApp.cs:19`).
+- **[Minor] Death on level-up frame softlock** — LevelUpSystem skips dead players (`LevelUpSystem.cs:27`, Chunk 3) and the app drops stale PendingChoice + sets gameOver (`SpaceVorsApp.cs:90-97`).
+- **[Minor] Post-death simulation / no restart** — R returns to ship select (`SpaceVorsApp.cs:79-83`); input gated on `!gameOver` (`:119`); player turrets skip when dead (`TurretFiringSystem.cs:16`, Chunk 2). Simulation keeps running during game over (background animates behind GAME OVER) — acceptable.
+- **[Minor] Renderer in Domain namespace** — now `namespace Spacevors.Game` (`Renderer.cs:5`), and the file is a thin dispatcher split into WorldRenderer/HudRenderer/StatsScreenRenderer/UpgradeMenuRenderer/ShipSelectScreen/etc.
+- **[Minor] ~100 lines of unused card UI** — gone; replaced by ShipSelectScreen + StatsScreenRenderer + UpgradeMenuRenderer, all used (grep).
+- **[Minor] DrawAsteroids iterated twice** — single pass over `<Asteroid, Rotation>` (`WorldRenderer.cs:37`); every asteroid has a Rotation (added by AsteroidFactory).
+- **[Minor] ImageLoader crashed on missing asset dirs** — `LoadSpriteSets` returns empty sets when the dir is absent (`ImageLoader.cs:74`) and paths resolve via `AppContext.BaseDirectory` (`:49`) so CWD no longer matters; map files without a complete lit set are skipped with a warning (`:94-98`).
+- **[Nit] GameInitializer unused turretEntities return** — signature is now a 5-tuple (`GameInitializer.cs:15`); `rand` comes from the world RNG `em.Rng` (`:39`), so initial layout and runtime spawning share one seeded stream → full runs are reproducible end-to-end (closes Chunk 3's "benchmark not reproducible" note).
+- **[Nit] Per-frame env-var reads in app layer** — gone; SPACEVORS_DIAGNOSTIC read once per run (`SpaceVorsApp.cs:24`) and once per game start (`GameInitializer.cs:33`). (TurretFiringSystem's per-shot read remains — Chunk 2.)
+
+**Still open:**
+- **[Minor] Turrets sync to pre-step player transform** — unchanged in shape: turret Position/Rotation written once per render frame before the fixed-step loop (`SpaceVorsApp.cs:179-194`), so turrets lag the hull on multi-step frames.
+- ~~**[Minor] No interpolation despite ARCHITECTURE.md**~~ — **resolved by doc change**: ARCHITECTURE.md:124 now states "Rendering draws the latest simulated state; no interpolation between ticks", matching the code (no previous-state storage anywhere). Motion stutter on slow machines remains as a documented tradeoff, not drift.
+- **[Minor] Unbounded accumulator → spiral of death** — `accumulator += frameTime` with no clamp (`SpaceVorsApp.cs:117`).
+- **[Minor] Mixed write patterns extend into the app layer** — input still writes Acceleration/AngularVelocity directly via AddComponent (`:164, :176`) and turret sync writes Position/Rotation (`:192-193`); contract undocumented (same as Chunk 2's finding).
+- **[Nit] Magic numbers in GameInitializer** — partially fixed: spawn counts/distances now named constants (`:10-13`), but the starfield/clutter block still has inline magic numbers (`:108-147`) and `Boost: 2.5f` (`:26`).
+- **[Nit] ApplyUpgrade always-true guard** — `if (newDamage > turret.Weapon.Damage)` still present (`SpaceVorsApp.cs:396`); switch cases still rebuild Player/Turret records copying ~8 unchanged fields each (ApplyUpgrade is now ~190 lines).
+- **[Nit] One-frame flash after upgrade selection** — same issue, different shape: `upgradeOptions` captured before the choice entity is destroyed (`:252-254`, `:289-290`) and passed to RenderPaused at `:299` → cards draw one more frame after selection.
+- **[Nit] DrawPlayerShip has no fallback** — ShipSpriteRenderer.DrawShipSprite silently returns when the texture is missing (`ShipSpriteRenderer.cs:23-24`); enemies have a triangle fallback, the player ship just vanishes without warning.
+- **[Nit] F12 screenshot.png not gitignored** — TakeScreenshot writes to CWD (`SpaceVorsApp.cs:35`); no .gitignore entry.
+- **[Nit] xunit version mismatch** — still xunit 2.9.3 + xunit.runner.visualstudio 3.0.2 (`Tests.csproj:13-14`).
+
+**New issues:**
+- **[minor/perf] Per-frame allocations in the lit-draw batching path.** `DrawAsteroids` allocates a fresh `Dictionary<LitSprite, List<...>>` + diagnostic list every frame (`WorldRenderer.cs:34-35`); `EnemyShipRenderer.Draw` does the same (`:21-23`). Key count is bounded by variant count, but each list holds one tuple per visible sprite → thousands of allocations/frame at 10k objects. Fix: reuse static buffers cleared per frame (same pattern as SpatialGrid's bucket reuse).
+- **[minor] `SpaceVorsApp.Main` is ~300 lines** (`SpaceVorsApp.cs:15-307`) — breaches "keep functions short"; upgrade-selection handling (`:248-300`), game-over/restart, and input could each be extracted.
+- **[minor] Redundant component lookups in render paths.** DrawMines does HasComponent<Health> + GetComponent<Health> (`WorldRenderer.cs:214-215`); DrawXpPickups/DrawHealthOrbs/DrawGreenSparks do a redundant HasComponent<Position> before GetComponent (`:253, :270, :286`) — one TryGetComponent each would do.
+- **[nit] `Lighting` holds mutable static state** (PointLights array + camera/window fields, `Lighting.cs:116-121`) with a BeginFrame/BeginDraw/EndDraw protocol that is easy to break; it also uploads all 16 light slots per variant block (`:184`). Acceptable for a single-threaded renderer, but note alongside the static-state findings in Chunks 1–3.
+- **[nit] UpgradeMenuRenderer hardcodes weapon-name strings** "MachineGun"/"Shotgun" in `GetUpgradeLabel` (`UpgradeMenuRenderer.cs:146-149`) — fragile coupling to WeaponType names; derive labels from weapon data instead.
+- **[nit] GetPlayerLevel queries all Players via LINQ FirstOrDefault + sentinel check** (`SpaceVorsApp.cs:68-69`) although `playerEntity` is in scope at both call sites — just use `em.GetComponent<Player>(playerEntity).Level`.
+- **[note] New headless render benchmark** `RenderBench/Program.cs` (357 lines) with a pixel oracle that keeps the legacy per-sprite shader as a frozen copy (`:174-259`) — good practice; delete the oracle + legacy shaders once the per-sprite path is gone for good (the comment says so).
+
+**Cross-chunk resolutions & notes for Chunk 5:**
+- Verified: SpaceVorsApp applies commands **per phase**, exactly like the benchmark (`SpaceVorsApp.cs:219-229`) → benchmark == game behavior on this point.
+- PendingChoice/PendingUpgradeOptions lifecycle: created by LevelUpSystem; consumed/destroyed only in SpaceVorsApp (death race `:93-94`, selection `:289-290`); no other consumers.
+- ARCHITECTURE.md drift to verify in Chunk 5 (updated): main-loop section describes "Loadout selection … Forward or Broadside" but the actual flow is ship select with engine stats baked into ShipType; the interpolation item was resolved by a doc change (ARCHITECTURE.md:124, see Still open above). The old dead card functions are gone, so that corroboration no longer applies.
+
+### Chunk 5 — Cross-cutting & docs consistency (2026-08-23)
+
+Scope: AGENTS.md, ARCHITECTURE.md, PLAN.md, TROUBLE_SHOOTING.md, plans/{POP_AND_SWAP, SHIP_TYPES, LOOT_DROPS, functional-ecs, GRAPHICS_REVIEW}.md. Method: read every doc in full and verify each concrete claim (controls, stats, file layout, API names) against code via grep/read. First review of this chunk (the 2026-08-15 pass covered Chunks 1–4 only).
+
+**Verified correct:**
+- Dependency direction holds: Domain has zero references to Raylib/Game; Game → Domain only; Tests → both (csproj + grep). AGENTS.md's "game logic must not depend on rendering/input/audio" is satisfied in practice.
+- TROUBLE_SHOOTING.md entries match current code: #5 Raylib-cs 8.0.0 ✓, #11 asset copy in Game.csproj ✓, #14 shader uniform leak (matches Lighting design + RenderBench probe), #15 Escape exit key (SpaceVorsApp comment), #16 ship-level upgrade empty weapon name (UpgradeCounts/StatsScreenRenderer).
+- LOOT_DROPS.md core numbers: mine XP 1/2 with radii 6/9 (`MineType`, EntityComponents.cs:66-67), ship XP 3 radius 18 (CollisionSystem.cs:786), health orb 5% roll (:778,:788), heal 3 (PickupMagnetSystem.cs:9), level threshold `Level * 10` (LevelUpSystem.cs:32).
+- SHIP_TYPES.md Phase 2 weapon slots heavy=3 / scout=1 / fighter=2 (GameplayComponents.cs:180,:193,:206); engine upgrades +10% (`UpgradeDefinition` ×1.1, :20-23); FireRate +15%, ProjectileSpeed +30% (:13-14).
+- GRAPHICS_REVIEW.md fix log matches code: AngularVelocity turn flame (ThrusterFlameRenderer.cs:103), LitGroupRenderer batching with measured numbers, PrevAngles deleted.
+
+**Drift found:**
+
+ARCHITECTURE.md:
+- **[major] Project layout stale** — lists non-existent `Domain/Systems/`, `Domain/Events/`, `Domain/Math/`, `Infrastructure/`; Game/ file list missing 8 files (ImageLoader, Lighting, LightGatherer, LitGroupRenderer, LitSprite, LitSpriteMatcher, StatsScreenRenderer, AsteroidSprite); RenderBench project absent. Fix: regenerate the layout from the actual tree.
+- **[major] Main-loop section "Loadout selection … Forward or Broadside"** — outdated; actual flow is ship select (ShipSelectScreen, 4 ships).
+- **[minor] ECS example component list stale** — `Transform`/`Weapon`/`Enemy`/`Projectile`/`Lifetime`/`Experience` don't exist; the example's `UpgradeExplosion` is dead code. Fix: use real components (Position, Velocity, Turret, HealthOrb…).
+- **[minor] Events section aspirational** — no event system exists; systems communicate via components + CommandBuffer.
+
+PLAN.md:
+- **[major] Controls table lists Q/E rotate and Space brake** — unimplemented; input is W/S/A/D + Shift boost + mouse aim only (SpaceVorsApp.cs:119-176). Fix: remove the rows or implement them.
+- **[minor] Phase 4c enemy stats stale** — Interceptor radius 45 / accel 85 vs doc "smaller (15px), faster acceleration (15)"; HeavyCannon radius 78 vs "(28px)" (EntityComponents.cs:41-43); fire rates match.
+- **[minor] Phase 7 turn-flame note says "dictionary inside the renderer"** — actual implementation reads the AngularVelocity component (ThrusterFlameRenderer.cs:103; PrevAngles deleted per GRAPHICS_REVIEW).
+- **[minor] Phases 5/8 reference deleted API `Lighting.TryDraw`** — now BeginDraw/EndDraw + LitGroupRenderer (commit 89e2d45); "upload once per frame" vs actual one upload of all 16 light slots per variant block (Lighting.cs:184).
+- **[nit] Ship select listed as "1/2/3/4 or click"** — actually also arrows/WASD + wheel + Enter.
+
+SHIP_TYPES.md:
+- **[major] Starting ships stale** — Scout's "side shotguns" vs LoadTestWeapon loadout (GameplayComponents.cs:174, documented intentional); Fighter listed as "machinegun" but actual loadout is RailGun (:187); Shadow ship missing from the list entirely (:209-222).
+- **[minor] Phase 3 milestone "Hp upgrade 5 points / 2 random weapons"** — code gives Hp +2 (`UpgradeDefinition.Hp` Additive=2) and up to 3 options drawn from a pool of Hp + new weapons + existing-weapon damage (LevelUpSystem.cs:64-90).
+
+LOOT_DROPS.md:
+- **[minor] UI description stale** — "Digit1/Digit2 keys showing 2 of 3 options at a time, cycling" vs actual up to 5 cards with keys 1–5 + click (LevelUpSystem.cs:115; SpaceVorsApp.cs:262-270).
+- **[minor] PickupRadius upgrade described as "additive stacking"** — code is multiplicative ×1.2 (GameplayComponents.cs:15).
+- **[nit] "Files to Change" paths stale** (no `Systems/` dir); "UpgradePickupSystem delete entirely" — done ✓.
+
+functional-ecs.md (historical plan):
+- **[minor] Per-system CommandBuffer vs actual shared per-phase buffer** — SimulationRunner.RunPhase passes one buffer to all systems in a phase.
+- **[minor] WorldView "no mutation methods"** — still exposes GetStorage/GetComponentRef (Chunk 1 finding, still open).
+- **[nit] Phase composition differs from plan** — CameraSystem is Cleanup not Movement; PickupMagnet/LevelUp are Resolution; systems instantiated once → SimulationRunner builds fresh per simulation (Chunk 3 fix).
+
+GRAPHICS_REVIEW.md:
+- **[minor] Internal inconsistency in its own status header** — "Status (checked 2026-08-21): Fixed: 28 · Open: 2" still lists "Perf: Lighting.TryDraw per-sprite shader-mode overhead (deferred)" (:15), but the doc's later section records it as Measured + fixed by batching with numbers (:173+). Fix: update header to Open: 1 and drop the TryDraw item.
+- **[nit] "Not issues (verified): PrevAngles is safe from entity-ID reuse" (:147)** references deleted code (PrevAngles removed per the doc's own fix entry at :128).
+
+POP_AND_SWAP.md: historical; implementation deviated as already noted in Chunk 2 (array `_entityIdToSlot` indexed by entity ID instead of the plan's `Dictionary<int,int>` slot map) — acceptable, mark implemented.
+
+**New issues:**
+- **[nit] TROUBLE_SHOOTING #1 claims each F12 shot produces both screenshot0NN.png and screenshot.png**, but the app only calls TakeScreenshot("screenshot.png") (SpaceVorsApp.cs:35); the doc hedges that the mechanism lives in the stripped native raylib lib — unverified. Consider a note or removal once confirmed.
+- **[nit] AGENTS.md typo** — "problems encountered before and and avoid" (:57).
 

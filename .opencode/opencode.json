@@ -33,6 +33,16 @@
             "context": 160000
           }
         },
+        "qwen3.8-27b-ud3.0": {
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
+          "limit": {
+            "output": 16384,
+            "context": 150000
+          }
+        },
         "huihui-qwen3.6-35b-a3b-abliterated": {
           "modalities": {
             "input": ["text", "image"],

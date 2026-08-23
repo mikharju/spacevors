@@ -243,7 +243,7 @@ public static class SpaceVorsApp
                 else if (showStats)
                 {
                     var statsCam = em.GetComponent<Camera>(cameraEntity);
-                    Renderer.RenderStats(em, (float)statsCam.Target.X, (float)statsCam.Target.Y, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, chosenShip.Name, GetPlayerLevel(em));
+                    Renderer.RenderPaused(em, (float)statsCam.Target.X, (float)statsCam.Target.Y, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, null, GetPlayerLevel(em), -1);
                 }
                 else
                 {
@@ -255,20 +255,7 @@ public static class SpaceVorsApp
 
                     int hoveredIndex = -1;
                     if (upgradeOptions is { Options.Length: > 0 } opts)
-                    {
-                        int contentLeft = StatsScreenRenderer.SidePanelReservedWidth;
-                        int mouseX = Raylib.GetMouseX();
-                        int mouseY = Raylib.GetMouseY();
-                        for (int i = 0; i < opts.Options.Length; i++)
-                        {
-                            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, opts.Options.Length, contentLeft, 0, GetW() - contentLeft, GetH());
-                            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
-                            {
-                                hoveredIndex = i;
-                                break;
-                            }
-                        }
-                    }
+                        hoveredIndex = StatsScreenRenderer.GetHoveredCardIndex(em, playerEntity, opts, Raylib.GetMouseX(), Raylib.GetMouseY(), GetW(), GetH());
 
                     int selectedIndex = -1;
 
@@ -309,7 +296,7 @@ public static class SpaceVorsApp
                     float upgradeCamX = (float)upgradeCam.Target.X;
                     float upgradeCamY = (float)upgradeCam.Target.Y;
 
-                    Renderer.RenderUpgradePause(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, upgradeOptions, playerLevel, hoveredIndex);
+                    Renderer.RenderPaused(em, upgradeCamX, upgradeCamY, GetW(), GetH(), stars, clutter, playerEntity, chosenShip, diagnostics, upgradeOptions, playerLevel, hoveredIndex);
                 }
             }
         }

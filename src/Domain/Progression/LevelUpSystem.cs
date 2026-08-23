@@ -103,8 +103,7 @@ public class LevelUpSystem : GameSystem
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
             }
 
-            var firstWeapon = weaponNames[0];
-            allOptions.Add(new UpgradableOption(firstWeapon, UpgradeOption.PickupRadius));
+            allOptions.Add(new UpgradableOption("", UpgradeOption.PickupRadius));
 
             allOptions.Add(new UpgradableOption("", UpgradeOption.ForwardAcceleration));
             allOptions.Add(new UpgradableOption("", UpgradeOption.TurnSpeed));

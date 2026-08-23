@@ -4,17 +4,19 @@ using Spacevors.Domain.Components;
 
 namespace Spacevors.Game;
 
-// Ship stats panel: every upgradeable stat with its current value and how many times it was upgraded.
+// Ship stats screen: ship/engine stats top-left, weapon stats top-right, upgrade cards along the bottom.
 public static class StatsScreenRenderer
 {
-    public const int PanelWidth = 420;
-    public const int PanelMargin = 32;
-    public static int SidePanelReservedWidth => PanelWidth + 2 * PanelMargin;
+    const int BaseDesignWidth = 1920;
+    const float MaxTextScale = 2f; // text grows with window width up to this multiple of base size
 
-    const int PaddingX = 16;
-    const int PaddingY = 16;
-    const int TitleFontSize = 24;
-    const int TitleGap = 18;
+    const int OuterMargin = 32;
+    const int PanelPaddingX = 16;
+    const int PanelPaddingY = 16;
+    const int ColumnGap = 32;
+    const int LeftPanelWidth = 420;
+    const int TitleFontSize = 20;
+    const int TitleGap = 14;
     const int HeaderFontSize = 18;
     const int HeaderHeight = 30;
     const int RowFontSize = 16;
@@ -22,6 +24,7 @@ public static class StatsScreenRenderer
     const int SectionGap = 10;
     const int CountColumnWidth = 48;
 
+    static readonly Color DimColor = new(15, 15, 25, 215);
     static readonly Color PanelBackground = new(28, 28, 40, 255);
     static readonly Color PanelBorder = new(90, 90, 120, 255);
     static readonly Color HeaderColor = new(50, 150, 255, 255);
@@ -29,90 +32,141 @@ public static class StatsScreenRenderer
     static readonly Color ValueColor = new(255, 255, 255, 255);
     static readonly Color CountUpgraded = new(120, 255, 140, 255);
     static readonly Color CountNone = new(110, 110, 130, 255);
+    static readonly Color HintColor = new(200, 200, 200, 255);
 
     readonly record struct StatRow(string Label, string Value, int Count); // Count < 0: no count column
     readonly record struct StatsSection(string Title, StatRow[] Rows);
+    readonly record struct StatsLayout(StatRow[] ShipRows, StatsSection[] WeaponSections);
 
-    public static void DrawOverlay(EntityManager em, Entity playerEntity, string shipName, int level, int windowWidth, int windowHeight)
+    public static void Draw(EntityManager em, Entity playerEntity, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex)
     {
-        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, new Color(15, 15, 25, 215));
+        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, DimColor);
 
-        var sections = BuildSections(em, playerEntity);
-        int panelHeight = MeasurePanelHeight(sections, hasTitle: true);
-        int x = (windowWidth - PanelWidth) / 2;
-        int y = Math.Max(PanelMargin, (windowHeight - panelHeight) / 2);
-        DrawPanel(x, y, $"{shipName} · Level {level}", sections);
+        var layout = BuildStats(em, playerEntity);
+        bool hasCards = options is { Options.Length: > 0 };
+        float scale = ComputeScale(windowWidth, windowHeight, layout, hasCards);
 
-        string hint = "Tab to close";
-        Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, RowFontSize) / 2, windowHeight - 40, RowFontSize, new Color(200, 200, 200, 255));
+        DrawTopPanels(layout, shipName, level, windowWidth, scale);
+
+        if (hasCards)
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, scale);
+        else
+            DrawHint("Tab to close", windowWidth, windowHeight, scale);
     }
 
-    public static void DrawSidePanel(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight)
+    public static int GetHoveredCardIndex(EntityManager em, Entity playerEntity, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
     {
-        var sections = BuildSections(em, playerEntity);
-        int panelHeight = MeasurePanelHeight(sections, hasTitle: false);
-        int x = PanelMargin;
-        int y = Math.Max(PanelMargin, (windowHeight - panelHeight) / 2);
-        DrawPanel(x, y, null, sections);
-    }
+        if (options.Options.Length == 0) return -1;
 
-    static void DrawPanel(int x, int y, string? title, StatsSection[] sections)
-    {
-        int height = MeasurePanelHeight(sections, title != null);
-        Raylib.DrawRectangle(x, y, PanelWidth, height, PanelBackground);
-        Raylib.DrawRectangleLines(x, y, PanelWidth, height, PanelBorder);
+        var layout = BuildStats(em, playerEntity);
+        float scale = ComputeScale(windowWidth, windowHeight, layout, hasCards: true);
 
-        int cursorY = y + PaddingY;
-        if (title is { } t)
+        for (int i = 0; i < options.Options.Length; i++)
         {
-            Raylib.DrawText(t, x + PaddingX, cursorY, TitleFontSize, ValueColor);
-            cursorY += TitleFontSize + TitleGap;
+            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, scale);
+            if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
+                return i;
         }
 
-        for (int i = 0; i < sections.Length; i++)
-        {
-            var section = sections[i];
-            Raylib.DrawText(section.Title.ToUpper(), x + PaddingX, cursorY, HeaderFontSize, HeaderColor);
-            cursorY += HeaderHeight;
+        return -1;
+    }
 
+    static float ComputeScale(int windowWidth, int windowHeight, StatsLayout layout, bool hasCards)
+    {
+        float scale = Math.Clamp(windowWidth / (float)BaseDesignWidth, 1f, MaxTextScale);
+
+        // Shrink to fit vertically if the content would overflow a short window.
+        float baseUnits = MeasureTopPanelsHeight(layout, 1f) + 2f * OuterMargin
+            + (hasCards ? UpgradeMenuRenderer.UpgradeCardHeight + UpgradeMenuRenderer.HintGap + UpgradeMenuRenderer.HintFontSize : 0f);
+        if (baseUnits * scale > windowHeight)
+            scale = windowHeight / baseUnits;
+
+        return scale;
+    }
+
+    static void DrawTopPanels(StatsLayout layout, string shipName, int level, int windowWidth, float scale)
+    {
+        int margin = (int)(OuterMargin * scale);
+        int padX = (int)(PanelPaddingX * scale);
+        int padY = (int)(PanelPaddingY * scale);
+
+        float leftContentH = (TitleFontSize + TitleGap) * scale + layout.ShipRows.Length * RowPitch * scale;
+        float rightContentH = MeasureWeaponSectionsHeight(layout, scale);
+        int panelH = (int)MathF.Max(leftContentH, rightContentH) + 2 * padY;
+
+        int leftW = (int)(LeftPanelWidth * scale);
+        DrawBox(margin, margin, leftW, panelH);
+
+        Raylib.DrawText($"{shipName} · Level {level}", margin + padX, margin + padY, (int)(TitleFontSize * scale), ValueColor);
+        int y = margin + padY + (int)((TitleFontSize + TitleGap) * scale);
+        foreach (var row in layout.ShipRows)
+            y = DrawRow(margin + padX, y, leftW - 2 * padX, row, scale);
+
+        int gap = (int)(ColumnGap * scale);
+        int rightX = margin + leftW + gap;
+        int rightW = windowWidth - 2 * margin - leftW - gap;
+        DrawBox(rightX, margin, rightW, panelH);
+
+        y = margin + padY;
+        for (int i = 0; i < layout.WeaponSections.Length; i++)
+        {
+            var section = layout.WeaponSections[i];
+            Raylib.DrawText(section.Title.ToUpper(), rightX + padX, y, (int)(HeaderFontSize * scale), HeaderColor);
+            y += (int)(HeaderHeight * scale);
             foreach (var row in section.Rows)
-                cursorY = DrawRow(x, cursorY, row);
-
-            if (i < sections.Length - 1) cursorY += SectionGap;
+                y = DrawRow(rightX + padX, y, rightW - 2 * padX, row, scale);
+            if (i < layout.WeaponSections.Length - 1) y += (int)(SectionGap * scale);
         }
     }
 
-    static int DrawRow(int x, int y, StatRow row)
+    static float MeasureWeaponSectionsHeight(StatsLayout layout, float scale)
     {
-        Raylib.DrawText(row.Label, x + PaddingX, y, RowFontSize, LabelColor);
+        float height = 0f;
+        for (int i = 0; i < layout.WeaponSections.Length; i++)
+            height += HeaderHeight * scale + layout.WeaponSections[i].Rows.Length * RowPitch * scale + (i > 0 ? SectionGap : 0) * scale;
+        return height;
+    }
 
-        int valueEnd = x + PanelWidth - PaddingX - (row.Count >= 0 ? CountColumnWidth : 0);
-        Raylib.DrawText(row.Value, valueEnd - Raylib.MeasureText(row.Value, RowFontSize), y, RowFontSize, ValueColor);
+    static float MeasureTopPanelsHeight(StatsLayout layout, float scale)
+    {
+        float left = (TitleFontSize + TitleGap) * scale + layout.ShipRows.Length * RowPitch * scale;
+        return MathF.Max(left, MeasureWeaponSectionsHeight(layout, scale)) + 2f * PanelPaddingY * scale;
+    }
+
+    static void DrawBox(int x, int y, int width, int height)
+    {
+        Raylib.DrawRectangle(x, y, width, height, PanelBackground);
+        Raylib.DrawRectangleLines(x, y, width, height, PanelBorder);
+    }
+
+    static int DrawRow(int x, int y, int contentWidth, StatRow row, float scale)
+    {
+        int font = (int)(RowFontSize * scale);
+        Raylib.DrawText(row.Label, x, y, font, LabelColor);
+
+        int countW = row.Count >= 0 ? (int)(CountColumnWidth * scale) : 0;
+        int valueEnd = x + contentWidth - countW;
+        Raylib.DrawText(row.Value, valueEnd - Raylib.MeasureText(row.Value, font), y, font, ValueColor);
 
         if (row.Count >= 0)
         {
             string count = $"x{row.Count}";
             Color color = row.Count > 0 ? CountUpgraded : CountNone;
-            int countEnd = x + PanelWidth - PaddingX;
-            Raylib.DrawText(count, countEnd - Raylib.MeasureText(count, RowFontSize), y, RowFontSize, color);
+            int countEnd = x + contentWidth;
+            Raylib.DrawText(count, countEnd - Raylib.MeasureText(count, font), y, font, color);
         }
 
-        return y + RowPitch;
+        return y + (int)(RowPitch * scale);
     }
 
-    static int MeasurePanelHeight(StatsSection[] sections, bool hasTitle)
+    static void DrawHint(string text, int windowWidth, int windowHeight, float scale)
     {
-        int height = 2 * PaddingY;
-        if (hasTitle) height += TitleFontSize + TitleGap;
-        foreach (var section in sections)
-            height += HeaderHeight + section.Rows.Length * RowPitch + SectionGap;
-        return height - SectionGap;
+        int font = (int)(UpgradeMenuRenderer.HintFontSize * scale);
+        Raylib.DrawText(text, windowWidth / 2 - Raylib.MeasureText(text, font) / 2, UpgradeMenuRenderer.GetHintY(windowHeight, scale), font, HintColor);
     }
 
-    static StatsSection[] BuildSections(EntityManager em, Entity playerEntity)
+    static StatsLayout BuildStats(EntityManager em, Entity playerEntity)
     {
-        var sections = new List<StatsSection>();
-
         var player = em.GetComponent<Player>(playerEntity);
         int currentHp = em.TryGetComponent<Health>(playerEntity, out var health) ? health.Current : 0;
 
@@ -129,8 +183,7 @@ public static class StatsScreenRenderer
         if (em.TryGetComponent<WeaponSlots>(playerEntity, out var slots))
             shipRows.Add(new("Weapons", $"{slots.Used}/{slots.Max}", -1));
 
-        sections.Add(new StatsSection("Ship", [.. shipRows]));
-
+        var weaponSections = new List<StatsSection>();
         foreach (var weaponName in GetPlayerWeaponNames(em))
         {
             var turret = FirstTurretOfWeapon(em, weaponName);
@@ -141,10 +194,10 @@ public static class StatsScreenRenderer
                 new("Projectile speed", FormatInt(turret.Weapon.AmmoSpeed), CountOf(em, playerEntity, UpgradeOption.ProjectileSpeed, weaponName)),
                 new("Range / bullet life", $"{FormatInt(turret.Range)} px · {turret.Weapon.ShotLifetime:0.0}s", CountOf(em, playerEntity, UpgradeOption.Range, weaponName)),
             };
-            sections.Add(new StatsSection(weaponName.ToUpper(), [.. rows]));
+            weaponSections.Add(new StatsSection(weaponName.ToUpper(), [.. rows]));
         }
 
-        return [.. sections];
+        return new StatsLayout([.. shipRows], [.. weaponSections]);
     }
 
     static List<string> GetPlayerWeaponNames(EntityManager em)
