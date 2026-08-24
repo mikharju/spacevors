@@ -28,4 +28,18 @@ public class CommandProcessorTest
         Assert.Equal(3f, ammo.Radius);
         Assert.Equal(2f, ammo.Lifetime);
     }
+
+    [Fact]
+    public void RemoveComponentCommand_IsApplied()
+    {
+        var em = new EntityManager();
+        var entity = em.CreateEntity();
+        em.AddComponent(entity, new Position(new Vector2(10f, 20f)));
+
+        var commands = new CommandBuffer();
+        commands.Add(new RemoveComponentCommand<Position>(entity));
+        commands.Apply(em);
+
+        Assert.False(em.HasComponent<Position>(entity), "Position should be removed via command");
+    }
 }
