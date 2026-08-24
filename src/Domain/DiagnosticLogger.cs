@@ -68,34 +68,6 @@ public static class DiagnosticLogger
         }
     }
 
-    public static void LogMouse(int x, int y, bool leftDown, bool rightDown, bool middleDown)
-    {
-        if (!_enabled) return;
-
-        lock (_lock)
-        {
-            Console.WriteLine($"[MOUSE] X:{x} Y:{y} L:{leftDown} R:{rightDown} M:{middleDown}");
-        }
-    }
-
-
-
-    public static void LogAllEnemyShips(string label, IReadOnlyList<(string Name, Vector2 Position)> ships)
-    {
-        if (!_enabled) return;
-
-        lock (_lock)
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"[SHIPS:{label}] count={ships.Count} ");
-            foreach (var (name, pos) in ships)
-            {
-                sb.Append($"{name}=({pos.X:F1},{pos.Y:F1}) ");
-            }
-            Console.WriteLine(sb.ToString());
-        }
-    }
-
     public static void LogFrameStart()
     {
         if (!_enabled) return;
