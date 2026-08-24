@@ -18,8 +18,6 @@ public class EntityManager
 
     public Random Rng => _rng;
 
-    public int MaxEntityId => _nextId - 1;
-
     public float ElapsedTime => _elapsedTime;
 
     public void AddElapsedTime(float amount) => _elapsedTime += amount;

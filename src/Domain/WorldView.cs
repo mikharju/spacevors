@@ -12,8 +12,6 @@ public class WorldView
         _em = em;
     }
 
-    public int MaxEntityId => _em.MaxEntityId;
-
     public Vector2 ViewportSize { get; set; } = DefaultViewportSize;
 
     public float ElapsedTime => _em.ElapsedTime;

@@ -67,7 +67,6 @@ public readonly record struct EngineLayout(
     float TurnRate)
 {
     public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f, 1.33f);
-    public static EngineLayout Maneuverable { get; } = new("Maneuverable", 250f, 20f, 200f, 1.33f);
     public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f, 1.2f);
     public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f, 0.67f);
 }
@@ -123,13 +122,6 @@ public readonly record struct WeaponLoadout(
     string Name,
     IReadOnlyList<TurretDefinition> Turrets)
 {
-    public static WeaponLoadout MachineGun { get; } = new("MachineGun", [
-        new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 1260f, WeaponType.MachineGun)]);
-
-    public static WeaponLoadout Shotgun { get; } = new("Shotgun", [
-        new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun),
-        new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun)]);
-
     public static WeaponLoadout MachineGunShotgun { get; } = new("MachineGunShotgun", [
         new(Vector2.Zero, ArcOffset: 0f, MathF.PI / 4f, 1260f, WeaponType.MachineGun),
         new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun),

@@ -5,8 +5,6 @@ public readonly record struct Explosion(float Radius, float Lifetime, float Init
     public float CurrentRadius => Radius * (1f + (1f - Lifetime / InitialLifetime));
 }
 
-public readonly record struct UpgradeExplosion(float Radius, float Lifetime);
-
 public readonly record struct Spark(float Lifetime, float InitialLifetime = 1.4f);
 
 public readonly record struct BlueSpark(float Lifetime);

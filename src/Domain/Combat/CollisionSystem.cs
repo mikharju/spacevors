@@ -25,7 +25,7 @@ public class CollisionSystem : GameSystem
     private readonly Dictionary<Entity, Vector2> _positionCorrections = new();
     private readonly Dictionary<Entity, float> _angularVelocityAccumulator = new();
     private readonly Dictionary<Entity, int> _frameRemainingHealth = new();
-    private readonly Dictionary<Entity, int> _mineDamageTotals = new();
+    private readonly HashSet<Entity> _hitMines = new();
     private readonly Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)> _shipDeathData = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
@@ -44,14 +44,13 @@ public class CollisionSystem : GameSystem
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
-        _mineDamageTotals.Clear();
+        _hitMines.Clear();
         _shipDeathData.Clear();
         bool anyTruncated = false;
         Span<SpatialGrid.SpatialItem> queryBuffer = stackalloc SpatialGrid.SpatialItem[256];
 
-        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
-        bool hasPlayer = playerEntity.Value >= 0;
 
         void CheckPlayerCollision(Vector2 entityPos, float entityRadius, Action onCollision)
         {
@@ -76,7 +75,7 @@ public class CollisionSystem : GameSystem
             _asteroidPositions.Add((entity, pos));
 
             CheckPlayerCollision(pos.Value, asteroid.Radius, () =>
-                ResolveCircleVsCircle(view, entity, asteroid, playerEntity, commands));
+                ResolveCollision(view, pos, playerTuple.Value2, entity, playerEntity, asteroid.Radius, playerTuple.Value1.Radius, false, commands));
         }
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
@@ -281,6 +280,7 @@ public class CollisionSystem : GameSystem
                     _frameRemainingHealth[closestMineHit.Value] = health;
                 }
                 _frameRemainingHealth[closestMineHit.Value] -= ammo.Damage;
+                _hitMines.Add(closestMineHit.Value);
                 _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
                 _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
@@ -367,13 +367,7 @@ public class CollisionSystem : GameSystem
             _entitiesToDestroy.Add(ammoEntity);
         }
 
-        foreach (var (_, mineEntity, _, _, ammoDamage, _) in _ammoToMineHits)
-        {
-            if (!_mineDamageTotals.TryGetValue(mineEntity, out var d)) _mineDamageTotals[mineEntity] = 0;
-            _mineDamageTotals[mineEntity] += ammoDamage;
-        }
-
-        foreach (var (mineEntity, totalDamage) in _mineDamageTotals)
+        foreach (var mineEntity in _hitMines)
         {
             var remaining = _frameRemainingHealth[mineEntity];
             if (remaining <= 0)
@@ -423,10 +417,6 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        var protectedEntities = new HashSet<Entity>();
-        foreach (var (_, mineEntity, _, _, _, _) in _ammoToMineHits) protectedEntities.Add(mineEntity);
-        foreach (var (_, shipEntity, _, _, _, _, _) in _ammoToShipHits) protectedEntities.Add(shipEntity);
-
         if (hasPlayer && _frameRemainingHealth.TryGetValue(playerEntity, out var playerRemaining))
         {
             if (playerRemaining <= 0)
@@ -441,10 +431,7 @@ public class CollisionSystem : GameSystem
 
         foreach (var entity in _entitiesToDestroy)
         {
-            if (!protectedEntities.Contains(entity))
-            {
-                commands.Add(new DestroyEntityCommand(entity));
-            }
+            commands.Add(new DestroyEntityCommand(entity));
         }
 
         foreach (var (position, mineType) in _effectsToSpawn)
@@ -526,41 +513,6 @@ public class CollisionSystem : GameSystem
         float sparkLifetime = 0.8f + (float)rng.NextDouble() * 0.6f;
         commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
     }
-
-    private void ResolveCircleVsCircle(
-        WorldView view,
-        Entity aEntity,
-        Asteroid aAst,
-        Entity bEntity,
-        CommandBuffer commands)
-    {
-        var aPos = view.GetComponent<Position>(aEntity);
-        var bPos = view.GetComponent<Position>(bEntity);
-
-        float aRadius = aAst.Radius;
-        float bRadius;
-        bool isAsteroidVsAsteroid;
-
-        if (view.TryGetComponent<Asteroid>(bEntity, out var bAst))
-        {
-            bRadius = bAst.Radius;
-            isAsteroidVsAsteroid = true;
-        }
-        else if (view.TryGetComponent<EnemyShip>(bEntity, out var bShip))
-        {
-            bRadius = bShip.Radius;
-            isAsteroidVsAsteroid = false;
-        }
-        else
-        {
-            var playerComp = view.GetComponent<Player>(bEntity);
-            bRadius = playerComp.Radius;
-            isAsteroidVsAsteroid = false;
-        }
-
-        ResolveCollision(view, aPos, bPos, aEntity, bEntity, aRadius, bRadius, isAsteroidVsAsteroid, commands);
-    }
-
 
     private void ResolveCollision(
         WorldView view,
