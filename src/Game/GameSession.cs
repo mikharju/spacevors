@@ -308,162 +308,50 @@ public sealed class GameSession
                 {
                     int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
                     float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * def.Multiplier : turret.Weapon.FireRate;
-
-                    em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(newFireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, newPelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
-                        WeaponName: turret.WeaponName,
-                        ArcAngle: turret.ArcAngle,
-                        Range: turret.Range,
-                        AutoTarget: turret.AutoTarget,
-                        IsEnemy: turret.IsEnemy));
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { FireRate = newFireRate, PelletCount = newPelletCount } });
                 }
                 break;
 
             case UpgradeOption.ProjectileSpeed:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed * def.Multiplier, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, turret.Weapon.Damage),
-                        WeaponName: turret.WeaponName,
-                        ArcAngle: turret.ArcAngle,
-                        Range: turret.Range,
-                        AutoTarget: turret.AutoTarget,
-                        IsEnemy: turret.IsEnemy));
-                }
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { AmmoSpeed = turret.Weapon.AmmoSpeed * def.Multiplier } });
                 break;
 
             case UpgradeOption.PickupRadius:
-                em.AddComponent(playerEntity, new Player(
-                    playerStats.Thrust,
-                    playerStats.SideThrust,
-                    playerStats.BackThrust,
-                    playerStats.Boost,
-                    playerStats.MaxHealth,
-                    playerStats.Radius,
-                    playerStats.Xp,
-                    playerStats.Level,
-                    playerStats.PickupRadius * def.Multiplier,
-                    playerStats.RotationSpeed));
+                em.AddComponent(playerEntity, playerStats with { PickupRadius = playerStats.PickupRadius * def.Multiplier });
                 break;
 
             case UpgradeOption.Range:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    em.AddComponent(turretEntity, new Turret(
-                        Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime * def.Multiplier, turret.Weapon.Damage),
-                        WeaponName: turret.WeaponName,
-                        ArcAngle: turret.ArcAngle,
-                        Range: turret.Range * def.Multiplier,
-                        AutoTarget: turret.AutoTarget,
-                        IsEnemy: turret.IsEnemy));
-                }
+                    em.AddComponent(turretEntity, turret with { Range = turret.Range * def.Multiplier, Weapon = turret.Weapon with { ShotLifetime = turret.Weapon.ShotLifetime * def.Multiplier } });
                 break;
 
             case UpgradeOption.Damage:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    int newDamage = turret.Weapon.Damage + def.Additive;
-
-                    if (newDamage > turret.Weapon.Damage)
-                    {
-                        em.AddComponent(turretEntity, new Turret(
-                            Weapon: new WeaponStats(turret.Weapon.FireRate, turret.Weapon.AmmoSpeed, turret.Weapon.KickbackForce, turret.Weapon.PelletCount, turret.Weapon.Scatter, turret.Weapon.ShotLifetime, newDamage),
-                            WeaponName: turret.WeaponName,
-                            ArcAngle: turret.ArcAngle,
-                            Range: turret.Range,
-                            AutoTarget: turret.AutoTarget,
-                            IsEnemy: turret.IsEnemy));
-                    }
-                }
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Damage = turret.Weapon.Damage + def.Additive } });
                 break;
 
             case UpgradeOption.Hp:
                 if (!em.HasComponent<Health>(playerEntity)) break;
                 var currentHealth = em.GetComponent<Health>(playerEntity);
                 em.AddComponent(playerEntity, new Health(currentHealth.Current + def.Additive));
-                em.AddComponent(playerEntity, new Player(
-                    playerStats.Thrust,
-                    playerStats.SideThrust,
-                    playerStats.BackThrust,
-                    playerStats.Boost,
-                    playerStats.MaxHealth + def.Additive,
-                    playerStats.Radius,
-                    playerStats.Xp,
-                    playerStats.Level,
-                    playerStats.PickupRadius,
-                    playerStats.RotationSpeed));
+                em.AddComponent(playerEntity, playerStats with { MaxHealth = playerStats.MaxHealth + def.Additive });
                 break;
 
             case UpgradeOption.ForwardAcceleration:
-                {
-                    var stats = em.GetComponent<Player>(playerEntity);
-                    float newThrust = stats.Thrust * def.Multiplier;
-                    em.AddComponent(playerEntity, new Player(
-                        newThrust,
-                        stats.SideThrust,
-                        stats.BackThrust,
-                        stats.Boost,
-                        stats.MaxHealth,
-                        stats.Radius,
-                        stats.Xp,
-                        stats.Level,
-                        stats.PickupRadius,
-                        stats.RotationSpeed));
-                }
+                em.AddComponent(playerEntity, playerStats with { Thrust = playerStats.Thrust * def.Multiplier });
                 break;
 
             case UpgradeOption.TurnSpeed:
-                {
-                    var stats = em.GetComponent<Player>(playerEntity);
-                    float newRotationSpeed = stats.RotationSpeed * def.Multiplier;
-                    em.AddComponent(playerEntity, new Player(
-                        stats.Thrust,
-                        stats.SideThrust,
-                        stats.BackThrust,
-                        stats.Boost,
-                        stats.MaxHealth,
-                        stats.Radius,
-                        stats.Xp,
-                        stats.Level,
-                        stats.PickupRadius,
-                        newRotationSpeed));
-                }
+                em.AddComponent(playerEntity, playerStats with { RotationSpeed = playerStats.RotationSpeed * def.Multiplier });
                 break;
 
             case UpgradeOption.SideThrust:
-                {
-                    var stats = em.GetComponent<Player>(playerEntity);
-                    float newSideThrust = stats.SideThrust * def.Multiplier;
-                    em.AddComponent(playerEntity, new Player(
-                        stats.Thrust,
-                        newSideThrust,
-                        stats.BackThrust,
-                        stats.Boost,
-                        stats.MaxHealth,
-                        stats.Radius,
-                        stats.Xp,
-                        stats.Level,
-                        stats.PickupRadius,
-                        stats.RotationSpeed));
-                }
+                em.AddComponent(playerEntity, playerStats with { SideThrust = playerStats.SideThrust * def.Multiplier });
                 break;
 
             case UpgradeOption.BackThrust:
-                {
-                    var stats = em.GetComponent<Player>(playerEntity);
-                    float newBackThrust = stats.BackThrust * def.Multiplier;
-                    em.AddComponent(playerEntity, new Player(
-                        stats.Thrust,
-                        stats.SideThrust,
-                        stats.BackThrust,
-                        stats.Boost,
-                        stats.MaxHealth,
-                        stats.Radius,
-                        stats.Xp,
-                        stats.Level,
-                        stats.PickupRadius,
-                        stats.RotationSpeed));
-                }
+                em.AddComponent(playerEntity, playerStats with { BackThrust = playerStats.BackThrust * def.Multiplier });
                 break;
         }
     }
