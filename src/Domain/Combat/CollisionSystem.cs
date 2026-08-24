@@ -12,6 +12,11 @@ public class CollisionSystem : GameSystem
     private const float AmmoRestitution = 0.15f;
     private const float CorrectionPercent = 0.4f;
     private const float Slop = 1.0f;
+
+    // Distance (or squared distance) below which bodies are treated as coincident.
+    private const float Epsilon = 0.001f;
+    private const float EnemyShipMass = 3000f;
+    private const int MineContactDamage = 3;
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly HashSet<Entity> _entitiesToDestroy = new();
@@ -60,7 +65,7 @@ public class CollisionSystem : GameSystem
             float distSq = diff.X * diff.X + diff.Y * diff.Y;
             float radiusSum = entityRadius + playerTuple.Value1.Radius;
 
-            if (distSq < radiusSum * radiusSum && distSq >= 0.001f)
+            if (distSq < radiusSum * radiusSum && distSq >= Epsilon)
             {
                 onCollision();
             }
@@ -97,7 +102,7 @@ public class CollisionSystem : GameSystem
             {
                 var aPos = view.GetComponent<Position>(entity);
                 var bPos = view.GetComponent<Position>(playerEntity);
-                ResolveCollision(view, aPos, bPos, entity, playerEntity, ship.Radius, playerTuple.Value1.Radius, false, commands, 3000f);
+                ResolveCollision(view, aPos, bPos, entity, playerEntity, ship.Radius, playerTuple.Value1.Radius, false, commands, EnemyShipMass);
             });
 
             int asteroidCount = _grid.GetQueryItems(pos.Value, ship.Radius, queryBuffer, out bool truncated);
@@ -108,7 +113,7 @@ public class CollisionSystem : GameSystem
                 ref readonly var candidate = ref queryBuffer[i];
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
 
-                ResolveCollision(view, pos, new Position(candidate.Position), entity, candidate.Id, ship.Radius, candidate.Radius, true, commands, 3000f);
+                ResolveCollision(view, pos, new Position(candidate.Position), entity, candidate.Id, ship.Radius, candidate.Radius, true, commands, EnemyShipMass);
             }
         }
 
@@ -178,7 +183,7 @@ public class CollisionSystem : GameSystem
 
                 var bPos = view.GetComponent<Position>(candidate.Id);
                 var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, mine.Radius, true, commands, 3000f);
+                ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, mine.Radius, true, commands, EnemyShipMass);
             }
         }
 
@@ -211,7 +216,7 @@ public class CollisionSystem : GameSystem
                 ref readonly var candidate = ref queryBuffer[i];
                 var diff = candidate.Position - ammoPos.Value;
                 float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                if (dSq < 0.001f) continue;
+                if (dSq < Epsilon) continue;
 
                 switch (candidate.Kind)
                 {
@@ -248,7 +253,7 @@ public class CollisionSystem : GameSystem
                                 closestShipHit = candidate.Id;
                                 var toAmmo = ammoPos.Value - candidate.Position;
                                 float distToAmmo = (float)Math.Sqrt(toAmmo.X * toAmmo.X + toAmmo.Y * toAmmo.Y);
-                                if (distToAmmo > 0.001f)
+                                if (distToAmmo > Epsilon)
                                 {
                                     shipHitPos = candidate.Position + (toAmmo / distToAmmo) * candidate.Radius;
                                 }
@@ -307,7 +312,7 @@ public class CollisionSystem : GameSystem
             float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
             float radiusSum2 = ammoRadius + playerTuple.Value1.Radius;
 
-            if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < 0.001f) continue;
+            if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < Epsilon) continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
@@ -346,7 +351,7 @@ public class CollisionSystem : GameSystem
 
             var diff = ammoPosComp.Value - minePosComp.Value;
             float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
-            if (dist < 0.001f) dist = 0.001f;
+            if (dist < Epsilon) dist = Epsilon;
             var normal = diff / dist;
 
             Vector2 mineVel = GetCollisionVelocity(view, mineEntity, default);
@@ -528,7 +533,7 @@ public class CollisionSystem : GameSystem
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
         float radiusSum = aRadius + bRadius;
 
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+        if (distSq >= radiusSum * radiusSum || distSq < Epsilon) return;
 
         float dist = (float)Math.Sqrt(distSq);
         var normal = diff / dist;
@@ -698,7 +703,7 @@ public class CollisionSystem : GameSystem
         float distSq = diff.X * diff.X + diff.Y * diff.Y;
         float radiusSum = mine.Radius + PlayerRadius;
 
-        if (distSq >= radiusSum * radiusSum || distSq < 0.001f) return;
+        if (distSq >= radiusSum * radiusSum || distSq < Epsilon) return;
 
         commands.Add(new DestroyEntityCommand(mineEntity));
 
@@ -708,7 +713,7 @@ public class CollisionSystem : GameSystem
             remaining = playerHealth.Current;
             _frameRemainingHealth[playerEntity] = remaining;
         }
-        _frameRemainingHealth[playerEntity] -= 3;
+        _frameRemainingHealth[playerEntity] -= MineContactDamage;
 
         var normal = diff / (float)Math.Sqrt(distSq);
         var mineType = MineType.FromSize(mine.Size);

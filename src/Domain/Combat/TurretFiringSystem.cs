@@ -4,6 +4,9 @@ namespace Spacevors.Domain.Systems;
 
 public class TurretFiringSystem : GameSystem
 {
+    // Distance (or squared distance) below which positions are treated as coincident.
+    private const float Epsilon = 0.001f;
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         bool playerDead = IsPlayerDead(view);
@@ -101,7 +104,7 @@ public class TurretFiringSystem : GameSystem
                     Vector2 relPos = playerPos.Value - turretPos;
                     float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-                    if (distSq < 0.001f || distSq > reachSq) continue;
+                    if (distSq < Epsilon || distSq > reachSq) continue;
 
                     // Engage when any part of the hull is inside the firing cone.
                     float dist = MathF.Sqrt(distSq);
@@ -142,7 +145,7 @@ public class TurretFiringSystem : GameSystem
                 var diff = pos.Value - turretPos;
                 float distSq = diff.X * diff.X + diff.Y * diff.Y;
 
-                if (distSq > checkRangeSq || distSq < 0.001f) continue;
+                if (distSq > checkRangeSq || distSq < Epsilon) continue;
 
                 float dist = (float)Math.Sqrt(distSq);
                 var dir = diff / dist;
@@ -164,7 +167,7 @@ public class TurretFiringSystem : GameSystem
             Vector2 relPos = minePos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             Vector2 relVel = velocity.Value - playerVelocity;
             float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
@@ -196,7 +199,7 @@ public class TurretFiringSystem : GameSystem
             Vector2 relPos = shipPos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             Vector2 relVel = velocity.Value - playerVelocity;
             float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
@@ -228,7 +231,7 @@ public class TurretFiringSystem : GameSystem
             var toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             float dist = (float)Math.Sqrt(distSq);
             var toTargetDir = toTarget / dist;
@@ -251,7 +254,7 @@ public class TurretFiringSystem : GameSystem
             Vector2 toTarget = minePos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             float dist = (float)Math.Sqrt(distSq);
             var aimDir = toTarget / dist;
@@ -270,7 +273,7 @@ public class TurretFiringSystem : GameSystem
             Vector2 toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             float dist = (float)Math.Sqrt(distSq);
             var aimDir = toTarget / dist;
@@ -289,7 +292,7 @@ public class TurretFiringSystem : GameSystem
             Vector2 toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 
-            if (distSq > rangeSq || distSq < 0.001f) continue;
+            if (distSq > rangeSq || distSq < Epsilon) continue;
 
             float dist = (float)Math.Sqrt(distSq);
             var aimDir = toTarget / dist;

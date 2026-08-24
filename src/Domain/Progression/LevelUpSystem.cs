@@ -8,6 +8,9 @@ public class LevelUpSystem : GameSystem
     const string DiagnosticEnvVar = "SPACEVORS_DIAGNOSTIC";
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
+    // Fallback for when the WeaponSlots component is missing (always present in production).
+    const int DefaultMaxWeaponSlots = 3;
+
     private static readonly WeaponType[] AllNewWeapons = WeaponType.AddOnWeapons;
 
     // Diagnostics only: fixed upgrade sequence consumed one entry per level-up.
@@ -178,6 +181,6 @@ public class LevelUpSystem : GameSystem
         {
             return ws.Max;
         }
-        return 3;
+        return DefaultMaxWeaponSlots;
     }
 }

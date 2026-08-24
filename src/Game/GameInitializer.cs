@@ -12,6 +12,18 @@ public static class GameInitializer
     public const float InitialShipMinDistance = 1600f;
     public const float InitialShipMaxDistance = 3200f;
 
+    private const float PlayerBoost = 2.5f;
+    private const int ClutterCount = 40;
+    private const float BackgroundExtent = 6000f; // stars and clutter spread across ±extent/2 around the origin
+
+    // (count, parallax, minSize, maxSize) per star layer, far to near.
+    private static readonly (int Count, float Parallax, float MinSize, float MaxSize)[] StarLayers =
+    [
+        (150, 0.2f, 0.5f, 1f),
+        (100, 0.5f, 1f, 1.5f),
+        (50, 1.0f, 1.5f, 2f)
+    ];
+
     public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(ShipType shipType, Vector2 viewportSize)
     {
         var em = new EntityManager();
@@ -23,7 +35,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
 
-        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: 2.5f, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
+        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerBoost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
 
         // A slot is one distinct weapon type (matches LevelUpSystem and AddNewWeaponTurret).
@@ -105,17 +117,12 @@ public static class GameInitializer
         // Background starfield with parallax layers
         var stars = new List<(Vector2 Position, float Size, Color Color, float Parallax)>();
 
-        for (int layer = 0; layer < 3; layer++)
+        foreach (var (count, parallax, sizeMin, sizeMax) in StarLayers)
         {
-            int count = layer == 0 ? 150 : layer == 1 ? 100 : 50;
-            float parallax = layer switch { 0 => 0.2f, 1 => 0.5f, _ => 1.0f };
-            float sizeMin = layer switch { 0 => 0.5f, 1 => 1f, _ => 1.5f };
-            float sizeMax = layer switch { 0 => 1f, 1 => 1.5f, _ => 2f };
-
             for (int i = 0; i < count; i++)
             {
-                float x = (float)rand.NextDouble() * 6000f - 3000f;
-                float y = (float)rand.NextDouble() * 6000f - 3000f;
+                float x = (float)(rand.NextDouble() - 0.5) * BackgroundExtent;
+                float y = (float)(rand.NextDouble() - 0.5) * BackgroundExtent;
                 float size = sizeMin + (float)rand.NextDouble() * (sizeMax - sizeMin);
 
                 Color color;
@@ -131,10 +138,10 @@ public static class GameInitializer
         // Stationary clutter fixed to world coordinates
         var clutter = new List<(Vector2 Position, float Width, float Height, Color Color)>();
 
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < ClutterCount; i++)
         {
-            float x = (float)rand.NextDouble() * 6000f - 3000f;
-            float y = (float)rand.NextDouble() * 6000f - 3000f;
+            float x = (float)(rand.NextDouble() - 0.5) * BackgroundExtent;
+            float y = (float)(rand.NextDouble() - 0.5) * BackgroundExtent;
             float w = 5f + (float)rand.NextDouble() * 20f;
             float h = 3f + (float)rand.NextDouble() * 12f;
 
