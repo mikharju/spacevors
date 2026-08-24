@@ -486,4 +486,33 @@ public class CollisionSystemTests
         var playerHealth = playerTuple.Value2;
         Assert.Equal(4, playerHealth.Current);
     }
+
+    [Fact]
+    public void AmmoVsHealthlessMine_ShipHitNotSkipped()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
+        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, Damage: 1, GraphicsId: 0));
+        em.AddComponent(ship, new Health(10));
+
+        var mine = em.CreateEntity();
+        em.AddComponent(mine, new Position(new Vector2(-492f, 0f)));
+        em.AddComponent(mine, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-496f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f, Damage: 6));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.True(em.HasComponent<Health>(ship), "Ship should survive single hit");
+        var health = em.GetComponent<Health>(ship);
+        Assert.Equal(4, health.Current);
+    }
 }

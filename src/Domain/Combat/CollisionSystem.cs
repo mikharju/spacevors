@@ -271,9 +271,8 @@ public class CollisionSystem : GameSystem
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
-            if (closestMineHit.HasValue)
+            if (closestMineHit.HasValue && view.TryGetComponent<Health>(closestMineHit.Value, out var healthComp))
             {
-                if (!view.TryGetComponent<Health>(closestMineHit.Value, out var healthComp)) continue;
                 if (!_frameRemainingHealth.TryGetValue(closestMineHit.Value, out var health))
                 {
                     health = healthComp.Current;
@@ -285,9 +284,8 @@ public class CollisionSystem : GameSystem
                 _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
 
-            if (closestShipHit.HasValue)
+            if (closestShipHit.HasValue && view.TryGetComponent<Health>(closestShipHit.Value, out var shipHealthComp))
             {
-                if (!view.TryGetComponent<Health>(closestShipHit.Value, out var shipHealthComp)) continue;
                 var shipHealth = shipHealthComp.Current;
                 if (!_frameRemainingHealth.TryGetValue(closestShipHit.Value, out var h))
                 {
