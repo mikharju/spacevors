@@ -141,16 +141,36 @@ public static class UpgradeMenuRenderer
             };
         }
 
-        return (option.WeaponName, option.Stat) switch
+        // Bespoke wording for the base-loadout weapons; everything else uses generic templates.
+        string name = option.WeaponName;
+        if (name == WeaponType.MachineGun.Name)
         {
-            ("MachineGun", UpgradeOption.FireRate) => "machine gun attack speed",
-            ("MachineGun", UpgradeOption.ProjectileSpeed) => "machine gun projectile speed",
-            ("Shotgun", UpgradeOption.FireRate) => "side shot attack speed",
-            ("Shotgun", UpgradeOption.ProjectileSpeed) => "side shot projectile speed",
-            (_, UpgradeOption.Range) => $"{option.WeaponName} range",
-            (_, UpgradeOption.Damage) => $"{option.WeaponName} damage",
-            (_, UpgradeOption.PickupRadius) => "pickup radius",
-            _ => $"{option.WeaponName} {option.Stat}"
+            return option.Stat switch
+            {
+                UpgradeOption.FireRate => "machine gun attack speed",
+                UpgradeOption.ProjectileSpeed => "machine gun projectile speed",
+                _ => GenericWeaponLabel(option)
+            };
+        }
+
+        if (name == WeaponType.Shotgun.Name)
+        {
+            return option.Stat switch
+            {
+                UpgradeOption.FireRate => "side shot attack speed",
+                UpgradeOption.ProjectileSpeed => "side shot projectile speed",
+                _ => GenericWeaponLabel(option)
+            };
+        }
+
+        return GenericWeaponLabel(option);
+
+        static string GenericWeaponLabel(UpgradableOption o) => o.Stat switch
+        {
+            UpgradeOption.Range => $"{o.WeaponName} range",
+            UpgradeOption.Damage => $"{o.WeaponName} damage",
+            UpgradeOption.PickupRadius => "pickup radius",
+            _ => $"{o.WeaponName} {o.Stat}"
         };
     }
 
