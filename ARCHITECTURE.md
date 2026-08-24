@@ -95,6 +95,17 @@ Experience
 Loadout TurretOffset ArcOffset PendingChoice BlueSpark UpgradeExplosion
 ```
 
+## Write patterns
+
+Two ways to write components:
+
+- Deferred commands (systems): a system adds writes to the phase CommandBuffer. The buffer is applied once, after every system in that phase finishes. Within a phase all systems read pre-phase values for command-written components; last write wins in system order.
+- Direct writes (app layer only): GameSession writes straight to the EntityManager before the simulation step — Acceleration/AngularVelocity from input, turret Position/Rotation from SyncTurrets, thruster removal on pause. These are pre-phase: they form the tick's initial state, so systems read them normally.
+
+Rules:
+- Systems never write components directly; always via CommandBuffer.
+- The app layer writes only before a step (pre-phase) or while paused, never mid-phase.
+
 ## Main loop
 
 ```
