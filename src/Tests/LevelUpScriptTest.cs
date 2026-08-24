@@ -74,6 +74,32 @@ public class LevelUpScriptTest
         Assert.Contains(options, o => o.IsNewWeapon);
     }
 
+    [Fact]
+    public void NoTurrets_LevelUpNotConsumedUntilTurretExists()
+    {
+        var em = new EntityManager();
+
+        var player = em.CreateEntity();
+        em.AddComponent(player, new Position(Vector2.Zero));
+        em.AddComponent(player, new Velocity(Vector2.Zero));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 10, Radius: 18f, Xp: 15, Level: 1));
+
+        var system = new LevelUpSystem();
+        RunLevelUp(system, em);
+
+        Assert.Empty(em.GetEntitiesWithComponents<PendingChoice>().ToList());
+        var stats = em.GetComponent<Player>(player);
+        Assert.Equal(1, stats.Level);
+        Assert.Equal(15, stats.Xp);
+
+        AddTurret(em, "TestWeapon");
+        RunLevelUp(system, em);
+
+        Assert.Equal(2, em.GetComponent<Player>(player).Level);
+        var options = GetChoiceOptions(em);
+        Assert.InRange(options.Length, 1, 5);
+    }
+
     private static void RunLevelUp(LevelUpSystem system, EntityManager em)
     {
         var view = new WorldView(em);

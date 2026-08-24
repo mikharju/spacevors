@@ -35,19 +35,21 @@ public class LevelUpSystem : GameSystem
         {
             int newLevel = playerStats.Level + 1;
             bool isMilestoneLevel = newLevel % MilestoneLevelInterval == 0;
-            SpawnLevelUpChoice(view, playerEntity, playerPos.Value, newLevel, isMilestoneLevel, commands);
-            commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
+
+            // Do not consume the level-up when no choice can be offered (e.g. zero turrets).
+            if (SpawnLevelUpChoice(view, playerEntity, playerPos.Value, newLevel, isMilestoneLevel, commands))
+                commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
         }
     }
 
-    private void SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
+    private bool SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
     {
         if (_scriptedUpgrades != null && _scriptIndex < _scriptedUpgrades.Length)
         {
             var scripted = _scriptedUpgrades[_scriptIndex++];
             DiagnosticLogger.LogEvent("UPGRADE", $"level={newLevel} scripted choice: {FormatChoice(scripted)}");
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions([scripted]));
-            return;
+            return true;
         }
 
         var turrets = new List<Turret>();
@@ -56,7 +58,7 @@ public class LevelUpSystem : GameSystem
             if (!t.Value1.IsEnemy) turrets.Add(t.Value1);
         }
 
-        if (turrets.Count == 0) return;
+        if (turrets.Count == 0) return false;
 
         var weaponNames = turrets.Select(t => t.WeaponName).Distinct().ToList();
         var allOptions = new List<UpgradableOption>();
@@ -91,6 +93,7 @@ public class LevelUpSystem : GameSystem
 
             DiagnosticLogger.LogEvent("UPGRADE", $"level={newLevel} choices: {FormatChoices(choices)}");
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(choices));
+            return true;
         }
         else
         {
@@ -116,6 +119,7 @@ public class LevelUpSystem : GameSystem
 
             DiagnosticLogger.LogEvent("UPGRADE", $"level={newLevel} choices: {FormatChoices(choices)}");
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(choices));
+            return true;
         }
     }
 
