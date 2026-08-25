@@ -8,7 +8,7 @@ public class MineRespawnSystem : GameSystem
     private const float InitialDelay = 10f;
     private const int MinInterval = 4;
     private const int MaxInterval = 8;
-    private const int TargetMineCount = 8;
+    private const int MaxMines = 23; // hard ceiling on live mines before respawning pauses
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -17,7 +17,7 @@ public class MineRespawnSystem : GameSystem
         if (_timer > 0f) return;
 
         int activeMines = view.GetEntitiesWithComponents<EnemyMine>().Count();
-        if (activeMines >= TargetMineCount + 15) return;
+        if (activeMines >= MaxMines) return;
 
         if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
         Entity playerEntity = playerTuple.Entity;
