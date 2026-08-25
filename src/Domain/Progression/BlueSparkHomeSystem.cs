@@ -6,9 +6,8 @@ public class BlueSparkHomeSystem : GameSystem
 {
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        bool hasPlayer = view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
-        bool hasPlayer = playerEntity.Value >= 0;
 
         if (!hasPlayer) return;
 

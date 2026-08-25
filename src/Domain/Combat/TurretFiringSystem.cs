@@ -44,8 +44,7 @@ public class TurretFiringSystem : GameSystem
 
     private static bool IsPlayerDead(WorldView view)
     {
-        view.GetEntitiesWithComponents<Player>().TryFirst(out var player);
-        return player.Entity.Value >= 0 && view.TryGetComponent<Dead>(player.Entity, out _);
+        return view.GetEntitiesWithComponents<Player>().TryFirst(out var player) && view.TryGetComponent<Dead>(player.Entity, out _);
     }
 
     private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
@@ -82,10 +81,10 @@ public class TurretFiringSystem : GameSystem
         }
         else
         {
-            view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+            bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
             Entity playerEntity = playerTuple.Entity;
 
-            if (playerEntity.Value >= 0 && view.TryGetComponent<EnemyShip>(turretEntity, out var es)
+            if (hasPlayer && view.TryGetComponent<EnemyShip>(turretEntity, out var es)
                 && view.TryGetComponent<Player>(playerEntity, out var player))
             {
                 Vector2 enemyVelocity = Vector2.Zero;

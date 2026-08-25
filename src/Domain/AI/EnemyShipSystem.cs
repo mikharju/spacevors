@@ -10,9 +10,8 @@ public class EnemyShipSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
-        bool hasPlayer = playerEntity.Value >= 0;
 
         foreach (var (shipEntity, ship, shipPos, currentRot) in view.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {

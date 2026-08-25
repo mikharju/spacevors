@@ -24,9 +24,8 @@ public class LevelUpSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
         Entity playerEntity = playerTuple.Entity;
-        if (playerEntity.Value < 0) return;
         if (view.TryGetComponent<Dead>(playerEntity, out _)) return;
 
         var playerPos = playerTuple.Value2;

@@ -10,9 +10,8 @@ public class PickupMagnetSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
         Entity playerEntity = playerTuple.Entity;
-        if (playerEntity.Value < 0) return;
 
         var playerPos = view.GetComponent<Position>(playerEntity);
         var playerStats = view.GetComponent<Player>(playerEntity);

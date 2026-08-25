@@ -233,10 +233,8 @@ public sealed class GameSession
     private void HandleUpgradeMenu()
     {
         // Game is paused — no simulation runs. Only handle choice input.
-        _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
-        PendingUpgradeOptions? upgradeOptions = null;
-        if (pendingTuple.Entity.Value >= 0)
-            upgradeOptions = pendingTuple.Value2;
+        bool hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
+        PendingUpgradeOptions? upgradeOptions = hasPending ? pendingTuple.Value2 : null;
 
         int hoveredIndex = -1;
         if (upgradeOptions is { Options.Length: > 0 } opts)
@@ -263,10 +261,9 @@ public sealed class GameSession
 
     private void ApplySelectedUpgrade(int selectedIndex)
     {
-        _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
-        Entity choiceEntity = choiceTuple.Entity;
+        bool hasChoice = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
 
-        if (choiceEntity.Value >= 0 && selectedIndex < choiceTuple.Value2.Options.Length)
+        if (hasChoice && selectedIndex < choiceTuple.Value2.Options.Length)
             ApplyUpgrade(_em, _playerEntity, choiceTuple.Value2.Options[selectedIndex]);
 
         ClearPendingChoices();

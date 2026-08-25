@@ -38,4 +38,28 @@ public class EnemyShipChaseTest
         float angle = em.GetComponent<Rotation>(shipEntity).Angle;
         Assert.Equal(MathF.PI - dt, angle, precision: 5);
     }
+
+    [Fact]
+    public void NoPlayer_EnemyShipStopsInsteadOfChasingOrigin()
+    {
+        var em = new EntityManager();
+
+        // Enemy ship far from origin, but no player exists in the world.
+        var shipEntity = em.CreateEntity();
+        em.AddComponent(shipEntity, new Position(new Vector2(0f, 3000f)));
+        em.AddComponent(shipEntity, new Velocity(Vector2.Zero));
+        em.AddComponent(shipEntity, new Rotation(MathF.PI));
+        em.AddComponent(shipEntity, new AngularVelocity(0f));
+        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
+
+        var view = new WorldView(em);
+        float dt = 1f / 60f;
+        var commands = new CommandBuffer();
+        new EnemyShipSystem().Update(view, dt, commands);
+        commands.Apply(em);
+
+        // With no player the ship must stop (zero acceleration), not steer toward origin.
+        Assert.True(em.TryGetComponent<Acceleration>(shipEntity, out var accel));
+        Assert.Equal(Vector2.Zero, accel.Value);
+    }
 }

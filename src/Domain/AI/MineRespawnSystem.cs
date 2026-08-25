@@ -19,9 +19,8 @@ public class MineRespawnSystem : GameSystem
         int activeMines = view.GetEntitiesWithComponents<EnemyMine>().Count();
         if (activeMines >= TargetMineCount + 15) return;
 
-        view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
         Entity playerEntity = playerTuple.Entity;
-        if (playerEntity.Value < 0) return;
 
         var rng = view.Rng;
         var playerPos = view.GetComponent<Position>(playerEntity);

@@ -16,9 +16,8 @@ public class EnemyShipSpawnSystem : GameSystem
     {
         var rng = view.Rng;
 
-        var playerTuple = view.GetEntitiesWithComponents<Player>().FirstOrDefault();
+        bool hasPlayer = view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
-        bool hasPlayer = playerEntity.Value >= 0;
 
         if (!hasPlayer) return;
 
