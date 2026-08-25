@@ -14,13 +14,12 @@ public class PickupMagnetSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
 
         var playerPos = view.GetComponent<Position>(playerEntity);
-        var playerStats = view.GetComponent<Player>(playerEntity);
 
-        ProcessXpPickups(view, playerEntity, playerPos.Value, playerStats.PickupRadius, deltaTime, commands);
-        ProcessHealthOrbs(view, playerEntity, playerPos.Value, playerStats.PickupRadius, deltaTime, commands);
+        ProcessXpPickups(view, playerEntity, playerPos.Value, deltaTime, commands);
+        ProcessHealthOrbs(view, playerEntity, playerPos.Value, deltaTime, commands);
     }
 
-    private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
+    private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float deltaTime, CommandBuffer commands)
     {
         var playerStats = view.GetComponent<Player>(playerEntity);
         int totalXpGained = 0;
@@ -77,7 +76,7 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float effectivePickupRadius, float deltaTime, CommandBuffer commands)
+    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Vector2 playerPos, float deltaTime, CommandBuffer commands)
     {
         var playerStats = view.GetComponent<Player>(playerEntity);
         int totalHeal = 0;
