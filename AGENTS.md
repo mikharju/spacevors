@@ -50,7 +50,7 @@ For every task:
 2. Make the smallest useful change.
 3. Keep the project compiling.
 4. Verify behavior.
-5. Update PLAN.md if needed.
+5. Update PLAN.md and ARCHITECTURE.md if needed.
 
 Never mix unrelated changes.
 
