@@ -46,7 +46,7 @@ public static class GameInitializer
 
         // Create camera
         var cameraEntity = em.CreateEntity();
-        em.AddComponent(cameraEntity, new Camera(new Vector2(0f, 0f)));
+        em.AddComponent(cameraEntity, new Camera(Vector2.Zero, Vector2.Zero));
 
         var rand = em.Rng;
 

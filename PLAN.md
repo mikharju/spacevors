@@ -234,7 +234,8 @@ Cheaper alternative if K-growth must be zero: make thruster flames self-emissive
 Camera drifts based on the mouse's screen offset from window center (`CameraSystem`):
 - Mouse inside a dead zone (5% of half-viewport) → camera stays centered on player ship
 - Drift ramps linearly to `MaxDriftFraction` (0.5) of the half-viewport at the window edge, so at full deflection the player sits a quarter-screen from the edge — always visible
-- Corner offsets are normalized before mapping, so diagonal drift never exceeds edge drift; the existing exponential follow smooths both ship tracking and re-centering
+- Corner offsets are normalized before mapping, so diagonal drift never exceeds edge drift
+- The camera tracks the player directly (per-tick motion is already smooth); only the mouse-driven drift eases in at `DriftFollowSpeed` (1.5/s), so fast mouse moves don't yank the screen — the eased offset persists on the `Camera.Drift` component
 - Mouse screen position flows into the simulation via `WorldView.MouseScreenPosition` (same seam as `ViewportSize`, set per tick in GameSession); aiming math is unchanged because it converts mouse→world through the camera target, so there is no feedback loop
 
 ## Mouse clicks to set primary target

@@ -63,6 +63,18 @@ public class CameraDriftTest
     }
 
     [Fact]
+    public void MouseMovedFast_DriftEasesInInsteadOfSnapping()
+    {
+        var (em, cameraEntity) = CreateWorld(Vector2.Zero);
+
+        // 15 ticks (0.25s) after a jump to the right edge: drift must be moving but well short of final.
+        var target = SettleCamera(em, cameraEntity, new Vector2(1920f, 512f), ticks: 15);
+
+        Assert.True(target.X > 0f, $"target {target}");
+        Assert.True(target.X < 480f * 0.5f, $"target {target}");
+    }
+
+    [Fact]
     public void FullDeflection_PlayerStaysInsideViewport()
     {
         var (em, cameraEntity) = CreateWorld(Vector2.Zero);
@@ -89,12 +101,13 @@ public class CameraDriftTest
         em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
 
         var cameraEntity = em.CreateEntity();
-        em.AddComponent(cameraEntity, new Camera(Vector2.Zero));
+        em.AddComponent(cameraEntity, new Camera(Vector2.Zero, Vector2.Zero));
 
         return (em, cameraEntity);
     }
 
-    private static Vector2 SettleCamera(EntityManager em, Entity cameraEntity, Vector2 mouseScreen, int ticks = 180)
+    // 600 ticks (10s) lets the lazy drift easing converge to within ~1e-4 px of its target.
+    private static Vector2 SettleCamera(EntityManager em, Entity cameraEntity, Vector2 mouseScreen, int ticks = 600)
     {
         var view = new WorldView(em) { MouseScreenPosition = mouseScreen };
 

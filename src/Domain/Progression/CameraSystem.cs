@@ -4,7 +4,9 @@ namespace Spacevors.Domain.Systems;
 
 public class CameraSystem : GameSystem
 {
-    private const float FollowSpeed = 5f;
+    // The camera tracks the player directly (its motion is already smooth per tick);
+    // only the mouse-driven drift eases in, so fast mouse moves don't yank the screen.
+    private const float DriftFollowSpeed = 1.5f;
 
     // At full mouse deflection the camera shifts this fraction of the half-viewport,
     // so the player stays at least (1 - MaxDriftFraction) of a half-screen from the edge.
@@ -17,13 +19,12 @@ public class CameraSystem : GameSystem
     {
         if (!view.GetEntitiesWithComponents<Position, Player>().TryFirst(out var playerTuple)) return;
 
-        var targetPos = playerTuple.Value1.Value + ComputeDrift(view.MouseScreenPosition, view.ViewportSize);
+        var desiredDrift = ComputeDrift(view.MouseScreenPosition, view.ViewportSize);
 
         foreach (var (entity, camera) in view.GetEntitiesWithComponents<Camera>())
         {
-            var diff = targetPos - camera.Target;
-            var newTarget = camera.Target + diff * Math.Min(FollowSpeed * deltaTime, 1f);
-            commands.Add(new AddComponentCommand<Camera>(entity, new Camera(newTarget)));
+            var drift = camera.Drift + (desiredDrift - camera.Drift) * Math.Min(DriftFollowSpeed * deltaTime, 1f);
+            commands.Add(new AddComponentCommand<Camera>(entity, new Camera(playerTuple.Value1.Value + drift, drift)));
         }
     }
 

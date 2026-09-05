@@ -75,4 +75,5 @@ public readonly record struct Asteroid(bool IsSmall, float Radius, byte Variant 
     public const int LargeVariantCount = 3;
 }
 
-public readonly record struct Camera(Vector2 Target);
+// Target is the camera center; Drift is the eased mouse-driven offset from the player.
+public readonly record struct Camera(Vector2 Target, Vector2 Drift);
