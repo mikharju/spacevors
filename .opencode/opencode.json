@@ -40,7 +40,7 @@
           },
           "limit": {
             "output": 16384,
-            "context": 150000
+            "context": 140000
           }
         },
         "huihui-qwen3.6-35b-a3b-abliterated": {
