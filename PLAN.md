@@ -229,6 +229,21 @@ Stage 4 (tuning) — done: `MaxPointLightContribution` 1.0, `ThrustLightIntensit
 
 Cheaper alternative if K-growth must be zero: make thruster flames self-emissive only (brighten the flame sprite / additive halo) instead of scene lights. Loses "flames light nearby rocks" but removes the largest emitter from the cap entirely.
 
+## Camera follows mouse
+
+Camera should be changed so it isn't simply mostly centered, but follows the mouse:
+- If mouse is near center of window, then camera will be centered on player ship
+- If mouse is moved further toward window edge, then camera will drift that way from player ship, but it will still keep player ship visible
+- Camera center should be somewhere between player ship and mouse cursor
+
+## Mouse clicks to set primary target
+
+Allow player to set primary target for weapons.
+- Add some targeting bracket on currently targeted enemy ship
+- Initially all weapons will shoot targeted ship at much larger range than auto targeting range
+- If targeted enemy is destroyed, no target is automatically selected
+- If no target is selected, then weapons will shoot at closest target with current targeting priorities
+
 ## Future
 
 - bosses
