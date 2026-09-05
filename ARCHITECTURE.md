@@ -48,7 +48,6 @@ Pure game rules.
 Contains:
 - components
 - systems
-- events
 - math
 - game state
 
@@ -80,19 +79,14 @@ Components:
 Systems:
 - pure logic operating on components
 
-Example:
+Examples (all in Domain/Components/, except Dead which lives in Combat/CollisionSystem.cs):
 
 ```
-Transform
-Velocity
-Health
-Weapon
-Enemy
-Player
-Projectile
-Lifetime
-Experience
-Loadout TurretOffset ArcOffset PendingChoice BlueSpark UpgradeExplosion
+Position Velocity Acceleration Rotation AngularVelocity
+Player EnemyShip EnemyMine Asteroid Camera
+Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset
+Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion
+Health PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
 ## Write patterns
@@ -103,13 +97,13 @@ Two ways to write components:
 - Direct writes (app layer only): GameSession writes straight to the EntityManager before the simulation step — Acceleration/AngularVelocity from input, turret Position/Rotation from SyncTurrets, thruster removal on pause. These are pre-phase: they form the tick's initial state, so systems read them normally.
 
 Rules:
-- Systems never write components directly; always via CommandBuffer.
+- Systems never write components directly; always via CommandBuffer. One documented exception: PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick.
 - The app layer writes only before a step (pre-phase) or while paused, never mid-phase.
 
 ## Main loop
 
 ```
-Loadout selection (before game starts)
+Ship selection (before game starts)
 
 ↓
 
@@ -124,9 +118,9 @@ Simulation
 Rendering
 ```
 
-Loadout selection is shown before the game loop begins.
+Ship selection is shown before the game loop begins.
 
-Player chooses Forward or Broadside configuration.
+Player chooses one of the defined ship types (`ShipType.All`: Scout, Fighter, Heavy, Shadow).
 
 Game pauses during upgrade choice; resumes after selection.
 
@@ -147,23 +141,23 @@ Components:
 
 Movement uses forces instead of directly setting velocity.
 
-## Events
+## Cross-system signaling
 
-Prefer event queues instead of systems directly calling each other.
+No event queues. Systems signal each other through components, written via the CommandBuffer (see Write patterns). A later system in a same or next phase reacts to the component it finds.
 
 Examples:
-- EntityDied
-- ProjectileHit
-- LevelUp
-- ExperienceCollected
+- CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions
+- PickupMagnetSystem raises Player.Xp; LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
+- GameSession reads PendingChoice to pause and show the upgrade menu
 
 ## Project layout
 
 ```
 src/
 
-    Game/
-        SpaceVorsApp.cs          -- game loop + input handling
+    Game/                    -- app layer: window, input, rendering (Raylib-cs)
+        SpaceVorsApp.cs          -- entry point: window + top-level loop (ship select <-> session)
+        GameSession.cs           -- one playthrough: player input, fixed-timestep stepping, pause/menu, upgrades
         GameInitializer.cs       -- entity setup + world generation
         Renderer.cs              -- frame orchestration (scene composition)
         BackgroundRenderer.cs    -- starfield + clutter layers
@@ -173,29 +167,41 @@ src/
         ThrusterFlameRenderer.cs -- thruster flames
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
+        StatsScreenRenderer.cs   -- ship stats screen (Tab)
         ShipSelectScreen.cs      -- ship selection screen (scrollable list + input)
         RenderHelpers.cs         -- shared screen-space culling helpers
+        ImageLoader.cs           -- texture loading (flat + lit sprite sets)
+        Lighting.cs              -- lighting shader: directional light + point lights
+        LightGatherer.cs         -- per-frame point-light collection for the shader
+        LitSprite.cs             -- lit sprite data (base/normal/depth textures)
+        LitSpriteMatcher.cs      -- matches texture files into lit sprites
+        LitGroupRenderer.cs      -- batches lit draws per variant under one shader-mode block
+        AsteroidSprite.cs        -- asteroid graphics variants
 
-    Domain/
-        Components/          -- Loadout, TurretOffset, ArcOffset, PendingChoice, etc.
-        Systems/             -- BlueSparkHomeSystem, UpgradePickupSystem, etc.
-        Events/
-        Math/
+    Domain/                  -- pure game logic, no Raylib
+        AI/                    -- enemy ship + mine spawning, chase AI, drift
+        Combat/                -- firing, collisions, effects, death explosions
+        Components/            -- component records (entity, physics, combat, effect, gameplay)
+        Physics/               -- force integration + position integration
+        Progression/           -- XP/level-up, pickups, camera, blue spark homing
+        Support/               -- SimulationRunner (phase ordering)
+        EntityManager.cs       -- entities + ComponentStorage<T> (compact arrays, swap-pop)
+        WorldView.cs           -- per-step read view over the EntityManager
+        Commands.cs            -- command records + CommandBuffer
+        CommandProcessor.cs    -- applies a CommandBuffer to the EntityManager
+        SpatialGrid.cs         -- broad-phase spatial hash
+        Vector2.cs             -- 2D math
 
-    Infrastructure/
-        Rendering/
-        Input/
-        Audio/
-        Save/
+    RenderBench/             -- headless render benchmark (lit-sprite draw cost)
 
-    Tests/
+    Tests/                   -- xunit tests for domain logic + matchers
 ```
 
 ## Principles
 
 Dependencies point inward.
 
-Domain never references infrastructure.
+Domain never references rendering, input, or audio (no Raylib).
 
 Keep systems small and deterministic.
 

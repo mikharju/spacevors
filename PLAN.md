@@ -38,18 +38,18 @@ Goal:
 ## Controls
 
 ### Ship selection (start)
-- 1/2/3/4 or click: choose ship
+- Arrows/WASD or mouse wheel: browse the scrollable ship list
+- Click, Enter, or 1/2/3/4: choose ship
 
 ### In-game
 - W: forward thrust
 - S: backward thrust
 - A: left sideways thrust
 - D: right sideways thrust
-- Q/E: rotate
 - Shift: boost (forward only, 2.5x)
-- Mouse: aim (optional)
-- Space: brake (optional)
+- Mouse: aim — the ship rotates toward the cursor (primary rotation)
 - Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
+- R: restart from game over (back to ship selection)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
@@ -115,9 +115,9 @@ Progression.
 Difficulty scaling.
 
 - shared elapsed time tracking across systems
-- enemy ship spawn rate increases over 3 minutes (10s→4s intervals)
-- mine respawn system with increasing frequency
-- max 100 active enemy ships, ~23 mines cap
+- enemy ship spawn interval ramps from random 5–10s to random 2–4s over 3 minutes
+- mine respawn system with increasing frequency (random 10–20s → 4–8s)
+- max 100 active enemy ships, 23 mines cap
 
 ### Off-screen spawning
 
@@ -130,11 +130,11 @@ Enemies and mines never pop in on screen; they spawn just outside the current vi
 
 ## Phase 4c
 
-Enemy variants.
+Enemy variants (stats in `EnemyShipType`, all ammo does 1 damage):
 
-- Interceptor: smaller (15px), purple, faster acceleration (15), low fire rate (0.6/s)
-- Heavy Cannon: larger (28px), dark red-gray, 2 damage ammo, slower fire rate (0.8/s)
-- Standard: unchanged (20px), red, baseline stats
+- Interceptor: radius 45px, speed 90, high acceleration (85), low fire rate (0.6/s), 2 hp
+- Heavy Cannon: radius 78px, slow (speed 50), slow ammo (160 px/s), fire rate 0.8/s, 5 hp
+- Standard: radius 20px, speed 65, acceleration 45, baseline fire rate (1.5/s), 3 hp
 - All three spawn equally (~33% each)
 
 ## Phase 5
@@ -179,7 +179,7 @@ All ships (player, enemy) and mines show engine flames while accelerating or tur
 
 Design decisions:
 - Rendering-only feature: no new components or systems. Renderer already reads components directly everywhere; a domain ThrusterState component would be an unnecessary abstraction
-- New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from DrawScene before ships/mines so flames draw behind them
+- New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from WorldRenderer.Draw before player/enemy ships so flames draw behind them
 - Thrust flame: one per active axis. All player axes are normalized by a single shared max (Thrust×Boost) so flame size reflects absolute thrust force across axes — main booster burns visibly larger than weak side/back thrusters; enemy flame is normalized by EnemyShip.Acceleration (drift-cancel stays below the gate). Flames passing the gate render at least MinVisibleFlameIntensity size so weak thrusters stay visible; flame base sits at the hull edge (radius × 1.0) so small flames are not hidden behind large ships. Direction = −normalize(axis acceleration). Flame length/width scale with intensity and ship radius
 - Turn flame: diagonal RCS pair fires while turning — front thruster on the side opposite the turn, rear thruster on the turn's side (turning right = left-front + right-rear). Front flame points forward from the nose corner; rear flame trails backward. Both are very small, sized like a weak lateral thrust flame (MinVisibleFlameIntensity scale) so they do not compete with the main booster. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
 - Mines have no Acceleration or Rotation: flame behind motion, direction = −normalize(Velocity), intensity = |velocity| / mine.Speed
@@ -261,4 +261,3 @@ The game is considered complete when:
 - architecture remains simple
 - code is easy for local LLMs to navigate
 - new weapons and enemies require minimal changes
-```
