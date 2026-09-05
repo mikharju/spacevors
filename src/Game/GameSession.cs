@@ -190,7 +190,11 @@ public sealed class GameSession
         {
             DiagnosticLogger.LogFrameStart();
 
-            var view = new WorldView(_em) { ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight()) };
+            var view = new WorldView(_em)
+            {
+                ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight()),
+                MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY())
+            };
             var commands = new CommandBuffer();
 
             _runner.RunPhase(view, commands, _runner.MovementSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));

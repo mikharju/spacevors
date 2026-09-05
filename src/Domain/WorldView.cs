@@ -14,6 +14,9 @@ public class WorldView
 
     public Vector2 ViewportSize { get; set; } = DefaultViewportSize;
 
+    // Mouse in screen pixels; defaults to window center so headless runs produce no camera drift.
+    public Vector2 MouseScreenPosition { get; set; } = new(DefaultViewportSize.X / 2f, DefaultViewportSize.Y / 2f);
+
     public float ElapsedTime => _em.ElapsedTime;
 
     public Random Rng => _em.Rng;

@@ -229,12 +229,13 @@ Stage 4 (tuning) — done: `MaxPointLightContribution` 1.0, `ThrustLightIntensit
 
 Cheaper alternative if K-growth must be zero: make thruster flames self-emissive only (brighten the flame sprite / additive halo) instead of scene lights. Loses "flames light nearby rocks" but removes the largest emitter from the cap entirely.
 
-## Camera follows mouse
+## Camera follows mouse — done
 
-Camera should be changed so it isn't simply mostly centered, but follows the mouse:
-- If mouse is near center of window, then camera will be centered on player ship
-- If mouse is moved further toward window edge, then camera will drift that way from player ship, but it will still keep player ship visible
-- Camera center should be somewhere between player ship and mouse cursor
+Camera drifts based on the mouse's screen offset from window center (`CameraSystem`):
+- Mouse inside a dead zone (5% of half-viewport) → camera stays centered on player ship
+- Drift ramps linearly to `MaxDriftFraction` (0.5) of the half-viewport at the window edge, so at full deflection the player sits a quarter-screen from the edge — always visible
+- Corner offsets are normalized before mapping, so diagonal drift never exceeds edge drift; the existing exponential follow smooths both ship tracking and re-centering
+- Mouse screen position flows into the simulation via `WorldView.MouseScreenPosition` (same seam as `ViewportSize`, set per tick in GameSession); aiming math is unchanged because it converts mouse→world through the camera target, so there is no feedback loop
 
 ## Mouse clicks to set primary target
 
