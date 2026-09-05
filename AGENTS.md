@@ -14,8 +14,16 @@ Optimize for:
 
 Never optimize prematurely.
 
-Do not implement any code changes unless explicitly commanded to do so. Only exception is if already implementing code changes and a new problem is reported. 
-If unclear, default to replies first, then documentation updates and only in very clear cases code changes.
+## Code changes
+
+Default: no code changes. Do not modify code unless explicitly commanded.
+
+Exception: while already implementing an approved change, a newly reported problem may be fixed as part of that work.
+
+When a request is unclear, escalate in this order and stop at the first level that suffices:
+1. Reply (explain or ask)
+2. Update documentation
+3. Code changes — only when intent is unambiguous
 
 ## Rules
 
