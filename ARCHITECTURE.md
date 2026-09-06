@@ -115,9 +115,9 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 1. Movement: PhysicsSystem → BlueSparkHomeSystem → PositionIntegrationSystem → AmmoLifetimeSystem
 2. Action: TurretFiringSystem → EnemyShipSpawnSystem
 3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
-4. Cleanup: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem
+4. Intent: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem
 
-Order within a phase matters (see Write patterns). The "Cleanup" name is historical — it holds AI, spawners and camera.
+Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
 
 ## Main loop
 

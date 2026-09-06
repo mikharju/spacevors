@@ -180,8 +180,8 @@ public class PerformanceBenchmark
                 runner.RunPhase(view, commands, runner.ResolutionSystems, deltaTime, Record);
                 commands.Apply(em);
 
-                // Phase 4: cleanupSystems
-                runner.RunPhase(view, commands, runner.CleanupSystems, deltaTime, Record);
+                // Phase 4: intentSystems
+                runner.RunPhase(view, commands, runner.IntentSystems, deltaTime, Record);
                 commands.Apply(em);
 
                 em.AddElapsedTime(deltaTime);

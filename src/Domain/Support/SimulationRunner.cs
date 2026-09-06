@@ -7,7 +7,7 @@ public sealed class SimulationRunner
     public GameSystem[] MovementSystems { get; }
     public GameSystem[] ActionSystems { get; }
     public GameSystem[] ResolutionSystems { get; }
-    public GameSystem[] CleanupSystems { get; }
+    public GameSystem[] IntentSystems { get; }
 
     public SimulationRunner()
     {
@@ -34,7 +34,7 @@ public sealed class SimulationRunner
             new EffectSystem()
         };
 
-        CleanupSystems = new GameSystem[]
+        IntentSystems = new GameSystem[]
         {
             new MineDriftSystem(),
             new MineRespawnSystem(),

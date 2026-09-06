@@ -279,7 +279,7 @@ public sealed class GameSession
             _runner.RunPhase(view, commands, _runner.ResolutionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
             commands.Apply(_em);
 
-            _runner.RunPhase(view, commands, _runner.CleanupSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
+            _runner.RunPhase(view, commands, _runner.IntentSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
             commands.Apply(_em);
 
             _accumulator -= FixedDeltaTime;
