@@ -84,7 +84,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset
+Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget
 Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion
 Health PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
@@ -165,6 +165,7 @@ src/
         EnemyShipRenderer.cs     -- enemy ship sprites + fallbacks
         ShipSpriteRenderer.cs    -- player ship sprite (lit/flat)
         ThrusterFlameRenderer.cs -- thruster flames
+        TargetingRenderer.cs     -- red corner brackets on the player's locked target
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
         StatsScreenRenderer.cs   -- ship stats screen (Tab)
@@ -180,7 +181,7 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning, chase AI, drift
-        Combat/                -- firing, collisions, effects, death explosions
+        Combat/                -- firing (incl. click-target priority), collisions, effects, death explosions
         Components/            -- component records (entity, physics, combat, effect, gameplay)
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera, blue spark homing

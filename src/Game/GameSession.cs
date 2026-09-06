@@ -13,6 +13,15 @@ public sealed class GameSession
     // Cap catch-up work after a hitch (window drag, GC pause) instead of running dozens of steps in one frame.
     private const float MaxAccumulator = 0.25f;
 
+    // Diagnostics: world offset where the test enemy ship spawns. To the side of the fixed test asteroid at (0, -300) so collisions do not push it away.
+    private static readonly Vector2 DiagnosticEnemySpawnOffset = new(250f, -250f);
+
+    // Diagnostics: health of the spawned test enemy (high enough to survive auto-targeting fire until a manual click is tested).
+    private const int DiagnosticTestEnemyHealth = 100000;
+
+    // Diagnostics: player health set by key H so test enemies cannot end the run during visual tests.
+    private const int DiagnosticTestPlayerHealth = 10000;
+
     private readonly EntityManager _em;
     private readonly Entity _playerEntity;
     private readonly Entity _cameraEntity;
@@ -26,6 +35,9 @@ public sealed class GameSession
     private bool _gameOver;
     private bool _wasPaused;
     private bool _showStats;
+
+    // Diagnostics: position the player is pinned to while T freeze is active.
+    private Vector2? _diagnosticFreezePosition;
 
     public GameSession(ShipType ship)
     {
@@ -102,7 +114,16 @@ public sealed class GameSession
         Vector2 toMouse = new(mouseWorldX - playerPos.Value.X, mouseWorldY - playerPos.Value.Y);
         float distToMouse = (float)Math.Sqrt(toMouse.X * toMouse.X + toMouse.Y * toMouse.Y);
 
-        _em.AddComponent(_playerEntity, new Acceleration(ComputeThrust(playerStats, playerRot.Angle)));
+        if (_diagnostics && _diagnosticFreezePosition is { } freezePos)
+        {
+            // Diagnostics: T pins the player in place so kickback and collisions cannot move it during visual tests.
+            _em.AddComponent(_playerEntity, new Position(freezePos));
+            _em.AddComponent(_playerEntity, new Acceleration(Vector2.Zero));
+        }
+        else
+        {
+            _em.AddComponent(_playerEntity, new Acceleration(ComputeThrust(playerStats, playerRot.Angle)));
+        }
 
         // Mouse aiming: set angular velocity toward cursor (rad/s)
         if (distToMouse > 1f)
@@ -116,8 +137,25 @@ public sealed class GameSession
             _em.AddComponent(_playerEntity, new AngularVelocity(newAngVel));
         }
 
+        // Left click: lock the clicked enemy ship or mine as primary target; empty space clears it.
+        if (Raylib.IsMouseButtonPressed(MouseButton.Left))
+            HandleTargetClick(new Vector2(mouseWorldX, mouseWorldY));
+
         SyncTurrets(playerPos.Value, playerRot.Angle);
         HandleDiagnosticKeys(playerStats);
+    }
+
+    private void HandleTargetClick(Vector2 worldPoint)
+    {
+        var target = PrimaryTargetPicker.Pick(_em, worldPoint);
+
+        if (target.HasValue)
+            _em.AddComponent(_playerEntity, new PrimaryTarget(target.Value));
+        else if (_em.HasComponent<PrimaryTarget>(_playerEntity))
+            _em.RemoveComponent<PrimaryTarget>(_playerEntity);
+
+        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        DiagnosticLogger.LogEvent("target", $"{(target.HasValue ? "locked" : "cleared")} click=({worldPoint.X}, {worldPoint.Y}) player=({playerPos.X}, {playerPos.Y})");
     }
 
     private static Vector2 ComputeThrust(Player stats, float angle)
@@ -180,6 +218,41 @@ public sealed class GameSession
             var testExplosion = _em.CreateEntity();
             _em.AddComponent(testExplosion, new Position(new Vector2(0f, -300f)));
             _em.AddComponent(testExplosion, new Explosion(80f, 1.5f, 1.5f));
+        }
+
+        // Diagnostic only: set player health very high so test enemies cannot end the run during visual tests.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.H))
+        {
+            _em.AddComponent(_playerEntity, new Health(DiagnosticTestPlayerHealth));
+            DiagnosticLogger.LogEvent("diag", "H pressed");
+        }
+
+        // Diagnostic only: T toggles a position pin for stable visual tests.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.T))
+        {
+            if (_diagnosticFreezePosition is null)
+            {
+                _diagnosticFreezePosition = _em.GetComponent<Position>(_playerEntity).Value;
+                _em.AddComponent(_playerEntity, new Velocity(Vector2.Zero));
+                DiagnosticLogger.LogEvent("diag", $"T freeze on at ({_diagnosticFreezePosition.Value.X}, {_diagnosticFreezePosition.Value.Y})");
+            }
+            else
+            {
+                _diagnosticFreezePosition = null;
+                DiagnosticLogger.LogEvent("diag", "T freeze off");
+            }
+        }
+
+        // Diagnostic only: spawn an enemy ship to test click targeting.
+        // Excessive health so auto-targeting turrets cannot kill it before a manual click is tested.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.N))
+        {
+            var pos = _em.GetComponent<Position>(_playerEntity);
+            var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
+            var testEnemy = _em.CreateEntity();
+            EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default);
+            _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth));
+            DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }
     }
 

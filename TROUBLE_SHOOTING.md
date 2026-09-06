@@ -116,6 +116,24 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Transient toolchain crash (seen once on this machine); a plain re-run builds fine. The exit code does not reflect the failure when output is piped through `tail`.
 - **Fix / Prevention**: Treat any build whose output lacks "Build succeeded" as failed — re-run until it prints, then re-run tests even if an earlier `--no-build` pass already went green (same discipline as entry 7).
 
+## 18. Mouse-driven camera drift shifts click world coordinates
+
+- **Symptom**: A left-click computed as "window center + (targetWorld − playerWorld)" landed ~57px away from the intended target — outside the pick zone — while keys and mousemove worked fine. Reproduced across several attempts; the miss distance changed with where the mouse was parked.
+- **Cause**: `CameraSystem` eases a drift offset toward the mouse's screen position (dead zone 5%, max half of the half-viewport, ease speed 1.5/s). The click→world conversion uses the *current* camera target (`player + drift`), so an off-center mouse moves the whole world under the cursor. A quick `mousemove; mousedown` gives the drift only ~0.3s to settle (≈36% of its final value) — enough to miss a 30px zone.
+- **Fix / Prevention**: For deterministic clicks, park the mouse at the *drift fixed point* — the position where settled drift maps the click exactly onto the target: solve `M = center + offset − Drift(n(M))` (one-dimensional per axis; converges in 2–3 hand iterations), then wait ≥2.5s after `mousemove` before `mousedown`. Verify with the game's own log: GameSession logs every click as `[target] ... click=(x,y) player=(x,y)` under SPACEVORS_DIAGNOSTIC=1, so a miss is measurable instead of guessed.
+
+## 19. Game over screen silently ignores all input — and test enemies kill the player fast
+
+- **Symptom**: After spawning a diagnostic enemy ship (N key), every subsequent xdotool click/key produced no log line at all; earlier clicks in the same run had worked.
+- **Cause**: The spawned enemy's turret fires at the player from within its 700px range (~4.5 dmg/s vs 8 HP) → game over within seconds. On the game-over screen `ReadPlayerInput` does not run, so all input is silently dropped — indistinguishable from a focus problem.
+- **Fix / Prevention**: Before debugging "input stopped working", take an F12 screenshot and check for GAME OVER (and the HP bar). For visual tests that outlast a few seconds: press H first (player health → 10000, diagnostic-only) so test enemies cannot end the run.
+
+## 20. Player position is not stable during headless tests — kickback and collisions move it (no linear drag)
+
+- **Symptom**: Two player-position samples taken seconds apart differed by hundreds of px with no keys pressed; any click computed from a stale player position missed.
+- **Cause**: Physics has angular damping but *no* linear drag, so anything that changes velocity persists: turret kickback (`TurretFiringSystem` adds recoil to the player on every shot), collision impulses, explosion knockback. With auto-targeting weapons firing continuously, the ship drifts at 50–200 px/s even with zero input.
+- **Fix / Prevention**: Press T (diagnostic-only) to toggle a position pin: it zeroes velocity and re-writes Position/Acceleration every tick before the simulation step, so no force can move the player. Sample positions from the `[target]`/`[diag]` log lines rather than assuming the ship stays where it spawned.
+
   ## General workflow that works
 
 ```bash

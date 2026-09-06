@@ -7,9 +7,13 @@ public class TurretFiringSystem : GameSystem
     // Distance (or squared distance) below which positions are treated as coincident.
     private const float Epsilon = 0.001f;
 
+    // A manually selected target may be engaged at this multiple of normal range, capped by ammo reach.
+    private const float TargetedRangeMultiplier = 3f;
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         bool playerDead = IsPlayerDead(view);
+        ClearStalePrimaryTarget(view, commands);
 
         // Commands are deferred to phase end, so the query can be iterated directly.
         foreach (var (turretEntity, turret, turretPos, turretRot) in view.GetEntitiesWithComponents<Turret, Position, Rotation>())
@@ -47,6 +51,72 @@ public class TurretFiringSystem : GameSystem
         return view.GetEntitiesWithComponents<Player>().TryFirst(out var player) && view.TryGetComponent<Dead>(player.Entity, out _);
     }
 
+    // A dead or destroyed target is dropped so weapons fall back to auto-targeting.
+    private static void ClearStalePrimaryTarget(WorldView view, CommandBuffer commands)
+    {
+        if (!view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple)) return;
+        if (!view.TryGetComponent<PrimaryTarget>(playerTuple.Entity, out _)) return;
+        if (TryGetLivePrimaryTarget(view, out _)) return;
+
+        commands.Add(new RemoveComponentCommand<PrimaryTarget>(playerTuple.Entity));
+    }
+
+    private static bool TryGetLivePrimaryTarget(WorldView view, out Entity target)
+    {
+        if (!view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple))
+        {
+            target = default;
+            return false;
+        }
+
+        if (!view.TryGetComponent<PrimaryTarget>(playerTuple.Entity, out var primary))
+        {
+            target = default;
+            return false;
+        }
+
+        target = primary.Target;
+        bool isEnemy = view.TryGetComponent<EnemyShip>(target, out _) || view.TryGetComponent<EnemyMine>(target, out _);
+        if (!isEnemy) return false;
+        return !view.TryGetComponent<Dead>(target, out _);
+    }
+
+    // Lead-predicts a single moving target (enemy ship or mine). Same math as the auto-targeting loops.
+    private static (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? EvaluateMovingTarget(
+        WorldView view, Entity targetEntity, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed)
+    {
+        if (!view.TryGetComponent<Position>(targetEntity, out var pos)) return null;
+        if (!view.TryGetComponent<Velocity>(targetEntity, out var vel)) return null;
+
+        float radius = view.TryGetComponent<EnemyShip>(targetEntity, out var ship) ? ship.Radius
+            : view.TryGetComponent<EnemyMine>(targetEntity, out var mine) ? mine.Radius
+            : 0f;
+
+        Vector2 relPos = pos.Value - turretPos;
+        float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
+
+        if (distSq > rangeSq || distSq < Epsilon) return null;
+
+        Vector2 relVel = vel.Value - playerVelocity;
+        float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
+        float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
+        float c = -distSq;
+
+        float travelTime = SolveQuadratic(a, b, c);
+        if (travelTime <= 0f) return null;
+
+        Vector2 predictedPos = pos.Value + vel.Value * travelTime;
+        var toPredicted = predictedPos - turretPos;
+        float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
+
+        if (distToPredictedSq > rangeSq) return null;
+
+        Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (ammoSpeed * travelTime);
+        if (Vector2.Dot(forwardDir, aimDir) < cosHalfArc) return null;
+
+        return (aimDir, predictedPos, radius);
+    }
+
     private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
     {
         Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
@@ -67,6 +137,14 @@ public class TurretFiringSystem : GameSystem
             }
 
             float ammoSpeed = turret.Weapon.AmmoSpeed;
+
+            // A manually selected target takes priority at an extended range (capped by what the ammo can physically reach).
+            if (TryGetLivePrimaryTarget(view, out var primaryTarget))
+            {
+                float targetedRange = Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
+                var aimed = EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
+                if (aimed.HasValue) return aimed;
+            }
 
             if (turret.AutoTarget)
             {

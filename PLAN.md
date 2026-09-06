@@ -48,13 +48,17 @@ Goal:
 - D: right sideways thrust
 - Shift: boost (forward only, 2.5x)
 - Mouse: aim — the ship rotates toward the cursor (primary rotation)
+- Left click: lock the clicked enemy ship or mine as primary target (red corner brackets); all weapons then prioritize it at extended range. Clicking empty space clears the target
 - Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
 - R: restart from game over (back to ship selection)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
+- N: spawn a test enemy ship 250px up-right of the player with huge health (only when SPACEVORS_DIAGNOSTIC=1, for click-targeting tests)
+- H: set player health to 10000 so test enemies cannot end the run (only when SPACEVORS_DIAGNOSTIC=1, for testing)
+- T: toggle a position pin that freezes the player in place — kickback and collisions cannot move it (only when SPACEVORS_DIAGNOSTIC=1, for stable visual tests)
 
 ### Diagnostics env vars (testing only)
-- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin
 - SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
 
 ## MVP
@@ -238,13 +242,16 @@ Camera drifts based on the mouse's screen offset from window center (`CameraSyst
 - The camera tracks the player directly (per-tick motion is already smooth); only the mouse-driven drift eases in at `DriftFollowSpeed` (1.5/s), so fast mouse moves don't yank the screen — the eased offset persists on the `Camera.Drift` component
 - Mouse screen position flows into the simulation via `WorldView.MouseScreenPosition` (same seam as `ViewportSize`, set per tick in GameSession); aiming math is unchanged because it converts mouse→world through the camera target, so there is no feedback loop
 
-## Mouse clicks to set primary target
+## Mouse clicks to set primary target — done
 
-Allow player to set primary target for weapons.
-- Add some targeting bracket on currently targeted enemy ship
-- Initially all weapons will shoot targeted ship at much larger range than auto targeting range
-- If targeted enemy is destroyed, no target is automatically selected
-- If no target is selected, then weapons will shoot at closest target with current targeting priorities
+Left click locks the clicked enemy ship or mine as primary target; clicking empty space clears it.
+
+Implementation:
+- `PrimaryTarget(Entity)` component on the player entity (CombatComponents.cs); set/cleared by GameSession from the left-click input via `PrimaryTargetPicker.Pick` (Domain/Combat) — the picker is pure domain logic, unit-tested without graphics
+- Forgiving click zones scale with collision radius so small targets stay clickable: ships ×1.5 (radius ≤ 45) / ×1.1 (larger); mines ×4 (small) / ×2 (large). Multiple candidates → closest center wins; dead ships are ignored
+- `TurretFiringSystem` checks the locked target before the normal auto search: it fires at it when in arc and within targeted range = min(3× turret.Range, AmmoSpeed × ShotLifetime) — extended reach without extending shot lifetime. Out of range/arc or destroyed → falls back to normal closest-target behavior (no auto re-selection); a dead target's component is cleared each tick
+- `TargetingRenderer` (Game layer) draws red corner brackets around the live target, after ships and mines so they overlay both; skips dead/off-screen targets
+- Entity IDs are never reused, so a stale `PrimaryTarget` can only ever point at a dead entity — validity check = has Position + EnemyShip/EnemyMine + no Dead
 
 ## Future
 

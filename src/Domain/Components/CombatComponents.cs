@@ -14,6 +14,9 @@ public readonly record struct Turret(
     bool AutoTarget = true,
     bool IsEnemy = false);
 
+// Player's manually selected target (enemy ship or mine), set by mouse click.
+public readonly record struct PrimaryTarget(Entity Target);
+
 public readonly record struct WeaponSlots(int Used, int Max);
 
 public readonly record struct ArcOffset(float Angle);

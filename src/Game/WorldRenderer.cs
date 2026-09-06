@@ -22,6 +22,7 @@ public static class WorldRenderer
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
         EnemyShipRenderer.Draw(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawMines(em, camX, camY, windowWidth, windowHeight);
+        TargetingRenderer.Draw(em, playerEntity, camX, camY, windowWidth, windowHeight);
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
