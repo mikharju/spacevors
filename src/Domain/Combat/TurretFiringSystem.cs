@@ -81,7 +81,7 @@ public class TurretFiringSystem : GameSystem
         return !view.TryGetComponent<Dead>(target, out _);
     }
 
-    // Lead-predicts a single moving target (enemy ship or mine). Same math as the auto-targeting loops.
+    // Lead-predicts a single moving target (enemy ship or mine); shared by the priority-target check and the auto-targeting search.
     private static (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? EvaluateMovingTarget(
         WorldView view, Entity targetEntity, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed)
     {
@@ -239,66 +239,32 @@ public class TurretFiringSystem : GameSystem
 
     private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget, ref float nearestDistSq)
     {
-        foreach (var (mineEntity, mine, velocity, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
+        foreach (var (mineEntity, _, _, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
         {
+            var aimed = EvaluateMovingTarget(view, mineEntity, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed);
+            if (!aimed.HasValue) continue;
+
             Vector2 relPos = minePos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-            if (distSq > rangeSq || distSq < Epsilon) continue;
-
-            Vector2 relVel = velocity.Value - playerVelocity;
-            float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
-            float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
-            float c = -distSq;
-
-            float travelTime = SolveQuadratic(a, b, c);
-            if (travelTime <= 0f) continue;
-
-            Vector2 predictedPos = minePos.Value + velocity.Value * travelTime;
-            var toPredicted = predictedPos - turretPos;
-            float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
-
-            if (distToPredictedSq > rangeSq) continue;
-
-            Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (ammoSpeed * travelTime);
-            float dot = Vector2.Dot(forwardDir, aimDir);
-            if (dot < cosHalfArc) continue;
-
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (aimDir, predictedPos, mine.Radius);
+                nearestTarget = aimed.Value;
                 nearestDistSq = distSq;
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip, velocity, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
+        foreach (var (enemyShipEntity, _, _, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
         {
+            var aimed = EvaluateMovingTarget(view, enemyShipEntity, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed);
+            if (!aimed.HasValue) continue;
+
             Vector2 relPos = shipPos.Value - turretPos;
             float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
 
-            if (distSq > rangeSq || distSq < Epsilon) continue;
-
-            Vector2 relVel = velocity.Value - playerVelocity;
-            float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
-            float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
-            float c = -distSq;
-
-            float travelTime = SolveQuadratic(a, b, c);
-            if (travelTime <= 0f) continue;
-
-            Vector2 predictedPos = shipPos.Value + velocity.Value * travelTime;
-            var toPredicted = predictedPos - turretPos;
-            float distToPredictedSq = toPredicted.X * toPredicted.X + toPredicted.Y * toPredicted.Y;
-
-            if (distToPredictedSq > rangeSq) continue;
-
-            Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (ammoSpeed * travelTime);
-            float dot = Vector2.Dot(forwardDir, aimDir);
-            if (dot < cosHalfArc) continue;
-
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (aimDir, predictedPos, enemyShip.Radius);
+                nearestTarget = aimed.Value;
                 nearestDistSq = distSq;
             }
         }

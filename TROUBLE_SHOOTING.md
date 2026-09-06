@@ -134,6 +134,18 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Physics has angular damping but *no* linear drag, so anything that changes velocity persists: turret kickback (`TurretFiringSystem` adds recoil to the player on every shot), collision impulses, explosion knockback. With auto-targeting weapons firing continuously, the ship drifts at 50–200 px/s even with zero input.
 - **Fix / Prevention**: Press T (diagnostic-only) to toggle a position pin: it zeroes velocity and re-writes Position/Acceleration every tick before the simulation step, so no force can move the player. Sample positions from the `[target]`/`[diag]` log lines rather than assuming the ship stays where it spawned.
 
+## 21. Scout's LoadTestWeapon sprays thousands of bullets in a ring — don't use Scout for weapon-behavior tests
+
+- **Symptom**: A visual test with the default ship (Scout, key 1) showed a dense isotropic ring of ~2500 yellow bullets around the player instead of shots converging on targets; any conclusion about targeting/aiming from that frame is meaningless.
+- **Cause**: Scout's loadout includes `LoadTestWeapon` (`GameplayComponents.cs`, "Intentionally kept while development is ongoing so manual load testing is easy"). It fires continuously into a wide arc, producing the ring and dominating the ammo entity count.
+- **Fix / Prevention**: For tests of normal weapon behavior (auto-targeting, lead prediction, click targeting), select Fighter or Heavy (keys 2/3). Reserve Scout for deliberate load/perf checks.
+
+## 22. Upgrade-menu pause silently swallows all input — and kills/asteroid XP trigger it mid-test
+
+- **Symptom**: Keys (N/H/T) and clicks that worked seconds earlier suddenly produced no log lines at all; nothing looked broken, focus was correct.
+- **Cause**: Destroying enemies or asteroids drops XP; the magnet pulls it in, a level-up pauses the game on the upgrade menu, and `ReadPlayerInput` does not run while paused — every key/click is silently dropped until a card is chosen (same trap as entry 19's game-over screen).
+- **Fix / Prevention**: When input mysteriously dies mid-run, grep for `[UPGRADE] level=` in app.log or take an F12 shot and look for the bottom card row. Resume by pressing 1–5 (or clicking a card) before sending further test input.
+
   ## General workflow that works
 
 ```bash
