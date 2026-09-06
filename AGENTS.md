@@ -62,9 +62,11 @@ For every task:
 
 Never mix unrelated changes.
 
-Check TROUBLE_SHOOTING.md for problems encountered before and and avoid
+Check TROUBLE_SHOOTING.md for problems encountered before and avoid
 similar problems. When encountering new problems, update TROUBLE_SHOOTING.md
 with solutions.
+
+Headless build/run/screenshot recipe: see "General workflow that works" at the bottom of TROUBLE_SHOOTING.md.
 
 ## Communication
 

@@ -79,26 +79,45 @@ Components:
 Systems:
 - pure logic operating on components
 
-Examples (all in Domain/Components/, except Dead which lives in Combat/CollisionSystem.cs):
+Examples (all in Domain/Components/, except Dead which lives in Combat/CollisionSystem.cs; DebugMarker is diagnostics-only):
 
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
 Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget
-Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion
+Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion DebugMarker
 Health PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
 ## Write patterns
 
-Two ways to write components:
+Three ways systems write components, plus direct app-layer writes:
 
-- Deferred commands (systems): a system adds writes to the phase CommandBuffer. The buffer is applied once, after every system in that phase finishes. Within a phase all systems read pre-phase values for command-written components; last write wins in system order.
-- Direct writes (app layer only): GameSession writes straight to the EntityManager before the simulation step — Acceleration/AngularVelocity from input, turret Position/Rotation from SyncTurrets, thruster removal on pause. These are pre-phase: they form the tick's initial state, so systems read them normally.
+1. Deferred commands (default): a system adds writes to the phase CommandBuffer. One buffer per tick is applied once after every system in that phase finishes; later phases then read those values within the same tick. Within a phase all systems read pre-phase values for command-written components; last write wins in command order. Destructions are deferred until after all other commands of the flush, so an entity destroyed this phase can still receive writes in the same flush (they are discarded with it).
+2. Direct ref mutation (speed exceptions): three systems mutate a single component in place via slot refs instead of queuing a command per entity — this avoids thousands of command allocations per tick on hot paths:
+   - PositionIntegrationSystem integrates Position in place; it reads the pre-phase Velocity (PhysicsSystem's new-velocity commands are not applied yet), so position advances with last tick's velocity.
+   - AmmoLifetimeSystem decrements Ammo.Lifetime in place; only destructions go through commands.
+   - PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick.
+3. Local accumulation + single flush: CollisionSystem accumulates per-entity velocity/position-correction/angular-velocity/health deltas in per-frame dictionaries and emits one command per entity at the end of Update — otherwise last-write-wins would drop all but the final hit on an entity struck several times in one frame.
+
+Direct writes (app layer): GameSession writes straight to the EntityManager before the simulation step or while paused, never mid-phase:
+- Pre-phase (form the tick's initial state; systems read them normally): Acceleration/AngularVelocity from input, turret Position/Rotation from SyncTurrets, diagnostic-key writes.
+- While paused: upgrade application (Player/Turret/Health/WeaponSlots + new weapon turrets), pending-choice cleanup, thruster removal on pause entry.
 
 Rules:
-- Systems never write components directly; always via CommandBuffer. One documented exception: PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick.
-- The app layer writes only before a step (pre-phase) or while paused, never mid-phase.
+- Systems default to CommandBuffer; the direct ref mutations above are the only exceptions and must stay single-component in-place edits with no structural changes during iteration. Any new direct-write path requires updating this section first.
+- Direct mutation is visible immediately to later systems in the same phase; command writes are not. Choose deliberately: use a ref when a same-phase reader needs the fresh value, otherwise queue a command.
+
+## Phases
+
+One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffer is applied after each phase, so later phases read earlier phases' writes within the same tick:
+
+1. Movement: PhysicsSystem → BlueSparkHomeSystem → PositionIntegrationSystem → AmmoLifetimeSystem
+2. Action: TurretFiringSystem → EnemyShipSpawnSystem
+3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
+4. Cleanup: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem
+
+Order within a phase matters (see Write patterns). The "Cleanup" name is historical — it holds AI, spawners and camera.
 
 ## Main loop
 
@@ -147,8 +166,14 @@ No event queues. Systems signal each other through components, written via the C
 
 Examples:
 - CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions
-- PickupMagnetSystem raises Player.Xp; LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
+- PickupMagnetSystem raises Player.Xp (direct ref write, see Write patterns); LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
 - GameSession reads PendingChoice to pause and show the upgrade menu
+
+## Determinism
+
+- One world RNG owned by EntityManager (default seed 42), exposed as WorldView.Rng; all gameplay randomness (spawning, loot, scatter, upgrade shuffles) goes through it. No Random.Shared anywhere in src/.
+- Elapsed time lives on EntityManager (WorldView.ElapsedTime); difficulty ramps and spawn intervals derive from it.
+- Same seed → same run; covered by Tests/WorldRngTest.cs (same-seed spawn equality).
 
 ## Project layout
 
@@ -180,18 +205,23 @@ src/
         AsteroidSprite.cs        -- asteroid graphics variants
 
     Domain/                  -- pure game logic, no Raylib
-        AI/                    -- enemy ship + mine spawning, chase AI, drift
-        Combat/                -- firing (incl. click-target priority), collisions, effects, death explosions
+        AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI, drift
+        Combat/                -- firing (incl. click-target priority), collisions, effects, death explosions, asteroid factory
         Components/            -- component records (entity, physics, combat, effect, gameplay)
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera, blue spark homing
         Support/               -- SimulationRunner (phase ordering)
-        EntityManager.cs       -- entities + ComponentStorage<T> (compact arrays, swap-pop)
-        WorldView.cs           -- per-step read view over the EntityManager
+        EntityManager.cs       -- EntityManager + ComponentStorageBase + ComponentQuery<T1..T4>
+        ComponentStorage.cs    -- ComponentStorage<T>: compact arrays, swap-pop
+        Entity.cs              -- entity id type
+        System.cs              -- GameSystem base class (Update contract)
+        WorldView.cs           -- per-step view: reads, world RNG/elapsed time, viewport/mouse seams
         Commands.cs            -- command records + CommandBuffer
         CommandProcessor.cs    -- applies a CommandBuffer to the EntityManager
         SpatialGrid.cs         -- broad-phase spatial hash
         Vector2.cs             -- 2D math
+        CoolDownHelper.cs      -- FireCooldown read helper
+        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, events)
 
     RenderBench/             -- headless render benchmark (lit-sprite draw cost)
 
@@ -211,11 +241,9 @@ For example: All ship related data in record structs related to ship, no ship co
 
 ## Performance
 
-ComponentStorage<T> uses compact arrays with swap-pop deletion for O(1) removal.
-
-Iteration is O(count) instead of O(N log N).
-
-Entity IDs remain stable across compaction.
+- ComponentStorage<T>: compact arrays + entity→slot direct-index map (O(1) lookup), swap-pop deletion for O(1) removal; entity IDs stay stable across compaction. Iteration order is not insertion order — do not rely on it.
+- Multi-component queries iterate the smallest participating storage and probe the rest with O(1) slot lookups, so iteration cost scales with the smallest set instead of N log N.
+- Current status: Tests/PerformanceBenchmark.cs runs the full four-phase simulation at a fixed 120 fps timestep and checks an 8.3 ms frame budget per scenario. Ammo-heavy scenarios (up to ~15k live bullets) meet the budget; ship/asteroid-heavy scenarios currently exceed it — CollisionSystem is the known bottleneck (see plans/CODE_REVIEW.md, chunk 2).
 
 ## Troubleshooting
 
