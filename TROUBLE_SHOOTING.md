@@ -146,6 +146,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Destroying enemies or asteroids drops XP; the magnet pulls it in, a level-up pauses the game on the upgrade menu, and `ReadPlayerInput` does not run while paused — every key/click is silently dropped until a card is chosen (same trap as entry 19's game-over screen).
 - **Fix / Prevention**: When input mysteriously dies mid-run, grep for `[UPGRADE] level=` in app.log or take an F12 shot and look for the bottom card row. Resume by pressing 1–5 (or clicking a card) before sending further test input.
 
+## 23. `dotnet` crashes on first run in sandboxed environments (read-only HOME, non-persistent /tmp)
+
+- **Symptom**: Any `dotnet` command dies with `System.IO.IOException: Read-only file system : '/home/agent/.dotnet'` during first-time-use configuration; or "The user's home directory could not be determined."
+- **Cause**: The sandbox makes the default HOME read-only, and /tmp is a per-command overlay — writes there do not persist between commands. dotnet needs a writable HOME for its first-run sentinel files.
+- **Fix / Prevention**: Do it all in one command: `mkdir -p /tmp/dotnet-home && export HOME=/tmp/dotnet-home NUGET_PACKAGES=/tmp/nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 && dotnet test src/Tests/Tests.csproj`. NuGet packages (xunit, Test.Sdk, Raylib-cs) are not preinstalled and re-download from nuget.org on each invocation (network required); bin/obj outputs inside the workspace do persist.
+
   ## General workflow that works
 
 ```bash
