@@ -4,6 +4,11 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSystem : GameSystem
 {
+    // Ships farther than this from the player are culled: stale tailers would otherwise persist forever,
+    // count against the spawn cap, and thin out fresh threats (plans/DIFFICULTY_SCALING.md P1).
+    // Must stay above GameInitializer.InitialShipMaxDistance so initial ships survive their spawn.
+    public const float CullDistance = 5500f;
+
     private const float DriftCancelForwardThrust = 18f;
     private const float DriftCancelSideThrust = 14f;
     private const float DriftCancelBackThrust = 16f;
@@ -26,6 +31,13 @@ public class EnemyShipSystem : GameSystem
 
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
+
+            if (distSq > CullDistance * CullDistance)
+            {
+                commands.Add(new DestroyEntityCommand(shipEntity));
+                continue;
+            }
+
             if (distSq < 0.01f)
             {
                 commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
