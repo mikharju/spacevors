@@ -1,6 +1,18 @@
 # DIFFICULTY_SCALING.md
 
-Plan for fixing the inverted difficulty curve (2026-09-12). No code changes yet.
+Plan for fixing the inverted difficulty curve (2026-09-12).
+
+## Status: P1–P5 implemented (commits `difficulty P4` … `difficulty P5`)
+
+Deviations from the proposed values, and why:
+
+- **P1 cull distance = 5500 px** (plan said ~4000): P4 widens the initial spawn band to 2400–5000 px, so the cull must exceed it or initial ships die on spawn.
+- **P4**: kept 6 initial ships and took the plan's primary option (widen band) at 2400–5000 instead of 2400–6000, to keep the cull distance sane; mines 15 → 9 (mid-range); ship `InitialDelay` 5 → 9 s (mid-range).
+- **P3**: plan gave no values — chose `ReferenceSpeed = 100 px/s`, `MaxFactor = 3`. The interval is *divided* by the factor (the stated effect — constant density per unit distance — requires faster spawning at higher speed).
+- **P5**: "capped multipliers" had no value — capped via `MaxTier = 10` (stats stop growing after 10 minutes). Damage scales on `Turret.Weapon.Damage` (base 1), the only enemy damage that actually hits the player; the dead `EnemyShip.Damage` field was removed.
+- **P6/P7**: not implemented (out of scope for this work).
+
+Verification: unit tests per item (`EnemyShipCullTest`, `EnemySpeedScalingTest`, `SpawnIntervalScalingTest`, `EnemyTierStatsTest`) plus existing `WorldRngTest` (determinism) and `PerformanceBenchmark`. The headless "enemies within 1000 px" diagnostic log from the verification section was not added — no Xvfb in this environment to observe it; add if a manual threat-curve check is wanted.
 
 ## Problem statement
 

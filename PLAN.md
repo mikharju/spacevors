@@ -130,7 +130,7 @@ Enemies and mines never pop in on screen; they spawn just outside the current vi
 - Enemy ships: forward quadrant (±45° of player velocity); initial velocity = half of player velocity + 40 px/s drift toward the player; face the player at spawn. Inheriting only half means fast players close on spawns quicker and slowing down doesn't fling enemies away. The existing drift-cancel AI brakes them into a chase
 - No detection range: every enemy ship always turns toward the player and accelerates after it from any distance, capped at its own (slowish) Speed. Ships that spawn or drift out of view keep chasing and come back into view instead of coasting away forever
 - Mines: forward quadrant while the player moves, any direction while stationary (no meaningful "front"); zero initial velocity, MineDriftSystem pulls them in as before
-- Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter. Initial enemy ships additionally spawn at 1600–3200px from the player (never closer than just outside the screen), so they start beyond firing range and give the player a grace period before the first contact
+- Initial layout (GameInitializer) uses the same placement; takes viewport size as a parameter. Initial enemy ships additionally spawn at 2400–5000px from the player (never closer than just outside the screen), so they start beyond firing range and arrive one at a time over ~90 s instead of as a pack (Phase 4d tuning)
 
 ## Phase 4c
 
@@ -139,7 +139,17 @@ Enemy variants (stats in `EnemyShipType`, all ammo does 1 damage):
 - Interceptor: radius 45px, speed 90, high acceleration (85), low fire rate (0.6/s), 2 hp
 - Heavy Cannon: radius 78px, slow (speed 50), slow ammo (160 px/s), fire rate 0.8/s, 5 hp
 - Standard: radius 20px, speed 65, acceleration 45, baseline fire rate (1.5/s), 3 hp
-- All three spawn equally (~33% each)
+- All three spawn equally (~33% each); enemy turret ammo does 1 damage at base (time-based tiers in Phase 4d add on top)
+
+## Phase 4d
+
+Difficulty scaling fix (plans/DIFFICULTY_SCALING.md P1–P5, implemented). Fixes the inverted curve — hard start, empty late game. All deterministic: derived from `ElapsedTime` and current player velocity, no new RNG sources (`WorldRngTest` still passes).
+
+- **Cull stale ships** (`EnemyShipSystem`): enemy ships beyond 5500px from the player are destroyed in the existing per-ship loop; frees the 100-ship cap for fresh threats. Must stay above the initial spawn band (5000px)
+- **Speed scales with player speed**: effective top-speed cap = `max(base, 0.75 × playerSpeed)` with a hard ceiling at 2× base — applied to both the velocity clamp and the drift-cancel threshold; fast movement no longer guarantees escape, slow play is unchanged
+- **Spawn rate scales with player speed** (`EnemyShipSpawnSystem`): interval divided by `clamp(playerSpeed / 100 px/s, 1, 3)` — threat density per unit distance stays roughly constant at any speed (pure `NextInterval`/`SpeedFactor`, same RNG call count)
+- **Survivable start**: initial mines 15 → 9; grace periods: mine respawn delay 10 → 20 s, ship spawn delay 5 → 9 s
+- **Time-based stat tiers** (`EnemyShipFactory`, applied at spawn time only — no mid-run mutation): `tier = clamp(floor(elapsed / 60 s), 0, 10)`; HP ×(1 + 0.25·tier) rounded away from zero, turret damage base 1 + tier/2, fire rate ×(1 + 0.1·tier); stats stop growing after 10 minutes (MaxTier cap)
 
 ## Phase 5
 

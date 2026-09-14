@@ -172,7 +172,7 @@ Examples:
 ## Determinism
 
 - One world RNG owned by EntityManager (default seed 42), exposed as WorldView.Rng; all gameplay randomness (spawning, loot, scatter, upgrade shuffles) goes through it. No Random.Shared anywhere in src/.
-- Elapsed time lives on EntityManager (WorldView.ElapsedTime); difficulty ramps and spawn intervals derive from it.
+- Elapsed time lives on EntityManager (WorldView.ElapsedTime); difficulty ramps, spawn intervals, and enemy stat tiers (EnemyShipFactory.TierFor) derive from it.
 - Same seed → same run; covered by Tests/WorldRngTest.cs (same-seed spawn equality).
 
 ## Project layout
@@ -205,7 +205,7 @@ src/
         AsteroidSprite.cs        -- asteroid graphics variants
 
     Domain/                  -- pure game logic, no Raylib
-        AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI, drift
+        AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
         Combat/                -- firing (incl. click-target priority), collisions, effects, death explosions, asteroid factory
         Components/            -- component records (entity, physics, combat, effect, gameplay)
         Physics/               -- force integration + position integration
