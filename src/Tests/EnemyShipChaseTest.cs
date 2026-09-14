@@ -22,7 +22,7 @@ public class EnemyShipChaseTest
         em.AddComponent(shipEntity, new Velocity(Vector2.Zero));
         em.AddComponent(shipEntity, new Rotation(MathF.PI));
         em.AddComponent(shipEntity, new AngularVelocity(0f));
-        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
+        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, GraphicsId: 0));
 
         var view = new WorldView(em);
         float dt = 1f / 60f;
@@ -50,7 +50,7 @@ public class EnemyShipChaseTest
         em.AddComponent(shipEntity, new Velocity(Vector2.Zero));
         em.AddComponent(shipEntity, new Rotation(MathF.PI));
         em.AddComponent(shipEntity, new AngularVelocity(0f));
-        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
+        em.AddComponent(shipEntity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, GraphicsId: 0));
 
         var view = new WorldView(em);
         float dt = 1f / 60f;

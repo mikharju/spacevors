@@ -36,7 +36,7 @@ public class TargetingTest
         em.AddComponent(entity, new Position(pos));
         em.AddComponent(entity, new Velocity(vel));
         em.AddComponent(entity, new Rotation(0f));
-        em.AddComponent(entity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, Damage: 3, GraphicsId: 0));
+        em.AddComponent(entity, new EnemyShip(Radius: 20f, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, GraphicsId: 0));
         return entity;
     }
 
@@ -180,7 +180,7 @@ public class TargetingTest
         var em = new EntityManager();
         var big = em.CreateEntity();
         em.AddComponent(big, new Position(Vector2.Zero));
-        em.AddComponent(big, new EnemyShip(Radius: 78f, Speed: 50f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 0.8f, TurretAmmoSpeed: 160f, Acceleration: 45f, Damage: 3, GraphicsId: 2));
+        em.AddComponent(big, new EnemyShip(Radius: 78f, Speed: 50f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 0.8f, TurretAmmoSpeed: 160f, Acceleration: 45f, GraphicsId: 2));
 
         Assert.NotNull(PrimaryTargetPicker.Pick(em, new Vector2(84f, 0f))); // <= 78*1.1 = 85.8
         Assert.Null(PrimaryTargetPicker.Pick(em, new Vector2(90f, 0f)));

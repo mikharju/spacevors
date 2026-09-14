@@ -15,6 +15,7 @@ public readonly record struct Player(
     public float MaxThrustForce => MathF.Max(Thrust * Boost, MathF.Max(SideThrust, BackThrust));
 }
 
+// Enemy damage lives on the ship's Turret.Weapon (see EnemyShipFactory.BuildTurret).
 public readonly record struct EnemyShip(
     float Radius,
     float Speed,
@@ -23,7 +24,6 @@ public readonly record struct EnemyShip(
     float TurretFireRate,
     float TurretAmmoSpeed,
     float Acceleration,
-    int Damage,
     byte GraphicsId);
 
 public readonly record struct EnemyShipType(
