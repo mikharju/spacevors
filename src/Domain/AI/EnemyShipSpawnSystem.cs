@@ -8,11 +8,31 @@ public class EnemyShipSpawnSystem : GameSystem
 
     // Grace period before the first respawn (plans/DIFFICULTY_SCALING.md P4).
     private const float InitialDelay = 9f;
+    // Interval ramps from random StartMin–StartMax s down to random Min–Max s over RampDuration (see NextInterval).
+    private const float StartMinInterval = 5f;
+    private const float StartMaxInterval = 10f;
     private const float MinInterval = 2f;
     private const float MaxInterval = 4f;
+    private const float RampDuration = 180f;
     private const int MaxEnemyShips = 100;
     private const float MinSpawnDistance = 300f;
     public const float FollowFactor = 0.5f;
+
+    // Threat density per unit distance stays roughly constant at any speed (plans/DIFFICULTY_SCALING.md P3):
+    // a fast player covers more ground per second, so spawns must arrive faster to keep pressure up.
+    public const float ReferenceSpeed = 100f;
+    private const float MaxSpeedFactor = 3f;
+
+    public static float SpeedFactor(float playerSpeed) => Math.Clamp(playerSpeed / ReferenceSpeed, 1f, MaxSpeedFactor);
+
+    // Random spawn interval for the given elapsed time and player speed. Pure: rng is the only input.
+    public static float NextInterval(float elapsedTime, float playerSpeed, Random rng)
+    {
+        float progress = MathF.Min(elapsedTime / RampDuration, 1f);
+        float minInterval = MinInterval + (StartMinInterval - MinInterval) * (1f - progress);
+        float maxInterval = MaxInterval + (StartMaxInterval - MaxInterval) * (1f - progress);
+        return (minInterval + (float)rng.NextDouble() * (maxInterval - minInterval)) / SpeedFactor(playerSpeed);
+    }
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -50,13 +70,7 @@ public class EnemyShipSpawnSystem : GameSystem
 
         commands.AddEntity(components);
 
-        float elapsed = view.ElapsedTime;
-        float rampDuration = 180f;
-        float progress = MathF.Min(elapsed / rampDuration, 1f);
-        float currentMinInterval = MinInterval + (5f - MinInterval) * (1f - progress);
-        float currentMaxInterval = MaxInterval + (10f - MaxInterval) * (1f - progress);
-
-        _timer = currentMinInterval + (float)rng.NextDouble() * (currentMaxInterval - currentMinInterval);
+        _timer = NextInterval(view.ElapsedTime, velMagnitude, rng);
     }
 
     private bool IsSpawnClear(WorldView view, Vector2 spawnPos)
