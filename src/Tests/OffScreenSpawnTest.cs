@@ -70,7 +70,7 @@ public class OffScreenSpawnTest
 
         var spawner = new EnemyShipSpawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 6f, commands); // expires the initial delay
+        spawner.Update(view, 10f, commands); // expires the initial delay (9 s)
         commands.Apply(em);
 
         var ships = em.GetEntitiesWithComponents<EnemyShip>().ToList();
@@ -101,7 +101,7 @@ public class OffScreenSpawnTest
 
         var spawner = new MineRespawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 11f, commands); // expires the initial delay
+        spawner.Update(view, 21f, commands); // expires the initial delay (20 s)
         commands.Apply(em);
 
         var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();
@@ -121,7 +121,7 @@ public class OffScreenSpawnTest
 
         var spawner = new MineRespawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 11f, commands); // expires the initial delay
+        spawner.Update(view, 21f, commands); // expires the initial delay (20 s)
         commands.Apply(em);
 
         var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();
@@ -146,6 +146,8 @@ public class OffScreenSpawnTest
             Assert.False(IsInside(pos.Value, halfW, halfH), $"initial ship at {pos.Value} is inside the screen");
             Assert.True(pos.Value.Magnitude >= GameInitializer.InitialShipMinDistance - Eps,
                 $"initial ship at {pos.Value} is closer than {GameInitializer.InitialShipMinDistance} to the player");
+            Assert.True(pos.Value.Magnitude <= GameInitializer.InitialShipMaxDistance + Eps,
+                $"initial ship at {pos.Value} is farther than {GameInitializer.InitialShipMaxDistance} from the player");
         }
 
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())

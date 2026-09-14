@@ -5,7 +5,9 @@ namespace Spacevors.Domain.Systems;
 public class MineRespawnSystem : GameSystem
 {
     private float _timer = InitialDelay;
-    private const float InitialDelay = 10f;
+
+    // Grace period before the first respawn (plans/DIFFICULTY_SCALING.md P4).
+    private const float InitialDelay = 20f;
     private const int MinInterval = 4;
     private const int MaxInterval = 8;
     private const int MaxMines = 23; // hard ceiling on live mines before respawning pauses

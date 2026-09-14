@@ -7,10 +7,12 @@ namespace Spacevors.Game;
 
 public static class GameInitializer
 {
-    private const int InitialMineCount = 15;
+    // Early-game tuning (plans/DIFFICULTY_SCALING.md P4): fewer omnidirectional mines, and a wider
+    // initial ship band so the first ships arrive one at a time over ~90 s instead of as a pack.
+    private const int InitialMineCount = 9;
     private const int InitialEnemyShipCount = 6;
-    public const float InitialShipMinDistance = 1600f;
-    public const float InitialShipMaxDistance = 3200f;
+    public const float InitialShipMinDistance = 2400f;
+    public const float InitialShipMaxDistance = 5000f; // must stay below EnemyShipSystem.CullDistance
 
     private const float PlayerBoost = 2.5f;
     private const int ClutterCount = 40;

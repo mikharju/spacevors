@@ -5,7 +5,9 @@ namespace Spacevors.Domain.Systems;
 public class EnemyShipSpawnSystem : GameSystem
 {
     private float _timer = InitialDelay;
-    private const float InitialDelay = 5f;
+
+    // Grace period before the first respawn (plans/DIFFICULTY_SCALING.md P4).
+    private const float InitialDelay = 9f;
     private const float MinInterval = 2f;
     private const float MaxInterval = 4f;
     private const int MaxEnemyShips = 100;
