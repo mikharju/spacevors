@@ -13,10 +13,24 @@ public class EnemyShipSystem : GameSystem
     private const float DriftCancelSideThrust = 14f;
     private const float DriftCancelBackThrust = 16f;
 
+    // Effective top-speed cap (plans/DIFFICULTY_SCALING.md P2): enemies chase at PlayerSpeedFactor of the
+    // player's current speed so fast movement no longer guarantees escape, but never exceed MaxSpeedMultiplier
+    // times their base speed — it should read as pursuit, not rubber-banding. Slow play is unchanged (max with base).
+    private const float PlayerSpeedFactor = 0.75f;
+    private const float MaxSpeedMultiplier = 2f;
+
+    public static float EffectiveSpeed(float baseSpeed, float playerSpeed) =>
+        MathF.Min(MathF.Max(baseSpeed, PlayerSpeedFactor * playerSpeed), MaxSpeedMultiplier * baseSpeed);
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
+
+        Vector2 playerVel = Vector2.Zero;
+        if (hasPlayer && view.TryGetComponent<Velocity>(playerEntity, out var playerVelComp))
+            playerVel = playerVelComp.Value;
+        float playerSpeed = playerVel.Magnitude;
 
         foreach (var (shipEntity, ship, shipPos, currentRot) in view.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
@@ -48,7 +62,8 @@ public class EnemyShipSystem : GameSystem
             var currentVel = vel.Value;
             float speed = currentVel.Magnitude;
 
-            bool inDriftCancel = speed > ship.Speed;
+            float speedCap = EffectiveSpeed(ship.Speed, playerSpeed);
+            bool inDriftCancel = speed > speedCap;
 
             if (inDriftCancel)
             {
@@ -105,9 +120,9 @@ public class EnemyShipSystem : GameSystem
             {
                 var newVel = currentVel + accel.Value * deltaTime;
 
-                if (newVel.Magnitude > ship.Speed)
+                if (newVel.Magnitude > speedCap)
                 {
-                    newVel = newVel / newVel.Magnitude * ship.Speed;
+                    newVel = newVel / newVel.Magnitude * speedCap;
                 }
 
                 commands.Add(new AddComponentCommand<Velocity>(shipEntity, new Velocity(newVel)));
