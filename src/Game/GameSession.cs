@@ -255,6 +255,49 @@ public sealed class GameSession
             _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }
+
+        // Diagnostic only: halve the hp of the locked target (or nearest enemy ship) to reach smoke tiers quickly.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.K))
+        {
+            var victim = PickDamageTestVictim();
+            if (victim.HasValue && _em.TryGetComponent<Health>(victim.Value, out var health))
+            {
+                int halved = Math.Max(health.Current / 2, 1);
+                _em.AddComponent(victim.Value, new Health(halved, health.Max));
+                DiagnosticLogger.LogEvent("diag", $"K pressed: hp of {victim.Value} -> {halved}/{health.Max}");
+            }
+            else
+            {
+                DiagnosticLogger.LogEvent("diag", "K pressed: no target to damage");
+            }
+        }
+    }
+
+    // The locked primary target if alive, otherwise the nearest enemy ship with health.
+    private Entity? PickDamageTestVictim()
+    {
+        if (_em.TryGetComponent<PrimaryTarget>(_playerEntity, out var primary)
+            && _em.HasComponent<Health>(primary.Target)
+            && !_em.HasComponent<Dead>(primary.Target))
+            return primary.Target;
+
+        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        Entity? nearest = null;
+        float bestDistSq = float.MaxValue;
+
+        foreach (var (entity, _, _, pos) in _em.GetEntitiesWithComponents<EnemyShip, Health, Position>())
+        {
+            if (_em.HasComponent<Dead>(entity)) continue;
+            var diff = pos.Value - playerPos;
+            float distSq = diff.X * diff.X + diff.Y * diff.Y;
+            if (distSq < bestDistSq)
+            {
+                bestDistSq = distSq;
+                nearest = entity;
+            }
+        }
+
+        return nearest;
     }
 
     private void StepSimulation()

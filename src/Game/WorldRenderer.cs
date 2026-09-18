@@ -9,6 +9,12 @@ public static class WorldRenderer
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
+    // Damage smoke: grey puffs that fade out over their lifetime.
+    private const int SmokeColorR = 120;
+    private const int SmokeColorG = 120;
+    private const int SmokeColorB = 130;
+    private const int SmokeAlphaMax = 80;
+
     public static void Draw(
         EntityManager em, Entity playerEntity, ShipType shipType, bool diagnostics,
         float camX, float camY, int windowWidth, int windowHeight)
@@ -18,6 +24,7 @@ public static class WorldRenderer
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawDamageSparks(em, camX, camY, windowWidth, windowHeight);
         DrawHealSparks(em, camX, camY, windowWidth, windowHeight);
+        DrawSmokePuffs(em, camX, camY, windowWidth, windowHeight);
         ThrusterFlameRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
         EnemyShipRenderer.Draw(em, camX, camY, windowWidth, windowHeight, diagnostics);
@@ -295,6 +302,25 @@ public static class WorldRenderer
             int alpha = (int)(lifeRatio * 255);
 
             Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
+        }
+    }
+
+    private static void DrawSmokePuffs(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, puff) in em.GetEntitiesWithComponents<SmokePuff>())
+        {
+            if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
+            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
+            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+
+            float lifeRatio = puff.Lifetime / puff.InitialLifetime;
+            // Puffs grow to about twice their spawn radius as they fade out.
+            float radius = puff.Radius * (1f + (1f - lifeRatio));
+
+            if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
+
+            int alpha = (int)(SmokeAlphaMax * lifeRatio);
+            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
         }
     }
 
