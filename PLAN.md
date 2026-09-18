@@ -56,9 +56,10 @@ Goal:
 - N: spawn a test enemy ship 250px up-right of the player with huge health (only when SPACEVORS_DIAGNOSTIC=1, for click-targeting tests)
 - H: set player health to 10000 so test enemies cannot end the run (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - T: toggle a position pin that freezes the player in place — kickback and collisions cannot move it (only when SPACEVORS_DIAGNOSTIC=1, for stable visual tests)
+- K: halve hp of the locked target or nearest enemy ship to reach damage smoke tiers quickly (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
 ### Diagnostics env vars (testing only)
-- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin, K key halve target hp
 - SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
 
 ## MVP
@@ -275,16 +276,17 @@ Implementation:
 - HP bar above each bracket: dark background, fill lerps green→red by current/max ratio; entities without Health draw no bar
 - Verified in-game via manual playtest (brackets + bars on auto and manual targets); 6 new mark-lifecycle tests in TurretTargetMarkTest; PerformanceBenchmark worst case (1k ships) keeps TurretFiringSystem at ~1.1 ms/frame — within budget, no optimization needed
 
-## Graphical damage indicators
+## Graphical damage indicators — done
 
-- Damaged ships may emit smoke puffs or sparks
-- Less than 2/3 hp left, few smoke puffs
-- Less than 1/3 hp left, more smoke puffs and some sparks
-- Smoke puffs are left behind when ship moves, but follow moving ships at slower speed than ship speed
-- Smoke and sparks fade away after 1 second
-- Smoke and sparks get budget after which they are culled
-- Damage graphics priority is player ship > manual target > auto targets > other visible ships
-- Ships far away and not visible in game screen will not emit smoke or sparks even if damaged
+Damaged ships emit grey smoke puffs below 2/3 hp, more smoke plus white sparks below 1/3 hp; both fade after 1 second and trail behind moving ships.
+
+Implementation:
+- `SmokePuff(Lifetime, InitialLifetime, Radius)` component (EffectComponents.cs), aged by EffectSystem like the other effects; rendered as a grey circle that grows to ~2x its spawn radius while fading (`WorldRenderer.DrawSmokePuffs`)
+- `DamageEffectSystem` (Domain/Combat, Intent phase): probabilistic per-tick emission — roll `rng < rate x dt`, light tier 2 puffs/s, heavy tier 6 puffs/s + 3 sparks/s; spawns inherit half the ship's velocity plus jitter, so puffs trail behind moving ships without per-tick source tracking
+- Per-tick spawn budget (1 puff + 1 spark) allocated in priority order: player > live manual target > fresh auto-mark (< `AutoTargetMark.FreshWindow` = 1 s old, shared with the bracket renderer) > others; ties broken by distance to camera then entity id. Particles live exactly 1 second, so steady-state live count is bounded by the budget — no separate culling pass
+- Ships outside the viewport (plus a 100 px margin) and dead ships never emit; all randomness goes through `view.Rng` after candidate sorting, so determinism is preserved
+- K diagnostic key (SPACEVORS_DIAGNOSTIC=1): halves hp of the locked target or nearest enemy ship to reach smoke tiers quickly
+- 7 new tests in DamageEffectTest (tiers, culling, ordering, budget, expiry); PerformanceBenchmark: DamageEffectSystem <= 0.09 ms/frame at 1k ships — no optimization needed
 
 ## Future
 

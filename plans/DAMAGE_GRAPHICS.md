@@ -2,7 +2,13 @@
 
 Plan for the PLAN.md section "Graphical damage indicators" (2026-09-15).
 
-## Status: not started
+## Status: done
+
+Implemented in three commits: `7f050d4` spark rename (separate concern), `2e68a43` emission system, `787ecd0` smoke rendering + K diagnostic key; this update is the final docs commit. The PLAN.md section is now the canonical done summary.
+
+Deviations from this plan:
+- Stage 1 also moved the bracket-freshness window into `AutoTargetMark.FreshWindow` (shared by `TargetingRenderer` and `DamageEffectSystem`) instead of a renderer-local constant.
+- Headless screenshot verification was not possible in the build environment (no Xvfb/xdotool, no root to install) — visual tuning of rates/color/puff size is pending; starting values from this plan are what shipped.
 
 ## Requirements (verbatim from PLAN.md)
 
@@ -26,7 +32,7 @@ Plan for the PLAN.md section "Graphical damage indicators" (2026-09-15).
 - Effect entities are plain components + `Position`/`Velocity`: `Explosion`, `DamageSpark`, `HealSpark`, `DebugMarker` (`EffectComponents.cs`). `EffectSystem` (Resolution phase) decrements each lifetime via CommandBuffer and destroys at 0 — one loop per component type, same pattern four times.
 - Hit/death sparks are spawned by `CollisionSystem` / `ShipDeathExplosionSystem` with random velocity + lifetime through `view.Rng`; drawn as fading orange circles in `WorldRenderer.DrawSparks`.
 - `Health(int Current, int Max)` exists on player, enemy ships, and mines — hp ratio is computable everywhere.
-- Targeting state: `PrimaryTarget(Entity)` on the player (manual lock), `AutoTargetMark(float LastTargetedAt)` on targets, refreshed every tick by `TurretFiringSystem` (Action phase); renderer treats marks as fresh for 1 s (`TargetingRenderer.AutoBracketPersistence`).
+- Targeting state: `PrimaryTarget(Entity)` on the player (manual lock), `AutoTargetMark(float LastTargetedAt)` on targets, refreshed every tick by `TurretFiringSystem` (Action phase); renderer treats marks as fresh for 1 s (`AutoTargetMark.FreshWindow`, moved from a renderer-local constant during implementation).
 - Camera: `Camera(Vector2 Target, Vector2 Drift)`; rendering uses `Camera.Target` as screen center. Domain systems can read it via `view.GetEntitiesWithComponents<Camera>()`; viewport size flows in per tick via `WorldView.ViewportSize` (set in `GameSession.StepSimulation`).
 - Phase order: Movement → Action → Resolution → Intent, CommandBuffer applied after each phase — an **Intent-phase system sees this tick's** collision damage (Resolution) and target marks (Action).
 - Enemy ships beyond 5500 px are culled by `EnemyShipSystem`; the on-screen check below covers everything nearer.

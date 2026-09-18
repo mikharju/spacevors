@@ -85,7 +85,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
 Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
-Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion DebugMarker
+Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
@@ -115,7 +115,7 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 1. Movement: PhysicsSystem → PositionIntegrationSystem → AmmoLifetimeSystem
 2. Action: TurretFiringSystem → EnemyShipSpawnSystem
 3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
-4. Intent: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem
+4. Intent: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
 
@@ -206,10 +206,10 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority), collisions, effects, death explosions, asteroid factory
+        Combat/                -- firing (incl. click-target priority), collisions, effects, damage emission, death explosions, asteroid factory
         Components/            -- component records (entity, physics, combat, effect, gameplay)
         Physics/               -- force integration + position integration
-        Progression/           -- XP/level-up, pickups, camera, blue spark homing
+        Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering)
         EntityManager.cs       -- EntityManager + ComponentStorageBase + ComponentQuery<T1..T4>
         ComponentStorage.cs    -- ComponentStorage<T>: compact arrays, swap-pop
