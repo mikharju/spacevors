@@ -84,9 +84,9 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget
+Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
 Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion DebugMarker
-Health PendingChoice PendingUpgradeOptions UpgradeCounts Dead
+Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
 ## Write patterns
@@ -190,7 +190,7 @@ src/
         EnemyShipRenderer.cs     -- enemy ship sprites + fallbacks
         ShipSpriteRenderer.cs    -- player ship sprite (lit/flat)
         ThrusterFlameRenderer.cs -- thruster flames
-        TargetingRenderer.cs     -- red corner brackets on the player's locked target
+        TargetingRenderer.cs     -- targeting brackets + hp bars: red for the locked target, blue-grey for auto-targeted enemies
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
         StatsScreenRenderer.cs   -- ship stats screen (Tab)

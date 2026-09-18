@@ -260,17 +260,20 @@ Implementation:
 - `PrimaryTarget(Entity)` component on the player entity (CombatComponents.cs); set/cleared by GameSession from the left-click input via `PrimaryTargetPicker.Pick` (Domain/Combat) — the picker is pure domain logic, unit-tested without graphics
 - Forgiving click zones scale with collision radius so small targets stay clickable: ships ×1.5 (radius ≤ 45) / ×1.1 (larger); mines ×4 (small) / ×2 (large). Multiple candidates → closest center wins; dead ships are ignored
 - `TurretFiringSystem` checks the locked target before the normal auto search: it fires at it when in arc and within targeted range = min(3× turret.Range, AmmoSpeed × ShotLifetime) — extended reach without extending shot lifetime. Out of range/arc or destroyed → falls back to normal closest-target behavior (no auto re-selection); a dead target's component is cleared each tick
-- `TargetingRenderer` (Game layer) draws red corner brackets around the live target, after ships and mines so they overlay both; skips dead/off-screen targets
+- `TargetingRenderer` (Game layer) draws red corner brackets around the live target, after ships and mines so they overlay both; skips dead/off-screen targets (later extended with auto-target brackets + HP bars — see next section)
 - Entity IDs are never reused, so a stale `PrimaryTarget` can only ever point at a dead entity — validity check = has Position + EnemyShip/EnemyMine + no Dead
 
-## Enemy hp bar visible on targeting graphic
+## Enemy hp bar visible on targeting graphic — done
 
-- Any ship or mine targeted by player turret automatically gets blue grey targeting bracket
-- Auto targeting brackets persist for 1 second after turret has stopped targeting that ship or mine
-- Dead ships have no targeting brackets
-- Manual targeting bracket is bright red
-- All targeting brackets show enemy hp bar above bracket
-- Enemy hp bar is green when full, transitions to red when nearing dead
+Player turrets mark their current target every tick; auto-marked enemies get blue-grey brackets, the manually locked target gets bright red, and every bracket shows an HP bar (green→red) above it.
+
+Implementation:
+- `Health` now carries `(Current, Max)` so any damaged entity can report its own max — damage writes preserve Max, heals/upgrades write both
+- `AutoTargetMark(LastTargetedAt)` component (CombatComponents.cs): player turrets add/refresh it on their selected enemy ship or mine every tick. Selection is a pure function of state, so per-tick runs keep firing behavior bit-identical; enemy turrets and asteroid last-resort picks never mark
+- `TurretFiringSystem.FindTarget` returns the target entity alongside aim data (`TargetSelection`) so the caller can stamp the mark without re-searching
+- `TargetingRenderer` (Game layer) draws both bracket kinds after ships/mines: manual red takes priority over auto on the same entity; auto brackets expire 1 s after last selection using world time (frozen while paused); dead and off-screen targets are skipped
+- HP bar above each bracket: dark background, fill lerps green→red by current/max ratio; entities without Health draw no bar
+- Verified in-game via manual playtest (brackets + bars on auto and manual targets); 6 new mark-lifecycle tests in TurretTargetMarkTest; PerformanceBenchmark worst case (1k ships) keeps TurretFiringSystem at ~1.1 ms/frame — within budget, no optimization needed
 
 ## Graphical damage indicators
 

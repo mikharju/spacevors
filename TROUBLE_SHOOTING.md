@@ -152,6 +152,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: The sandbox makes the default HOME read-only, and /tmp is a per-command overlay — writes there do not persist between commands. dotnet needs a writable HOME for its first-run sentinel files.
 - **Fix / Prevention**: Do it all in one command: `mkdir -p /tmp/dotnet-home && export HOME=/tmp/dotnet-home NUGET_PACKAGES=/tmp/nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 && dotnet test src/Tests/Tests.csproj`. NuGet packages (xunit, Test.Sdk, Raylib-cs) are not preinstalled and re-download from nuget.org on each invocation (network required); bin/obj outputs inside the workspace do persist.
 
+## 24. `new Color(...)` is ambiguous when mixing byte and int arguments
+
+- **Symptom**: `Color c = new((byte)r, (byte)g, (byte)b, 255);` fails with CS0121 "The call is ambiguous between 'Color.Color(byte, byte, byte, byte)' and 'Color.Color(int, int, int, int)'".
+- **Cause**: Raylib-cs defines both overloads. An all-int list resolves to the int overload (identity beats constant conversion), but a mixed list keeps both candidates viable — `255` is a constant that fits in byte, so neither overload is strictly better.
+- **Fix / Prevention**: Make all four arguments the same type: either all ints (`new(255, 80, 80, 230)`) or a typed constant for the odd one out (`private const byte OpaqueAlpha = 255; new(r, g, b, OpaqueAlpha)`).
+
   ## General workflow that works
 
 ```bash
