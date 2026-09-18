@@ -28,6 +28,7 @@ packages/
 *.nupkg
 *.snupkg
 **/packages.lock.json
+.nuget-packages/
 
 ## .NET Core ##
 project.lock.json
