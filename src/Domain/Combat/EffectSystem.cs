@@ -9,7 +9,7 @@ public class EffectSystem : GameSystem
     {
         var sw = Stopwatch.StartNew();
 
-        foreach (var (entity, spark) in view.GetEntitiesWithComponents<Spark>())
+        foreach (var (entity, spark) in view.GetEntitiesWithComponents<DamageSpark>())
         {
             var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
@@ -18,12 +18,12 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Spark>(entity, new Spark(newLifetime, spark.InitialLifetime)));
+                commands.Add(new AddComponentCommand<DamageSpark>(entity, new DamageSpark(newLifetime, spark.InitialLifetime)));
             }
         }
 
         sw.Stop();
-        DiagnosticLogger.LogSystem("Effects: spark", sw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Effects: damage spark", sw.ElapsedTicks);
 
         sw.Restart();
 
@@ -45,7 +45,7 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (entity, spark) in view.GetEntitiesWithComponents<GreenSpark>())
+        foreach (var (entity, spark) in view.GetEntitiesWithComponents<HealSpark>())
         {
             var newLifetime = spark.Lifetime - deltaTime;
             if (newLifetime <= 0f)
@@ -54,30 +54,12 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<GreenSpark>(entity, new GreenSpark(newLifetime, spark.InitialLifetime)));
+                commands.Add(new AddComponentCommand<HealSpark>(entity, new HealSpark(newLifetime, spark.InitialLifetime)));
             }
         }
 
         sw.Stop();
-        DiagnosticLogger.LogSystem("Effects: green spark", sw.ElapsedTicks);
-
-        sw.Restart();
-
-        foreach (var (entity, spark) in view.GetEntitiesWithComponents<BlueSpark>())
-        {
-            var newLifetime = spark.Lifetime - deltaTime;
-            if (newLifetime <= 0f)
-            {
-                commands.Add(new DestroyEntityCommand(entity));
-            }
-            else
-            {
-                commands.Add(new AddComponentCommand<BlueSpark>(entity, new BlueSpark(newLifetime)));
-            }
-        }
-
-        sw.Stop();
-        DiagnosticLogger.LogSystem("Effects: blue spark", sw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Effects: heal spark", sw.ElapsedTicks);
 
         sw.Restart();
 

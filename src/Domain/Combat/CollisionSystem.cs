@@ -412,7 +412,7 @@ public class CollisionSystem : GameSystem
                     float sparkSpeed = (data.shipRadius + 15f) / 0.7f * (0.8f + (float)rng.NextDouble() * 0.4f);
                     Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
                     float sparkLifetime = 0.7f + (float)rng.NextDouble() * 0.3f;
-                    commands.AddEntity(new Position(data.hitPoint), new Velocity(sparkVel), new Spark(sparkLifetime, sparkLifetime));
+                    commands.AddEntity(new Position(data.hitPoint), new Velocity(sparkVel), new DamageSpark(sparkLifetime, sparkLifetime));
                 }
             }
             else
@@ -517,7 +517,7 @@ public class CollisionSystem : GameSystem
         float speed = 50f + (float)rng.NextDouble() * 100f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed, (float)Math.Sin(angle) * speed);
         float sparkLifetime = 0.8f + (float)rng.NextDouble() * 0.6f;
-        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
+        commands.AddEntity(new Position(position), new Velocity(velocity), new DamageSpark(sparkLifetime, sparkLifetime));
     }
 
     private void ResolveCollision(

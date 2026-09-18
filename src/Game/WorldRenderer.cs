@@ -16,8 +16,8 @@ public static class WorldRenderer
         DrawAsteroids(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
-        DrawSparks(em, camX, camY, windowWidth, windowHeight);
-        DrawGreenSparks(em, camX, camY, windowWidth, windowHeight);
+        DrawDamageSparks(em, camX, camY, windowWidth, windowHeight);
+        DrawHealSparks(em, camX, camY, windowWidth, windowHeight);
         ThrusterFlameRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
         EnemyShipRenderer.Draw(em, camX, camY, windowWidth, windowHeight, diagnostics);
@@ -153,9 +153,9 @@ public static class WorldRenderer
         }
     }
 
-    private static void DrawSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawDamageSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, spark) in em.GetEntitiesWithComponents<Spark>())
+        foreach (var (entity, spark) in em.GetEntitiesWithComponents<DamageSpark>())
         {
             var pos = em.GetComponent<Position>(entity);
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;
@@ -279,9 +279,9 @@ public static class WorldRenderer
         }
     }
 
-    private static void DrawGreenSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawHealSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, spark) in em.GetEntitiesWithComponents<GreenSpark>())
+        foreach (var (entity, spark) in em.GetEntitiesWithComponents<HealSpark>())
         {
             if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
             float cx = (float)pos.Value.X - camX + windowWidth / 2f;

@@ -14,7 +14,6 @@ public sealed class SimulationRunner
         MovementSystems = new GameSystem[]
         {
             new PhysicsSystem(),
-            new BlueSparkHomeSystem(),
             new PositionIntegrationSystem(),
             new AmmoLifetimeSystem()
         };

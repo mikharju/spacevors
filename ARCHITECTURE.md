@@ -85,7 +85,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
 Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
-Explosion Spark BlueSpark GreenSpark HealthOrb XpPickup ShipDeathExplosion DebugMarker
+Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
@@ -112,7 +112,7 @@ Rules:
 
 One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffer is applied after each phase, so later phases read earlier phases' writes within the same tick:
 
-1. Movement: PhysicsSystem → BlueSparkHomeSystem → PositionIntegrationSystem → AmmoLifetimeSystem
+1. Movement: PhysicsSystem → PositionIntegrationSystem → AmmoLifetimeSystem
 2. Action: TurretFiringSystem → EnemyShipSpawnSystem
 3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
 4. Intent: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem

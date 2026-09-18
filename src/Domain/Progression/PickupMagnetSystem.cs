@@ -115,7 +115,7 @@ public class PickupMagnetSystem : GameSystem
             if (dist < collectionDist)
             {
                 totalHeal += HealthOrbHealAmount;
-                SpawnGreenExplosion(view, position: pos.Value, commands);
+                SpawnHealSparks(position: pos.Value, commands);
                 commands.Add(new DestroyEntityCommand(orbEntity));
                 continue;
             }
@@ -131,7 +131,7 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    private void SpawnGreenExplosion(WorldView view, Vector2 position, CommandBuffer commands)
+    private void SpawnHealSparks(Vector2 position, CommandBuffer commands)
     {
         for (int i = 0; i < 6; i++)
         {
@@ -144,7 +144,7 @@ public class PickupMagnetSystem : GameSystem
             float speed = 80f + i * 25f;
             var velocity = sparkDir * speed;
 
-            commands.AddEntity(new Position(position), new Velocity(velocity), new GreenSpark(0.6f));
+            commands.AddEntity(new Position(position), new Velocity(velocity), new HealSpark(0.6f));
         }
     }
 }

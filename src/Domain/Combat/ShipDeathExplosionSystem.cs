@@ -94,6 +94,6 @@ public class ShipDeathExplosionSystem : GameSystem
         float speedVariation = 0.8f + (float)rng.NextDouble() * 0.4f;
         Vector2 velocity = new Vector2((float)Math.Cos(angle) * speed * speedVariation, (float)Math.Sin(angle) * speed * speedVariation);
         float sparkLifetime = 2.5f + (float)rng.NextDouble() * 0.5f;
-        commands.AddEntity(new Position(position), new Velocity(velocity), new Spark(sparkLifetime, sparkLifetime));
+        commands.AddEntity(new Position(position), new Velocity(velocity), new DamageSpark(sparkLifetime, sparkLifetime));
     }
 }
