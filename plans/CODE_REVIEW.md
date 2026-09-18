@@ -109,7 +109,7 @@ Consolidated from the per-chunk re-reviews below; line numbers verified against 
 19. **F12 screenshot.png not gitignored** (+ TROUBLE_SHOOTING #1's numbered-file claim unverified — confirm, then fix doc or add .gitignore entry).
 20. One-frame flash after upgrade selection (SpaceVorsApp.cs:252-254/:289-290); DrawPlayerShip no fallback on missing texture (ShipSpriteRenderer.cs:23-24); AGENTS.md typo "and and" (:57).
 
-**Excluded:** Scout's `LoadTestWeapon` — documented intentional for load testing (GameplayComponents.cs:174); keep tracking until a real Scout loadout lands.
+**Excluded:** Scout's `LoadTestWeapon` — documented intentional for load testing (GameplayComponents.cs:174); resolved 2026-09-18: Scout carries the SideShot loadout, LoadTestWeapon moved to Shadow.
 
 ## Findings
 
@@ -245,7 +245,7 @@ Consolidated from the per-chunk re-reviews below; line numbers verified against 
 - **[Minor] Player turrets firing after death** (old Chunk 4 Minor #5) — `TurretFiringSystem.cs:16` now skips non-enemy turrets when the player is dead.
 
 **Still open:**
-- **[Major/gameplay] Scout ships with LoadTestWeapon** (`GameplayComponents.cs:174`) — unchanged, but now carries an explicit comment "Intentionally kept while development is ongoing so manual load testing is easy". Still 8000 pellets/shot + kickback 100 for the default ship; keep tracking until a real Scout loadout lands.
+- **[Major/gameplay] Scout ships with LoadTestWeapon** (`GameplayComponents.cs:174`) — resolved 2026-09-18: Scout now carries the SideShot loadout (side shotguns, as its description says); LoadTestWeapon moved to Shadow for deliberate load/perf checks (TROUBLE_SHOOTING #21).
 - **[Minor] Mixed write patterns** — `EffectSystem` still issues one `AddComponentCommand` per effect entity per frame (`EffectSystem.cs:21,39,57,75,93`) while `AmmoLifetimeSystem.cs:27` and `PositionIntegrationSystem.cs:27` mutate via ref. The "pick one rule" question is still unanswered.
 - **[Minor] Redundant third target loop** — now in *both* `FindTargetWithPrediction` (`TurretFiringSystem.cs:227-245`) and `FindTargetWithoutPrediction` (`:288-305`); every enemy ship has a Velocity (`EnemyShipFactory.cs:22,35`). ~76 lines to delete.
 - **[Minor] Env var read per turret per shot** — unchanged (`TurretFiringSystem.cs:29`).

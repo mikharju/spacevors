@@ -86,7 +86,7 @@ Out of scope: the separate "Graphical damage indicators" section (smoke/sparks) 
 ### Stage 4 — Verification, performance check, docs
 
 - Headless screenshots per TROUBLE_SHOOTING.md "General workflow that works":
-  - Ship: Fighter (key 2 — troubleshooting #21: Scout's LoadTestWeapon ring pollutes targeting tests); press H then T for a stable scene; N to spawn test enemies.
+  - Ship: Fighter (key 2 — troubleshooting #21: Shadow's LoadTestWeapon ring pollutes targeting tests); press H then T for a stable scene; N to spawn test enemies.
   - Verify: blue-grey brackets + green bars on auto-targeted ships/mines; bar shrinks and shifts toward red as the test enemy takes damage (use a lower-HP spawn or several seconds of fire); left-click → bright red bracket + bar on the clicked ship; click empty space → manual clears, blue-grey persists from the fresh mark then fades ~1 s after turrets stop selecting it.
   - Dead ships: no brackets during/after the death explosion (mark ignored via `Dead` check).
   - The exact 1 s fade is timing-sensitive in screenshots — assert it with a domain test instead (mark timestamp vs `em.ElapsedTime`).

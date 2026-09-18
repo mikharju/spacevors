@@ -81,7 +81,7 @@ Deviations from this plan:
 
 - `WorldRenderer.cs`: `DrawSmokePuffs` pass per Design #4, inserted in draw order.
 - `GameSession.cs`: K-key hp-halving under `_diagnostics` (Design #5), logged via `DiagnosticLogger.LogEvent`.
-- Headless verification per TROUBLE_SHOOTING.md "General workflow that works": Fighter (key 2 — Scout's LoadTestWeapon ring pollutes the scene, troubleshooting #21); H + T for a stable invincible pinned player; N to spawn test enemies.
+- Headless verification per TROUBLE_SHOOTING.md "General workflow that works": Fighter (key 2 — Shadow's LoadTestWeapon ring pollutes the scene, troubleshooting #21); H + T for a stable invincible pinned player; N to spawn test enemies.
   - K once → light tier: sparse grey puffs trailing behind moving ships, gone ~1 s after emission stops; no sparks.
   - K twice → heavy tier: denser smoke **plus** orange sparks at the hull.
   - Move the ship (release T briefly) → trail stretches behind it; stop → puffs linger in place and fade.
@@ -91,7 +91,7 @@ Deviations from this plan:
 
 ### Stage 3 — Performance check, tuning, docs
 
-- Perf: run under LoadTestWeapon + max enemies (Scout), read `[FRAME]` per-system timings; expect negligible (≤124 Health entities scanned, small sort, ≤2 RNG calls/candidate). Also confirm `PerformanceBenchmark` scenarios stay within the 8.3 ms budget and `WorldRngTest` passes unchanged.
+- Perf: run under LoadTestWeapon + max enemies (Shadow), read `[FRAME]` per-system timings; expect negligible (≤124 Health entities scanned, small sort, ≤2 RNG calls/candidate). Also confirm `PerformanceBenchmark` scenarios stay within the 8.3 ms budget and `WorldRngTest` passes unchanged.
 - Tune via screenshots: rates, follow factor, puff size/growth/alpha/color; verify smoke reads against both dark space background and bright hulls/explosions.
 - Docs: rewrite the PLAN.md section as a done summary (style of "Mouse clicks to set primary target — done"); ARCHITECTURE.md component list gains `SmokePuff`, project layout notes the new system + renderer pass; note the K key in PLAN.md diagnostics.
 - Commit: `damage graphics tuning + docs`
