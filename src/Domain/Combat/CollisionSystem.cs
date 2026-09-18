@@ -382,7 +382,8 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(remaining)));
+                var mineHealth = view.GetComponent<Health>(mineEntity);
+                commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(remaining, mineHealth.Max)));
             }
         }
 
@@ -416,7 +417,8 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(remaining)));
+                var shipHealth = view.GetComponent<Health>(shipEntity);
+                commands.Add(new AddComponentCommand<Health>(shipEntity, new Health(remaining, shipHealth.Max)));
             }
         }
 
@@ -428,7 +430,8 @@ public class CollisionSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerRemaining)));
+                var playerHealth = view.GetComponent<Health>(playerEntity);
+                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerRemaining, playerHealth.Max)));
             }
         }
 

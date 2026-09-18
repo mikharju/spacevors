@@ -11,6 +11,7 @@ public class MineRespawnSystem : GameSystem
     private const int MinInterval = 4;
     private const int MaxInterval = 8;
     private const int MaxMines = 23; // hard ceiling on live mines before respawning pauses
+    private const int MineHealth = 2; // all mines share the same fixed health
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -39,7 +40,7 @@ public class MineRespawnSystem : GameSystem
 
         MineSize mSize = rng.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
 
-        commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)rng.NextDouble() * 20f, mineAngle), new Health(2));
+        commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, 30f + (float)rng.NextDouble() * 20f, mineAngle), new Health(MineHealth, MineHealth));
 
         float elapsed = view.ElapsedTime;
         float rampDuration = 180f;

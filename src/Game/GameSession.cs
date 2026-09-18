@@ -223,7 +223,8 @@ public sealed class GameSession
         // Diagnostic only: set player health very high so test enemies cannot end the run during visual tests.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.H))
         {
-            _em.AddComponent(_playerEntity, new Health(DiagnosticTestPlayerHealth));
+            _em.AddComponent(_playerEntity, new Health(DiagnosticTestPlayerHealth, DiagnosticTestPlayerHealth));
+            _em.AddComponent(_playerEntity, playerStats with { MaxHealth = DiagnosticTestPlayerHealth });
             DiagnosticLogger.LogEvent("diag", "H pressed");
         }
 
@@ -251,7 +252,7 @@ public sealed class GameSession
             var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
             var testEnemy = _em.CreateEntity();
             EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default);
-            _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth));
+            _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }
     }
@@ -408,8 +409,9 @@ public sealed class GameSession
             case UpgradeOption.Hp:
                 if (!em.HasComponent<Health>(playerEntity)) break;
                 var currentHealth = em.GetComponent<Health>(playerEntity);
-                em.AddComponent(playerEntity, new Health(currentHealth.Current + def.Additive));
-                em.AddComponent(playerEntity, playerStats with { MaxHealth = playerStats.MaxHealth + def.Additive });
+                int newMaxHealth = playerStats.MaxHealth + def.Additive;
+                em.AddComponent(playerEntity, new Health(currentHealth.Current + def.Additive, newMaxHealth));
+                em.AddComponent(playerEntity, playerStats with { MaxHealth = newMaxHealth });
                 break;
 
             case UpgradeOption.ForwardAcceleration:

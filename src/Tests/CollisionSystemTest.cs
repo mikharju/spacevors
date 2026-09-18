@@ -18,7 +18,7 @@ public class CollisionSystemTests
         var player = em.CreateEntity();
         em.AddComponent(player, new Position(new Vector2(0f, 0f)));
         em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
-        em.AddComponent(player, new Health(10));
+        em.AddComponent(player, new Health(10, 10));
     }
 
     [Fact]
@@ -235,7 +235,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
-        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Health(10, 10));
         em.AddComponent(ship, new Velocity(Vector2.Zero));
 
         var mine = em.CreateEntity();
@@ -268,7 +268,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
-        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Health(10, 10));
         em.AddComponent(ship, new Velocity(new Vector2(50f, 0f)));
 
         var asteroid = em.CreateEntity();
@@ -336,7 +336,7 @@ public class CollisionSystemTests
         var mine = em.CreateEntity();
         em.AddComponent(mine, new Position(new Vector2(-508f, 0f)));
         em.AddComponent(mine, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
-        em.AddComponent(mine, new Health(2));
+        em.AddComponent(mine, new Health(2, 2));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(-512f, 0f)));
@@ -364,7 +364,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
-        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Health(10, 10));
 
         var ammo = em.CreateEntity();
         em.AddComponent(ammo, new Position(new Vector2(-496f, 0f)));
@@ -378,6 +378,8 @@ public class CollisionSystemTests
         Assert.True(em.HasComponent<Health>(ship), "Ship should survive single hit");
         var health = em.GetComponent<Health>(ship);
         Assert.Equal(4, health.Current);
+        // Damage must not change the ship's max health.
+        Assert.Equal(10, health.Max);
     }
 
     [Fact]
@@ -390,7 +392,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
-        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Health(10, 10));
 
         var ammo1 = em.CreateEntity();
         em.AddComponent(ammo1, new Position(new Vector2(-496f, 0f)));
@@ -418,7 +420,7 @@ public class CollisionSystemTests
         var mine = em.CreateEntity();
         em.AddComponent(mine, new Position(new Vector2(-508f, 0f)));
         em.AddComponent(mine, new EnemyMine(MineSize.Large, Speed: 10f, Angle: 0f));
-        em.AddComponent(mine, new Health(10));
+        em.AddComponent(mine, new Health(10, 10));
 
         var ammo1 = em.CreateEntity();
         em.AddComponent(ammo1, new Position(new Vector2(-504f, 0f)));
@@ -497,7 +499,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
-        em.AddComponent(ship, new Health(10));
+        em.AddComponent(ship, new Health(10, 10));
 
         var mine = em.CreateEntity();
         em.AddComponent(mine, new Position(new Vector2(-492f, 0f)));
@@ -514,5 +516,7 @@ public class CollisionSystemTests
         Assert.True(em.HasComponent<Health>(ship), "Ship should survive single hit");
         var health = em.GetComponent<Health>(ship);
         Assert.Equal(4, health.Current);
+        // Damage must not change the ship's max health.
+        Assert.Equal(10, health.Max);
     }
 }

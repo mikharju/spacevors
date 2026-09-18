@@ -126,8 +126,8 @@ public class PickupMagnetSystem : GameSystem
         if (totalHeal > 0)
         {
             var health = view.GetComponent<Health>(playerEntity);
-            int healed = Math.Min(health.Current + totalHeal, playerStats.MaxHealth);
-            commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed)));
+            int healed = Math.Min(health.Current + totalHeal, health.Max);
+            commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed, health.Max)));
         }
     }
 

@@ -38,7 +38,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new AngularVelocity(0f));
 
         em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerBoost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
-        em.AddComponent(playerEntity, new Health(shipType.MaxHealth));
+        em.AddComponent(playerEntity, new Health(shipType.MaxHealth, shipType.MaxHealth));
 
         // A slot is one distinct weapon type (matches LevelUpSystem and AddNewWeaponTurret).
         int usedSlots = shipType.Weapon.Turrets.Select(t => t.Weapon.Name).Distinct().Count();
@@ -88,7 +88,7 @@ public static class GameInitializer
             em.AddComponent(mine, new Position(minePos));
             em.AddComponent(mine, new Velocity(Vector2.Zero));
             em.AddComponent(mine, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, (float)(rand.NextDouble() * Math.PI * 2)));
-            em.AddComponent(mine, new Health(2));
+            em.AddComponent(mine, new Health(2, 2));
         }
 
         // Spawn enemy ships well outside the screen (beyond firing range), drifting in toward the player

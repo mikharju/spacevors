@@ -49,7 +49,7 @@ public class PerformanceBenchmark
             em.AddComponent(playerEntity, new Rotation(0f));
             em.AddComponent(playerEntity, new AngularVelocity(0f));
             em.AddComponent(playerEntity, new Player(0f, 0f, 0f, 1f, MaxHealth: 10));
-            em.AddComponent(playerEntity, new Health(10));
+            em.AddComponent(playerEntity, new Health(10, 10));
             em.AddComponent(playerEntity, new WeaponSlots(0, 4));
 
             // Turrets on player (world-space positions synced from player rotation)
@@ -86,7 +86,7 @@ public class PerformanceBenchmark
                 em.AddComponent(entity, new EnemyShip(
                     Radius: 20f, Speed: 35f, TurnRate: 1f, FiringRange: 300f,
                     TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 9f, GraphicsId: 0));
-                em.AddComponent(entity, new Health(3));
+                em.AddComponent(entity, new Health(3, 3));
 
                 // Enemy turrets with zero cooldown so they fire immediately
                 var te = em.CreateEntity();
@@ -150,7 +150,7 @@ public class PerformanceBenchmark
                     (float)((rng.NextDouble() - 0.5) * 20f),
                     (float)((rng.NextDouble() - 0.5) * 20f))));
                 em.AddComponent(entity, new EnemyMine(isLarge ? MineSize.Large : MineSize.Small, Speed: 0f, Angle: 0f));
-                em.AddComponent(entity, new Health(1));
+                em.AddComponent(entity, new Health(1, 1));
             }
 
             var timings = new Dictionary<string, double>();

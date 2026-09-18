@@ -42,12 +42,14 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
         em.AddComponent(entity, BuildEnemyShip(type));
         em.AddComponent(entity, BuildTurret(type, tier));
-        em.AddComponent(entity, new Health(TieredHealth(type, tier)));
+        int health = TieredHealth(type, tier);
+        em.AddComponent(entity, new Health(health, health));
     }
 
     public static IInitialComponent[] CreateComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, float elapsedTime = 0f)
     {
         int tier = TierFor(elapsedTime);
+        int health = TieredHealth(type, tier);
         return new IInitialComponent[]
         {
             new InitialComponent<Position>(new Position(position)),
@@ -56,7 +58,7 @@ public static class EnemyShipFactory
             new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
             new InitialComponent<EnemyShip>(BuildEnemyShip(type)),
             new InitialComponent<Turret>(BuildTurret(type, tier)),
-            new InitialComponent<Health>(new Health(TieredHealth(type, tier)))
+            new InitialComponent<Health>(new Health(health, health))
         };
     }
 

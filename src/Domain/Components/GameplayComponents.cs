@@ -1,6 +1,6 @@
 namespace Spacevors.Domain.Components;
 
-public readonly record struct Health(int Current);
+public readonly record struct Health(int Current, int Max);
 
 public readonly record struct PendingChoice;
 
