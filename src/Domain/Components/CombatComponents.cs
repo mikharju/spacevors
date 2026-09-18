@@ -17,6 +17,9 @@ public readonly record struct Turret(
 // Player's manually selected target (enemy ship or mine), set by mouse click.
 public readonly record struct PrimaryTarget(Entity Target);
 
+// Last world time a player turret selected this entity as its current target; the renderer draws an auto bracket while fresh.
+public readonly record struct AutoTargetMark(float LastTargetedAt);
+
 public readonly record struct WeaponSlots(int Used, int Max);
 
 public readonly record struct ArcOffset(float Angle);

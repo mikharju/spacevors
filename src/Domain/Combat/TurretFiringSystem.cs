@@ -2,6 +2,9 @@ using Spacevors.Domain.Components;
 
 namespace Spacevors.Domain.Systems;
 
+// One turret's current target selection: the entity plus the aim data for firing at it.
+public readonly record struct TargetSelection(Entity Target, Vector2 AimDirection, Vector2 PredictedPosition, float Radius);
+
 public class TurretFiringSystem : GameSystem
 {
     // Distance (or squared distance) below which positions are treated as coincident.
@@ -21,24 +24,28 @@ public class TurretFiringSystem : GameSystem
             if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
             if (!turret.IsEnemy && playerDead) continue;
 
+            // Selection is computed every tick (pure function of state) so auto-target marks stay fresh between shots.
+            var selection = FindTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle);
+
+            if (!turret.IsEnemy && selection.HasValue && IsMarkableTarget(view, selection.Value.Target))
+                commands.Add(new AddComponentCommand<AutoTargetMark>(selection.Value.Target, new AutoTargetMark(view.ElapsedTime)));
+
             var cooldown = CooldownHelper.GetCooldown(view, turretEntity);
 
             if (cooldown <= 0f)
             {
-                var target = FindTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle);
-
-                if (target.HasValue)
+                if (selection.HasValue)
                 {
-                    FireAtTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle, target.Value, commands);
+                    FireAtTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle, selection.Value, commands);
                     commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
 
                     if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
                     {
-                        commands.AddEntity(new Position(target.Value.PredictedPosition), new DebugMarker(0.5f));
+                        commands.AddEntity(new Position(selection.Value.PredictedPosition), new DebugMarker(0.5f));
                     }
                 }
             }
-            else if (cooldown > 0f)
+            else
             {
                 var newCooldown = cooldown - deltaTime;
                 commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(Math.Max(newCooldown, 0f))));
@@ -82,7 +89,7 @@ public class TurretFiringSystem : GameSystem
     }
 
     // Lead-predicts a single moving target (enemy ship or mine); shared by the priority-target check and the auto-targeting search.
-    private static (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? EvaluateMovingTarget(
+    private static TargetSelection? EvaluateMovingTarget(
         WorldView view, Entity targetEntity, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed)
     {
         if (!view.TryGetComponent<Position>(targetEntity, out var pos)) return null;
@@ -114,17 +121,21 @@ public class TurretFiringSystem : GameSystem
         Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (ammoSpeed * travelTime);
         if (Vector2.Dot(forwardDir, aimDir) < cosHalfArc) return null;
 
-        return (aimDir, predictedPos, radius);
+        return new TargetSelection(targetEntity, aimDir, predictedPos, radius);
     }
 
-    private (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
+    // Only enemy ships and mines get auto brackets; asteroid selections are never marked.
+    private static bool IsMarkableTarget(WorldView view, Entity target) =>
+        view.TryGetComponent<EnemyShip>(target, out _) || view.TryGetComponent<EnemyMine>(target, out _);
+
+    private TargetSelection? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
     {
         Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
 
         float cosHalfArc = (float)Math.Cos(turret.ArcAngle / 2f);
         float rangeSq = turret.Range * turret.Range;
 
-        (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget = null;
+        TargetSelection? nearestTarget = null;
         float nearestDistSq = float.MaxValue;
 
         if (!turret.IsEnemy)
@@ -205,7 +216,7 @@ public class TurretFiringSystem : GameSystem
                     if (distToPredictedSq > reachSq) continue;
 
                     Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (ammoSpeed * travelTime);
-                    nearestTarget = (aimDir, predictedPos, player.Radius);
+                    nearestTarget = new TargetSelection(playerEntity, aimDir, predictedPos, player.Radius);
                     nearestDistSq = distSq;
                 }
             }
@@ -230,14 +241,14 @@ public class TurretFiringSystem : GameSystem
 
                 if (distSq < nearestDistSq)
                 {
-                    nearestTarget = (dir, pos.Value, getRadius(value));
+                    nearestTarget = new TargetSelection(candidateEntity, dir, pos.Value, getRadius(value));
                     nearestDistSq = distSq;
                 }
             }
         }
     }
 
-    private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget, ref float nearestDistSq)
+    private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref TargetSelection? nearestTarget, ref float nearestDistSq)
     {
         foreach (var (mineEntity, _, _, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
         {
@@ -249,7 +260,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = aimed.Value;
+                nearestTarget = aimed;
                 nearestDistSq = distSq;
             }
         }
@@ -264,7 +275,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = aimed.Value;
+                nearestTarget = aimed;
                 nearestDistSq = distSq;
             }
         }
@@ -284,13 +295,13 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (toTargetDir, shipPos.Value, enemyShip.Radius);
+                nearestTarget = new TargetSelection(enemyShipEntity, toTargetDir, shipPos.Value, enemyShip.Radius);
                 nearestDistSq = distSq;
             }
         }
     }
 
-    private static void FindTargetWithoutPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, ref (Vector2 AimDirection, Vector2 PredictedPosition, float Radius)? nearestTarget, ref float nearestDistSq)
+    private static void FindTargetWithoutPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, ref TargetSelection? nearestTarget, ref float nearestDistSq)
     {
         foreach (var (mineEntity, mine, velocity, minePos) in view.GetEntitiesWithComponents<EnemyMine, Velocity, Position>())
         {
@@ -306,7 +317,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (aimDir, minePos.Value, mine.Radius);
+                nearestTarget = new TargetSelection(mineEntity, aimDir, minePos.Value, mine.Radius);
                 nearestDistSq = distSq;
             }
         }
@@ -325,7 +336,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (aimDir, shipPos.Value, enemyShip.Radius);
+                nearestTarget = new TargetSelection(enemyShipEntity, aimDir, shipPos.Value, enemyShip.Radius);
                 nearestDistSq = distSq;
             }
         }
@@ -344,13 +355,13 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = (aimDir, shipPos.Value, enemyShip.Radius);
+                nearestTarget = new TargetSelection(enemyShipEntity, aimDir, shipPos.Value, enemyShip.Radius);
                 nearestDistSq = distSq;
             }
         }
     }
 
-    private void FireAtTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle, (Vector2 AimDirection, Vector2 PredictedPosition, float Radius) target, CommandBuffer commands)
+    private void FireAtTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle, TargetSelection target, CommandBuffer commands)
     {
         Vector2 ammoDir = target.AimDirection;
 

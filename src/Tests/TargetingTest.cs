@@ -8,7 +8,7 @@ namespace Tests;
 public class TargetingTest
 {
     // Turret sits at origin, rotation 0 = facing down (-Y). Targets with negative Y are in front.
-    private static (EntityManager em, Entity player, Entity turret) CreatePlayerWorld(float range, float ammoSpeed, float shotLifetime, float arcAngle = MathF.PI / 2f)
+    internal static (EntityManager em, Entity player, Entity turret) CreatePlayerWorld(float range, float ammoSpeed, float shotLifetime, float arcAngle = MathF.PI / 2f)
     {
         var em = new EntityManager();
 
@@ -30,7 +30,7 @@ public class TargetingTest
         return (em, playerEntity, turretEntity);
     }
 
-    private static Entity AddEnemyShip(EntityManager em, Vector2 pos, Vector2 vel = default)
+    internal static Entity AddEnemyShip(EntityManager em, Vector2 pos, Vector2 vel = default)
     {
         var entity = em.CreateEntity();
         em.AddComponent(entity, new Position(pos));
@@ -40,7 +40,7 @@ public class TargetingTest
         return entity;
     }
 
-    private static Entity AddMine(EntityManager em, Vector2 pos, MineSize size)
+    internal static Entity AddMine(EntityManager em, Vector2 pos, MineSize size)
     {
         var entity = em.CreateEntity();
         em.AddComponent(entity, new Position(pos));
