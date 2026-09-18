@@ -1,0 +1,1 @@
+PACEVORS_DIAGNOSTIC=1 dotnet run --project src/Game/Game.csproj
