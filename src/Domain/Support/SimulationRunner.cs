@@ -38,7 +38,8 @@ public sealed class SimulationRunner
             new MineDriftSystem(),
             new MineRespawnSystem(),
             new EnemyShipSystem(),
-            new CameraSystem()
+            new CameraSystem(),
+            new DamageEffectSystem()
         };
     }
 

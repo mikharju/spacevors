@@ -18,7 +18,11 @@ public readonly record struct Turret(
 public readonly record struct PrimaryTarget(Entity Target);
 
 // Last world time a player turret selected this entity as its current target; the renderer draws an auto bracket while fresh.
-public readonly record struct AutoTargetMark(float LastTargetedAt);
+public readonly record struct AutoTargetMark(float LastTargetedAt)
+{
+    // How long after last selection the mark still counts (auto brackets, damage-graphics priority).
+    public const float FreshWindow = 1f;
+}
 
 public readonly record struct WeaponSlots(int Used, int Max);
 

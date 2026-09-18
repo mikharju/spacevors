@@ -9,6 +9,9 @@ public readonly record struct DamageSpark(float Lifetime, float InitialLifetime 
 
 public readonly record struct HealSpark(float Lifetime, float InitialLifetime = 0.6f);
 
+// Damage smoke: trails behind damaged ships, fades over its lifetime. Radius is set at spawn from the source hull size.
+public readonly record struct SmokePuff(float Lifetime, float InitialLifetime = 1f, float Radius = 6f);
+
 public readonly record struct HealthOrb(float Lifetime = 30f, float Radius = 8f);
 
 public readonly record struct XpPickup(int XpAmount, float Lifetime = 30f, float Radius = 6f, bool Chased = false);

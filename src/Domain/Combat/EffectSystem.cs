@@ -63,6 +63,24 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
+        foreach (var (entity, puff) in view.GetEntitiesWithComponents<SmokePuff>())
+        {
+            var newLifetime = puff.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(entity));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<SmokePuff>(entity, new SmokePuff(newLifetime, puff.InitialLifetime, puff.Radius)));
+            }
+        }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Effects: smoke puff", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, marker) in view.GetEntitiesWithComponents<DebugMarker>())
         {
             var newLifetime = marker.Lifetime - deltaTime;

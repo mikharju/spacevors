@@ -17,9 +17,6 @@ public static class TargetingRenderer
     private const float ArmLength = 10f;
     private const float Thickness = 2.5f;
 
-    // Auto brackets persist this long after the last turret selected the target (world seconds).
-    private const float AutoBracketPersistence = 1f;
-
     private const float BarHeight = 4f;
     private const float BarGap = 6f; // gap between the top bracket corners and the bar
 
@@ -36,7 +33,7 @@ public static class TargetingRenderer
         foreach (var (entity, mark) in em.GetEntitiesWithComponents<AutoTargetMark>())
         {
             if (em.HasComponent<Dead>(entity)) continue; // dead ships keep their mark until destroyed
-            if (em.ElapsedTime - mark.LastTargetedAt > AutoBracketPersistence) continue;
+            if (em.ElapsedTime - mark.LastTargetedAt > AutoTargetMark.FreshWindow) continue;
             if (hasManual && entity == primary.Target) continue; // manual bracket takes priority
 
             DrawTarget(em, entity, AutoBracketColor, camX, camY, windowWidth, windowHeight);
