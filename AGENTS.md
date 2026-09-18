@@ -79,6 +79,15 @@ When proposing changes:
 
 Prefer bullet lists.
 
+## Planning
+
+Save plan files under plans.
+- Plan files may become stale later
+- Keep AGENTS.md, ARCHITECTURE.md, PLAN.md up to date
+- When user asks for plan, only make plan file, do not implement, change code, run tests.
+- Web search is ok when planning
+- If web search fails, report to user in reply which sites were not reachable
+
 ## Dependencies
 
 Only introduce a dependency if it substantially simplifies the project.
