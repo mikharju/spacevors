@@ -263,6 +263,26 @@ Implementation:
 - `TargetingRenderer` (Game layer) draws red corner brackets around the live target, after ships and mines so they overlay both; skips dead/off-screen targets
 - Entity IDs are never reused, so a stale `PrimaryTarget` can only ever point at a dead entity — validity check = has Position + EnemyShip/EnemyMine + no Dead
 
+## Enemy hp bar visible on targeting graphic
+
+- Any ship or mine targeted by player turret automatically gets blue grey targeting bracket
+- Auto targeting brackets persist for 1 second after turret has stopped targeting that ship or mine
+- Dead ships have no targeting brackets
+- Manual targeting bracket is bright red
+- All targeting brackets show enemy hp bar above bracket
+- Enemy hp bar is green when full, transitions to red when nearing dead
+
+## Graphical damage indicators
+
+- Damaged ships may emit smoke puffs or sparks
+- Less than 2/3 hp left, few smoke puffs
+- Less than 1/3 hp left, more smoke puffs and some sparks
+- Smoke puffs are left behind when ship moves, but follow moving ships at slower speed than ship speed
+- Smoke and sparks fade away after 1 second
+- Smoke and sparks get budget after which they are culled
+- Damage graphics priority is player ship > manual target > auto targets > other visible ships
+- Ships far away and not visible in game screen will not emit smoke or sparks even if damaged
+
 ## Future
 
 - bosses
