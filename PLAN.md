@@ -288,6 +288,13 @@ Implementation:
 - K diagnostic key (SPACEVORS_DIAGNOSTIC=1): halves hp of the locked target or nearest enemy ship to reach smoke tiers quickly
 - 7 new tests in DamageEffectTest (tiers, culling, ordering, budget, expiry); PerformanceBenchmark: DamageEffectSystem <= 0.09 ms/frame at 1k ships — no optimization needed
 
+## Difficulty scaling
+
+- Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.
+- At start of game only spawn easiest enemies and mines
+- As game progresses mix in harder enemies
+- As difficulty increases allow clusters of enemies to spawn
+
 ## Future
 
 - bosses
