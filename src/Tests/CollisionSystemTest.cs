@@ -411,6 +411,42 @@ public class CollisionSystemTests
     }
 
     [Fact]
+    public void AmmoVsEnemyShip_BulletConsumedOnHit_DamageAppliedOnce()
+    {
+        var (em, view, system) = Setup();
+
+        AddPlayer(em);
+
+        // HeavyCannon-sized ship: a bullet stays inside its collision radius for many frames.
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
+        em.AddComponent(ship, new EnemyShip(Radius: 78f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 2));
+        em.AddComponent(ship, new Health(30, 30));
+
+        // Bullet starts inside the ship's collision radius (78 + 2.5 > 4) and never moves in this test,
+        // so a non-consumed bullet would re-hit every frame.
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-496f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(120f, 0f), Radius: 2.5f, Lifetime: 10f, Damage: 1));
+
+        var firstFrame = new CommandBuffer();
+        system.Update(view, 1 / 120f, firstFrame);
+        Assert.Contains(firstFrame.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+        firstFrame.Apply(em);
+
+        for (int frame = 0; frame < 5; frame++)
+        {
+            var commands = new CommandBuffer();
+            system.Update(view, 1 / 120f, commands);
+            commands.Apply(em);
+        }
+
+        Assert.True(em.HasComponent<Health>(ship), "Ship should survive a single bullet");
+        var health = em.GetComponent<Health>(ship);
+        Assert.Equal(29, health.Current);
+    }
+
+    [Fact]
     public void TwoAmmoVsMine_BothDamageApplied_MineDies()
     {
         var (em, view, system) = Setup();

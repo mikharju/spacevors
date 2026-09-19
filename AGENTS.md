@@ -66,6 +66,9 @@ Check TROUBLE_SHOOTING.md for problems encountered before and avoid
 similar problems. When encountering new problems, update TROUBLE_SHOOTING.md
 with solutions.
 
+Only record LLM workflow related problems in TROUBLE_SHOOTING.md, not project code problems that are not 
+likely to be encountered in future while working on other features.
+
 Headless build/run/screenshot recipe: see "General workflow that works" at the bottom of TROUBLE_SHOOTING.md.
 
 ## Communication

@@ -301,6 +301,8 @@ public class CollisionSystem : GameSystem
                 var enemyShip = view.GetComponent<EnemyShip>(closestShipHit.Value);
                 var shipPos = view.GetComponent<Position>(closestShipHit.Value);
                 _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
+                _entitiesToDestroy.Add(ammoEntity);
             }
 
             if (!ammo.IsEnemy) continue;
