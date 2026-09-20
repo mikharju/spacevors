@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 using Xunit;
 
 public class PerformanceBenchmark

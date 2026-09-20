@@ -1,5 +1,6 @@
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 using Xunit;
 

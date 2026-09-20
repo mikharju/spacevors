@@ -1,4 +1,5 @@
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 
 namespace Spacevors.Domain.Systems;
 

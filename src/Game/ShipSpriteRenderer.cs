@@ -1,5 +1,6 @@
 using Raylib_cs;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 
 namespace Spacevors.Game;
 

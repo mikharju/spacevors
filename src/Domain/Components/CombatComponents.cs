@@ -1,3 +1,5 @@
+using Spacevors.Domain.Stats; // WeaponStats
+
 namespace Spacevors.Domain.Components;
 
 public enum AmmoColor { Yellow, Green, Blue, Red }
