@@ -1,13 +1,10 @@
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 
 namespace Spacevors.Domain.Systems;
 
 public class PickupMagnetSystem : GameSystem
 {
-    const float MagnetAcceleration = 800f;
-    const float MaxMagnetSpeed = 350f;
-    const int HealthOrbHealAmount = 3;
-
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
@@ -60,7 +57,7 @@ public class PickupMagnetSystem : GameSystem
             }
 
             var normalizedDir = diff / dist;
-            var newVel = normalizedDir * MaxMagnetSpeed;
+            var newVel = normalizedDir * LootStats.MaxMagnetSpeed;
 
             var newPos = pos.Value + newVel * deltaTime;
             commands.Add(new AddComponentCommand<Position>(pickupEntity, new Position(newPos)));
@@ -97,13 +94,13 @@ public class PickupMagnetSystem : GameSystem
             if (dist < playerStats.PickupRadius)
             {
                 Vector2 currentVel = view.TryGetComponent<Velocity>(orbEntity, out var vel) ? vel.Value : Vector2.Zero;
-                var accel = (diff / dist) * MagnetAcceleration;
+                var accel = (diff / dist) * LootStats.MagnetAcceleration;
                 var newVel = currentVel + accel * deltaTime;
                 float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
 
-                if (speed > MaxMagnetSpeed)
+                if (speed > LootStats.MaxMagnetSpeed)
                 {
-                    newVel = newVel / speed * MaxMagnetSpeed;
+                    newVel = newVel / speed * LootStats.MaxMagnetSpeed;
                 }
 
                 var newPos = pos.Value + newVel * deltaTime;
@@ -114,7 +111,7 @@ public class PickupMagnetSystem : GameSystem
             float collectionDist = playerStats.Radius + orb.Radius;
             if (dist < collectionDist)
             {
-                totalHeal += HealthOrbHealAmount;
+                totalHeal += LootStats.HealthOrbHealAmount;
                 SpawnHealSparks(position: pos.Value, commands);
                 commands.Add(new DestroyEntityCommand(orbEntity));
                 continue;

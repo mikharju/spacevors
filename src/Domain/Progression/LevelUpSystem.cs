@@ -32,7 +32,7 @@ public class LevelUpSystem : GameSystem
         var playerPos = playerTuple.Value2;
 
         var playerStats = view.GetComponent<Player>(playerEntity);
-        int xpThreshold = playerStats.Level * 10;
+        int xpThreshold = UpgradeStats.XpForLevel(playerStats.Level);
 
         if (playerStats.Xp >= xpThreshold)
         {

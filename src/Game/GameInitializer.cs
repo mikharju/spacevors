@@ -15,7 +15,6 @@ public static class GameInitializer
     public const float InitialShipMinDistance = 2400f;
     public const float InitialShipMaxDistance = 5000f; // must stay below EnemyShipSystem.CullDistance
 
-    private const float PlayerBoost = 2.5f;
     private const int ClutterCount = 40;
     private const float BackgroundExtent = 6000f; // stars and clutter spread across ±extent/2 around the origin
 
@@ -38,7 +37,7 @@ public static class GameInitializer
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
 
-        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerBoost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
+        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerShipStats.Boost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth, shipType.MaxHealth));
 
         // A slot is one distinct weapon type (matches LevelUpSystem and AddNewWeaponTurret).
@@ -86,10 +85,11 @@ public static class GameInitializer
             Vector2 dir = SpawnPlacement.AnyDirection(rand);
             Vector2 minePos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
             MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
+            var mineType = MineType.FromSize(mSize);
             em.AddComponent(mine, new Position(minePos));
             em.AddComponent(mine, new Velocity(Vector2.Zero));
-            em.AddComponent(mine, new EnemyMine(mSize, 30f + (float)rand.NextDouble() * 20f, (float)(rand.NextDouble() * Math.PI * 2)));
-            em.AddComponent(mine, new Health(2, 2));
+            em.AddComponent(mine, new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rand.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), (float)(rand.NextDouble() * Math.PI * 2)));
+            em.AddComponent(mine, new Health(mineType.Health, mineType.Health));
         }
 
         // Spawn enemy ships well outside the screen (beyond firing range), drifting in toward the player

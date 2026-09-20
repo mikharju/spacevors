@@ -17,7 +17,6 @@ public class CollisionSystem : GameSystem
     // Distance (or squared distance) below which bodies are treated as coincident.
     private const float Epsilon = 0.001f;
     private const float EnemyShipMass = 3000f;
-    private const int MineContactDamage = 3;
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly HashSet<Entity> _entitiesToDestroy = new();
@@ -719,7 +718,7 @@ public class CollisionSystem : GameSystem
             remaining = playerHealth.Current;
             _frameRemainingHealth[playerEntity] = remaining;
         }
-        _frameRemainingHealth[playerEntity] -= MineContactDamage;
+        _frameRemainingHealth[playerEntity] -= MineStats.ContactDamage;
 
         var normal = diff / (float)Math.Sqrt(distSq);
         var mineType = MineType.FromSize(mine.Size);
@@ -738,19 +737,19 @@ public class CollisionSystem : GameSystem
     {
         commands.AddEntity(new Position(position), new XpPickup(mineType.XpAmount, Radius: mineType.XpPickupRadius));
 
-        if (rng.NextDouble() < 0.05)
+        if (rng.NextDouble() < LootStats.HealthOrbChance)
         {
-            commands.AddEntity(new Position(position), new HealthOrb(Radius: mineType.XpPickupRadius + 2f));
+            commands.AddEntity(new Position(position), new HealthOrb(Radius: mineType.XpPickupRadius + LootStats.HealthOrbRadiusOffset));
         }
     }
 
     private void SpawnShipLootOnDeath(CommandBuffer commands, Vector2 position, Random rng)
     {
-        commands.AddEntity(new Position(position), new XpPickup(3, Radius: 18f));
+        commands.AddEntity(new Position(position), new XpPickup(LootStats.ShipXpAmount, Radius: LootStats.ShipXpPickupRadius));
 
-        if (rng.NextDouble() < 0.05)
+        if (rng.NextDouble() < LootStats.HealthOrbChance)
         {
-            commands.AddEntity(new Position(position), new HealthOrb(Radius: 20f));
+            commands.AddEntity(new Position(position), new HealthOrb(Radius: LootStats.HealthOrbRadius));
         }
     }
 }

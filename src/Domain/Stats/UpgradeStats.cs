@@ -1,5 +1,12 @@
 namespace Spacevors.Domain.Stats;
 
+// XP progression (LevelUpSystem).
+public static class UpgradeStats
+{
+    // Cumulative XP threshold that must be reached while at `level` to advance.
+    public static int XpForLevel(int level) => level * 10;
+}
+
 public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust }
 
 public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multiplier = 1f, int Additive = 0)

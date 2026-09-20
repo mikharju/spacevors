@@ -18,7 +18,7 @@ public class EnemyTierStatsTest
     [InlineData(7200f, 10)]   // stays capped after the cap
     public void TierFor_DerivesFromElapsedTime_Capped(float elapsed, int expected)
     {
-        Assert.Equal(expected, EnemyShipFactory.TierFor(elapsed));
+        Assert.Equal(expected, EnemyShipStats.TierFor(elapsed));
     }
 
     [Fact]
@@ -41,13 +41,13 @@ public class EnemyTierStatsTest
         // Tier 1 at t=60 s.
         var (hp1, turret1) = Spawn(type, 60f);
         Assert.Equal(ExpectedHealth(type, 1), hp1);
-        Assert.Equal(baseDamage + EnemyShipFactory.DamageAdd(1), turret1.Weapon.Damage); // no add yet at tier 1
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(1), turret1.Weapon.Damage); // no add yet at tier 1
         Assert.Equal(ExpectedFireRate(type, 1), turret1.Weapon.FireRate, precision: 3);
 
         // Tier 2 at t=120 s.
         var (hp2, turret2) = Spawn(type, 120f);
         Assert.Equal(ExpectedHealth(type, 2), hp2);
-        Assert.Equal(baseDamage + EnemyShipFactory.DamageAdd(2), turret2.Weapon.Damage); // +1 at tier 2
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2), turret2.Weapon.Damage); // +1 at tier 2
         Assert.Equal(ExpectedFireRate(type, 2), turret2.Weapon.FireRate, precision: 3);
 
         // Other ship types scale from their own recorded base stats.
@@ -56,7 +56,7 @@ public class EnemyTierStatsTest
 
         var (hpHeavy, turretHeavy) = Spawn(EnemyShipType.HeavyCannon, 120f);
         Assert.Equal(ExpectedHealth(EnemyShipType.HeavyCannon, 2), hpHeavy);
-        Assert.Equal(baseDamage + EnemyShipFactory.DamageAdd(2), turretHeavy.Weapon.Damage);
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2), turretHeavy.Weapon.Damage);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public class EnemyTierStatsTest
     {
         var type = EnemyShipType.Default;
         int baseDamage = Spawn(type, 0f).Turret.Weapon.Damage;
-        int cappedTier = EnemyShipFactory.TierFor(7200f);
+        int cappedTier = EnemyShipStats.TierFor(7200f);
 
         var (hpEarly, turretEarly) = Spawn(type, 600f);   // at the cap
         var (hpLate, turretLate) = Spawn(type, 7200f);    // still capped
@@ -74,17 +74,17 @@ public class EnemyTierStatsTest
         Assert.Equal(turretEarly.Weapon.FireRate, turretLate.Weapon.FireRate);
 
         Assert.Equal(ExpectedHealth(type, cappedTier), hpEarly);
-        Assert.Equal(baseDamage + EnemyShipFactory.DamageAdd(cappedTier), turretEarly.Weapon.Damage);
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(cappedTier), turretEarly.Weapon.Damage);
         Assert.Equal(ExpectedFireRate(type, cappedTier), turretEarly.Weapon.FireRate, precision: 3);
     }
 
-    // Expected stats derived from the base values recorded on EnemyShipType and the factory's public
+    // Expected stats derived from the base values recorded on EnemyShipType and the EnemyShipStats
     // tier formulas, so tuning base health or fire rate does not break these tests.
     private static int ExpectedHealth(EnemyShipType type, int tier) =>
-        (int)MathF.Round(type.Health * EnemyShipFactory.HpMultiplier(tier), MidpointRounding.AwayFromZero);
+        (int)MathF.Round(type.Health * EnemyShipStats.HpMultiplier(tier), MidpointRounding.AwayFromZero);
 
     private static float ExpectedFireRate(EnemyShipType type, int tier) =>
-        type.TurretFireRate * EnemyShipFactory.FireRateMultiplier(tier);
+        type.TurretFireRate * EnemyShipStats.FireRateMultiplier(tier);
 
     private static (int Health, Turret Turret) Spawn(EnemyShipType type, float elapsed)
     {

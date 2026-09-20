@@ -428,6 +428,7 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
+    // Fallback ammo radius when the weapon name is not a known player WeaponType.
     private const float DefaultAmmoRadius = 2.5f;
 
     // Ships are treated as spheres, so mass scales with r^3: bigger ships recoil much less. The lightest ship keeps 2/3 of base kickback.
@@ -441,7 +442,7 @@ public class TurretFiringSystem : GameSystem
 
     private static float GetAmmoRadius(Turret turret)
     {
-        if (turret.IsEnemy) return DefaultAmmoRadius;
+        if (turret.IsEnemy) return EnemyShipStats.AmmoRadius;
 
         var type = WeaponType.FromName(turret.WeaponName);
         return type?.AmmoRadius ?? DefaultAmmoRadius;

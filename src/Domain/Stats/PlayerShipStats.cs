@@ -1,5 +1,12 @@
 namespace Spacevors.Domain.Stats;
 
+// Shared player ship tuning applied on top of each ShipType (GameInitializer).
+public static class PlayerShipStats
+{
+    // Shift boost multiplier, forward only.
+    public const float Boost = 2.5f;
+}
+
 public readonly record struct EngineLayout(
     string Name,
     float ForwardThrust,
