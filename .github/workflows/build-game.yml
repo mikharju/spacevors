@@ -1,4 +1,3 @@
-
 name: Build SpaceVors
 
 on:
@@ -21,13 +20,9 @@ jobs:
         include:
           - name: Linux x64
             rid: linux-x64
-            archive: SpaceVors-linux-x64.tar.gz
-            native_lib: libraylib.so
 
           - name: Windows x64
             rid: win-x64
-            archive: SpaceVors-windows-x64.zip
-            native_lib: raylib.dll
 
     steps:
       - name: Checkout repository
@@ -49,29 +44,89 @@ jobs:
             --self-contained true \
             --output ./publish/${{ matrix.rid }}
 
-      - name: Verify Raylib native library
-        shell: bash
-        run: |
-          test -f "$(find "./publish/${{ matrix.rid }}" \
-            -name '${{ matrix.native_lib }}' -type f | head -n 1)" \
-            || (echo "Raylib native library not found" && exit 1)
+      # -------------------------
+      # Linux AppImage
+      # -------------------------
 
-      - name: Package Linux build
+      - name: Install LinuxDeploy
+        if: matrix.rid == 'linux-x64'
+        uses: miurahr/install-linuxdeploy-action@v1.8.0
+        with:
+          arch: x64
+          plugins: appimage
+
+      - name: Prepare Linux AppImage
         if: matrix.rid == 'linux-x64'
         run: |
-          tar -czf "${{ matrix.archive }}" \
-            -C "./publish/${{ matrix.rid }}" .
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp -a ./publish/linux-x64/. AppDir/usr/bin/
+
+          cat > AppDir/usr/share/applications/spacevors.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=SpaceVors
+          Comment=SpaceVors
+          Exec=SpaceVors
+          Icon=spacevors
+          Categories=Game;
+          Terminal=false
+          EOF
+
+          # linuxdeploy expects the executable itself as the application entry point.
+          # Adjust this if the generated executable has a different name.
+          chmod +x AppDir/usr/bin/Game
+
+      - name: Create Linux AppImage
+        if: matrix.rid == 'linux-x64'
+        run: |
+          export OUTPUT="SpaceVors-x86_64.AppImage"
+
+          linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/Game \
+            --desktop-file AppDir/usr/share/applications/spacevors.desktop \
+            --output appimage
+
+          mv *.AppImage "$OUTPUT"
+
+      - name: Verify Linux AppImage
+        if: matrix.rid == 'linux-x64'
+        run: |
+          test -f SpaceVors-x86_64.AppImage
+          chmod +x SpaceVors-x86_64.AppImage
+          file SpaceVors-x86_64.AppImage
+
+      # -------------------------
+      # Windows
+      # -------------------------
 
       - name: Package Windows build
         if: matrix.rid == 'win-x64'
         run: |
-          cd "./publish/${{ matrix.rid }}"
-          zip -r "../../${{ matrix.archive }}" .
+          cd ./publish/win-x64
+          zip -r ../../SpaceVors-windows-x64.zip .
 
-      - name: Upload game artifact
+      # -------------------------
+      # Upload artifacts
+      # -------------------------
+
+      - name: Upload Linux AppImage
+        if: matrix.rid == 'linux-x64'
         uses: actions/upload-artifact@v4
         with:
-          name: SpaceVors-${{ matrix.rid }}
-          path: ${{ matrix.archive }}
+          name: SpaceVors-linux-x64
+          path: SpaceVors-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Windows build
+        if: matrix.rid == 'win-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceVors-windows-x64
+          path: SpaceVors-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
