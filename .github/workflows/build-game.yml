@@ -1,0 +1,77 @@
+
+name: Build SpaceVors
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            rid: linux-x64
+            archive: SpaceVors-linux-x64.tar.gz
+            native_lib: libraylib.so
+
+          - name: Windows x64
+            rid: win-x64
+            archive: SpaceVors-windows-x64.zip
+            native_lib: raylib.dll
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Game/Game.csproj
+
+      - name: Publish game
+        run: |
+          dotnet publish src/Game/Game.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained true \
+            --output ./publish/${{ matrix.rid }}
+
+      - name: Verify Raylib native library
+        shell: bash
+        run: |
+          test -f "$(find "./publish/${{ matrix.rid }}" \
+            -name '${{ matrix.native_lib }}' -type f | head -n 1)" \
+            || (echo "Raylib native library not found" && exit 1)
+
+      - name: Package Linux build
+        if: matrix.rid == 'linux-x64'
+        run: |
+          tar -czf "${{ matrix.archive }}" \
+            -C "./publish/${{ matrix.rid }}" .
+
+      - name: Package Windows build
+        if: matrix.rid == 'win-x64'
+        run: |
+          cd "./publish/${{ matrix.rid }}"
+          zip -r "../../${{ matrix.archive }}" .
+
+      - name: Upload game artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceVors-${{ matrix.rid }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 30
