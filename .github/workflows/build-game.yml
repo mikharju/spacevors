@@ -48,19 +48,24 @@ jobs:
       # Linux AppImage
       # -------------------------
 
-      - name: Install LinuxDeploy
+      - name: Install linuxdeploy
         if: matrix.rid == 'linux-x64'
-        uses: miurahr/install-linuxdeploy-action@v1.8.0
-        with:
-          arch: x64
-          plugins: appimage
+        run: |
+          wget -q \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
+            -O linuxdeploy
+
+          chmod +x linuxdeploy
+
+          echo "$GITHUB_WORKSPACE" >> "$GITHUB_PATH"
+
+          ./linuxdeploy --version
 
       - name: Prepare Linux AppImage
         if: matrix.rid == 'linux-x64'
         run: |
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
           cp -a ./publish/linux-x64/. AppDir/usr/bin/
 
@@ -69,28 +74,24 @@ jobs:
           Type=Application
           Name=SpaceVors
           Comment=SpaceVors
-          Exec=SpaceVors
+          Exec=Game
           Icon=spacevors
           Categories=Game;
           Terminal=false
           EOF
 
-          # linuxdeploy expects the executable itself as the application entry point.
-          # Adjust this if the generated executable has a different name.
           chmod +x AppDir/usr/bin/Game
 
       - name: Create Linux AppImage
         if: matrix.rid == 'linux-x64'
         run: |
-          export OUTPUT="SpaceVors-x86_64.AppImage"
-
-          linuxdeploy \
+          ./linuxdeploy \
             --appdir AppDir \
             --executable AppDir/usr/bin/Game \
             --desktop-file AppDir/usr/share/applications/spacevors.desktop \
             --output appimage
 
-          mv *.AppImage "$OUTPUT"
+          mv *.AppImage SpaceVors-x86_64.AppImage
 
       - name: Verify Linux AppImage
         if: matrix.rid == 'linux-x64'
