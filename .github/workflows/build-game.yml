@@ -10,19 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.name }}
+  build-linux:
+    name: Build Linux x64 AppImage
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux x64
-            rid: linux-x64
-
-          - name: Windows x64
-            rid: win-x64
 
     steps:
       - name: Checkout repository
@@ -34,41 +24,38 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/Game/Game.csproj
+        run: |
+          dotnet restore src/Game/Game.csproj
 
-      - name: Publish game
+      - name: Publish SpaceVors
         run: |
           dotnet publish src/Game/Game.csproj \
             --configuration Release \
-            --runtime ${{ matrix.rid }} \
+            --runtime linux-x64 \
             --self-contained true \
-            --output ./publish/${{ matrix.rid }}
+            --output ./publish/linux-x64
 
-      # -------------------------
-      # Linux AppImage
-      # -------------------------
-
-      - name: Install linuxdeploy
-        if: matrix.rid == 'linux-x64'
+      - name: Inspect published files
         run: |
-          wget -q \
-            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
-            -O linuxdeploy
+          echo "Published files:"
+          find ./publish/linux-x64 -maxdepth 2 -type f | sort
 
-          chmod +x linuxdeploy
+      - name: Verify game executable
+        run: |
+          test -f ./publish/linux-x64/Game
+          chmod +x ./publish/linux-x64/Game
 
-          echo "$GITHUB_WORKSPACE" >> "$GITHUB_PATH"
-
-          ./linuxdeploy --version
-
-      - name: Prepare Linux AppImage
-        if: matrix.rid == 'linux-x64'
+      - name: Prepare AppDir
         run: |
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
 
           cp -a ./publish/linux-x64/. AppDir/usr/bin/
 
+          chmod +x AppDir/usr/bin/Game
+
+      - name: Create desktop file
+        run: |
           cat > AppDir/usr/share/applications/spacevors.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
@@ -80,54 +67,36 @@ jobs:
           Terminal=false
           EOF
 
-          chmod +x AppDir/usr/bin/Game
-
-      - name: Create Linux AppImage
-        if: matrix.rid == 'linux-x64'
+      - name: Install appimagetool
         run: |
-          ./linuxdeploy \
-            --appdir AppDir \
-            --executable AppDir/usr/bin/Game \
-            --desktop-file AppDir/usr/share/applications/spacevors.desktop \
-            --output appimage
+          wget -q \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O appimagetool
 
-          mv *.AppImage SpaceVors-x86_64.AppImage
+          chmod +x appimagetool
 
-      - name: Verify Linux AppImage
-        if: matrix.rid == 'linux-x64'
+          ./appimagetool --version
+
+      - name: Create AppImage
+        run: |
+          ./appimagetool \
+            AppDir \
+            SpaceVors-x86_64.AppImage
+
+      - name: Verify AppImage
         run: |
           test -f SpaceVors-x86_64.AppImage
           chmod +x SpaceVors-x86_64.AppImage
+
+          echo "AppImage:"
+          ls -lh SpaceVors-x86_64.AppImage
+
           file SpaceVors-x86_64.AppImage
 
-      # -------------------------
-      # Windows
-      # -------------------------
-
-      - name: Package Windows build
-        if: matrix.rid == 'win-x64'
-        run: |
-          cd ./publish/win-x64
-          zip -r ../../SpaceVors-windows-x64.zip .
-
-      # -------------------------
-      # Upload artifacts
-      # -------------------------
-
       - name: Upload Linux AppImage
-        if: matrix.rid == 'linux-x64'
         uses: actions/upload-artifact@v4
         with:
           name: SpaceVors-linux-x64
           path: SpaceVors-x86_64.AppImage
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Windows build
-        if: matrix.rid == 'win-x64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: SpaceVors-windows-x64
-          path: SpaceVors-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
