@@ -48,7 +48,6 @@ jobs:
       - name: Prepare AppDir
         run: |
           mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
 
           cp -a ./publish/linux-x64/. AppDir/usr/bin/
 
@@ -56,16 +55,23 @@ jobs:
 
       - name: Create desktop file
         run: |
-          cat > AppDir/usr/share/applications/spacevors.desktop <<'EOF'
+          cat > AppDir/spacevors.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=SpaceVors
           Comment=SpaceVors
           Exec=Game
-          Icon=spacevors
           Categories=Game;
           Terminal=false
           EOF
+
+      - name: Verify AppDir
+        run: |
+          echo "AppDir contents:"
+          find AppDir -maxdepth 3 -type f | sort
+
+          test -f AppDir/spacevors.desktop
+          test -f AppDir/usr/bin/Game
 
       - name: Install appimagetool
         run: |
