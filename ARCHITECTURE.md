@@ -46,7 +46,8 @@ Hexagonal architecture with ECS.
 Pure game rules.
 
 Contains:
-- components
+- components (runtime per-entity state only)
+- stats (tuning data, code-first — see Stats/ below)
 - systems
 - math
 - game state
@@ -172,7 +173,7 @@ Examples:
 ## Determinism
 
 - One world RNG owned by EntityManager (default seed 42), exposed as WorldView.Rng; all gameplay randomness (spawning, loot, scatter, upgrade shuffles) goes through it. No Random.Shared anywhere in src/.
-- Elapsed time lives on EntityManager (WorldView.ElapsedTime); difficulty ramps, spawn intervals, and enemy stat tiers (EnemyShipFactory.TierFor) derive from it.
+- Elapsed time lives on EntityManager (WorldView.ElapsedTime); difficulty ramps, spawn intervals, and enemy stat tiers (EnemyShipStats.TierFor) derive from it.
 - Same seed → same run; covered by Tests/WorldRngTest.cs (same-seed spawn equality).
 
 ## Project layout
@@ -207,7 +208,8 @@ src/
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
         Combat/                -- firing (incl. click-target priority), collisions, effects, damage emission, death explosions, asteroid factory
-        Components/            -- component records (entity, physics, combat, effect, gameplay)
+        Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
+        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull)
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering)

@@ -244,6 +244,10 @@ Stage 4 (tuning) — done: `MaxPointLightContribution` 1.0, `ThrustLightIntensit
 
 Cheaper alternative if K-growth must be zero: make thruster flames self-emissive only (brighten the flame sprite / additive halo) instead of scene lights. Loses "flames light nearby rocks" but removes the largest emitter from the cap entirely.
 
+## Stats directory (Domain/Stats) — done
+
+All tuning data lives in `src/Domain/Stats/` as code-first record structs + named constants: player ships/engines (`PlayerShipStats`), weapons/loadouts (`WeaponStats`), enemy types + spawn weights + tier curves + shared enemy weapon (`EnemyShipStats`), mines (`MineStats`), upgrades + XP curve (`UpgradeStats`), loot/magnet values (`LootStats`), and the whole difficulty/spawn curve in `SpawningStats` (initial world, enemy-ship spawning, mine respawns, chase/cull). `Components/` holds runtime per-entity components only. See plans/STATS_DIRECTORY.md.
+
 ## Camera follows mouse — done
 
 Camera drifts based on the mouse's screen offset from window center (`CameraSystem`):
