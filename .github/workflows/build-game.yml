@@ -35,10 +35,18 @@ jobs:
             --self-contained true \
             --output ./publish/linux-x64
 
-      - name: Verify game executable
+      - name: Inspect published executable
         run: |
-          test -f ./publish/linux-x64/Game
-          chmod +x ./publish/linux-x64/Game
+          echo "Game executable:"
+          ls -lah ./publish/linux-x64/Game
+
+          echo
+          echo "File type:"
+          file ./publish/linux-x64/Game
+
+          echo
+          echo "Dynamic dependencies:"
+          ldd ./publish/linux-x64/Game || true
 
       - name: Prepare AppDir
         run: |
@@ -46,13 +54,22 @@ jobs:
 
           cp -a ./publish/linux-x64/. AppDir/usr/bin/
 
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+          exec "$HERE/usr/bin/Game" "$@"
+          EOF
+
+          chmod +x AppDir/AppRun
           chmod +x AppDir/usr/bin/Game
 
       - name: Prepare AppImage icon
         run: |
           test -f assets/player-ships/shadow-texture.png
 
-          cp assets/player-ships/shadow-texture.png AppDir/spacevors.png
+          cp \
+            assets/player-ships/shadow-texture.png \
+            AppDir/spacevors.png
 
       - name: Create desktop file
         run: |
@@ -61,7 +78,7 @@ jobs:
           Type=Application
           Name=SpaceVors
           Comment=Space survival game
-          Exec=Game
+          Exec=SpaceVors
           Icon=spacevors
           Categories=Game;
           Terminal=false
@@ -70,11 +87,28 @@ jobs:
       - name: Verify AppDir
         run: |
           echo "AppDir contents:"
-          find AppDir -maxdepth 3 -type f | sort
+          find AppDir -maxdepth 3 -type f -print | sort
 
+          echo
+          echo "AppRun:"
+          ls -l AppDir/AppRun
+
+          echo
+          echo "Game executable:"
+          ls -l AppDir/usr/bin/Game
+
+          echo
+          echo "Icon:"
+          file AppDir/spacevors.png
+
+          echo
+          echo "Desktop file:"
+          cat AppDir/spacevors.desktop
+
+          test -x AppDir/AppRun
+          test -x AppDir/usr/bin/Game
           test -f AppDir/spacevors.desktop
           test -f AppDir/spacevors.png
-          test -f AppDir/usr/bin/Game
 
       - name: Install appimagetool
         run: |
@@ -100,9 +134,11 @@ jobs:
           echo "AppImage:"
           ls -lh SpaceVors-x86_64.AppImage
 
+          echo
+          echo "File type:"
           file SpaceVors-x86_64.AppImage
 
-      - name: Upload Linux AppImage
+      - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
           name: SpaceVors-linux-x64
