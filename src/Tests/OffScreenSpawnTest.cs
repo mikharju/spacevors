@@ -88,7 +88,7 @@ public class OffScreenSpawnTest
         Assert.True(Vector2.Dot(vel - playerVel, inward) > 0f, $"velocity {vel} does not drift toward the player relative to it");
 
         float diff = (vel - playerVel).Magnitude;
-        float maxDiff = (1f - EnemyShipSpawnSystem.FollowFactor) * playerVel.Magnitude + SpawnPlacement.DriftSpeed + Eps;
+        float maxDiff = (1f - SpawningStats.EnemyShips.FollowFactor) * playerVel.Magnitude + SpawnPlacement.DriftSpeed + Eps;
         Assert.True(diff <= maxDiff, $"velocity {vel} is not near player velocity {playerVel} (diff={diff})");
     }
 
@@ -145,10 +145,10 @@ public class OffScreenSpawnTest
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
         {
             Assert.False(IsInside(pos.Value, halfW, halfH), $"initial ship at {pos.Value} is inside the screen");
-            Assert.True(pos.Value.Magnitude >= GameInitializer.InitialShipMinDistance - Eps,
-                $"initial ship at {pos.Value} is closer than {GameInitializer.InitialShipMinDistance} to the player");
-            Assert.True(pos.Value.Magnitude <= GameInitializer.InitialShipMaxDistance + Eps,
-                $"initial ship at {pos.Value} is farther than {GameInitializer.InitialShipMaxDistance} from the player");
+            Assert.True(pos.Value.Magnitude >= SpawningStats.InitialWorld.EnemyShipMinDistance - Eps,
+                $"initial ship at {pos.Value} is closer than {SpawningStats.InitialWorld.EnemyShipMinDistance} to the player");
+            Assert.True(pos.Value.Magnitude <= SpawningStats.InitialWorld.EnemyShipMaxDistance + Eps,
+                $"initial ship at {pos.Value} is farther than {SpawningStats.InitialWorld.EnemyShipMaxDistance} from the player");
         }
 
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())

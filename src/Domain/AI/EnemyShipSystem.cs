@@ -1,26 +1,16 @@
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 
 namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSystem : GameSystem
 {
-    // Ships farther than this from the player are culled: stale tailers would otherwise persist forever,
-    // count against the spawn cap, and thin out fresh threats (plans/DIFFICULTY_SCALING.md P1).
-    // Must stay above GameInitializer.InitialShipMaxDistance so initial ships survive their spawn.
-    public const float CullDistance = 5500f;
-
     private const float DriftCancelForwardThrust = 18f;
     private const float DriftCancelSideThrust = 14f;
     private const float DriftCancelBackThrust = 16f;
 
-    // Effective top-speed cap (plans/DIFFICULTY_SCALING.md P2): enemies chase at PlayerSpeedFactor of the
-    // player's current speed so fast movement no longer guarantees escape, but never exceed MaxSpeedMultiplier
-    // times their base speed — it should read as pursuit, not rubber-banding. Slow play is unchanged (max with base).
-    private const float PlayerSpeedFactor = 0.75f;
-    private const float MaxSpeedMultiplier = 2f;
-
     public static float EffectiveSpeed(float baseSpeed, float playerSpeed) =>
-        MathF.Min(MathF.Max(baseSpeed, PlayerSpeedFactor * playerSpeed), MaxSpeedMultiplier * baseSpeed);
+        MathF.Min(MathF.Max(baseSpeed, SpawningStats.Chase.PlayerSpeedFactor * playerSpeed), SpawningStats.Chase.MaxSpeedMultiplier * baseSpeed);
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -46,7 +36,7 @@ public class EnemyShipSystem : GameSystem
             var toPlayer = playerPos.Value - shipPos.Value;
             float distSq = toPlayer.X * toPlayer.X + toPlayer.Y * toPlayer.Y;
 
-            if (distSq > CullDistance * CullDistance)
+            if (distSq > SpawningStats.Chase.CullDistance * SpawningStats.Chase.CullDistance)
             {
                 commands.Add(new DestroyEntityCommand(shipEntity));
                 continue;

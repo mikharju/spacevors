@@ -5,13 +5,7 @@ namespace Spacevors.Domain.Systems;
 
 public class MineRespawnSystem : GameSystem
 {
-    private float _timer = InitialDelay;
-
-    // Grace period before the first respawn (plans/DIFFICULTY_SCALING.md P4).
-    private const float InitialDelay = 20f;
-    private const int MinInterval = 4;
-    private const int MaxInterval = 8;
-    private const int MaxMines = 23; // hard ceiling on live mines before respawning pauses
+    private float _timer = SpawningStats.Mines.InitialDelay;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
@@ -20,7 +14,7 @@ public class MineRespawnSystem : GameSystem
         if (_timer > 0f) return;
 
         int activeMines = view.GetEntitiesWithComponents<EnemyMine>().Count();
-        if (activeMines >= MaxMines) return;
+        if (activeMines >= SpawningStats.Mines.MaxMines) return;
 
         if (!view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple)) return;
         Entity playerEntity = playerTuple.Entity;
@@ -44,10 +38,9 @@ public class MineRespawnSystem : GameSystem
         commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), mineAngle), new Health(mineType.Health, mineType.Health));
 
         float elapsed = view.ElapsedTime;
-        float rampDuration = 180f;
-        float progress = MathF.Min(elapsed / rampDuration, 1f);
-        float currentMinInterval = MinInterval + (10 - MinInterval) * (1f - progress);
-        float currentMaxInterval = MaxInterval + (20 - MaxInterval) * (1f - progress);
+        float progress = MathF.Min(elapsed / SpawningStats.Mines.RampDuration, 1f);
+        float currentMinInterval = SpawningStats.Mines.StartMinInterval + (SpawningStats.Mines.LateMinInterval - SpawningStats.Mines.StartMinInterval) * (1f - progress);
+        float currentMaxInterval = SpawningStats.Mines.StartMaxInterval + (SpawningStats.Mines.LateMaxInterval - SpawningStats.Mines.StartMaxInterval) * (1f - progress);
 
         _timer = currentMinInterval + (float)rng.NextDouble() * (currentMaxInterval - currentMinInterval);
     }

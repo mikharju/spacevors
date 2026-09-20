@@ -8,13 +8,6 @@ namespace Spacevors.Game;
 
 public static class GameInitializer
 {
-    // Early-game tuning (plans/DIFFICULTY_SCALING.md P4): fewer omnidirectional mines, and a wider
-    // initial ship band so the first ships arrive one at a time over ~90 s instead of as a pack.
-    private const int InitialMineCount = 9;
-    private const int InitialEnemyShipCount = 6;
-    public const float InitialShipMinDistance = 2400f;
-    public const float InitialShipMaxDistance = 5000f; // must stay below EnemyShipSystem.CullDistance
-
     private const int ClutterCount = 40;
     private const float BackgroundExtent = 6000f; // stars and clutter spread across ±extent/2 around the origin
 
@@ -79,7 +72,7 @@ public static class GameInitializer
         }
 
         // Spawn enemy mines just outside the screen around the player
-        for (int i = 0; i < InitialMineCount; i++)
+        for (int i = 0; i < SpawningStats.InitialWorld.MineCount; i++)
         {
             var mine = em.CreateEntity();
             Vector2 dir = SpawnPlacement.AnyDirection(rand);
@@ -93,11 +86,11 @@ public static class GameInitializer
         }
 
         // Spawn enemy ships well outside the screen (beyond firing range), drifting in toward the player
-        for (int i = 0; i < InitialEnemyShipCount; i++)
+        for (int i = 0; i < SpawningStats.InitialWorld.EnemyShipCount; i++)
         {
             var ship = em.CreateEntity();
             Vector2 dir = SpawnPlacement.AnyDirection(rand);
-            float dist = InitialShipMinDistance + (float)rand.NextDouble() * (InitialShipMaxDistance - InitialShipMinDistance);
+            float dist = SpawningStats.InitialWorld.EnemyShipMinDistance + (float)rand.NextDouble() * (SpawningStats.InitialWorld.EnemyShipMaxDistance - SpawningStats.InitialWorld.EnemyShipMinDistance);
             Vector2 spawnPos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
             if (spawnPos.Magnitude < dist) spawnPos = dir * dist;
             Vector2 initialVel = (Vector2.Zero - spawnPos).Normalized * SpawnPlacement.DriftSpeed;

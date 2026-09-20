@@ -1,5 +1,6 @@
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 using Xunit;
 
@@ -14,7 +15,7 @@ public class EnemyShipCullTest
         AddPlayer(em);
 
         var shipEntity = em.CreateEntity();
-        AddEnemyShip(em, shipEntity, new Vector2(0f, EnemyShipSystem.CullDistance + 500f));
+        AddEnemyShip(em, shipEntity, new Vector2(0f, SpawningStats.Chase.CullDistance + 500f));
 
         var view = new WorldView(em);
         var commands = new CommandBuffer();
