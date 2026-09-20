@@ -138,10 +138,62 @@ jobs:
           echo "File type:"
           file SpaceVors-x86_64.AppImage
 
-      - name: Upload AppImage artifact
+      - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
           name: SpaceVors-linux-x64
           path: SpaceVors-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+  build-windows:
+    name: Build Windows x64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: |
+          dotnet restore src/Game/Game.csproj
+
+      - name: Publish SpaceVors
+        run: |
+          dotnet publish src/Game/Game.csproj \
+            --configuration Release \
+            --runtime win-x64 \
+            --self-contained true \
+            --output ./publish/win-x64
+
+      - name: Inspect Windows build
+        run: |
+          echo "Windows executable:"
+          ls -lah ./publish/win-x64/Game.exe
+
+          echo
+          echo "Published files:"
+          find ./publish/win-x64 -maxdepth 2 -type f | sort
+
+      - name: Package Windows build
+        run: |
+          cd ./publish/win-x64
+          zip -r ../../SpaceVors-windows-x64.zip .
+
+      - name: Verify Windows package
+        run: |
+          test -f SpaceVors-windows-x64.zip
+          ls -lh SpaceVors-windows-x64.zip
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaceVors-windows-x64
+          path: SpaceVors-windows-x64.zip
           if-no-files-found: error
           retention-days: 30
