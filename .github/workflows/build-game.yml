@@ -35,11 +35,6 @@ jobs:
             --self-contained true \
             --output ./publish/linux-x64
 
-      - name: Inspect published files
-        run: |
-          echo "Published files:"
-          find ./publish/linux-x64 -maxdepth 2 -type f | sort
-
       - name: Verify game executable
         run: |
           test -f ./publish/linux-x64/Game
@@ -53,14 +48,21 @@ jobs:
 
           chmod +x AppDir/usr/bin/Game
 
+      - name: Prepare AppImage icon
+        run: |
+          test -f assets/player-ships/shadow-texture.png
+
+          cp assets/player-ships/shadow-texture.png AppDir/spacevors.png
+
       - name: Create desktop file
         run: |
           cat > AppDir/spacevors.desktop <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=SpaceVors
-          Comment=SpaceVors
+          Comment=Space survival game
           Exec=Game
+          Icon=spacevors
           Categories=Game;
           Terminal=false
           EOF
@@ -71,6 +73,7 @@ jobs:
           find AppDir -maxdepth 3 -type f | sort
 
           test -f AppDir/spacevors.desktop
+          test -f AppDir/spacevors.png
           test -f AppDir/usr/bin/Game
 
       - name: Install appimagetool
