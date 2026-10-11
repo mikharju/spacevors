@@ -50,12 +50,21 @@ public sealed class SimulationRunner
         float deltaTime,
         Action<string, long>? onSystemComplete = null)
     {
+        // Timing (Stopwatch + type-name strings per system) only runs when a callback is
+        // supplied; callers pass null with diagnostics off to keep the hot path allocation-free.
+        if (onSystemComplete is null)
+        {
+            foreach (var system in phaseSystems)
+                system.Update(view, deltaTime, commands);
+            return;
+        }
+
         foreach (var system in phaseSystems)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             system.Update(view, deltaTime, commands);
             sw.Stop();
-            onSystemComplete?.Invoke(system.GetType().Name, sw.ElapsedTicks);
+            onSystemComplete(system.GetType().Name, sw.ElapsedTicks);
         }
     }
 }

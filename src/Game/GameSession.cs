@@ -24,6 +24,8 @@ public sealed class GameSession
     private const int DiagnosticTestPlayerHealth = 10000;
 
     private readonly EntityManager _em;
+    private readonly WorldView _worldView;
+    private readonly CommandBuffer _commands = new();
     private readonly Entity _playerEntity;
     private readonly Entity _cameraEntity;
     private readonly List<(Vector2 Position, float Size, Color Color, float Parallax)> _stars;
@@ -44,6 +46,7 @@ public sealed class GameSession
     {
         var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(ship, new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight()));
         _em = em;
+        _worldView = new WorldView(em);
         _playerEntity = playerEntity;
         _cameraEntity = cameraEntity;
         _stars = stars;
@@ -303,34 +306,36 @@ public sealed class GameSession
 
     private void StepSimulation()
     {
-        // Fixed timestep simulation
+        // WorldView and CommandBuffer are reused across steps: the command list's backing
+        // array (thousands of entries on ammo-heavy ticks) would otherwise be reallocated
+        // every tick. Apply() clears the buffer after each phase.
+        Action<string, long>? onSystemComplete = DiagnosticLogger.IsEnabled ? LogSystemTiming : null;
+
         while (_accumulator >= FixedDeltaTime)
         {
             DiagnosticLogger.LogFrameStart();
 
-            var view = new WorldView(_em)
-            {
-                ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight()),
-                MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY())
-            };
-            var commands = new CommandBuffer();
+            _worldView.ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+            _worldView.MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY());
 
-            _runner.RunPhase(view, commands, _runner.MovementSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
-            commands.Apply(_em);
+            _runner.RunPhase(_worldView, _commands, _runner.MovementSystems, FixedDeltaTime, onSystemComplete);
+            _commands.Apply(_em);
 
-            _runner.RunPhase(view, commands, _runner.ActionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
-            commands.Apply(_em);
+            _runner.RunPhase(_worldView, _commands, _runner.ActionSystems, FixedDeltaTime, onSystemComplete);
+            _commands.Apply(_em);
 
-            _runner.RunPhase(view, commands, _runner.ResolutionSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
-            commands.Apply(_em);
+            _runner.RunPhase(_worldView, _commands, _runner.ResolutionSystems, FixedDeltaTime, onSystemComplete);
+            _commands.Apply(_em);
 
-            _runner.RunPhase(view, commands, _runner.IntentSystems, FixedDeltaTime, (name, ticks) => DiagnosticLogger.LogSystem(name, ticks));
-            commands.Apply(_em);
+            _runner.RunPhase(_worldView, _commands, _runner.IntentSystems, FixedDeltaTime, onSystemComplete);
+            _commands.Apply(_em);
 
             _accumulator -= FixedDeltaTime;
             _em.AddElapsedTime(FixedDeltaTime);
         }
     }
+
+    private static void LogSystemTiming(string name, long ticks) => DiagnosticLogger.LogSystem(name, ticks);
 
     private void StopThrusters()
     {

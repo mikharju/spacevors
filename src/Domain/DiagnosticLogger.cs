@@ -7,6 +7,8 @@ public static class DiagnosticLogger
     private static readonly bool _enabled = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
     private static readonly object _lock = new();
 
+    public static bool IsEnabled => _enabled;
+
     private static int _frameCount;
     private static double _fpsTimer;
     private static int _currentFps;
