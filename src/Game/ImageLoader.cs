@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Raylib_cs;
 using Spacevors.Domain;
 

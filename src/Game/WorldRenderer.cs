@@ -18,6 +18,16 @@ public static class WorldRenderer
     private const int SmokeColorB = 130;
     private const int SmokeAlphaMax = 80;
 
+    // A mine down to its last hp is drawn fully opaque so it stands out; healthier ones stay dim
+    // so the bright core reads as the mine body.
+    private const int MineLastHealth = 1;
+    private const int MineDimAlpha = 180;
+    private const int MineOpaqueAlpha = 255;
+
+    // Layer order, bottom to top. The deliberate choices:
+    // - thruster flames draw before ships, so they appear behind the hull
+    // - the player draws before enemy ships and mines: an overlapping enemy covers the player hull
+    // - brackets, pickups and turret markers draw last, so they stay readable over sprites
     public static void Draw(
         EntityManager em, Entity playerEntity, ShipType shipType, bool diagnostics,
         float camX, float camY, int windowWidth, int windowHeight)
@@ -217,7 +227,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
             bool hasHealth = em.TryGetComponent<Health>(entity, out var mineHealth);
-            int healthAlpha = hasHealth && mineHealth.Current >= 2 ? 180 : 255;
+            int healthAlpha = hasHealth && mineHealth.Current > MineLastHealth ? MineDimAlpha : MineOpaqueAlpha;
 
             if (hasTexture)
             {
