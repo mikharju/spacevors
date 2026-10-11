@@ -183,6 +183,22 @@ public class EntityManagerTests
     }
 
     [Fact]
+    public void Clear_ResetsWorldState()
+    {
+        var em = new EntityManager(seed: 7);
+        em.AddElapsedTime(12.5f);
+        em.Rng.Next();
+        var entity = em.CreateEntity();
+        em.AddComponent(entity, new Position(1f, 2f));
+
+        em.Clear();
+
+        Assert.Equal(0f, em.ElapsedTime);
+        Assert.Equal(new EntityManager(seed: 7).Rng.Next(), em.Rng.Next());
+        Assert.Equal(new EntityManager(seed: 7).CreateEntity(), em.CreateEntity());
+    }
+
+    [Fact]
     public void DestroyMiddleEntity_CompactsCorrectly()
     {
         var e1 = _em.CreateEntity();

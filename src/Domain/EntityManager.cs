@@ -7,12 +7,14 @@ public class EntityManager
     public const int DefaultRngSeed = 42;
 
     private readonly Dictionary<Type, object> _storages = new();
-    private readonly Random _rng;
+    private readonly int _seed;
+    private Random _rng;
     private int _nextId = 0;
     private float _elapsedTime = 0f;
 
     public EntityManager(int seed = DefaultRngSeed)
     {
+        _seed = seed;
         _rng = new Random(seed);
     }
 
@@ -199,10 +201,13 @@ public class EntityManager
             (ComponentStorage<T4>)s4);
     }
 
+    // Full world reset: same state as a freshly constructed manager with this seed.
     public void Clear()
     {
         _nextId = 0;
         _storages.Clear();
+        _elapsedTime = 0f;
+        _rng = new Random(_seed);
     }
 }
 
