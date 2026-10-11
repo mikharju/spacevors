@@ -25,6 +25,10 @@ public static class Renderer
         {
             HudRenderer.DrawGameOverText(windowWidth, windowHeight);
         }
+        else
+        {
+            HudRenderer.ResetGameOverFade();
+        }
 
         Raylib.EndDrawing();
     }
@@ -72,6 +76,7 @@ public static class Renderer
         BackgroundRenderer.Draw(stars, clutter, camX, camY, windowWidth, windowHeight);
         WorldRenderer.Draw(em, playerEntity, shipType, diagnostics, camX, camY, windowWidth, windowHeight);
         HudRenderer.DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
+        HudRenderer.DrawXpBar(em, playerEntity, windowWidth, windowHeight);
     }
 
 }

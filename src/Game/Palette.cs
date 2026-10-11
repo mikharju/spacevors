@@ -9,4 +9,30 @@ internal static class Palette
     // HudRenderer switches between them, TargetingRenderer lerps across them.
     public static readonly Color HealthFull = new(80, 255, 80, 255);
     public static readonly Color HealthLow = new(255, 60, 60, 255);
+    public static readonly Color HealthMid = new(255, 190, 80, 255);
+
+    // Soft-depth UI language (plans/UI_POLISH.md): one accent used sparingly,
+    // off-white text, translucent panels so stars faintly show through.
+    public static readonly Color Accent = new(120, 200, 230, 255);
+    public static readonly Color TextBright = new(230, 235, 245, 255);
+    public static readonly Color TextMuted = new(150, 160, 175, 255);
+    public static readonly Color PanelFill = new(10, 12, 20, 200);
+    public static readonly Color PanelEdge = new(255, 255, 255, 30);
+    public static readonly Color Shadow = new(0, 0, 0, 90);
+    public static readonly Color TrackDark = new(10, 12, 20, 140);
+
+    // Green → amber → red health gradient shared by the HUD and target hp bars.
+    public static Color HealthColor(float ratio) => ratio < 0.5f
+        ? Lerp(HealthLow, HealthMid, ratio * 2f)
+        : Lerp(HealthMid, HealthFull, (ratio - 0.5f) * 2f);
+
+    public static Color Lerp(Color a, Color b, float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        return new Color(
+            (byte)(a.R + (b.R - a.R) * t),
+            (byte)(a.G + (b.G - a.G) * t),
+            (byte)(a.B + (b.B - a.B) * t),
+            (byte)(a.A + (b.A - a.A) * t));
+    }
 }
