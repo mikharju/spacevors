@@ -76,4 +76,40 @@ public class Vector2Tests
         Assert.Equal(2f, v.X);
         Assert.Equal(3f, v.Y);
     }
+
+    [Fact]
+    public void ClosestPointOnSegment_InteriorProjection()
+    {
+        var p = Vector2.ClosestPointOnSegment(new Vector2(0, 0), new Vector2(10, 0), new Vector2(4, 7), out float t);
+        Assert.Equal(4f, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+        Assert.Equal(0.4f, t, 3);
+    }
+
+    [Fact]
+    public void ClosestPointOnSegment_ClampsBeforeStart()
+    {
+        var p = Vector2.ClosestPointOnSegment(new Vector2(0, 0), new Vector2(10, 0), new Vector2(-5, 3), out float t);
+        Assert.Equal(0f, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+        Assert.Equal(0f, t, 3);
+    }
+
+    [Fact]
+    public void ClosestPointOnSegment_ClampsAfterEnd()
+    {
+        var p = Vector2.ClosestPointOnSegment(new Vector2(0, 0), new Vector2(10, 0), new Vector2(15, 3), out float t);
+        Assert.Equal(10f, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+        Assert.Equal(1f, t, 3);
+    }
+
+    [Fact]
+    public void ClosestPointOnSegment_DegenerateSegment_ReturnsStart()
+    {
+        var p = Vector2.ClosestPointOnSegment(new Vector2(2, 3), new Vector2(2, 3), new Vector2(9, 9), out float t);
+        Assert.Equal(2f, p.X, 3);
+        Assert.Equal(3f, p.Y, 3);
+        Assert.Equal(0f, t, 3);
+    }
 }

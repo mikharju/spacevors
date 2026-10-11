@@ -67,6 +67,23 @@ public class SpatialGrid
         int minY = (int)MathF.Floor((position.Y - radius) / CellSize);
         int maxY = (int)MathF.Floor((position.Y + radius) / CellSize);
 
+        return CollectFromCells(minX, maxX, minY, maxY, result, out truncated);
+    }
+
+    // Box variant for swept segments and beams: returns every entity inserted in cells
+    // overlapping the AABB [min, max]. Same dedup/truncation/non-reentrancy as GetQueryItems.
+    public int GetQueryItemsInBox(Vector2 min, Vector2 max, Span<SpatialItem> result, out bool truncated)
+    {
+        int minX = (int)MathF.Floor(min.X / CellSize);
+        int maxX = (int)MathF.Floor(max.X / CellSize);
+        int minY = (int)MathF.Floor(min.Y / CellSize);
+        int maxY = (int)MathF.Floor(max.Y / CellSize);
+
+        return CollectFromCells(minX, maxX, minY, maxY, result, out truncated);
+    }
+
+    private int CollectFromCells(int minX, int maxX, int minY, int maxY, Span<SpatialItem> result, out bool truncated)
+    {
         _seen.Clear();
         truncated = false;
         int count = 0;

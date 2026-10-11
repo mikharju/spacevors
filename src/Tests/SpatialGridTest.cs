@@ -194,4 +194,58 @@ public class SpatialGridTest
         int count = grid.GetQueryItems(new Vector2(100, 100), 0.5f, results, out _);
         Assert.Equal(1, count);
     }
+
+    [Fact]
+    public void BoxQuery_EntityAlongLongBox_ReturnsIt()
+    {
+        var grid = new SpatialGrid(128f);
+        var entity = new Entity(1);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(500, 0), 10f);
+
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItemsInBox(new Vector2(-100, -10), new Vector2(600, 10), results, out bool truncated);
+
+        Assert.False(truncated);
+        Assert.Equal(1, count);
+        Assert.Equal(entity, results[0].Id);
+    }
+
+    [Fact]
+    public void BoxQuery_EntityOutsideBox_ReturnsNothing()
+    {
+        var grid = new SpatialGrid(128f);
+        grid.Insert(new Entity(1), SpatialGrid.CollisionKind.Asteroid, new Vector2(500, 400), 10f);
+
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItemsInBox(new Vector2(-100, -100), new Vector2(600, 100), results, out _);
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public void BoxQuery_MultiCellEntity_ReturnsItExactlyOnce()
+    {
+        var grid = new SpatialGrid(128f);
+        var entity = new Entity(1);
+        grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, new Vector2(300, 0), 200f);
+
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[64];
+        int count = grid.GetQueryItemsInBox(new Vector2(-100, -50), new Vector2(900, 50), results, out bool truncated);
+
+        Assert.False(truncated);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void BoxQuery_BufferTooSmall_SignalsTruncation()
+    {
+        var grid = new SpatialGrid(128f);
+        for (int i = 0; i < 5; i++)
+            grid.Insert(new Entity(i + 1), SpatialGrid.CollisionKind.Asteroid, new Vector2(i * 200f, 0f), 5f);
+
+        Span<SpatialGrid.SpatialItem> results = stackalloc SpatialGrid.SpatialItem[3];
+        int count = grid.GetQueryItemsInBox(new Vector2(-10, -10), new Vector2(1000, 10), results, out bool truncated);
+
+        Assert.Equal(3, count);
+        Assert.True(truncated);
+    }
 }

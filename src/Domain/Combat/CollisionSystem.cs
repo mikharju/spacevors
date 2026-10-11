@@ -21,7 +21,7 @@ public class CollisionSystem : GameSystem
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly HashSet<Entity> _entitiesToDestroy = new();
     private readonly HashSet<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
-    private readonly List<(Entity ammo, Entity target, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
+    private readonly List<(Entity ammo, Entity target, Vector2 contact, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
     private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
@@ -195,112 +195,115 @@ public class CollisionSystem : GameSystem
         {
             float ammoRadius = ammo.Radius;
 
-            Entity? closestAsteroidHit = null;
-            Vector2 asteroidDiff = default;
-            float asteroidDistSq = float.MaxValue;
+            // Swept capsule: ammo velocity is constant (ammo never gets Acceleration), so the
+            // position at the start of the tick is exactly pos - vel*dt. The bullet is the
+            // segment [sweepFrom, sweepTo] inflated by its radius, so a bullet that jumps over
+            // a target between ticks still intersects it. t orders hits along travel.
+            Vector2 sweepFrom = ammoPos.Value - ammo.Velocity * deltaTime;
+            Vector2 sweepTo = ammoPos.Value;
+            var boxMin = new Vector2(
+                MathF.Min(sweepFrom.X, sweepTo.X) - ammoRadius,
+                MathF.Min(sweepFrom.Y, sweepTo.Y) - ammoRadius);
+            var boxMax = new Vector2(
+                MathF.Max(sweepFrom.X, sweepTo.X) + ammoRadius,
+                MathF.Max(sweepFrom.Y, sweepTo.Y) + ammoRadius);
 
-            Entity? closestMineHit = null;
+            Entity? earliestAsteroidHit = null;
+            Vector2 asteroidContact = default;
+            float asteroidT = float.MaxValue;
+
+            Entity? earliestMineHit = null;
             MineSize? mineHitSize = null;
             Vector2 mineHitPos = default;
-            float mineDistSq = float.MaxValue;
+            Vector2 mineContact = default;
+            float mineT = float.MaxValue;
 
-            Entity? closestShipHit = null;
+            Entity? earliestShipHit = null;
             Vector2 shipHitPos = default;
-            float shipDistSq = float.MaxValue;
+            float shipT = float.MaxValue;
 
-            int count = _grid.GetQueryItems(ammoPos.Value, ammoRadius, queryBuffer, out bool truncated);
+            int count = _grid.GetQueryItemsInBox(boxMin, boxMax, queryBuffer, out bool truncated);
             if (truncated) anyTruncated = true;
 
             for (int i = 0; i < count; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
-                var diff = candidate.Position - ammoPos.Value;
+                Vector2 contact = Vector2.ClosestPointOnSegment(sweepFrom, sweepTo, candidate.Position, out float t);
+                var diff = contact - candidate.Position;
                 float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                if (dSq < Epsilon) continue;
+                float rSum = ammoRadius + candidate.Radius;
+                if (dSq >= rSum * rSum) continue;
 
                 switch (candidate.Kind)
                 {
                     case SpatialGrid.CollisionKind.Asteroid:
+                        if (t < asteroidT)
                         {
-                            float rSum = ammoRadius + candidate.Radius;
-                            if (dSq < rSum * rSum && dSq < asteroidDistSq)
-                            {
-                                closestAsteroidHit = candidate.Id;
-                                asteroidDiff = diff;
-                                asteroidDistSq = dSq;
-                            }
+                            earliestAsteroidHit = candidate.Id;
+                            asteroidContact = contact;
+                            asteroidT = t;
                         }
                         break;
 
                     case SpatialGrid.CollisionKind.EnemyMine when !ammo.IsEnemy:
+                        if (t < mineT)
                         {
-                            float rSum = ammoRadius + candidate.Radius;
-                            if (dSq < rSum * rSum && dSq < mineDistSq)
-                            {
-                                closestMineHit = candidate.Id;
-                                mineHitPos = candidate.Position;
-                                mineHitSize = candidate.Size!;
-                                mineDistSq = dSq;
-                            }
+                            earliestMineHit = candidate.Id;
+                            mineHitPos = candidate.Position;
+                            mineContact = contact;
+                            mineHitSize = candidate.Size!;
+                            mineT = t;
                         }
                         break;
 
                     case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
+                        if (t < shipT)
                         {
-                            float rSum = ammoRadius + candidate.Radius;
-                            if (dSq < rSum * rSum && dSq < shipDistSq)
-                            {
-                                closestShipHit = candidate.Id;
-                                var toAmmo = ammoPos.Value - candidate.Position;
-                                float distToAmmo = (float)Math.Sqrt(toAmmo.X * toAmmo.X + toAmmo.Y * toAmmo.Y);
-                                if (distToAmmo > Epsilon)
-                                {
-                                    shipHitPos = candidate.Position + (toAmmo / distToAmmo) * candidate.Radius;
-                                }
-                                else
-                                {
-                                    shipHitPos = candidate.Position;
-                                }
-                                shipDistSq = dSq;
-                            }
+                            earliestShipHit = candidate.Id;
+                            var toContact = contact - candidate.Position;
+                            float distToContact = toContact.Magnitude;
+                            shipHitPos = distToContact > Epsilon
+                                ? candidate.Position + (toContact / distToContact) * candidate.Radius
+                                : candidate.Position;
+                            shipT = t;
                         }
                         break;
                 }
             }
 
-            if (closestAsteroidHit.HasValue)
+            if (earliestAsteroidHit.HasValue)
             {
-                var asteroid = view.GetComponent<Asteroid>(closestAsteroidHit.Value);
-                ResolveAmmoVsAsteroid(view, ammoEntity, ammo, closestAsteroidHit.Value, asteroid, commands);
-                _effectsToSpawn.Add((ammoPos.Value, MineType.Small));
+                var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
+                ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidContact, commands);
+                _effectsToSpawn.Add((asteroidContact, MineType.Small));
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
-            if (closestMineHit.HasValue && view.TryGetComponent<Health>(closestMineHit.Value, out var healthComp))
+            if (earliestMineHit.HasValue && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
             {
-                if (!_frameRemainingHealth.TryGetValue(closestMineHit.Value, out var health))
+                if (!_frameRemainingHealth.TryGetValue(earliestMineHit.Value, out var health))
                 {
                     health = healthComp.Current;
-                    _frameRemainingHealth[closestMineHit.Value] = health;
+                    _frameRemainingHealth[earliestMineHit.Value] = health;
                 }
-                _frameRemainingHealth[closestMineHit.Value] -= ammo.Damage;
-                _hitMines.Add(closestMineHit.Value);
-                _ammoToMineHits.Add((ammoEntity, closestMineHit.Value, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
+                _frameRemainingHealth[earliestMineHit.Value] -= ammo.Damage;
+                _hitMines.Add(earliestMineHit.Value);
+                _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineContact, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
                 _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
 
-            if (closestShipHit.HasValue && view.TryGetComponent<Health>(closestShipHit.Value, out var shipHealthComp))
+            if (earliestShipHit.HasValue && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
             {
                 var shipHealth = shipHealthComp.Current;
-                if (!_frameRemainingHealth.TryGetValue(closestShipHit.Value, out var h))
+                if (!_frameRemainingHealth.TryGetValue(earliestShipHit.Value, out var h))
                 {
                     h = shipHealth;
-                    _frameRemainingHealth[closestShipHit.Value] = h;
+                    _frameRemainingHealth[earliestShipHit.Value] = h;
                 }
-                _frameRemainingHealth[closestShipHit.Value] -= ammo.Damage;
-                var enemyShip = view.GetComponent<EnemyShip>(closestShipHit.Value);
-                var shipPos = view.GetComponent<Position>(closestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, closestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                _frameRemainingHealth[earliestShipHit.Value] -= ammo.Damage;
+                var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
+                var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
+                _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
                 // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
                 _entitiesToDestroy.Add(ammoEntity);
             }
@@ -310,11 +313,12 @@ public class CollisionSystem : GameSystem
             if (!hasPlayer) continue;
 
             var playerPos = playerTuple.Value2;
-            var diff2 = playerPos.Value - ammoPos.Value;
+            Vector2 playerContact = Vector2.ClosestPointOnSegment(sweepFrom, sweepTo, playerPos.Value, out _);
+            var diff2 = playerContact - playerPos.Value;
             float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
             float radiusSum2 = ammoRadius + playerTuple.Value1.Radius;
 
-            if (distSq2 >= radiusSum2 * radiusSum2 || distSq2 < Epsilon) continue;
+            if (distSq2 >= radiusSum2 * radiusSum2) continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
@@ -340,10 +344,9 @@ public class CollisionSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (ammoEntity, mineEntity, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
+        foreach (var (ammoEntity, mineEntity, contact, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
         {
             var minePosComp = view.GetComponent<Position>(mineEntity);
-            var ammoPosComp = view.GetComponent<Position>(ammoEntity);
 
             var mineType = MineType.FromSize(mineSize);
             float mineRadius = mineType.Radius;
@@ -351,7 +354,9 @@ public class CollisionSystem : GameSystem
             float mineMass = MathF.PI * mineRadius * mineRadius;
             float totalInvMass = 1f / AmmoMass + 1f / mineMass;
 
-            var diff = ammoPosComp.Value - minePosComp.Value;
+            // Normal from the swept contact point, so a bullet that already jumped past the
+            // mine still pushes it in the travel direction.
+            var diff = contact - minePosComp.Value;
             float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
             if (dist < Epsilon) dist = Epsilon;
             var normal = diff / dist;
@@ -696,17 +701,17 @@ public class CollisionSystem : GameSystem
 
     private void ResolveAmmoVsAsteroid(
         WorldView view,
-        Entity ammoEntity,
         Ammo ammo,
         Entity asteroidEntity,
         Asteroid asteroid,
+        Vector2 contactPoint,
         CommandBuffer commands)
     {
-        var ammoPos = view.GetComponent<Position>(ammoEntity);
         var asteroidPos = view.GetComponent<Position>(asteroidEntity);
 
-        var diff = ammoPos.Value - asteroidPos.Value;
+        var diff = contactPoint - asteroidPos.Value;
         float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
+        if (dist < Epsilon) return; // segment ran through the center: no meaningful normal
         var normal = diff / dist;
 
         Vector2 asteroidVel = GetCollisionVelocity(view, asteroidEntity, default);

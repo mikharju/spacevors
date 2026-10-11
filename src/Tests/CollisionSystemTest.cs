@@ -556,4 +556,114 @@ public class CollisionSystemTests
         // Damage must not change the ship's max health.
         Assert.Equal(10, health.Max);
     }
+
+    [Fact]
+    public void Ammo_SweepsPastAsteroidInOneTick_StillHits()
+    {
+        // 96000 px/s at 1/120 s = 800 px per tick: the bullet starts left of the asteroid
+        // and ends right of it — a point test would tunnel through.
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(400f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(96000f, 0f), Radius: 3f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        Assert.Contains(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+    }
+
+    [Fact]
+    public void Ammo_WideRadius_GrazesOffsetAsteroid()
+    {
+        // Segment passes 25 px off an r=20 asteroid: 25 > 20 (no center hit) but
+        // 25 < 20 + 8 (capsule width catches it).
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(10f, 25f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(-1000f, 0f), Radius: 8f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        Assert.Contains(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+    }
+
+    [Fact]
+    public void Ammo_ThinRadius_MissesSameOffsetAsteroid()
+    {
+        // Same geometry as the grazing test but radius 2: 25 > 22, so it must miss.
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(10f, 25f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(-1000f, 0f), Radius: 2f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        Assert.DoesNotContain(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+    }
+
+    [Fact]
+    public void Ammo_EarliestAsteroidAlongSweep_TakesTheHit()
+    {
+        var (em, view, system) = Setup();
+
+        var near = em.CreateEntity();
+        em.AddComponent(near, new Position(new Vector2(100f, 0f)));
+        em.AddComponent(near, new Asteroid(IsSmall: false, Radius: 20f));
+
+        var far = em.CreateEntity();
+        em.AddComponent(far, new Position(new Vector2(300f, 0f)));
+        em.AddComponent(far, new Asteroid(IsSmall: false, Radius: 20f));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(500f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(72000f, 0f), Radius: 3f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        // The hit effect spawns at the crossing point of the earliest asteroid only.
+        var explosionPositions = new List<Vector2>();
+        foreach (var (_, _, pos) in em.GetEntitiesWithComponents<Explosion, Position>())
+            explosionPositions.Add(pos.Value);
+
+        Assert.Contains(explosionPositions, p => MathF.Abs(p.X - 100f) < 1f);
+        Assert.DoesNotContain(explosionPositions, p => MathF.Abs(p.X - 300f) < 1f);
+    }
+
+    [Fact]
+    public void EnemyAmmo_SweepsPastPlayerInOneTick_StillHits()
+    {
+        var (em, view, system) = Setup();
+        AddPlayer(em);
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-400f, 0f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(-96000f, 0f), Radius: 3f, Lifetime: 10f, IsEnemy: true, Damage: 2));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        view.GetEntitiesWithComponents<Player, Health>().TryFirst(out var playerTuple);
+        Assert.Equal(8, playerTuple.Value2.Current);
+    }
 }
