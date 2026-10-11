@@ -4,7 +4,8 @@ namespace Spacevors.Domain;
 
 public class ComponentStorage<T> : ComponentStorageBase where T : notnull
 {
-    public const int MaxEntities = 20_000;
+    // Initial capacity of the entity→slot map, not a cap: the map grows past it on demand.
+    public const int InitialSlotMapCapacity = 20_000;
 
     private T[] _data = Array.Empty<T>();
     private Entity[] _entityIds = Array.Empty<Entity>();
@@ -15,7 +16,7 @@ public class ComponentStorage<T> : ComponentStorageBase where T : notnull
     {
         if (_entityIdToSlot == null)
         {
-            var size = Math.Max(entityId + 1, MaxEntities);
+            var size = Math.Max(entityId + 1, InitialSlotMapCapacity);
             _entityIdToSlot = new int[size];
             Array.Fill(_entityIdToSlot, -1);
             return;
