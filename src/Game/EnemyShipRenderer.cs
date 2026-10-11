@@ -13,11 +13,33 @@ public static class EnemyShipRenderer
     private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
+    // Sprite of one GraphicsId, resolved once per frame. Every enemy of a type shares it, so the
+    // texture-key lookups run per type instead of per entity.
+    private static readonly Dictionary<byte, (LitSprite? Lit, Texture2D? Flat)> _spritesByGraphicsId = new();
+
+    private static (LitSprite? Lit, Texture2D? Flat) ResolveSprite(byte graphicsId)
+    {
+        if (_spritesByGraphicsId.TryGetValue(graphicsId, out var cached)) return cached;
+
+        LitSprite? lit = null;
+        Texture2D? flat = null;
+        string? texKey = EnemyShipType.FromGraphicsId(graphicsId)?.TextureKey;
+        if (texKey != null && ImageLoader.EnemyShipLitSprites != null && ImageLoader.EnemyShipLitSprites.TryGetValue(texKey, out var litCandidate))
+            lit = litCandidate;
+        else if (texKey != null && ImageLoader.EnemyShipTextures!.TryGetValue(texKey, out var flatCandidate) && flatCandidate.Id != 0)
+            flat = flatCandidate;
+
+        var resolved = (lit, flat);
+        _spritesByGraphicsId[graphicsId] = resolved;
+        return resolved;
+    }
+
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         LitGroupRenderer.Clear(_litDraws);
         _turretMarkers.Clear();
         _diagnosticCircles.Clear();
+        _spritesByGraphicsId.Clear();
 
         if (ImageLoader.EnemyShipTextures == null)
         {
@@ -25,23 +47,12 @@ public static class EnemyShipRenderer
             return;
         }
 
-        foreach (var (entity, enemyShip) in em.GetEntitiesWithComponents<EnemyShip>())
+        foreach (var (entity, enemyShip, shipPos, shipRot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
-            var shipPos = em.GetComponent<Position>(entity);
-            var shipRot = em.GetComponent<Rotation>(entity);
-
             var (screenCx, screenCy) = RenderHelpers.ToScreen(shipPos.Value, camX, camY, windowWidth, windowHeight);
             float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-            string? texKey = EnemyShipType.FromGraphicsId(enemyShip.GraphicsId)?.TextureKey;
-
-            LitSprite? lit = null;
-            Texture2D? flat = null;
-            if (texKey != null && ImageLoader.EnemyShipLitSprites != null && ImageLoader.EnemyShipLitSprites.TryGetValue(texKey, out var litCandidate))
-                lit = litCandidate;
-            else if (texKey != null && ImageLoader.EnemyShipTextures.TryGetValue(texKey, out var flatCandidate) && flatCandidate.Id != 0)
-                flat = flatCandidate;
-
+            var (lit, flat) = ResolveSprite(enemyShip.GraphicsId);
             Texture2D? baseTex = lit != null ? lit.Base : flat;
             bool hasSprite = baseTex.HasValue && baseTex.Value.Id != 0;
 

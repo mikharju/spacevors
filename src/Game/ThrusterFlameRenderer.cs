@@ -35,9 +35,8 @@ public static class ThrusterFlameRenderer
             DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, camX, camY, windowWidth, windowHeight);
         }
 
-        foreach (var (entity, mine, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
+        foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
         {
-            if (!em.TryGetComponent<Velocity>(entity, out var vel)) continue;
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;

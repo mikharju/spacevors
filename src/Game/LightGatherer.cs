@@ -23,9 +23,8 @@ public static class LightGatherer
 
     static void CollectExplosionLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, explosion) in em.GetEntitiesWithComponents<Explosion>())
+        foreach (var (entity, explosion, pos) in em.GetEntitiesWithComponents<Explosion, Position>())
         {
-            var pos = em.GetComponent<Position>(entity);
             Vector2 p = pos.Value;
 
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
@@ -38,10 +37,9 @@ public static class LightGatherer
 
     static void CollectThrustLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
+        foreach (var (entity, player, pos, rot, accel) in em.GetEntitiesWithComponents<Player, Position, Rotation, Acceleration>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
-            if (!em.TryGetComponent<Acceleration>(entity, out var accel)) continue;
 
             // Main thrusters outrank side thrusters when the light list is full.
             float sin = (float)Math.Sin(rot.Angle);
@@ -55,16 +53,14 @@ public static class LightGatherer
             AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius, camX, camY, windowWidth, windowHeight);
         }
 
-        foreach (var (entity, ship, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
+        foreach (var (entity, ship, pos, accel) in em.GetEntitiesWithComponents<EnemyShip, Position, Acceleration>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
-            if (!em.TryGetComponent<Acceleration>(entity, out var accel)) continue;
             AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius, camX, camY, windowWidth, windowHeight);
         }
 
-        foreach (var (entity, mine, pos) in em.GetEntitiesWithComponents<EnemyMine, Position>())
+        foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
         {
-            if (!em.TryGetComponent<Velocity>(entity, out var vel)) continue;
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;
