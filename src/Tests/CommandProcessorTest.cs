@@ -42,4 +42,24 @@ public class CommandProcessorTest
 
         Assert.False(em.HasComponent<Position>(entity), "Position should be removed via command");
     }
+
+    [Fact]
+    public void DuplicateDestroyCommands_DestroyOnceAndKeepOthers()
+    {
+        var em = new EntityManager();
+        var a = em.CreateEntity();
+        em.AddComponent(a, new Position(new Vector2(1f, 1f)));
+        var b = em.CreateEntity();
+        em.AddComponent(b, new Position(new Vector2(2f, 2f)));
+
+        var commands = new CommandBuffer();
+        commands.Add(new DestroyEntityCommand(a));
+        commands.Add(new DestroyEntityCommand(a));
+        commands.Add(new DestroyEntityCommand(b));
+        commands.Apply(em);
+
+        Assert.False(em.HasComponent<Position>(a));
+        Assert.False(em.HasComponent<Position>(b));
+        Assert.Equal(0, em.GetEntitiesWithComponents<Position>().Count());
+    }
 }

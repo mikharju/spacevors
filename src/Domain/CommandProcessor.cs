@@ -11,7 +11,10 @@ public class CommandProcessor
 
     public void Process(IEnumerable<ICommand> commands)
     {
-        var destroyEntities = new HashSet<Entity>();
+        // List, not HashSet: destroys then apply in command order, making the resulting
+        // storage layout contractual instead of relying on HashSet iteration behavior.
+        // Destroy counts per flush are small, so the Contains dedup stays cheap.
+        var destroyEntities = new List<Entity>();
 
         foreach (var cmd in commands)
         {
@@ -23,7 +26,8 @@ public class CommandProcessor
             }
             else if (cmd is DestroyEntityCommand destroyCmd)
             {
-                destroyEntities.Add(destroyCmd.Entity);
+                if (!destroyEntities.Contains(destroyCmd.Entity))
+                    destroyEntities.Add(destroyCmd.Entity);
             }
             else if (cmd is IApplyCommand applyCmd)
             {
