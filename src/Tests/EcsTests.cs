@@ -95,6 +95,41 @@ public class EntityManagerTests
     }
 
     [Fact]
+    public void HasComponent_NullEntity_ReturnsFalse()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 2f));
+        Assert.False(_em.HasComponent<Position>(Entity.Null));
+    }
+
+    [Fact]
+    public void GetComponent_NullEntity_ThrowsNotFound()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 2f));
+        Assert.Throws<KeyNotFoundException>(() => _em.GetComponent<Position>(Entity.Null));
+    }
+
+    [Fact]
+    public void TryGetComponent_NullEntity_ReturnsFalse()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 2f));
+        Assert.False(_em.TryGetComponent<Position>(Entity.Null, out _));
+    }
+
+    [Fact]
+    public void DestroyEntity_NullEntity_DoesNotThrow()
+    {
+        var entity = _em.CreateEntity();
+        _em.AddComponent(entity, new Position(1f, 2f));
+
+        _em.DestroyEntity(Entity.Null);
+
+        Assert.True(_em.HasComponent<Position>(entity));
+    }
+
+    [Fact]
     public void DestroyEntity_RemovesAllComponents()
     {
         var entity = _em.CreateEntity();

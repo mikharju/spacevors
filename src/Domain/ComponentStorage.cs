@@ -57,24 +57,17 @@ public class ComponentStorage<T> : ComponentStorageBase where T : notnull
 
     public T Get(Entity entity)
     {
-        int id = entity.Value;
-        if (_entityIdToSlot != null && id < _entityIdToSlot.Length && _entityIdToSlot[id] != -1)
-        {
-            return _data[_entityIdToSlot[id]];
-        }
-        throw new KeyNotFoundException($"Component of type {typeof(T).Name} not found for entity {entity.Value}");
+        if (!TryGetSlot(entity, out int slot))
+            throw new KeyNotFoundException($"Component of type {typeof(T).Name} not found for entity {entity.Value}");
+        return _data[slot];
     }
 
-    public bool Has(Entity entity)
-    {
-        int id = entity.Value;
-        return _entityIdToSlot != null && id < _entityIdToSlot.Length && _entityIdToSlot[id] != -1;
-    }
+    public bool Has(Entity entity) => TryGetSlot(entity, out _);
 
     public bool TryGetSlot(Entity entity, out int slot)
     {
         int id = entity.Value;
-        if (_entityIdToSlot != null && id < _entityIdToSlot.Length && _entityIdToSlot[id] != -1)
+        if (_entityIdToSlot != null && id >= 0 && id < _entityIdToSlot.Length && _entityIdToSlot[id] != -1)
         {
             slot = _entityIdToSlot[id];
             return true;
@@ -102,7 +95,7 @@ public class ComponentStorage<T> : ComponentStorageBase where T : notnull
     public override void Remove(Entity entity)
     {
         int id = entity.Value;
-        if (_entityIdToSlot == null || id >= _entityIdToSlot.Length || _entityIdToSlot[id] == -1)
+        if (_entityIdToSlot == null || id < 0 || id >= _entityIdToSlot.Length || _entityIdToSlot[id] == -1)
             return;
 
         int slot = _entityIdToSlot[id];
