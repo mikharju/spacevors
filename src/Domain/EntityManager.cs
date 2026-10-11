@@ -140,14 +140,16 @@ public class EntityManager
             (ComponentStorage<T1>)s1);
     }
 
-    public static ComponentStorageBase FindSmallest(ComponentStorageBase first, params ComponentStorageBase[] rest)
-    {
-        var smallest = first;
-        foreach (var s in rest)
-            if (s.Count < smallest.Count)
-                smallest = s;
-        return smallest;
-    }
+    // Smallest storage; ties keep the earlier argument so iteration order stays stable.
+    // Fixed-arity overloads: a params array would allocate on every multi-component foreach.
+    public static ComponentStorageBase FindSmallest(ComponentStorageBase a, ComponentStorageBase b)
+        => b.Count < a.Count ? b : a;
+
+    public static ComponentStorageBase FindSmallest(ComponentStorageBase a, ComponentStorageBase b, ComponentStorageBase c)
+        => FindSmallest(FindSmallest(a, b), c);
+
+    public static ComponentStorageBase FindSmallest(ComponentStorageBase a, ComponentStorageBase b, ComponentStorageBase c, ComponentStorageBase d)
+        => FindSmallest(FindSmallest(a, b, c), d);
 
     public ComponentQuery<T1, T2> GetEntitiesWithComponents<T1, T2>()
         where T1 : notnull
