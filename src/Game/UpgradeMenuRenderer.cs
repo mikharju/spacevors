@@ -19,6 +19,13 @@ public static class UpgradeMenuRenderer
     public const int HintFontSize = 16;
     public const int HintGap = 28; // gap between card bottom and hint text top
     const int BottomMargin = 32;
+    const float FadeInSeconds = 0.15f;
+
+    // Fade-in state: the menu re-fades each time it appears after being hidden.
+    static bool _cardsWereShown;
+    static float _cardsShownSince;
+
+    public static void ResetFade() => _cardsWereShown = false;
 
     public static int GetHintY(int windowHeight, float scale) => (int)(windowHeight - (BottomMargin + HintFontSize) * scale);
 
@@ -26,16 +33,24 @@ public static class UpgradeMenuRenderer
     {
         if (options.Options.Length == 0) return;
 
+        if (!_cardsWereShown)
+        {
+            _cardsWereShown = true;
+            _cardsShownSince = (float)Raylib.GetTime();
+        }
+        float fade = Ui.FadeAlpha(_cardsShownSince, FadeInSeconds);
+
         for (int i = 0; i < options.Options.Length; i++)
         {
             var opt = options.Options[i];
             var (topLeft, w, h) = GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, scale);
-            DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), new Color(50, 150, 255, 255), (i + 1).ToString(), i == hoveredIndex, scale);
+            DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), (i + 1).ToString(), i == hoveredIndex, fade, scale);
         }
 
         string hint = "Click a card or press keys";
         int font = (int)(HintFontSize * scale);
-        Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font, new Color(200, 200, 200, 255));
+        Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font,
+            Ui.WithAlpha(Palette.TextMuted, fade));
     }
 
     public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int windowWidth, int windowHeight, float scale)
@@ -59,18 +74,21 @@ public static class UpgradeMenuRenderer
         return (new Vector2(x, startY), cardW, cardH);
     }
 
-    private static void DrawCard(int x, int y, int width, int height, string label, string statValue, Color borderColor, string key, bool hovered, float scale)
+    // Soft-depth card: rounded translucent panel with shadow; hover lifts it 4px,
+    // brightens the border to the accent; value in accent, label muted.
+    private static void DrawCard(int x, int y, int width, int height, string label, string statValue, string key, bool hovered, float fade, float scale)
     {
         int labelFont = (int)(UpgradeCardLabelFontSize * scale);
         int valueFont = (int)(UpgradeCardValueFontSize * scale);
+        int radius = (int)(6 * scale);
 
-        Color background = hovered ? new Color(50, 50, 68, 255) : new Color(35, 35, 45, 255);
-        Color border = hovered ? new Color(130, 200, 255, 255) : borderColor;
+        Color background = hovered ? new Color(50, 50, 68, 230) : new Color(28, 30, 40, 230);
+        Color border = hovered ? Palette.Accent : Palette.PanelEdge;
+        y -= hovered ? (int)(4 * scale) : 0;
 
-        Raylib.DrawRectangle(x, y, width, height, background);
-        Raylib.DrawRectangleLines(x, y, width, height, border);
+        Ui.DrawPanel(x, y, width, height, radius, Ui.WithAlpha(background, fade), Ui.WithAlpha(border, fade));
 
-        DrawKeyBadge(x + (int)(10 * scale), y + (int)(10 * scale), key, scale);
+        DrawKeyBadge(x + (int)(10 * scale), y + (int)(10 * scale), key, fade, scale);
 
         string[] labelLines = WrapText(label, width - (int)(24 * scale), labelFont);
         int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
@@ -82,21 +100,23 @@ public static class UpgradeMenuRenderer
         for (int i = 0; i < numLines; i++)
         {
             int lineW = Raylib.MeasureText(labelLines[i], labelFont);
-            Raylib.DrawText(labelLines[i], x + width / 2 - lineW / 2, contentY + i * linePitch, labelFont, new Color(255, 255, 255, 255));
+            Raylib.DrawText(labelLines[i], x + width / 2 - lineW / 2, contentY + i * linePitch, labelFont,
+                Ui.WithAlpha(Palette.TextMuted, fade));
         }
 
         int valueWidth = Raylib.MeasureText(statValue, valueFont);
-        Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, contentY + labelHeight + labelValueGap, valueFont, borderColor);
+        Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, contentY + labelHeight + labelValueGap, valueFont,
+            Ui.WithAlpha(Palette.Accent, fade));
     }
 
-    private static void DrawKeyBadge(int x, int y, string key, float scale)
+    private static void DrawKeyBadge(int x, int y, string key, float fade, float scale)
     {
         int badgeSize = (int)(24 * scale);
-        Raylib.DrawRectangle(x, y, badgeSize, badgeSize, new Color(60, 60, 78, 255));
+        Ui.DrawRoundedRect(x, y, badgeSize, badgeSize, (int)(5 * scale), Ui.WithAlpha(new Color(60, 60, 78, 255), fade));
 
         int font = (int)(18 * scale);
         int keyWidth = Raylib.MeasureText(key, font);
-        Raylib.DrawText(key, x + (badgeSize - keyWidth) / 2, y + (int)(4 * scale), font, new Color(220, 220, 230, 255));
+        Raylib.DrawText(key, x + (badgeSize - keyWidth) / 2, y + (int)(4 * scale), font, Ui.WithAlpha(Palette.TextBright, fade));
     }
 
     private static string[] WrapText(string text, int maxWidth, int fontSize)

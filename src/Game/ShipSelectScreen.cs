@@ -87,7 +87,7 @@ public sealed class ShipSelectScreen
 
         string hint = "Arrows/WASD or scroll to browse · Click or Enter to select";
         int hintWidth = Raylib.MeasureText(hint, 16);
-        Raylib.DrawText(hint, windowWidth / 2 - hintWidth / 2, windowHeight - ListBottomMargin / 2, 16, new Color(200, 200, 200, 255));
+        Raylib.DrawText(hint, windowWidth / 2 - hintWidth / 2, windowHeight - ListBottomMargin / 2, 16, Palette.TextMuted);
 
         Raylib.EndDrawing();
     }
@@ -168,11 +168,11 @@ public sealed class ShipSelectScreen
 
         int trackX = windowWidth / 2 + CardWidth / 2 + ScrollbarGap;
         float maxScroll = contentH - viewH;
-        Raylib.DrawRectangle(trackX, ListTopMargin, ScrollbarWidth, viewH, new Color(45, 45, 60, 255));
 
+        // Trackless scrollbar: just a rounded translucent thumb.
         int thumbHeight = Math.Max(30, (int)(viewH * ((float)viewH / contentH)));
         int thumbY = ListTopMargin + (int)(_scrollOffset / maxScroll * (viewH - thumbHeight));
-        Raylib.DrawRectangle(trackX, thumbY, ScrollbarWidth, thumbHeight, new Color(120, 120, 150, 255));
+        Ui.DrawRoundedRect(trackX, thumbY, ScrollbarWidth, thumbHeight, ScrollbarWidth / 2, new Color(120, 130, 150, 180));
     }
 
     void DrawShipPreview(float cx, float cy, ShipType ship)
@@ -183,17 +183,21 @@ public sealed class ShipSelectScreen
 
     void DrawShipCard(int x, int y, int width, int height, string title, string details, Color borderColor, string keyLabel, bool highlighted)
     {
-        Raylib.DrawRectangle(x, y, width, height, highlighted ? new Color(48, 48, 64, 255) : new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, width, height, borderColor);
+        // Rounded translucent card; the ship's own color stays as the border for
+        // identity, the highlight adds an accent stripe on the left edge.
+        Color fill = highlighted ? new Color(48, 50, 68, 235) : new Color(28, 30, 40, 235);
+        Ui.DrawPanel(x, y, width, height, 8, fill, borderColor);
+        if (highlighted)
+            Ui.DrawRoundedRect(x + 4, y + 10, 3, height - 20, 1, Palette.Accent);
 
         int textX = x + ShipPanelWidth + TextGap;
         if (keyLabel.Length > 0)
-            Raylib.DrawText(keyLabel, textX, y + 70, 18, new Color(200, 200, 200, 255));
+            Raylib.DrawText(keyLabel, textX, y + 70, 18, Palette.TextMuted);
 
-        Raylib.DrawText(title, textX, y + 105, 24, new Color(255, 255, 255, 255));
+        Raylib.DrawText(title, textX, y + 105, 24, Palette.TextBright);
 
         string[] lines = details.Split('\n');
         for (int i = 0; i < lines.Length; i++)
-            Raylib.DrawText(lines[i], textX, y + 155 + i * 26, 16, new Color(200, 200, 200, 255));
+            Raylib.DrawText(lines[i], textX, y + 155 + i * 26, 16, Palette.TextMuted);
     }
 }

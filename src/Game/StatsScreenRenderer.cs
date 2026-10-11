@@ -26,14 +26,9 @@ public static class StatsScreenRenderer
     const int CountColumnWidth = 48;
 
     static readonly Color DimColor = new(15, 15, 25, 215);
-    static readonly Color PanelBackground = new(28, 28, 40, 255);
-    static readonly Color PanelBorder = new(90, 90, 120, 255);
-    static readonly Color HeaderColor = new(50, 150, 255, 255);
-    static readonly Color LabelColor = new(220, 220, 230, 255);
-    static readonly Color ValueColor = new(255, 255, 255, 255);
+    static readonly Color RowTint = new(255, 255, 255, 6);
     static readonly Color CountUpgraded = new(120, 255, 140, 255);
     static readonly Color CountNone = new(110, 110, 130, 255);
-    static readonly Color HintColor = new(200, 200, 200, 255);
 
     public readonly record struct StatRow(string Label, string Value, int Count); // Count < 0: no count column
     public readonly record struct StatsSection(string Title, StatRow[] Rows);
@@ -60,7 +55,10 @@ public static class StatsScreenRenderer
         if (hasCards)
             UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale);
         else
+        {
+            UpgradeMenuRenderer.ResetFade();
             DrawHint("Tab to close", windowWidth, windowHeight, prepared.Scale);
+        }
     }
 
     public static int GetHoveredCardIndex(Prepared prepared, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
@@ -101,26 +99,32 @@ public static class StatsScreenRenderer
         int panelH = (int)MathF.Max(leftContentH, rightContentH) + 2 * padY;
 
         int leftW = (int)(LeftPanelWidth * scale);
-        DrawBox(margin, margin, leftW, panelH);
+        int radius = (int)(6 * scale);
+        DrawBox(margin, margin, leftW, panelH, radius);
 
-        Raylib.DrawText($"{shipName} · Level {level}", margin + padX, margin + padY, (int)(TitleFontSize * scale), ValueColor);
+        int titleFont = (int)(TitleFontSize * scale);
+        Raylib.DrawText(shipName, margin + padX, margin + padY, titleFont, Palette.TextBright);
+        string levelText = $"LV {level}";
+        Raylib.DrawText(levelText, margin + padX + Raylib.MeasureText(shipName, titleFont) + 12, margin + padY, titleFont, Palette.Accent);
         int y = margin + padY + (int)((TitleFontSize + TitleGap) * scale);
-        foreach (var row in layout.ShipRows)
-            y = DrawRow(margin + padX, y, leftW - 2 * padX, row, scale);
+        for (int i = 0; i < layout.ShipRows.Length; i++)
+            y = DrawRow(margin + padX, y, leftW - 2 * padX, layout.ShipRows[i], i, scale);
 
         int gap = (int)(ColumnGap * scale);
         int rightX = margin + leftW + gap;
         int rightW = windowWidth - 2 * margin - leftW - gap;
-        DrawBox(rightX, margin, rightW, panelH);
+        DrawBox(rightX, margin, rightW, panelH, radius);
 
         y = margin + padY;
         for (int i = 0; i < layout.WeaponSections.Length; i++)
         {
             var section = layout.WeaponSections[i];
-            Raylib.DrawText(section.Title.ToUpper(), rightX + padX, y, (int)(HeaderFontSize * scale), HeaderColor);
+            int headerFont = (int)(HeaderFontSize * scale);
+            Raylib.DrawText(section.Title.ToUpper(), rightX + padX, y, headerFont, Palette.Accent);
+            Raylib.DrawRectangle(rightX + padX, y + headerFont + 4, rightW - 2 * padX, 1, Palette.PanelEdge);
             y += (int)(HeaderHeight * scale);
-            foreach (var row in section.Rows)
-                y = DrawRow(rightX + padX, y, rightW - 2 * padX, row, scale);
+            for (int r = 0; r < section.Rows.Length; r++)
+                y = DrawRow(rightX + padX, y, rightW - 2 * padX, section.Rows[r], r, scale);
             if (i < layout.WeaponSections.Length - 1) y += (int)(SectionGap * scale);
         }
     }
@@ -139,20 +143,21 @@ public static class StatsScreenRenderer
         return MathF.Max(left, MeasureWeaponSectionsHeight(layout, scale)) + 2f * PanelPaddingY * scale;
     }
 
-    static void DrawBox(int x, int y, int width, int height)
-    {
-        Raylib.DrawRectangle(x, y, width, height, PanelBackground);
-        Raylib.DrawRectangleLines(x, y, width, height, PanelBorder);
-    }
+    static void DrawBox(int x, int y, int width, int height, int radius)
+        => Ui.DrawPanel(x, y, width, height, radius, Palette.PanelFill, Palette.PanelEdge);
 
-    static int DrawRow(int x, int y, int contentWidth, StatRow row, float scale)
+    static int DrawRow(int x, int y, int contentWidth, StatRow row, int rowIndex, float scale)
     {
+        int rowHeight = (int)(RowPitch * scale);
+        if (rowIndex % 2 == 1)
+            Ui.DrawRoundedRect(x - 6, y - 3, contentWidth + 12, rowHeight, 3, RowTint);
+
         int font = (int)(RowFontSize * scale);
-        Raylib.DrawText(row.Label, x, y, font, LabelColor);
+        Raylib.DrawText(row.Label, x, y, font, Palette.TextMuted);
 
         int countW = row.Count >= 0 ? (int)(CountColumnWidth * scale) : 0;
         int valueEnd = x + contentWidth - countW;
-        Raylib.DrawText(row.Value, valueEnd - Raylib.MeasureText(row.Value, font), y, font, ValueColor);
+        Raylib.DrawText(row.Value, valueEnd - Raylib.MeasureText(row.Value, font), y, font, Palette.TextBright);
 
         if (row.Count >= 0)
         {
@@ -162,13 +167,13 @@ public static class StatsScreenRenderer
             Raylib.DrawText(count, countEnd - Raylib.MeasureText(count, font), y, font, color);
         }
 
-        return y + (int)(RowPitch * scale);
+        return y + rowHeight;
     }
 
     static void DrawHint(string text, int windowWidth, int windowHeight, float scale)
     {
         int font = (int)(UpgradeMenuRenderer.HintFontSize * scale);
-        Raylib.DrawText(text, windowWidth / 2 - Raylib.MeasureText(text, font) / 2, UpgradeMenuRenderer.GetHintY(windowHeight, scale), font, HintColor);
+        Raylib.DrawText(text, windowWidth / 2 - Raylib.MeasureText(text, font) / 2, UpgradeMenuRenderer.GetHintY(windowHeight, scale), font, Palette.TextMuted);
     }
 
     static StatsLayout BuildStats(EntityManager em, Entity playerEntity)
