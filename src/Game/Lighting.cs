@@ -34,6 +34,7 @@ public static class Lighting
         uniform sampler2D texture0;
         uniform sampler2D normalMap;
         uniform sampler2D depthMap;
+        uniform float uTime;
 
         const float TwoPi = 6.28318530718;
 
@@ -58,6 +59,9 @@ public static class Lighting
         // so undamaged sprites execute the identical path as before damage existed).
         const float DamageGrid = 4.0;  // impact cells per sprite edge
         const vec3 SootColor = vec3(0.10, 0.09, 0.08);
+        const vec3 EmberColor = vec3(1.0, 0.35, 0.08);
+        // Holes and ember glow start once damage passes this and grow toward 1.
+        const float HoleStartDamage = 0.55;
 
         // Cheap hash (Dave Hoskins) — deterministic per Voronoi cell, seeded away from the origin.
         vec2 hash21(vec2 p)
@@ -85,6 +89,7 @@ public static class Lighting
             vec3 nMap = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
             vec3 normalLocal = normalize(vec3(nMap.x, -nMap.y, nMap.z));
             float depthDamage = 0.0;
+            vec3 ember = vec3(0.0);
 
             if (damage > 0.0)
             {
@@ -118,6 +123,20 @@ public static class Lighting
                 float scorch = hull * impact * smoothstep(craterR * 2.6, craterR * 0.5, distC);
 
                 baseColor.rgb = mix(baseColor.rgb, SootColor, scorch * mix(0.45, 0.8, damage));
+
+                // Perforation: interior impacts punch alpha holes once damage is critical,
+                // so space shows through; the hole rotates with the hull, the rest stays lit.
+                vec2 centerUv = (bestId + cellRand) / DamageGrid;
+                float interior = step(0.12, centerUv.x) * step(centerUv.x, 0.88)
+                               * step(0.12, centerUv.y) * step(centerUv.y, 0.88);
+                float holeR = interior * impact * max(0.0, damage - HoleStartDamage) / (1.0 - HoleStartDamage) * 0.22;
+                if (hull > 0.0 && distC < holeR) discard;
+
+                // Embers: craters glow hot when critical, strongest on the rim around a hole.
+                // Additive and small — the hull keeps its directional shading underneath.
+                float holeRim = hull * (holeR > 0.0 ? smoothstep(holeR * 2.2, holeR, distC) : 0.0);
+                float pulse = 0.75 + 0.25 * sin(uTime * 2.5 + cellRand.y * 6.28318);
+                ember = EmberColor * (crater * smoothstep(0.5, 1.0, damage) + holeRim) * 0.45 * damage * pulse;
 
                 // Crater dent: tilt the normal toward the impact center and sink the depth so the
                 // existing diffuse and self-shadow passes shade it like a real depression.
@@ -155,7 +174,7 @@ public static class Lighting
             }
             pointLight = min(pointLight, MaxPointLightContribution);
 
-            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight;
+            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight + ember;
 
             // RGB of the vertex color carries the packed angle, so only its alpha tints.
             finalColor = vec4(lit, baseColor.a * fragColor.a);
@@ -168,6 +187,7 @@ public static class Lighting
     static int _normalMapLoc;
     static int _depthMapLoc;
     static int _lightsLoc;
+    static int _timeLoc;
 
     // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
     static readonly System.Numerics.Vector4[] PointLights = new System.Numerics.Vector4[MaxPointLights];
@@ -213,6 +233,7 @@ public static class Lighting
         _normalMapLoc = Raylib.GetShaderLocation(shader, "normalMap");
         _depthMapLoc = Raylib.GetShaderLocation(shader, "depthMap");
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
+        _timeLoc = Raylib.GetShaderLocation(shader, "uTime");
         IsReady = true;
     }
 
@@ -239,6 +260,8 @@ public static class Lighting
         Raylib.SetShaderValueTexture(shader, _normalMapLoc, sprite.Normals);
         Raylib.SetShaderValueTexture(shader, _depthMapLoc, sprite.Depth);
         Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, MaxPointLights);
+        // Frame-global time drives the ember pulse; a global uniform is exactly right here.
+        Raylib.SetShaderValue(shader, _timeLoc, (float)Raylib.GetTime(), ShaderUniformDataType.Float);
         return true;
     }
 
