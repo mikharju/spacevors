@@ -4,12 +4,15 @@ Proposal: impact damage rules for ship↔ship and ship↔asteroid collisions (20
 
 ## Status: done (2026-09-16)
 
-Implemented in one commit (`ImpactDamage.cs` + wiring in `ResolveCollision` + 15 tests).
-Deviations from the plan's calibration table: the table's "player" rows used the
-Fighter hull (r=58, mass 10568 → ram costs 5); the smaller default test hull (r=18)
-absorbs more of a hit and takes 3 — mass split working as designed. The pebble-ram
-row reads 0 (not ~1) with the shipped constants. Feel tuning (constants at the top
-of `ImpactDamage.cs`) still wants a playtest session.
+Implemented in one commit (`ImpactDamage.cs` + wiring in `ResolveCollision` + tests),
+then retuned per playtest feedback (2026-09-16): `MinClosingSpeed` 80 → 160 px/s
+(strong collisions need 2× the speed), `ImpactScale` 4.6e-8 → 1.8e-8, and
+`MaxImpactDamage` 15 → 7 so the initial 8 hp Scout hull barely survives a single
+strong collision (800 px/s closing into a large asteroid leaves exactly 1 hp).
+Also fixed: the fatal hit now writes `Health(0)` (the stale high value left the hull
+shading rendering a pristine wreck), and game over is delayed 1.2 s after the player
+dies so the damage graphics play out before the overlay.
+Feel tuning of the constants may still want further playtesting.
 
 ## Requirements (from the request)
 

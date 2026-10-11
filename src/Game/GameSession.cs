@@ -36,6 +36,12 @@ public sealed class GameSession
 
     private float _accumulator;
     private bool _gameOver;
+
+    // After the player dies the simulation keeps running this long so the death moment
+    // plays out — full hull damage graphics (holes, embers), smoke and sparks — before
+    // the game over overlay appears.
+    private const float DeathAnimationSeconds = 1.2f;
+    private float _deathCountdown = -1f; // < 0: player alive; >= 0: counting down to game over
     private bool _wasPaused;
     private bool _showStats;
 
@@ -65,12 +71,12 @@ public sealed class GameSession
 
         bool hasPendingChoice = _em.GetEntitiesWithComponents<PendingChoice>().Any();
 
-        // Player died on the level-up frame: drop the stale choice and show game over.
+        // Player died on the level-up frame: drop the stale choice; the death animation
+        // in UpdateRunning then leads to game over like on any other frame.
         if (hasPendingChoice && _em.HasComponent<Dead>(_playerEntity))
         {
             ClearPendingChoices();
             hasPendingChoice = false;
-            _gameOver = true;
         }
 
         if (_gameOver) _showStats = false;
@@ -96,12 +102,20 @@ public sealed class GameSession
     {
         _accumulator = Math.Min(_accumulator + frameTime, MaxAccumulator);
 
-        if (!_gameOver) ReadPlayerInput();
+        bool playerDead = _em.HasComponent<Dead>(_playerEntity);
+
+        if (!_gameOver && !playerDead) ReadPlayerInput();
 
         StepSimulation();
 
-        if (!_gameOver && _em.HasComponent<Dead>(_playerEntity))
-            _gameOver = true;
+        // Death animation: keep simulating (smoke, sparks, embers, hull shading) for a
+        // moment after the fatal hit, then freeze into game over.
+        if (!_gameOver && playerDead)
+        {
+            if (_deathCountdown < 0f) _deathCountdown = DeathAnimationSeconds;
+            _deathCountdown -= frameTime;
+            if (_deathCountdown <= 0f) _gameOver = true;
+        }
 
         RenderGame();
     }

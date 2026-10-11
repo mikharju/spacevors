@@ -428,6 +428,10 @@ public class CollisionSystem : GameSystem
         {
             if (playerRemaining <= 0)
             {
+                // Zero the health on the fatal hit: the hull damage shading reads Health, and
+                // without this write the killing blow from high hp renders a pristine hull.
+                var playerHealth = view.GetComponent<Health>(playerEntity);
+                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(0, playerHealth.Max)));
                 commands.Add(new AddComponentCommand<Dead>(playerEntity, new Dead()));
             }
             else

@@ -305,15 +305,16 @@ Implementation (plan: plans/DAMAGE_SHADING.md):
 
 ## Impact damage — done
 
-Fast collisions between ships and asteroids (and ships vs ships) deal rail-gun-style damage based on closing speed; gentle bumps deal none.
+Fast collisions between ships and asteroids (and ships vs ships) deal closing-speed damage; gentle bumps deal none, and one hit can never destroy the initial hull.
 
 Implementation (plan: plans/IMPACT_DAMAGE.md):
-- `ImpactDamage.ForMasses` (Domain/Combat): absorbed energy ½·μ·v² at the contact normal split by inverse-mass share (lighter body absorbs more); zero below 80 px/s closing speed — side-by-side flight and swarm jostling never hurt; quadratic ramp capped at 15 = one RailGun shot
+- `ImpactDamage.ForMasses` (Domain/Combat): absorbed energy ½·μ·v² at the contact normal split by inverse-mass share (lighter body absorbs more); zero below 160 px/s closing speed — side-by-side flight and swarm jostling never hurt; quadratic ramp capped at 7 so a single hit leaves 1 hp on the initial 8 hp Scout hull
+- Tuning targets: normal 400 px/s ram ≈ 2 (minor); strong collision at 800 px/s closing (explosion-flung, head-on) ≈ 7 — barely survives; tune constants at the top of `ImpactDamage.cs`
 - Wired into `CollisionSystem.ResolveCollision` using the closing speed and masses the impulse solve already computes (hot-path cost: one compare); damage only on approach, so resting contact never chips hp — no cooldown state
 - Player and enemy ships take damage through the existing per-frame health accumulator, so the existing death pass runs the full kill flow (loot, explosion, sparks) for impact kills; asteroids (no Health) and mines (own contact rule) take none
 - Hits where either body absorbs ≥ 3 damage throw a spark burst (2 + damage/3, cap 6) at the contact point
-- Feel: player full-ram into a large asteroid ~3–5 of 8–20 hp, head-on Interceptor ram ~10 on itself, explosion-flung at 800 px/s lethal; tune constants in ImpactDamage.cs
-- 15 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, calibration, death flow, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
+- Death graphics render fully: the fatal hit writes `Health(0)` (without it the killing blow from high hp left the hull shading scalar stale and the wreck looked pristine), and game over waits 1.2 s after the player dies — simulation keeps running so holes, ember glow, smoke and sparks play out before the overlay; input stops at death
+- 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, barely-survives calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
 
 ## Difficulty scaling
 
