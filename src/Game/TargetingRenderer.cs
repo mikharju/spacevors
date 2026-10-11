@@ -15,18 +15,21 @@ public static class TargetingRenderer
     // Gap between the target radius and the bracket corners.
     private const float Margin = 10f;
     private const float ArmLength = 10f;
-    private const float Thickness = 2.5f;
+    private const float Thickness = 1.5f;
 
-    private const float BarHeight = 4f;
+    private const float BarHeight = 3f;
     private const float BarGap = 6f; // gap between the top bracket corners and the bar
-
-    private static readonly Color BarBackground = new(40, 40, 40, 180);
 
     public static void Draw(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight)
     {
         bool hasManual = em.TryGetComponent<PrimaryTarget>(playerEntity, out var primary);
         if (hasManual && !em.HasComponent<Dead>(primary.Target))
-            DrawTarget(em, primary.Target, ManualBracketColor, camX, camY, windowWidth, windowHeight);
+        {
+            // Gentle 1 Hz alpha pulse so the manual lock reads without any shape change.
+            float pulse = 0.5f + 0.5f * MathF.Sin((float)Raylib.GetTime() * 2f * MathF.PI);
+            var manualColor = new Color(ManualBracketColor.R, ManualBracketColor.G, ManualBracketColor.B, (byte)(229 + 26 * pulse));
+            DrawTarget(em, primary.Target, manualColor, camX, camY, windowWidth, windowHeight);
+        }
 
         foreach (var (entity, mark) in em.GetEntitiesWithComponents<AutoTargetMark>())
         {
@@ -57,15 +60,16 @@ public static class TargetingRenderer
     private static void DrawHpBar(EntityManager em, Entity target, float centerX, float centerY, float halfSize)
     {
         if (!em.TryGetComponent<Health>(target, out var health)) return; // dead ships have no Health and are skipped by the caller
+        if (health.Current >= health.Max) return; // full-health targets need no bar — less clutter
 
         float ratio = Math.Clamp((float)health.Current / health.Max, 0f, 1f);
         int x = (int)(centerX - halfSize);
         int y = (int)(centerY - BarHeight / 2f);
         int width = (int)(halfSize * 2f);
+        int radius = (int)(BarHeight / 2f);
 
-        Raylib.DrawRectangle(x, y, width, (int)BarHeight, BarBackground);
-        if (ratio > 0f)
-            Raylib.DrawRectangle(x, y, (int)(width * ratio), (int)BarHeight, LerpColor(Palette.HealthLow, Palette.HealthFull, ratio));
+        Ui.DrawRoundedRect(x, y, width, (int)BarHeight, radius, Palette.TrackDark);
+        Ui.DrawRoundedRect(x, y, Math.Max((int)BarHeight, (int)(width * ratio)), (int)BarHeight, radius, Palette.HealthColor(ratio));
     }
 
     private static float GetRadius(EntityManager em, Entity target)
@@ -85,13 +89,4 @@ public static class TargetingRenderer
                 Raylib.DrawLineEx(corner, new System.Numerics.Vector2(corner.X, corner.Y - sy * ArmLength), Thickness, color);
             }
     }
-
-    private const byte OpaqueAlpha = 255;
-
-    // Green at full health to red when nearly dead; alpha stays fully opaque.
-    private static Color LerpColor(Color from, Color to, float t) => new(
-        (byte)(from.R + (to.R - from.R) * t),
-        (byte)(from.G + (to.G - from.G) * t),
-        (byte)(from.B + (to.B - from.B) * t),
-        OpaqueAlpha);
 }
