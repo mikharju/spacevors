@@ -78,8 +78,14 @@ public class ComponentStorage<T> : ComponentStorageBase where T : notnull
 
     public override Entity GetEntity(int slot) => _entityIds[slot];
 
+    // Direct reference into the storage array; see GetComponentRef for the invalidation contract.
     public ref T GetComponent(int slot) => ref _data[slot];
 
+    /// <summary>
+    /// Direct reference into the storage array. A later Add of this component type can grow
+    /// the backing array and silently invalidate the reference: never hold it across
+    /// structural changes (entity creation that adds this component type).
+    /// </summary>
     public ref T GetComponentRef(Entity entity)
     {
         if (!TryGetSlot(entity, out int slot))
@@ -87,6 +93,7 @@ public class ComponentStorage<T> : ComponentStorageBase where T : notnull
         return ref GetBySlot(slot);
     }
 
+    // Direct reference into the storage array; see GetComponentRef for the invalidation contract.
     public ref T GetBySlot(int slot)
     {
         return ref _data[slot];

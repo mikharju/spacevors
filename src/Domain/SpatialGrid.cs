@@ -59,6 +59,7 @@ public class SpatialGrid
 
     // Returns each entity at most once, even if it spans multiple cells.
     // Sets truncated to true when a unique item did not fit in result.
+    // Not reentrant: dedup uses the shared _seen set, so callers must not nest queries.
     public int GetQueryItems(Vector2 position, float radius, Span<SpatialItem> result, out bool truncated)
     {
         int minX = (int)MathF.Floor((position.X - radius) / CellSize);

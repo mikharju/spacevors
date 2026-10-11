@@ -38,6 +38,10 @@ public class EntityManager
         }
     }
 
+    /// <summary>
+    /// Direct reference into the component storage. Invalidated by a later AddComponent of
+    /// the same type that grows the storage; see ComponentStorage&lt;T&gt;.GetComponentRef.
+    /// </summary>
     public ref T GetComponentRef<T>(Entity entity) where T : notnull
     {
         var type = typeof(T);
