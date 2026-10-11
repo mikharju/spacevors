@@ -6,14 +6,14 @@ Scope: `src/Game/Renderer.cs`, `Lighting.cs`, `LitSprite.cs`, `LitSpriteMatcher.
 
 Overall the system is clean (off-screen culling via `IsOffScreen`/`HalfDiagonal`, defensive `Id != 0` texture checks, testable `LitSpriteMatcher`, shader fallback design). Findings below.
 
-## Status (checked 2026-08-21)
+## Status (checked 2026-08-26)
 
-Fixed: 28 · Open: 2
+Fixed: 31 · Open: 1
 
 Remaining work:
-- Nit: per-entity second Position lookup in draw loops (deferred — measure first; see "Suggested order of work")
-- Perf: `Lighting.TryDraw` per-sprite shader-mode overhead (deferred — measure first)
 - Asset: regenerate the four mismatched lit maps (small-1, interceptor, fighter, heavy) at base dimensions so the load-time warnings stop firing
+
+The 2026-08-26 pass also fixed findings from a second review that were never items in this file: one world→screen transform, one ship placeholder for player and enemies, `Health.Max` as the single hp source, untruncated `DrawCircle` radii, asteroid variant wrap-around, shared palette / turret marker / card rects, one prepared stats layout per paused frame, and a shader limit generated from the C# constant (commits 7d4a3a0…bf866f3).
 
 ## Findings
 
@@ -114,7 +114,7 @@ Remaining work:
   **Fixed** — fields removed from the `ShipType` record (GameplayComponents.cs:129-140).
 
 - **Per-entity second lookup in draw loops** — each `Draw*` method calls `GetComponent<Position>(entity)` per entity after a single-component query; multi-component queries (`<Asteroid, Position>`) would halve lookups. Relevant to the 10k-object goal but measure first (AGENTS.md: optimize only after measuring).
-  **Open (deferred)** — asteroid/turret loops now use multi-component queries for their own components, but `Position` is still fetched separately in every `Draw*` loop; left as-is pending measurement.
+  **Fixed** — every draw loop now takes `Position` from its own multi-component query (`WorldRenderer`, `EnemyShipRenderer`, `LightGatherer`, `ThrusterFlameRenderer`); enemy ship sprites are additionally resolved once per `GraphicsId` per frame instead of a texture-key lookup per entity.
 
 ## Post-review findings (added 2026-08-21)
 

@@ -161,9 +161,9 @@ Dynamic lighting.
 - flat texture fallback when maps or shader are unavailable
 - Asteroids (small + large) load as lit sprites through the same matcher; a set's base may be `<name>-texture.png` or a plain `<name>.png`. The loader scans only top-level files, so `not-in-use/` subfolders are ignored. Variant count = number of loaded bases (`Asteroid.Small/LargeVariantCount`)
 - Stage 1 (done): LitSprite matching in ImageLoader + tests
-- Stage 2 (done): Shadow ship (key 4), Lighting.Init/Shutdown/TryDraw, select screen + gameplay rendering
+- Stage 2 (done): Shadow ship (key 4), Lighting.Init/Shutdown + BeginDraw/Draw/EndDraw, lit draws batched per sprite variant in LitGroupRenderer, select screen + gameplay rendering
 - Stage 3: tuning — exposure/washout on bright textures, normal Y convention check, shadow strength
-- In `Lighting.TryDraw`, `BeginShaderMode` must run before the map `Set*` calls: its batch flush clears raylib's texture-unit registry, so maps set earlier are lost and the sprite renders with the previous lit sprite's maps (verified against raylib 6.0)
+- In `Lighting.BeginDraw`, `BeginShaderMode` must run before the map `Set*` calls: its batch flush clears raylib's texture-unit registry, so maps set earlier are lost and the sprite renders with the previous lit sprite's maps (verified against raylib 6.0). `LitGroupRenderer` keeps one BeginDraw/EndDraw block per sprite variant so the map uniforms stay constant inside a block
 
 ## Phase 6
 
@@ -196,7 +196,7 @@ Design decisions:
 - Rendering-only feature: no new components or systems. Renderer already reads components directly everywhere; a domain ThrusterState component would be an unnecessary abstraction
 - New file src/Game/ThrusterFlameRenderer.cs (keeps Renderer.cs small, one responsibility per type), called from WorldRenderer.Draw before player/enemy ships so flames draw behind them
 - Thrust flame: one per active axis. All player axes are normalized by a single shared max (Thrust×Boost) so flame size reflects absolute thrust force across axes — main booster burns visibly larger than weak side/back thrusters; enemy flame is normalized by EnemyShip.Acceleration (drift-cancel stays below the gate). Flames passing the gate render at least MinVisibleFlameIntensity size so weak thrusters stay visible; flame base sits at the hull edge (radius × 1.0) so small flames are not hidden behind large ships. Direction = −normalize(axis acceleration). Flame length/width scale with intensity and ship radius
-- Turn flame: diagonal RCS pair fires while turning — front thruster on the side opposite the turn, rear thruster on the turn's side (turning right = left-front + right-rear). Front flame points forward from the nose corner; rear flame trails backward. Both are very small, sized like a weak lateral thrust flame (MinVisibleFlameIntensity scale) so they do not compete with the main booster. Turn rate comes from per-entity previous rotation tracked in a small dictionary inside the renderer (pruned each frame, cleared on new game); normalized by RotationSpeed/TurnRate
+- Turn flame: diagonal RCS pair fires while turning — front thruster on the side opposite the turn, rear thruster on the turn's side (turning right = left-front + right-rear). Front flame points forward from the nose corner; rear flame trails backward. Both are very small, sized like a weak lateral thrust flame (MinVisibleFlameIntensity scale) so they do not compete with the main booster. Turn rate comes from the AngularVelocity component (written for the player in GameSession, for enemies by EnemyShipSystem); normalized by RotationSpeed/TurnRate
 - Mines have no Acceleration or Rotation: flame behind motion, direction = −normalize(Velocity), intensity = |velocity| / mine.Speed
 - Entities with Dead component are skipped
 - Flame shape: one triangle per thruster, orange→yellow color by intensity
@@ -227,15 +227,15 @@ Dynamic point lights (additional light sources).
 Extends the Phase 5 lighting shader with a fixed set of per-frame point lights so explosions and thruster flames illuminate nearby lit sprites (ships + asteroids). Flat/fallback path unchanged.
 
 Design decisions:
-- Point lights live in the existing Lighting fragment shader as a uniform array `uLights[MAX_LIGHTS]` (world pos, radius, intensity) plus a shared warm tint; per-fragment cost is O(MAX_LIGHTS), independent of entity count
-- MAX_LIGHTS fixed at 16. Emitter entities may exceed it; the list fills in priority order and overflow is dropped (no sorting). The cap is what keeps GPU + uniform cost bounded as the world grows toward 10k/100k objects
+- Point lights live in the existing Lighting fragment shader as a uniform array `uLights[MaxPointLights]` (screen pos, radius, intensity) plus a shared warm tint; per-fragment cost is O(MaxPointLights), independent of entity count
+- MaxPointLights fixed at 16 in Lighting.cs; the shader source is generated from that constant so the two cannot drift. Emitter entities may exceed it; the list fills in priority order and overflow is dropped (no sorting). The cap is what keeps GPU + uniform cost bounded as the world grows toward 10k/100k objects
 - Only lit sprites respond (player/enemy ships, asteroids). Mines/ammo/sparks/pickups stay flat — they are not drawn through the shader
 - Light sources, by priority:
   - Ship death explosions (initial + secondary + final) and mine blasts — all use the existing Explosion component; rare and large, included first. Ammo hits do NOT spawn Explosion components (only sparks), so there is no per-shot light to limit
   - Thruster flames — numerous (up to ~125 in load test); fill remaining slots after explosions and are dropped first under pressure. Gives engine glow on nearby hulls/rocks without unbounded cost
 - Intensity fades with effect life (lifeRatio); radius maps from Explosion.Radius / flame size; one shared warm tint for all lights keeps uniform count low (per-light color is an optional refinement)
 - Point lights shade with sprite normals: per-light Lambertian term against `normalScreen` (light direction y-flipped from GL space, light elevated `PointLightHeight` px toward viewer so flat surfaces stay lit). No depth-map occlusion for point lights — would need 16 extra depth fetches per lit pixel for dubious benefit
-- CPU gathers the list once per frame and uploads it once (K vec4s). No new draw calls: the per-sprite batch flush already exists in Lighting.TryDraw, so adding lights changes only fragment work + a few uniforms
+- CPU gathers the list once per frame and uploads it once (K vec4s). No new draw calls: the per-sprite batch flush already exists in Lighting.EndDraw, so adding lights changes only fragment work + a few uniforms
 
 Stage 1 (shader plumbing) — done: `uLights[16]` vec4 array (screen pos xy with GL bottom-left origin, radius z, intensity w); `Lighting.BeginFrame` + `AddLight`; one `SetShaderValueV` upload per lit-sprite draw; idle screenshot pixel-identical to pre-change baseline at zero lights
 Stage 2 (explosion lights) — done: new `LightGatherer.Collect` gathers Explosion entities first (radius grows as the effect fades, intensity = lifeRatio); screenshots confirm ship deaths + mine blasts light nearby asteroid/player hull and fade out
