@@ -567,6 +567,10 @@ public class CollisionSystem : GameSystem
 
         if (velAlongNormal > 0f) return;
 
+        // Impact damage: only reached while approaching, so sustained/resting contact never
+        // chips hp; -velAlongNormal is the closing speed (relative, normal component only).
+        ApplyImpactDamage(view, aEntity, bEntity, aPos.Value, normal, aRadius, aMass, bMass, -velAlongNormal, commands);
+
         float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
         if (MathF.Abs(velAlongNormal) < 5f)
         {
@@ -634,6 +638,55 @@ public class CollisionSystem : GameSystem
                     SetCollisionAngularVelocity(bEntity, bAngVel + torqueB / bMOI);
                 }
             }
+        }
+    }
+
+    // Impact damage (plans/IMPACT_DAMAGE.md). Damage flows through the same per-frame health
+    // accumulator as bullet damage, so the existing death pass covers impact kills.
+    private void ApplyImpactDamage(
+        WorldView view,
+        Entity aEntity,
+        Entity bEntity,
+        Vector2 aPos,
+        Vector2 normal,
+        float aRadius,
+        float aMass,
+        float bMass,
+        float closingSpeed,
+        CommandBuffer commands)
+    {
+        var (damageA, damageB) = ImpactDamage.ForMasses(aMass, bMass, closingSpeed);
+        if (damageA == 0 && damageB == 0) return;
+
+        var contactPoint = aPos + normal * aRadius;
+
+        AccumulateImpactHealth(view, aEntity, damageA, contactPoint);
+        AccumulateImpactHealth(view, bEntity, damageB, contactPoint);
+
+        int biggest = Math.Max(damageA, damageB);
+        if (biggest >= ImpactDamage.SparkDamageThreshold)
+            for (int i = 0; i < ImpactDamage.SparkCount(biggest); i++)
+                SpawnSpark(commands, contactPoint, view.Rng);
+    }
+
+    // Asteroids (no Health) and mines (their own contact rule in ResolveMineVsPlayer)
+    // never take impact damage; ships register death data like bullet hits do, so the
+    // death pass writes back damaged health for survivors and runs the full death flow
+    // for kills.
+    private void AccumulateImpactHealth(WorldView view, Entity entity, int damage, Vector2 hitPoint)
+    {
+        if (damage == 0) return;
+        if (view.HasComponent<EnemyMine>(entity)) return;
+        if (!view.TryGetComponent<Health>(entity, out var health)) return;
+
+        var remaining = (_frameRemainingHealth.TryGetValue(entity, out var r) ? r : health.Current) - damage;
+        _frameRemainingHealth[entity] = remaining;
+
+        if (!_shipDeathData.ContainsKey(entity)
+            && view.TryGetComponent<EnemyShip>(entity, out var enemyShip)
+            && view.TryGetComponent<Position>(entity, out var pos))
+        {
+            _shipDeathData[entity] = (hitPoint, pos.Value, enemyShip.Radius, enemyShip.GraphicsId);
         }
     }
 
