@@ -67,7 +67,7 @@ Focus: doc-vs-code drift (e.g. ARCHITECTURE.md lists Events/, Math/, Infrastruct
 
 | Chunk | Topic | Status |
 |-------|-------|--------|
-| 1 | Core ECS infrastructure | done (2026-08-15), re-reviewed (2026-08-23) |
+| 1 | Core ECS infrastructure | done (2026-08-15), re-reviewed (2026-08-23, 2026-10-11) |
 | 2 | Combat & physics systems | done (2026-08-15), re-reviewed (2026-08-23) |
 | 3 | AI, progression & support | done (2026-08-15), re-reviewed (2026-08-23) |
 | 4 | Presentation layer | done (2026-08-15), re-reviewed (2026-08-23) |
@@ -96,9 +96,9 @@ Consolidated from the per-chunk re-reviews below; line numbers verified against 
 9. **Mixed write patterns** — app layer writes components directly (input :164/:176, turret sync :192-193); document or unify the contract. (Chunks 2/4.)
 10. **Ammo-loop `continue` skips remaining checks if a target lacks Health** (CollisionSystem.cs:273,:286) — unreachable today (all mines spawn with `Health(2)` at MineRespawnSystem.cs:41, all ships via EnemyShipFactory.cs:27), but fragile; make each hit check independent. (Chunk 2.)
 11. **Zero-turret level consumption** — LevelUpSystem.cs:59 returns without spawning a choice, but Update() still consumes XP and bumps the level (:34-40). (Chunk 3.)
-12. **ECS core smells** — EntityManager 628 lines; CommandProcessor reflection dispatch intercepting `RemoveComponentCommand<T>` (CommandProcessor.cs:28-32); unbounded `_entityIdToSlot` + `MaxEntities=20_000` magic number (ComponentStorage.cs:7); DestroyEntity scans all storages. (Chunk 1.)
+12. **ECS core smells** — ~~CommandProcessor reflection dispatch~~ fixed (a66ecc3); ~~`MaxEntityId` dead code~~ fixed (4d8f5ba). Remaining: EntityManager 626 lines; unbounded `_entityIdToSlot` + `MaxEntities=20_000` magic number (ComponentStorage.cs:7); DestroyEntity scans all storages; plus 2026-10-11 re-review items (`Entity.Null` throws, stale-ref write loss, per-tick CommandBuffer/WorldView allocations). (Chunk 1.)
 13. **Magic numbers** — GameInitializer starfield/clutter (:108-147) + `Boost: 2.5f` (:26); CollisionSystem mass/epsilon/mine-damage; GetMaxWeaponSlots fallback 3 (LevelUpSystem.cs:177).
-14. **DiagnosticLogger Console I/O in Domain** — LogMouse :71-79, game-specific LogAllEnemyShips :83-97; move to Game or no-op interface. (Chunk 1.)
+14. **DiagnosticLogger Console I/O in Domain** — ~~`LogMouse`/`LogAllEnemyShips`~~ deleted (ac7fdd2); remaining generic surface still writes `Console.*` from Domain — move to Game or no-op interface. (Chunk 1.)
 15. **Lighting mutable static state + BeginFrame/BeginDraw/EndDraw protocol** (Lighting.cs:116-121); UpgradeMenuRenderer hardcodes weapon-name strings (:146-149). (Chunk 4.)
 16. **xunit 2.9.3 + runner.visualstudio 3.0.2 mismatch** (Tests.csproj:13-14) — latent test-infra breakage; align versions. (Chunk 4.)
 17. Smaller: turrets sync to pre-step transform (SpaceVorsApp.cs:179-194); Vector2.Magnitude/SolveQuadratic double math; CoolDownHelper file/class mismatch + 2 lookups; ComponentQuery<T1> redundant lookup; sentinel coupling (~7 sites, `IsNull` unused in production); misleading "CleanupSystems" phase name (SimulationRunner.cs:37-43); copy-pasted difficulty ramp; confusing mine cap (TargetMineCount+15=23); dead `effectivePickupRadius` param; no-op XpPickup false→false writes; EnemyShipSystem stale-accel integration + spin-stop damping duplication; MineDrift per-mine lookup + blend duplication (k=3 vs k=6).
@@ -187,6 +187,40 @@ Consolidated from the per-chunk re-reviews below; line numbers verified against 
 - **[nit/dead code] `MaxEntityId` has zero consumers.** Defined at `EntityManager.cs:21`, forwarded by `WorldView.cs:15`, used nowhere (grep incl. tests) → delete both.
 - **[nit/perf] `CommandBuffer.Apply` allocates a new `CommandProcessor` per apply** (`Commands.cs:134`). The processor is stateless — reuse one instance or inline `Process`.
 - **[nit] `SpatialGrid._cells` never shrinks.** Empty lists for cells no longer touched accumulate for the session's lifetime (bounded by world extent; acceptable, but note alongside the bucket-reuse fix).
+
+#### Re-review (2026-10-11)
+
+Scope: EntityManager.cs, ComponentStorage.cs, Entity.cs, System.cs, WorldView.cs, SpatialGrid.cs, Vector2.cs, Commands.cs, CommandProcessor.cs, DiagnosticLogger.cs, CoolDownHelper.cs, SimulationRunner.cs + chunk-1 tests. Verified against current code; edge cases probed empirically (scratch console app against Domain). Suite green: 177/177.
+
+**Fixed since 2026-08-23:**
+- **[Major] `CommandProcessor` reflection dispatch** — gone (commit a66ecc3); `RemoveComponentCommand<T>` flows through `IApplyCommand` interface dispatch only; `ReflectionTest.cs` deleted. `CommandProcessor.cs` is a clean 39 lines.
+- **[Nit/dead code] `MaxEntityId`** — removed from EntityManager + WorldView (commit 4d8f5ba).
+- **[Minor] `DiagnosticLogger` game-specific methods** — `LogMouse`/`LogAllEnemyShips` deleted (commit ac7fdd2); remaining surface is generic (fps/system/warning/event). Console I/O in Domain itself remains.
+- **[Nit] Sentinel coupling** — `.Value >= 0` no longer appears in any production file (grep; one test assertion remains). `Entity.IsNull` exists but is still only exercised by tests.
+
+**New issues:**
+- **[minor/correctness] `ComponentStorage` throws `IndexOutOfRangeException` on `Entity.Null`** (`ComponentStorage.cs:61,71,77,105`) — guards check `id < _entityIdToSlot.Length` but never `id >= 0`. Verified: once any component exists, `HasComponent<T>(Entity.Null)`, `GetComponent<T>(Entity.Null)` and `DestroyEntity(Entity.Null)` all throw instead of returning false / no-oping. Unreachable today (systems no longer pass Null sentinels) but `Entity.Null` exists precisely to be passed around, so this is a loaded trap for the next system that uses the sentinel idiom. Fix: add `id >= 0` to the three guards in `Has`/`Get`/`TryGetSlot` (and `Remove`).
+- **[minor/design] Stale `ref` from `GetComponentRef` silently loses writes** — verified: take `ref var p = storage.GetComponentRef(e)`, `Add` the same component type to enough entities to force `Array.Resize` (`ComponentStorage.cs:48-49`), write through the ref → write lands in the abandoned array, `GetComponent` returns the old value. The ARCHITECTURE.md "no structural changes during iteration" rule is the only guard and nothing enforces it. Fix: document the invalidation contract on `GetComponentRef`/`GetBySlot`; optionally a debug-build version counter.
+- **[minor/perf] `GameSession.StepSimulation` allocates `WorldView` + `CommandBuffer` per fixed step** (`GameSession.cs:311-316`) — the CommandBuffer's `List<ICommand>` backing array (thousands of entries on ammo-heavy ticks) is reallocated and discarded every tick. Fix: keep both as fields; update the two WorldView properties and `Clear()` the buffer per step (it already clears on Apply).
+- **[minor/perf] `SimulationRunner.RunPhase` starts a `Stopwatch` per system per tick unconditionally** (`SimulationRunner.cs:55`) — ~16 Stopwatch allocations + 16 `GetType().Name` strings per tick even with diagnostics off (GameSession always passes a non-null callback). Fix: expose `DiagnosticLogger.IsEnabled` and gate the timing block.
+- **[nit] `EntityManager.FindSmallest(params ComponentStorageBase[])`** (`EntityManager.cs:139-146`) — allocates the params array on every multi-component `foreach` setup. Inline the comparisons in the 2/3/4-arity enumerators or take a `ReadOnlySpan`.
+- **[nit] `MaxEntities = 20_000` is a misleading name** (`ComponentStorage.cs:7`) — it is the *initial* slot-map capacity, not a cap (`Add` grows past it freely); costs 80 KB per component type (~30 types ≈ 2.4 MB baseline). Rename to e.g. `InitialSlotMapCapacity`.
+- **[nit] `EntityManager.Clear()` resets `_nextId` but not `_elapsedTime` or `_rng`** (`EntityManager.cs:196-200`) — a "cleared" manager reports stale world time and RNG state. Only tests call it today; reset everything or document that Clear is test-only.
+- **[nit] `SpatialGrid.GetQueryItems` is not reentrant** — shared `_seen` HashSet (`SpatialGrid.cs:10,69`) is cleared per call; nesting two queries would corrupt dedup. Fine for the single current caller; add a one-line comment.
+- **[nit] `Entity` could be `readonly record struct Entity(int Value)`** (`Entity.cs`) — deletes ~30 lines of hand-rolled equality/hash/operator boilerplate (AGENTS.md: prefer deleting code); keep `Null`/`IsNull`.
+- **[note] Destroy-order determinism is implicit** — `CommandProcessor.Process` defers destroys via `HashSet<Entity>` (`CommandProcessor.cs:14,34-37`); destroy order (→ swap-pop positions → later query iteration order) relies on HashSet's insertion-order iteration guarantee. Deterministic in practice, but a `List<Entity>` + `Contains` (destroy counts are small) would make the determinism contractual.
+
+**Still open (unchanged from 2026-08-23):**
+- **[Major/perf/design] Unbounded `_entityIdToSlot` / no id recycling** — within one session ids still grow monotonically (ammo churn) and the index array never shrinks; `MaxEntities` magic number remains (see rename nit above).
+- **[Minor] `DestroyEntity` scans all storages** (`EntityManager.cs:30-39`) — O(component types) per destroy.
+- **[Minor] `Vector2.Magnitude` double math, no `LengthSquared()`** (`Vector2.cs:10`) — ~25 hand-written `x*x + y*y` sites remain across systems (grep).
+- **[Minor] `DiagnosticLogger` Console I/O in Domain** — improved (see Fixed) but still `Console.*` in Domain.
+- **[Minor] `ComponentQuery<T1>` redundant `TryGetSlot`** (`EntityManager.cs:255-264`) — `_smallest == _storage1`, probe always true.
+- **[Minor→naming] `WorldView` exposes mutating `GetStorage<T>`/`GetComponentRef<T>`** — ARCHITECTURE.md now documents the direct-write exceptions, so the mutability is intentional; the name "View" is what's left misleading. Consider a doc note or rename.
+- **[Nit] `CoolDownHelper.cs` file vs `CooldownHelper` class** + Has+Get = 2 lookups where one `TryGetComponent` would do (`CoolDownHelper.cs:7-10`).
+- **[Nit] `EntityManager.cs` size** — 626 lines of query boilerplate; splitting `ComponentQuery<T1..T4>` into its own file would halve it.
+- **[Nit] `CommandBuffer.Apply` allocates a `CommandProcessor` per apply** (`Commands.cs:134`) — plus a `HashSet<Entity>` per flush (`CommandProcessor.cs:14`); 4× per tick.
+- **[Nit] `SpatialGrid._cells` never shrinks.**
 
 ### Chunk 2 — Combat & physics systems (2026-08-15)
 
