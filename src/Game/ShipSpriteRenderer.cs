@@ -8,7 +8,8 @@ public static class ShipSpriteRenderer
     static readonly Color FallbackShipColor = new(180, 60, 60, 255);
 
     // Draws the ship sprite: lit (normal + depth maps) when available, otherwise flat texture.
-    public static void DrawShipSprite(ShipType ship, float cx, float cy, float diameter, float angleDeg)
+    // damage is the hull damage scalar [0,1] (see DamageShading); 0 renders an undamaged hull.
+    public static void DrawShipSprite(ShipType ship, float cx, float cy, float diameter, float angleDeg, float damage = 0f)
     {
         string key = ship.TextureKey;
 
@@ -32,7 +33,7 @@ public static class ShipSpriteRenderer
 
         if (lit != null && Lighting.BeginDraw(lit))
         {
-            Lighting.Draw(lit, dest, angleDeg);
+            Lighting.Draw(lit, dest, angleDeg, damage);
             Lighting.EndDraw();
             return;
         }

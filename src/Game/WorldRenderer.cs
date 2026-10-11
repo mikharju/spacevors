@@ -7,7 +7,7 @@ namespace Spacevors.Game;
 
 public static class WorldRenderer
 {
-    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
+    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
     private static readonly Color PlayerTurretColor = new(255, 180, 50, 255);
@@ -338,7 +338,8 @@ public static class WorldRenderer
         var (screenCx, screenCy) = RenderHelpers.ToScreen(shipPos.Value, camX, camY, windowWidth, windowHeight);
         float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
-        ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg);
+        float damage = em.TryGetComponent<Health>(playerEntity, out var health) ? DamageShading.FromHealth(health) : 0f;
+        ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg, damage);
 
         if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, shipType.Radius, new Color(0, 255, 0, 60));
     }

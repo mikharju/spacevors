@@ -9,7 +9,7 @@ public static class EnemyShipRenderer
 {
     static readonly Color EnemyTurretColor = new(255, 140, 30, 255);
 
-    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
+    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
@@ -69,8 +69,10 @@ public static class EnemyShipRenderer
                 float scale = drawDiameter / t.Width;
                 var dest = new Rectangle(screenCx, screenCy, t.Width * scale, t.Height * scale);
 
+                float damage = em.TryGetComponent<Health>(entity, out var health) ? DamageShading.FromHealth(health) : 0f;
+
                 if (lit != null)
-                    LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg);
+                    LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg, damage);
                 else
                     // Flat sprites draw straight away while lit ones wait for the batch flush below,
                     // so a mixed layer draws flat variants under lit ones.

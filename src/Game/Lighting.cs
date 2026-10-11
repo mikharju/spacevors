@@ -54,20 +54,76 @@ public static class Lighting
         // Lights sit this many px above the scene plane (toward viewer), so flat surfaces still receive light.
         const float PointLightHeight = 80.0f;
 
+        // Hull damage rides in vertex color B (0 = pristine: every damage line below is skipped,
+        // so undamaged sprites execute the identical path as before damage existed).
+        const float DamageGrid = 4.0;  // impact cells per sprite edge
+        const vec3 SootColor = vec3(0.10, 0.09, 0.08);
+
+        // Cheap hash (Dave Hoskins) — deterministic per Voronoi cell, seeded away from the origin.
+        vec2 hash21(vec2 p)
+        {
+            p += vec2(31.7, 11.3);
+            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.xx + p3.yz) * p3.zy);
+        }
+
         void main()
         {
             // Per-sprite rotation is packed into the vertex color: RG hold a 16-bit fixed-point
-            // angle over [0, 2pi), A holds opacity. Shader uniforms are global at batch-flush time
-            // in this raylib build, so per-instance data must travel with the vertices.
+            // angle over [0, 2pi), B holds hull damage, A holds opacity. Shader uniforms are
+            // global at batch-flush time in this raylib build, so per-instance data must travel
+            // with the vertices.
             int rByte = int(round(fragColor.r * 255.0));
             int gByte = int(round(fragColor.g * 255.0));
             float angleRad = float(rByte * 256 + gByte) / 65535.0 * TwoPi;
+            float damage = fragColor.b;
 
             vec4 baseColor = texture(texture0, fragTexCoord);
 
             // Normal map is tangent space with +Y up in image; screen y points down.
             vec3 nMap = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
             vec3 normalLocal = normalize(vec3(nMap.x, -nMap.y, nMap.z));
+            float depthDamage = 0.0;
+
+            if (damage > 0.0)
+            {
+                // Procedural hull damage in sprite-local UV space: the pattern rotates with the
+                // hull while lighting stays screen-space, so a turning ship keeps its lit and
+                // shadow sides. Pure function of uv — no textures, no RNG.
+                float hull = step(0.5, baseColor.a);
+                vec2 uv = fragTexCoord * DamageGrid;
+                vec2 cell = floor(uv);
+                vec2 f = fract(uv);
+
+                // Nearest Voronoi cell center = nearest impact site.
+                float bestSq = 1e9;
+                vec2 bestOff = vec2(0.0);
+                vec2 bestId = cell;
+                for (int j = -1; j <= 1; j++)
+                for (int i = -1; i <= 1; i++) {
+                    vec2 o = vec2(float(i), float(j));
+                    vec2 center = o + hash21(cell + o);
+                    vec2 d = center - f;
+                    float sq = dot(d, d);
+                    if (sq < bestSq) { bestSq = sq; bestOff = d; bestId = cell + o; }
+                }
+                float distC = sqrt(bestSq);
+                vec2 cellRand = hash21(bestId);
+
+                // Impacts appear one by one as damage grows; craters widen with damage.
+                float impact = step(hash21(bestId + 7.7).x, min(1.0, damage * 1.3));
+                float craterR = mix(0.18, 0.55, damage) * (0.7 + 0.6 * cellRand.x);
+                float crater = hull * impact * smoothstep(craterR, craterR * 0.25, distC);
+                float scorch = hull * impact * smoothstep(craterR * 2.6, craterR * 0.5, distC);
+
+                baseColor.rgb = mix(baseColor.rgb, SootColor, scorch * mix(0.45, 0.8, damage));
+
+                // Crater dent: tilt the normal toward the impact center and sink the depth so the
+                // existing diffuse and self-shadow passes shade it like a real depression.
+                normalLocal = normalize(normalLocal + vec3(bestOff / max(distC, 1e-4), 0.0) * crater * 0.8);
+                depthDamage = crater * 0.25;
+            }
 
             float c = cos(angleRad);
             float s = sin(angleRad);
@@ -78,7 +134,7 @@ public static class Lighting
 
             // Self-shadow: a higher surface toward the light blocks it. Depth white = closer to viewer.
             vec2 lightUvDir = vec2(c * LightDir.x + s * LightDir.y, -s * LightDir.x + c * LightDir.y);
-            float depthHere = texture(depthMap, fragTexCoord).r;
+            float depthHere = texture(depthMap, fragTexCoord).r - depthDamage;
             float depthTowardLight = texture(depthMap, fragTexCoord + lightUvDir * ShadowUvOffset).r;
             float shadowed = 1.0 - smoothstep(-ShadowDepthBias, ShadowDepthBias, depthHere - depthTowardLight);
 
@@ -186,21 +242,24 @@ public static class Lighting
         return true;
     }
 
-    // Draws one lit sprite inside a BeginDraw/EndDraw block. The rotation angle is packed into the
-    // vertex color (see shader) because per-instance uniforms would leak across draws in the block.
-    public static void Draw(LitSprite sprite, Rectangle dest, float angleDeg)
-        => Raylib.DrawTexturePro(sprite.Base, RenderHelpers.FullSource(sprite.Base), dest, RenderHelpers.CenterOrigin(dest), angleDeg, EncodeAngle(angleDeg));
+    // Draws one lit sprite inside a BeginDraw/EndDraw block. The rotation angle and hull damage
+    // are packed into the vertex color (see shader) because per-instance uniforms would leak
+    // across draws in the block. damage is [0,1]; 0 renders exactly like an undamaged hull.
+    public static void Draw(LitSprite sprite, Rectangle dest, float angleDeg, float damage = 0f)
+        => Raylib.DrawTexturePro(sprite.Base, RenderHelpers.FullSource(sprite.Base), dest, RenderHelpers.CenterOrigin(dest), angleDeg, EncodeAngle(angleDeg, damage));
 
     public static void EndDraw()
     {
         if (_shader != null) Raylib.EndShaderMode();
     }
 
-    // Packs a rotation angle into the vertex color RG channels as 16-bit fixed-point over [0, 360).
-    static Color EncodeAngle(float angleDeg)
+    // Packs a rotation angle into the vertex color RG channels as 16-bit fixed-point over [0, 360)
+    // and the hull damage scalar [0,1] into the B channel.
+    static Color EncodeAngle(float angleDeg, float damage)
     {
         float normalized = ((angleDeg % 360f) + 360f) % 360f / 360f;
         int packed = (int)MathF.Round(normalized * 65535f);
-        return new Color(packed >> 8, packed & 0xFF, 255, 255);
+        int damageByte = (int)MathF.Round(Math.Clamp(damage, 0f, 1f) * 255f);
+        return new Color(packed >> 8, packed & 0xFF, damageByte, 255);
     }
 }

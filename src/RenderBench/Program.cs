@@ -155,7 +155,7 @@ public static class Program
         }
 
         // Mirrors the game path: group by variant, one shader-mode block per variant.
-        var groups = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
+        var groups = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>>();
         for (int i = 0; i < layout.Length; i++)
             LitGroupRenderer.Add(groups, sprites[i % sprites.Count], ToDest(layout[i]), AngleFor(i));
 
@@ -337,7 +337,7 @@ public static class Program
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
-        var groups = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>>();
+        var groups = new Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>>();
         for (int i = 0; i < scene.Length; i++)
             LitGroupRenderer.Add(groups, scene[i].Sprite, CellRect(i), scene[i].AngleDeg);
         LitGroupRenderer.Draw(groups);
