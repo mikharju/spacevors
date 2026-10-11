@@ -441,9 +441,16 @@ public class TurretFiringSystem : GameSystem
             if (turret.Weapon.Hitscan)
             {
                 // Instant beam to max range; CollisionSystem damages the first thing hit.
+                // With BeamSpacing, pellets form parallel beams instead of overlapping ones.
+                Vector2 beamStart = spawnPos;
+                if (turret.Weapon.BeamSpacing > 0f && pelletCount > 1)
+                {
+                    var perp = new Vector2(-pelletDir.Y, pelletDir.X);
+                    beamStart += perp * ((i - (pelletCount - 1) / 2f) * turret.Weapon.BeamSpacing);
+                }
                 commands.AddEntity(
-                    new Position(spawnPos),
-                    new LaserBeam(spawnPos, pelletDir, turret.Range, ammoRadius, damage, turret.IsEnemy, ammoColor,
+                    new Position(beamStart),
+                    new LaserBeam(beamStart, pelletDir, turret.Range, ammoRadius, damage, turret.IsEnemy, ammoColor,
                         LaserBeam.FlashLifetime, LaserBeam.FlashLifetime));
                 continue;
             }

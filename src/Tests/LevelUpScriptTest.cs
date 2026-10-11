@@ -71,7 +71,8 @@ public class LevelUpScriptTest
 
         Assert.Equal(5, em.GetComponent<Player>(player).Level);
         var options = GetChoiceOptions(em);
-        Assert.Equal(3, options.Length);
+        // Milestone levels offer five random options (was three before the weapon pool grew).
+        Assert.Equal(5, options.Length);
         Assert.Contains(options, o => o.IsNewWeapon);
     }
 

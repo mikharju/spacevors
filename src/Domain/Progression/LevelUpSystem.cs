@@ -6,6 +6,7 @@ namespace Spacevors.Domain.Systems;
 public class LevelUpSystem : GameSystem
 {
     const int MilestoneLevelInterval = 5;
+    const int MilestoneChoiceCount = 5;
     const string DiagnosticEnvVar = "SPACEVORS_DIAGNOSTIC";
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
@@ -92,7 +93,7 @@ public class LevelUpSystem : GameSystem
 
             Shuffle(allOptions, view.Rng);
             var shuffled = allOptions.ToArray();
-            var choices = shuffled[..Math.Min(3, shuffled.Length)];
+            var choices = shuffled[..Math.Min(MilestoneChoiceCount, shuffled.Length)];
 
             DiagnosticLogger.LogEvent("UPGRADE", $"level={newLevel} choices: {FormatChoices(choices)}");
             commands.AddEntity(new Position(position), new PendingChoice(), new PendingUpgradeOptions(choices));
