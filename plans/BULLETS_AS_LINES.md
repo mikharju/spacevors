@@ -3,7 +3,15 @@
 Plan for turning bullets from points into swept lines, adding lasers and particle
 accelerators, and giving projectiles a width that scores grazing hits (2026-10-11).
 
-## Status: not started
+## Status: done (2026-10-11)
+
+Implemented as planned, plus the follow-up request: all six proposed weapons shipped
+(Laser Lance, Prism Lance, Ripple Cutter, Cyclotron, Graviton Burst, Flak Curtain),
+ship loadouts updated (Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy =
+machinegun + side shotguns + Flak Curtain, Shadow keeps LoadTestWeapon), old weapons
+stay in the milestone upgrade pool, and milestone level-ups offer 5 choices instead of 3.
+RailGun AmmoSpeed raised 900 → 2500. No display was available in this environment, so
+visual tuning (streak look, beam alpha) is unverified by screenshot (TROUBLE_SHOOTING.md #25).
 
 ## Requirements (from the request)
 

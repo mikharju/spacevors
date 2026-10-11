@@ -85,7 +85,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
+Ammo LaserBeam FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
 Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
@@ -210,7 +210,7 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority), collisions, impact damage rule, effects, damage emission, death explosions, asteroid factory
+        Combat/                -- firing (incl. click-target priority, hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass), impact damage rule, effects, damage emission, death explosions, asteroid factory
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
         Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull)
         Physics/               -- force integration + position integration
