@@ -140,6 +140,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Raylib-cs defines both overloads. An all-int list resolves to the int overload (identity beats constant conversion), but a mixed list keeps both candidates viable — `255` is a constant that fits in byte, so neither overload is strictly better.
 - **Fix / Prevention**: Make all four arguments the same type: either all ints (`new(255, 80, 80, 230)`) or a typed constant for the odd one out (`private const byte OpaqueAlpha = 255; new(r, g, b, OpaqueAlpha)`).
 
+## 25. No display in the agent sandbox — game cannot launch; validate shader changes with glslang WASM instead
+
+- **Symptom**: The "General workflow that works" recipe fails at step 2: no `Xvfb`, no `xdotool`, no `/tmp/.X11-unix`, no wayland socket, `DISPLAY` empty — `Game` and `RenderBench` both need a window and cannot run, so F12 screenshots are impossible.
+- **Cause**: The agent sandbox runs headless without X/Wayland and without root to install Xvfb. This varies per environment — check before promising screenshot verification.
+- **Fix / Prevention**: For shader edits, at least verify compilation offline: download the `glslang-wasm-validator` npm tarball with curl (npm itself fails: unwritable HOME; do download + untar + run in ONE command since /tmp is per-command), extract the shader strings from `Lighting.cs` with awk, rewrite `#version 330` → `#version 310 es` + `precision highp float;` and `{{MaxPointLights}}` → `16`, then `node package/dist/cli.mjs --vertex v.vert --fragment f.frag --json`. Passes compile+link; runtime visuals and in-game tuning still need a real display, so say so when reporting.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.

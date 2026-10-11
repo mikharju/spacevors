@@ -260,7 +260,8 @@ public sealed class GameSession
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }
 
-        // Diagnostic only: halve the hp of the locked target (or nearest enemy ship) to reach smoke tiers quickly.
+        // Diagnostic only: halve the hp of the locked target (or nearest enemy ship) to reach
+        // the smoke and hull damage shading tiers quickly.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.K))
         {
             var victim = PickDamageTestVictim();
@@ -273,6 +274,18 @@ public sealed class GameSession
             else
             {
                 DiagnosticLogger.LogEvent("diag", "K pressed: no target to damage");
+            }
+        }
+
+        // Diagnostic only: halve the player hp to walk the player hull through the damage
+        // shading tiers (K only damages targets, never the player).
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.J))
+        {
+            if (_em.TryGetComponent<Health>(_playerEntity, out var health))
+            {
+                int halved = Math.Max(health.Current / 2, 1);
+                _em.AddComponent(_playerEntity, new Health(halved, health.Max));
+                DiagnosticLogger.LogEvent("diag", $"J pressed: player hp -> {halved}/{health.Max}");
             }
         }
     }

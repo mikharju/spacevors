@@ -1,7 +1,19 @@
 # DAMAGE_SHADING.md
 
-Proposal: procedural hull-damage shading (2026-09-16). Complements the done smoke/spark
+Plan for procedural hull-damage shading (2026-09-16). Complements the done smoke/spark
 plan (`DAMAGE_GRAPHICS.md`); this changes the hull itself, not particles.
+
+## Status: done (2026-09-16)
+
+Implemented in three commits: scorch + craters + B-channel transport + hp wiring
+(stage 1), holes + ember glow (stage 2), J diagnostic key + docs (stage 3).
+Decisions from the open questions: shared per-variant crater seed (rotation already
+differs per ship); ships only — asteroids/mines keep damage 0; continuous morph
+(thresholds are functions of the damage scalar, no hard tiers in the shader);
+K key kept unchanged for enemy tier testing, new J key halves player hp.
+Shader compile/link verified offline with glslang (TROUBLE_SHOOTING.md #25 — no
+display in the build environment); in-game visual tuning of crater size, hole
+threshold and ember brightness is pending.
 
 ## Requirements
 

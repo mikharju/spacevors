@@ -199,7 +199,8 @@ src/
         RenderHelpers.cs         -- shared world→screen transform + screen-space culling helpers
         Palette.cs               -- colours shared by more than one renderer
         ImageLoader.cs           -- texture loading (flat + lit sprite sets)
-        Lighting.cs              -- lighting shader: directional light + point lights
+        Lighting.cs              -- lighting shader: directional light + point lights + procedural hull damage (vertex color B)
+        DamageShading.cs         -- hp ratio -> hull damage scalar [0,1] for the shader
         LightGatherer.cs         -- per-frame point-light collection for the shader
         LitSprite.cs             -- lit sprite data (base/normal/depth textures)
         LitSpriteMatcher.cs      -- matches texture files into lit sprites
