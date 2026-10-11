@@ -81,6 +81,24 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
+        foreach (var (entity, beam) in view.GetEntitiesWithComponents<LaserBeam>())
+        {
+            var newLifetime = beam.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(entity));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<LaserBeam>(entity, beam with { Lifetime = newLifetime }));
+            }
+        }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Effects: laser beam", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, marker) in view.GetEntitiesWithComponents<DebugMarker>())
         {
             var newLifetime = marker.Lifetime - deltaTime;

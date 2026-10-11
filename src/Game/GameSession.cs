@@ -9,7 +9,9 @@ namespace Spacevors.Game;
 // One playthrough: owns the world from ship selection to game over.
 public sealed class GameSession
 {
-    private const float FixedDeltaTime = 1f / SpaceVorsApp.MaxFps;
+    // Public: WorldRenderer draws ammo as the segment it swept during the tick,
+    // which needs the same dt the collision system used.
+    public const float FixedDeltaTime = 1f / SpaceVorsApp.MaxFps;
 
     // Cap catch-up work after a hitch (window drag, GC pause) instead of running dozens of steps in one frame.
     private const float MaxAccumulator = 0.25f;

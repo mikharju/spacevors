@@ -2,8 +2,10 @@ using Spacevors.Domain.Stats; // WeaponStats
 
 namespace Spacevors.Domain.Components;
 
-public enum AmmoColor { Yellow, Green, Blue, Red }
+public enum AmmoColor { Yellow, Green, Blue, Red, Cyan, Violet }
 
+// Radius is the capsule half-thickness: collision and rendering treat the bullet as the
+// segment [Position - Velocity*dt, Position] inflated by it, so wide shots score grazing hits.
 public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetime, bool IsEnemy = false, int Damage = 1, AmmoColor Color = AmmoColor.Yellow);
 
 public readonly record struct FireCooldown(float Timer);
@@ -27,6 +29,27 @@ public readonly record struct AutoTargetMark(float LastTargetedAt)
 }
 
 public readonly record struct WeaponSlots(int Used, int Max);
+
+// Instant hitscan beam: static segment [Start, Start + Direction * Length], Width is half-thickness.
+// CollisionSystem applies its damage exactly once (clearing DamagePending) to the first thing
+// hit; afterwards the beam lingers only as a fading visual until Lifetime expires.
+public readonly record struct LaserBeam(
+    Vector2 Start,
+    Vector2 Direction,
+    float Length,
+    float Width,
+    int Damage,
+    bool IsEnemy,
+    AmmoColor Color,
+    float Lifetime,
+    float InitialLifetime,
+    bool DamagePending = true)
+{
+    // How long the visible flash lingers; damage always lands on the first tick.
+    public const float FlashLifetime = 0.12f;
+
+    public Vector2 End => Start + Direction * Length;
+}
 
 public readonly record struct ArcOffset(float Angle);
 

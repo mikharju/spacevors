@@ -9,7 +9,10 @@ public readonly record struct WeaponStats(
     int PelletCount,
     float Scatter,
     float ShotLifetime = 3f,
-    int Damage = 1);
+    int Damage = 1,
+    // Hitscan weapons fire instant LaserBeams instead of travelling Ammo:
+    // AmmoSpeed/ShotLifetime are unused, aim skips lead prediction, beam length = turret range.
+    bool Hitscan = false);
 
 public readonly record struct AddOnMount(
     Vector2 Offset,

@@ -331,6 +331,123 @@ public class CollisionSystem : GameSystem
             _entitiesToDestroy.Add(ammoEntity);
         }
 
+        // Laser beams: static segments, damage applied exactly once (DamagePending) to the
+        // first thing hit. Runs before the mine/ship death loops so damage flows through the
+        // same per-frame health accumulators.
+        foreach (var (beamEntity, beam) in view.GetEntitiesWithComponents<LaserBeam>())
+        {
+            if (!beam.DamagePending) continue;
+
+            Vector2 beamStart = beam.Start;
+            Vector2 beamEnd = beam.End;
+
+            if (beam.IsEnemy)
+            {
+                // Enemy beams engage only the player, mirroring enemy ammo.
+                if (hasPlayer)
+                {
+                    Vector2 playerContact = Vector2.ClosestPointOnSegment(beamStart, beamEnd, playerTuple.Value2.Value, out _);
+                    var pDiff = playerContact - playerTuple.Value2.Value;
+                    float pRSum = beam.Width + playerTuple.Value1.Radius;
+                    if (pDiff.X * pDiff.X + pDiff.Y * pDiff.Y < pRSum * pRSum)
+                    {
+                        var beamPlayerHealth = view.GetComponent<Health>(playerEntity);
+                        if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
+                        {
+                            remaining = beamPlayerHealth.Current;
+                            _frameRemainingHealth[playerEntity] = remaining;
+                        }
+                        _frameRemainingHealth[playerEntity] -= beam.Damage;
+                        _effectsToSpawn.Add((playerTuple.Value2.Value, MineType.Small));
+                    }
+                }
+            }
+            else
+            {
+                var beamBoxMin = new Vector2(
+                    MathF.Min(beamStart.X, beamEnd.X) - beam.Width,
+                    MathF.Min(beamStart.Y, beamEnd.Y) - beam.Width);
+                var beamBoxMax = new Vector2(
+                    MathF.Max(beamStart.X, beamEnd.X) + beam.Width,
+                    MathF.Max(beamStart.Y, beamEnd.Y) + beam.Width);
+
+                Entity? firstHit = null;
+                SpatialGrid.CollisionKind firstKind = default;
+                Vector2 firstContact = default;
+                Vector2 firstCandidatePos = default;
+                MineSize firstMineSize = default;
+                float firstT = float.MaxValue;
+
+                int beamCount = _grid.GetQueryItemsInBox(beamBoxMin, beamBoxMax, queryBuffer, out bool beamTruncated);
+                if (beamTruncated) anyTruncated = true;
+
+                for (int i = 0; i < beamCount; i++)
+                {
+                    ref readonly var candidate = ref queryBuffer[i];
+                    Vector2 contact = Vector2.ClosestPointOnSegment(beamStart, beamEnd, candidate.Position, out float t);
+                    var diff = contact - candidate.Position;
+                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
+                    float rSum = beam.Width + candidate.Radius;
+                    if (dSq >= rSum * rSum || t >= firstT) continue;
+
+                    firstHit = candidate.Id;
+                    firstKind = candidate.Kind;
+                    firstContact = contact;
+                    firstCandidatePos = candidate.Position;
+                    if (candidate.Kind == SpatialGrid.CollisionKind.EnemyMine) firstMineSize = candidate.Size!.Value;
+                    firstT = t;
+                }
+
+                if (firstHit.HasValue)
+                {
+                    switch (firstKind)
+                    {
+                        case SpatialGrid.CollisionKind.Asteroid:
+                            // Asteroids have no health: the beam just stops with an impact flash.
+                            _effectsToSpawn.Add((firstContact, MineType.Small));
+                            break;
+
+                        case SpatialGrid.CollisionKind.EnemyMine:
+                            if (view.TryGetComponent<Health>(firstHit.Value, out var beamMineHealth))
+                            {
+                                if (!_frameRemainingHealth.TryGetValue(firstHit.Value, out var mh))
+                                {
+                                    mh = beamMineHealth.Current;
+                                    _frameRemainingHealth[firstHit.Value] = mh;
+                                }
+                                _frameRemainingHealth[firstHit.Value] -= beam.Damage;
+                                _hitMines.Add(firstHit.Value);
+                                _effectsToSpawn.Add((firstCandidatePos, MineType.FromSize(firstMineSize)));
+                            }
+                            break;
+
+                        case SpatialGrid.CollisionKind.EnemyShip:
+                            if (view.TryGetComponent<Health>(firstHit.Value, out var beamShipHealth))
+                            {
+                                if (!_frameRemainingHealth.TryGetValue(firstHit.Value, out var sh))
+                                {
+                                    sh = beamShipHealth.Current;
+                                    _frameRemainingHealth[firstHit.Value] = sh;
+                                }
+                                _frameRemainingHealth[firstHit.Value] -= beam.Damage;
+                                var beamShip = view.GetComponent<EnemyShip>(firstHit.Value);
+                                var beamShipPos = view.GetComponent<Position>(firstHit.Value);
+                                var toContact = firstContact - beamShipPos.Value;
+                                float contactDist = toContact.Magnitude;
+                                Vector2 beamHitPoint = contactDist > Epsilon
+                                    ? beamShipPos.Value + (toContact / contactDist) * beamShip.Radius
+                                    : beamShipPos.Value;
+                                if (!_shipDeathData.ContainsKey(firstHit.Value))
+                                    _shipDeathData[firstHit.Value] = (beamHitPoint, beamShipPos.Value, beamShip.Radius, beamShip.GraphicsId);
+                            }
+                            break;
+                    }
+                }
+            }
+
+            commands.Add(new AddComponentCommand<LaserBeam>(beamEntity, beam with { DamagePending = false }));
+        }
+
         ammoDetectionSw.Stop();
 
         sw.Stop();

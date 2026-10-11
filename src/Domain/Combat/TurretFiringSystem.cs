@@ -96,9 +96,7 @@ public class TurretFiringSystem : GameSystem
         if (!view.TryGetComponent<Position>(targetEntity, out var pos)) return null;
         if (!view.TryGetComponent<Velocity>(targetEntity, out var vel)) return null;
 
-        float radius = view.TryGetComponent<EnemyShip>(targetEntity, out var ship) ? ship.Radius
-            : view.TryGetComponent<EnemyMine>(targetEntity, out var mine) ? mine.Radius
-            : 0f;
+        float radius = GetTargetRadius(view, targetEntity);
 
         Vector2 relPos = pos.Value - turretPos;
         float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
@@ -124,6 +122,27 @@ public class TurretFiringSystem : GameSystem
 
         return new TargetSelection(targetEntity, aimDir, predictedPos, radius);
     }
+
+    // Hitscan (instant) aim: target's current position must be in arc and within range — no lead.
+    private static TargetSelection? EvaluateStaticTarget(
+        WorldView view, Entity targetEntity, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq)
+    {
+        if (!view.TryGetComponent<Position>(targetEntity, out var pos)) return null;
+
+        Vector2 relPos = pos.Value - turretPos;
+        float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
+        if (distSq > rangeSq || distSq < Epsilon) return null;
+
+        Vector2 aimDir = relPos / (float)Math.Sqrt(distSq);
+        if (Vector2.Dot(forwardDir, aimDir) < cosHalfArc) return null;
+
+        return new TargetSelection(targetEntity, aimDir, pos.Value, GetTargetRadius(view, targetEntity));
+    }
+
+    private static float GetTargetRadius(WorldView view, Entity targetEntity) =>
+        view.TryGetComponent<EnemyShip>(targetEntity, out var ship) ? ship.Radius
+        : view.TryGetComponent<EnemyMine>(targetEntity, out var mine) ? mine.Radius
+        : 0f;
 
     // Only enemy ships and mines get auto brackets; asteroid selections are never marked.
     private static bool IsMarkableTarget(WorldView view, Entity target) =>
@@ -153,12 +172,21 @@ public class TurretFiringSystem : GameSystem
             // A manually selected target takes priority at an extended range (capped by what the ammo can physically reach).
             if (TryGetLivePrimaryTarget(view, out var primaryTarget))
             {
-                float targetedRange = Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
-                var aimed = EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
+                TargetSelection? aimed;
+                if (turret.Weapon.Hitscan)
+                {
+                    // The beam reaches exactly turret.Range and lands instantly: aim at the current position.
+                    aimed = EvaluateStaticTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, turret.Range * turret.Range);
+                }
+                else
+                {
+                    float targetedRange = Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
+                    aimed = EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
+                }
                 if (aimed.HasValue) return aimed;
             }
 
-            if (turret.AutoTarget)
+            if (turret.AutoTarget && !turret.Weapon.Hitscan)
             {
                 FindTargetWithPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed, ref nearestTarget, ref nearestDistSq);
             }
@@ -409,6 +437,16 @@ public class TurretFiringSystem : GameSystem
             float ammoRadius = GetAmmoRadius(turret);
             int damage = turret.Weapon.Damage;
             var ammoColor = GetAmmoColor(turret, damage);
+
+            if (turret.Weapon.Hitscan)
+            {
+                // Instant beam to max range; CollisionSystem damages the first thing hit.
+                commands.AddEntity(
+                    new Position(spawnPos),
+                    new LaserBeam(spawnPos, pelletDir, turret.Range, ammoRadius, damage, turret.IsEnemy, ammoColor,
+                        LaserBeam.FlashLifetime, LaserBeam.FlashLifetime));
+                continue;
+            }
 
             commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor));
         }

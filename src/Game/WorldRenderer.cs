@@ -34,6 +34,7 @@ public static class WorldRenderer
     {
         DrawAsteroids(em, camX, camY, windowWidth, windowHeight, diagnostics);
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
+        DrawLaserBeams(em, camX, camY, windowWidth, windowHeight);
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         DrawDamageSparks(em, camX, camY, windowWidth, windowHeight);
         DrawHealSparks(em, camX, camY, windowWidth, windowHeight);
@@ -119,19 +120,54 @@ public static class WorldRenderer
     {
         foreach (var (entity, ammo, pos) in em.GetEntitiesWithComponents<Ammo, Position>())
         {
-            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+            // Same segment the collision system swept: fast bullets draw as streaks,
+            // slow ones as short thick dashes (effectively the old dot).
+            Vector2 from = pos.Value - ammo.Velocity * GameSession.FixedDeltaTime;
+            var (fromX, fromY) = RenderHelpers.ToScreen(from, camX, camY, windowWidth, windowHeight);
+            var (toX, toY) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
-            if (RenderHelpers.IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
+            float extent = ammo.Radius;
+            if (MathF.Max(fromX, toX) < -extent || MathF.Min(fromX, toX) > windowWidth + extent ||
+                MathF.Max(fromY, toY) < -extent || MathF.Min(fromY, toY) > windowHeight + extent) continue;
 
-            Color color = ammo.Color switch
-            {
-                AmmoColor.Green => new Color(80, 255, 80, 255),
-                AmmoColor.Blue => new Color(100, 180, 255, 255),
-                AmmoColor.Red => new Color(255, 80, 80, 255),
-                _ => new Color(255, 230, 100, 255)
-            };
+            Raylib.DrawLineEx(
+                new System.Numerics.Vector2(fromX, fromY),
+                new System.Numerics.Vector2(toX, toY),
+                MathF.Max(1f, ammo.Radius * 2f),
+                AmmoColorOf(ammo.Color));
+        }
+    }
 
-            Raylib.DrawCircle((int)cx, (int)cy, ammo.Radius, color);
+    public static Color AmmoColorOf(AmmoColor color) => color switch
+    {
+        AmmoColor.Green => new Color(80, 255, 80, 255),
+        AmmoColor.Blue => new Color(100, 180, 255, 255),
+        AmmoColor.Red => new Color(255, 80, 80, 255),
+        AmmoColor.Cyan => new Color(90, 240, 240, 255),
+        AmmoColor.Violet => new Color(200, 120, 255, 255),
+        _ => new Color(255, 230, 100, 255)
+    };
+
+    private static void DrawLaserBeams(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, beam) in em.GetEntitiesWithComponents<LaserBeam>())
+        {
+            Vector2 end = beam.End;
+            var (x1, y1) = RenderHelpers.ToScreen(beam.Start, camX, camY, windowWidth, windowHeight);
+            var (x2, y2) = RenderHelpers.ToScreen(end, camX, camY, windowWidth, windowHeight);
+
+            if (MathF.Max(x1, x2) < 0f || MathF.Min(x1, x2) > windowWidth ||
+                MathF.Max(y1, y2) < 0f || MathF.Min(y1, y2) > windowHeight) continue;
+
+            int alpha = (int)(255f * Math.Clamp(beam.Lifetime / beam.InitialLifetime, 0f, 1f));
+            Color baseColor = AmmoColorOf(beam.Color);
+            var color = new Color(baseColor.R, baseColor.G, baseColor.B, (byte)alpha);
+
+            Raylib.DrawLineEx(
+                new System.Numerics.Vector2(x1, y1),
+                new System.Numerics.Vector2(x2, y2),
+                MathF.Max(1f, beam.Width * 2f),
+                color);
         }
     }
 
