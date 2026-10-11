@@ -197,6 +197,7 @@ src/
         StatsScreenRenderer.cs   -- ship stats screen (Tab)
         ShipSelectScreen.cs      -- ship selection screen (scrollable list + input)
         RenderHelpers.cs         -- shared world→screen transform + screen-space culling helpers
+        Ui.cs                    -- shared UI primitives: rounded rects, soft-depth panels, easing/fade
         Palette.cs               -- colours shared by more than one renderer
         ImageLoader.cs           -- texture loading (flat + lit sprite sets)
         Lighting.cs              -- lighting shader: directional light + point lights + procedural hull damage (vertex color B)

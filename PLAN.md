@@ -316,6 +316,17 @@ Implementation (plan: plans/IMPACT_DAMAGE.md):
 - Death graphics render fully: the fatal hit writes `Health(0)` (without it the killing blow from high hp left the hull shading scalar stale and the wreck looked pristine), and game over waits 1.2 s after the player dies — simulation keeps running so holes, ember glow, smoke and sparks play out before the overlay; input stops at death
 - 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, barely-survives calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
 
+## UI polish — done
+
+Plain soft-depth UI language across HUD and menus: rounded translucent panels, soft shadows, one accent color, eased values — no new bitmaps or fonts.
+
+Implementation (plan: plans/UI_POLISH.md):
+- `Ui.cs` helper: rounded rects (2 rects + 4 circles), panels (shadow + translucent fill + 1px border), alpha/easing/fade helpers; `Palette` gains the design language (accent cyan, off-white/muted text, translucent panel colors, green→amber→red `HealthColor` gradient)
+- HUD: hp bar is one rounded pip per hp point with eased fade-out on loss + muted "8/8" readout; new thin top-edge xp bar (accent fill, "LV n" readout — the HUD showed no xp before); game over fades a dark overlay + title + accent rule + "Press R to restart" hint (the hint never existed)
+- Upgrade cards: rounded panels with shadow, hover lifts 4px + accent border, value in accent / label muted, rounded key badge, 150 ms fade-in; stats screen: rounded panels, accent headers with hairline rule, alternating row tint, accent LV readout; ship select: rounded cards, accent selection stripe, trackless rounded scrollbar
+- Targeting: 1.5px arms, manual lock pulses at 1 Hz (alpha 229–255), hp bars rounded 3px and only when damaged
+- Renderer-only; visual verification pending a display (TROUBLE_SHOOTING.md #25)
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.
