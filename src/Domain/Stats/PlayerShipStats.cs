@@ -21,6 +21,9 @@ public readonly record struct EngineLayout(
 
 public readonly record struct ShipType(
     string Name,
+    // Asset stem in assets/player-ships (ShipSpriteRenderer looks up "<key>", "<key>-texture", …).
+    // Kept separate from Name so display text and filenames cannot drift together.
+    string TextureKey,
     string Description,
     EngineLayout Engine,
     WeaponLoadout Weapon,
@@ -33,10 +36,11 @@ public readonly record struct ShipType(
     float PickupRadius)
 {
     public static ShipType Scout { get; } = new(
-        "Scout",
-        "Balanced engines, side shotguns",
-        EngineLayout.Balanced,
-        WeaponLoadout.SideShot, 
+        Name: "Scout",
+        TextureKey: "scout",
+        Description: "Balanced engines, side shotguns",
+        Engine: EngineLayout.Balanced,
+        Weapon: WeaponLoadout.SideShot, 
         MaxHealth: 8,
         Radius: 46f,
         DrawR: 80,
@@ -46,10 +50,11 @@ public readonly record struct ShipType(
         PickupRadius: 120f);
 
     public static ShipType Fighter { get; } = new(
-        "Fighter",
-        "Pursuit engines, machinegun",
-        EngineLayout.Pursuit,
-        WeaponLoadout.RailGun,
+        Name: "Fighter",
+        TextureKey: "fighter",
+        Description: "Pursuit engines, machinegun",
+        Engine: EngineLayout.Pursuit,
+        Weapon: WeaponLoadout.RailGun,
         MaxHealth: 10,
         Radius: 58f,
         DrawR: 100,
@@ -59,10 +64,11 @@ public readonly record struct ShipType(
         PickupRadius: 160f);
 
     public static ShipType Heavy { get; } = new(
-        "Heavy",
-        "Slow engines, side shotguns + machinegun",
-        EngineLayout.Slow,
-        WeaponLoadout.MachineGunShotgun,
+        Name: "Heavy",
+        TextureKey: "heavy",
+        Description: "Slow engines, side shotguns + machinegun",
+        Engine: EngineLayout.Slow,
+        Weapon: WeaponLoadout.MachineGunShotgun,
         MaxHealth: 20,
         Radius: 84f,
         DrawR: 230,
@@ -72,10 +78,11 @@ public readonly record struct ShipType(
         PickupRadius: 230f);
 
     public static ShipType Shadow { get; } = new(
-        "Shadow",
-        "Balanced engines, LoadTestWeapon",
-        EngineLayout.Balanced,
-        WeaponLoadout.LoadTestWeapon, // Intentionally kept while development is ongoing so manual load testing is easy
+        Name: "Shadow",
+        TextureKey: "shadow",
+        Description: "Balanced engines, LoadTestWeapon",
+        Engine: EngineLayout.Balanced,
+        Weapon: WeaponLoadout.LoadTestWeapon, // Intentionally kept while development is ongoing so manual load testing is easy
         MaxHealth: 10,
         Radius: 58f,
         DrawR: 140,

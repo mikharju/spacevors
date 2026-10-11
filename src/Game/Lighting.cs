@@ -22,7 +22,11 @@ public static class Lighting
         }
         """;
 
-    const string FragmentShader = """
+    // Point light slots per frame. The shader source is generated with this value, so the C# and
+    // GLSL limits cannot drift apart.
+    const int MaxPointLights = 16;
+
+    static readonly string FragmentShader = $$"""
         #version 330
         in vec2 fragTexCoord;
         in vec4 fragColor;
@@ -42,7 +46,7 @@ public static class Lighting
 
         // Point lights: xy screen pos (GL origin bottom-left), z radius px, w intensity.
         // Slots with zero radius or intensity are skipped, so unused slots stay inert.
-        const int MaxPointLights = 16;
+        const int MaxPointLights = {{MaxPointLights}};
         uniform vec4 uLights[MaxPointLights];
         const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
         // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
@@ -101,9 +105,6 @@ public static class Lighting
             finalColor = vec4(lit, baseColor.a * fragColor.a);
         }
         """;
-
-    // Must match the shader's MaxPointLights.
-    const int MaxPointLights = 16;
 
     public static bool IsReady { get; private set; }
 

@@ -29,6 +29,14 @@ public static class Renderer
         Raylib.EndDrawing();
     }
 
+    // The paused stats/upgrade overlay. Prepared once per frame so hover hit-testing and drawing
+    // share one layout and scale.
+    public readonly record struct StatsOverlay(
+        StatsScreenRenderer.Prepared Screen,
+        PendingUpgradeOptions? Options,
+        int PlayerLevel,
+        int HoveredIndex);
+
     public static void RenderPaused(
         EntityManager em,
         float camX, float camY,
@@ -38,13 +46,11 @@ public static class Renderer
         Entity playerEntity,
         ShipType shipType,
         bool diagnostics,
-        PendingUpgradeOptions? upgradeOptions,
-        int playerLevel,
-        int hoveredIndex)
+        StatsOverlay stats)
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
-        StatsScreenRenderer.Draw(em, playerEntity, shipType.Name, playerLevel, windowWidth, windowHeight, upgradeOptions, hoveredIndex);
+        StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex);
         Raylib.EndDrawing();
     }
 

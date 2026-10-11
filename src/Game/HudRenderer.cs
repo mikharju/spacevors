@@ -17,7 +17,7 @@ public static class HudRenderer
 
         Raylib.DrawRectangle(paddingX, paddingY, barWidth, barHeight, new Color(50, 50, 50, 255));
         int filledWidth = (int)(barWidth * healthPercent);
-        Color healthColor = filledWidth > barWidth / 3 ? new Color(80, 255, 80, 255) : new Color(255, 60, 60, 255);
+        Color healthColor = filledWidth > barWidth / 3 ? Palette.HealthFull : Palette.HealthLow;
         Raylib.DrawRectangle(paddingX, paddingY, filledWidth, barHeight, healthColor);
         Raylib.DrawRectangleLines(paddingX, paddingY, barWidth, barHeight, new Color(180, 180, 180, 255));
 

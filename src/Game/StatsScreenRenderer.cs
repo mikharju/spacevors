@@ -35,36 +35,41 @@ public static class StatsScreenRenderer
     static readonly Color CountNone = new(110, 110, 130, 255);
     static readonly Color HintColor = new(200, 200, 200, 255);
 
-    readonly record struct StatRow(string Label, string Value, int Count); // Count < 0: no count column
-    readonly record struct StatsSection(string Title, StatRow[] Rows);
-    readonly record struct StatsLayout(StatRow[] ShipRows, StatsSection[] WeaponSections);
+    public readonly record struct StatRow(string Label, string Value, int Count); // Count < 0: no count column
+    public readonly record struct StatsSection(string Title, StatRow[] Rows);
+    public readonly record struct StatsLayout(StatRow[] ShipRows, StatsSection[] WeaponSections);
 
-    public static void Draw(EntityManager em, Entity playerEntity, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex)
+    // Stats layout + window scale for one paused frame. Prepared once and used for both hover
+    // hit-testing and drawing, so the two can never disagree and the work is not repeated.
+    public sealed record Prepared(StatsLayout Layout, float Scale);
+
+    public static Prepared Prepare(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight, bool hasCards)
+    {
+        var layout = BuildStats(em, playerEntity);
+        return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards));
+    }
+
+    public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, DimColor);
 
-        var layout = BuildStats(em, playerEntity);
         bool hasCards = options is { Options.Length: > 0 };
-        float scale = ComputeScale(windowWidth, windowHeight, layout, hasCards);
 
-        DrawTopPanels(layout, shipName, level, windowWidth, scale);
+        DrawTopPanels(prepared.Layout, shipName, level, windowWidth, prepared.Scale);
 
         if (hasCards)
-            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, scale);
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale);
         else
-            DrawHint("Tab to close", windowWidth, windowHeight, scale);
+            DrawHint("Tab to close", windowWidth, windowHeight, prepared.Scale);
     }
 
-    public static int GetHoveredCardIndex(EntityManager em, Entity playerEntity, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
+    public static int GetHoveredCardIndex(Prepared prepared, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
     {
         if (options.Options.Length == 0) return -1;
 
-        var layout = BuildStats(em, playerEntity);
-        float scale = ComputeScale(windowWidth, windowHeight, layout, hasCards: true);
-
         for (int i = 0; i < options.Options.Length; i++)
         {
-            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, scale);
+            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, prepared.Scale);
             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                 return i;
         }

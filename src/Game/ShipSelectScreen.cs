@@ -68,20 +68,19 @@ public sealed class ShipSelectScreen
         Lighting.BeginFrame(0f, 0f, windowWidth, windowHeight);
 
         var ships = ShipType.All;
-        int listX = windowWidth / 2 - CardWidth / 2;
-        float listTopY = GetListTopY(windowHeight);
 
         for (int i = 0; i < ships.Length; i++)
         {
-            int y = (int)(listTopY + i * (CardHeight + CardSpacing));
-            if (y + CardHeight < ListTopMargin || y > windowHeight - ListBottomMargin) continue; // off-screen
+            // Same rect the click hit-test uses, so the card cannot be drawn where it is not clickable.
+            var (x, y, width, height) = GetCardRect(i, windowWidth, windowHeight);
+            if (y + height < ListTopMargin || y > windowHeight - ListBottomMargin) continue; // off-screen
 
             var ship = ships[i];
             string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Weapon.Turrets.Count} turret{(ship.Weapon.Turrets.Count > 1 ? "s" : "")}";
             var borderColor = i == _highlightedIndex ? new Color(255, 255, 255, 255) : new Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
-            DrawShipCard(listX, y, ship.Name, stats, borderColor, i < DigitKeys.Length ? $"{i + 1}" : "", i == _highlightedIndex);
+            DrawShipCard(x, y, width, height, ship.Name, stats, borderColor, i < DigitKeys.Length ? $"{i + 1}" : "", i == _highlightedIndex);
 
-            DrawShipPreview((float)(listX + ShipPanelWidth / 2), (float)y + CardHeight / 2f, ship);
+            DrawShipPreview(x + ShipPanelWidth / 2f, y + height / 2f, ship);
         }
 
         DrawScrollbar(windowWidth, windowHeight);
@@ -182,10 +181,10 @@ public sealed class ShipSelectScreen
         ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, ship.Radius * 2f * PreviewZoom, 0f);
     }
 
-    void DrawShipCard(int x, int y, string title, string details, Color borderColor, string keyLabel, bool highlighted)
+    void DrawShipCard(int x, int y, int width, int height, string title, string details, Color borderColor, string keyLabel, bool highlighted)
     {
-        Raylib.DrawRectangle(x, y, CardWidth, CardHeight, highlighted ? new Color(48, 48, 64, 255) : new Color(35, 35, 45, 255));
-        Raylib.DrawRectangleLines(x, y, CardWidth, CardHeight, borderColor);
+        Raylib.DrawRectangle(x, y, width, height, highlighted ? new Color(48, 48, 64, 255) : new Color(35, 35, 45, 255));
+        Raylib.DrawRectangleLines(x, y, width, height, borderColor);
 
         int textX = x + ShipPanelWidth + TextGap;
         if (keyLabel.Length > 0)

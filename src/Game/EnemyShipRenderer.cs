@@ -7,16 +7,16 @@ namespace Spacevors.Game;
 
 public static class EnemyShipRenderer
 {
-    const float TurretSize = 8f;
+    static readonly Color EnemyTurretColor = new(255, 140, 30, 255);
 
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
-    private static readonly List<(int X, int Y)> _turretRects = new();
+    private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         LitGroupRenderer.Clear(_litDraws);
-        _turretRects.Clear();
+        _turretMarkers.Clear();
         _diagnosticCircles.Clear();
 
         if (ImageLoader.EnemyShipTextures == null)
@@ -70,15 +70,15 @@ public static class EnemyShipRenderer
                 ShipSpriteRenderer.DrawFallbackShip(screenCx, screenCy, enemyShip.Radius, angleDeg);
             }
 
-            _turretRects.Add(((int)(screenCx - TurretSize / 2f), (int)(screenCy - TurretSize / 2f)));
+            _turretMarkers.Add((screenCx, screenCy));
 
             if (diagnostics) _diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
         }
 
         LitGroupRenderer.Draw(_litDraws);
 
-        foreach (var (x, y) in _turretRects)
-            Raylib.DrawRectangle(x, y, (int)TurretSize, (int)TurretSize, new Color(255, 140, 30, 255));
+        foreach (var (cx, cy) in _turretMarkers)
+            RenderHelpers.DrawTurretMarker(cx, cy, EnemyTurretColor);
 
         if (diagnostics)
             foreach (var (x, y, radius) in _diagnosticCircles)
@@ -98,13 +98,7 @@ public static class EnemyShipRenderer
 
             ShipSpriteRenderer.DrawFallbackShip(cx, cy, enemyShip.Radius, shipRot.Angle * 180f / MathF.PI);
 
-            Raylib.DrawRectangle(
-                (int)(cx - TurretSize / 2f),
-                (int)(cy - TurretSize / 2f),
-                (int)TurretSize,
-                (int)TurretSize,
-                new Color(255, 140, 30, 255)
-            );
+            RenderHelpers.DrawTurretMarker(cx, cy, EnemyTurretColor);
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, enemyShip.Radius, new Color(255, 165, 0, 60));
         }

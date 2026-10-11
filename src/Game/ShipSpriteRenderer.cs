@@ -11,7 +11,7 @@ public static class ShipSpriteRenderer
     // Draws the ship sprite: lit (normal + depth maps) when available, otherwise flat texture.
     public static void DrawShipSprite(ShipType ship, float cx, float cy, float diameter, float angleDeg)
     {
-        string key = ship.Name.ToLower();
+        string key = ship.TextureKey;
 
         LitSprite? lit = null;
         Texture2D? tex = null;

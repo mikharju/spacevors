@@ -349,7 +349,12 @@ public sealed class GameSession
     private void RenderStatsScreen()
     {
         var statsCam = _em.GetComponent<Camera>(_cameraEntity);
-        Renderer.RenderPaused(_em, (float)statsCam.Target.X, (float)statsCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _stars, _clutter, _playerEntity, _ship, _diagnostics, null, GetPlayerLevel(), -1);
+        int windowWidth = Raylib.GetScreenWidth();
+        int windowHeight = Raylib.GetScreenHeight();
+        var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards: false);
+
+        Renderer.RenderPaused(_em, (float)statsCam.Target.X, (float)statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
+            new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1));
     }
 
     private void HandleUpgradeMenu()
@@ -358,15 +363,21 @@ public sealed class GameSession
         bool hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
         PendingUpgradeOptions? upgradeOptions = hasPending ? pendingTuple.Value2 : null;
 
-        int hoveredIndex = -1;
-        if (upgradeOptions is { Options.Length: > 0 } opts)
-            hoveredIndex = StatsScreenRenderer.GetHoveredCardIndex(_em, _playerEntity, opts, Raylib.GetMouseX(), Raylib.GetMouseY(), Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+        int windowWidth = Raylib.GetScreenWidth();
+        int windowHeight = Raylib.GetScreenHeight();
+        bool hasCards = upgradeOptions is { Options.Length: > 0 };
+        var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards);
+
+        int hoveredIndex = hasCards
+            ? StatsScreenRenderer.GetHoveredCardIndex(screen, upgradeOptions!.Value, Raylib.GetMouseX(), Raylib.GetMouseY(), windowWidth, windowHeight)
+            : -1;
 
         int selectedIndex = ReadChoiceSelection(hoveredIndex);
         if (selectedIndex >= 0) ApplySelectedUpgrade(selectedIndex);
 
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
-        Renderer.RenderPaused(_em, (float)upgradeCam.Target.X, (float)upgradeCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _stars, _clutter, _playerEntity, _ship, _diagnostics, upgradeOptions, GetPlayerLevel(), hoveredIndex);
+        Renderer.RenderPaused(_em, (float)upgradeCam.Target.X, (float)upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
+            new Renderer.StatsOverlay(screen, upgradeOptions, GetPlayerLevel(), hoveredIndex));
     }
 
     private static int ReadChoiceSelection(int hoveredIndex)

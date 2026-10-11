@@ -10,6 +10,8 @@ public static class WorldRenderer
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
+    private static readonly Color PlayerTurretColor = new(255, 180, 50, 255);
+
     // Damage smoke: grey puffs that fade out over their lifetime.
     private const int SmokeColorR = 120;
     private const int SmokeColorG = 120;
@@ -192,16 +194,9 @@ public static class WorldRenderer
             var pos = em.GetComponent<Position>(entity);
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
-            float turretSize = 8f;
-            if (RenderHelpers.IsOffScreen(cx, cy, turretSize / 2f, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, RenderHelpers.TurretMarkerSize / 2f, windowWidth, windowHeight)) continue;
 
-            Raylib.DrawRectangle(
-                (int)(cx - turretSize / 2f),
-                (int)(cy - turretSize / 2f),
-                (int)turretSize,
-                (int)turretSize,
-                new Color(255, 180, 50, 255)
-            );
+            RenderHelpers.DrawTurretMarker(cx, cy, PlayerTurretColor);
         }
     }
 

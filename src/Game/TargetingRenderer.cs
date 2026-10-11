@@ -21,8 +21,6 @@ public static class TargetingRenderer
     private const float BarGap = 6f; // gap between the top bracket corners and the bar
 
     private static readonly Color BarBackground = new(40, 40, 40, 180);
-    private static readonly Color BarFullColor = new(80, 255, 80, 255); // same palette as HudRenderer
-    private static readonly Color BarEmptyColor = new(255, 60, 60, 255);
 
     public static void Draw(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight)
     {
@@ -67,7 +65,7 @@ public static class TargetingRenderer
 
         Raylib.DrawRectangle(x, y, width, (int)BarHeight, BarBackground);
         if (ratio > 0f)
-            Raylib.DrawRectangle(x, y, (int)(width * ratio), (int)BarHeight, LerpColor(BarEmptyColor, BarFullColor, ratio));
+            Raylib.DrawRectangle(x, y, (int)(width * ratio), (int)BarHeight, LerpColor(Palette.HealthLow, Palette.HealthFull, ratio));
     }
 
     private static float GetRadius(EntityManager em, Entity target)

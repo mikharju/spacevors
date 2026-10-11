@@ -25,4 +25,17 @@ internal static class RenderHelpers
     public static Rectangle FullSource(Texture2D tex) => new(0f, 0f, tex.Width, tex.Height);
 
     public static System.Numerics.Vector2 CenterOrigin(Rectangle rect) => new(rect.Width / 2f, rect.Height / 2f);
+
+    // Turret marker: the small square drawn on the ship that owns a turret.
+    public const float TurretMarkerSize = 8f;
+
+    public static void DrawTurretMarker(float cx, float cy, Color color)
+    {
+        Raylib.DrawRectangle(
+            (int)(cx - TurretMarkerSize / 2f),
+            (int)(cy - TurretMarkerSize / 2f),
+            (int)TurretMarkerSize,
+            (int)TurretMarkerSize,
+            color);
+    }
 }
