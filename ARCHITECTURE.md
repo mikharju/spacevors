@@ -209,7 +209,7 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority), collisions, effects, damage emission, death explosions, asteroid factory
+        Combat/                -- firing (incl. click-target priority), collisions, impact damage rule, effects, damage emission, death explosions, asteroid factory
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
         Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull)
         Physics/               -- force integration + position integration
