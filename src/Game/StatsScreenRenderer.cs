@@ -169,11 +169,15 @@ public static class StatsScreenRenderer
     static StatsLayout BuildStats(EntityManager em, Entity playerEntity)
     {
         var player = em.GetComponent<Player>(playerEntity);
-        int currentHp = em.TryGetComponent<Health>(playerEntity, out var health) ? health.Current : 0;
+        // Health.Max is the live value; Player.MaxHealth is its tuning-side twin. Show the live one,
+        // as the health bar and hp bars do.
+        bool hasHealth = em.TryGetComponent<Health>(playerEntity, out var health);
+        int currentHp = hasHealth ? health.Current : 0;
+        int maxHp = hasHealth ? health.Max : player.MaxHealth;
 
         var shipRows = new List<StatRow>
         {
-            new("Health", $"{currentHp}/{player.MaxHealth}", CountOf(em, playerEntity, UpgradeOption.Hp)),
+            new("Health", $"{currentHp}/{maxHp}", CountOf(em, playerEntity, UpgradeOption.Hp)),
             new("Forward thrust", FormatInt(player.Thrust), CountOf(em, playerEntity, UpgradeOption.ForwardAcceleration)),
             new("Side thrust", FormatInt(player.SideThrust), CountOf(em, playerEntity, UpgradeOption.SideThrust)),
             new("Back thrust", FormatInt(player.BackThrust), CountOf(em, playerEntity, UpgradeOption.BackThrust)),

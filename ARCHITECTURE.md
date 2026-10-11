@@ -189,7 +189,7 @@ src/
         BackgroundRenderer.cs    -- starfield + clutter layers
         WorldRenderer.cs         -- world entities: asteroids, ammo, effects, pickups
         EnemyShipRenderer.cs     -- enemy ship sprites + fallbacks
-        ShipSpriteRenderer.cs    -- player ship sprite (lit/flat)
+        ShipSpriteRenderer.cs    -- player ship sprite (lit/flat) + shared ship placeholder shape
         ThrusterFlameRenderer.cs -- thruster flames
         TargetingRenderer.cs     -- targeting brackets + hp bars: red for the locked target, blue-grey for auto-targeted enemies
         HudRenderer.cs           -- health bar + game over text

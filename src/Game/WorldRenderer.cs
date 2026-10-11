@@ -66,6 +66,8 @@ public static class WorldRenderer
             if (baseTex.HasValue && baseTex.Value.Id != 0)
                 DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
             else
+                // Flat sprites draw straight away while lit ones wait for the batch flush below, so a
+                // mixed layer draws flat variants under lit ones.
                 Raylib.DrawRectanglePro(
                     new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
                     new System.Numerics.Vector2(asteroid.Radius, asteroid.Radius),
@@ -84,8 +86,10 @@ public static class WorldRenderer
     private static AsteroidSprite? GetAsteroidSprite(Asteroid asteroid)
     {
         var sprites = asteroid.IsSmall ? ImageLoader.AsteroidSmallSprites : ImageLoader.AsteroidLargeSprites;
-        if (sprites == null || asteroid.Variant >= sprites.Length) return null;
-        return sprites[asteroid.Variant];
+        if (sprites == null || sprites.Length == 0) return null;
+        // Wrap rather than give up: the domain picks a variant from its own constant count, which can
+        // be out of step with how many sprite sets the asset directory holds.
+        return sprites[asteroid.Variant % sprites.Length];
     }
 
     // Lit when the variant has normal + depth maps (collected for batched drawing), otherwise a flat texture.
@@ -117,7 +121,7 @@ public static class WorldRenderer
                 _ => new Color(255, 230, 100, 255)
             };
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)ammo.Radius, color);
+            Raylib.DrawCircle((int)cx, (int)cy, ammo.Radius, color);
         }
     }
 
@@ -154,7 +158,7 @@ public static class WorldRenderer
                 color = new Color(255, 140, 30, alpha);
             }
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(currentRadius, 1f), color);
+            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(currentRadius, 1f), color);
         }
     }
 
@@ -166,7 +170,7 @@ public static class WorldRenderer
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
-            int size = (int)Math.Max(lifeRatio * 5f, 1f);
+            float size = Math.Max(lifeRatio * 5f, 1f);
 
             if (RenderHelpers.IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
 
@@ -237,17 +241,17 @@ public static class WorldRenderer
                     Color.White
                 );
 
-                Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, healthAlpha));
+                Raylib.DrawCircle((int)cx, (int)cy, mine.Radius * 0.4f, new Color(255, 200, 200, healthAlpha));
             }
             else
             {
                 // No-texture fallback: red disc plus a bright core so mines stay readable.
                 if (hasHealth)
-                    Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 60, 60, healthAlpha));
+                    Raylib.DrawCircle((int)cx, (int)cy, mine.Radius, new Color(255, 60, 60, healthAlpha));
                 else
-                    Raylib.DrawCircle((int)cx, (int)cy, (int)mine.Radius, new Color(255, 100, 100, 200));
+                    Raylib.DrawCircle((int)cx, (int)cy, mine.Radius, new Color(255, 100, 100, 200));
 
-                Raylib.DrawCircle((int)cx, (int)cy, (int)(mine.Radius * 0.4f), new Color(255, 200, 200, 255));
+                Raylib.DrawCircle((int)cx, (int)cy, mine.Radius * 0.4f, new Color(255, 200, 200, 255));
             }
         }
     }
@@ -262,7 +266,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
 
             int alpha = pickup.Chased ? 255 : 180;
-            Raylib.DrawCircle((int)cx, (int)cy, (int)pickup.Radius, new Color(50, 150, 255, alpha));
+            Raylib.DrawCircle((int)cx, (int)cy, pickup.Radius, new Color(50, 150, 255, alpha));
         }
     }
 
@@ -275,7 +279,7 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)orb.Radius, new Color(50, 255, 100, 200));
+            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, new Color(50, 255, 100, 200));
         }
     }
 
@@ -287,7 +291,7 @@ public static class WorldRenderer
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
-            int size = (int)Math.Max(lifeRatio * 5f, 1f);
+            float size = Math.Max(lifeRatio * 5f, 1f);
 
             if (RenderHelpers.IsOffScreen(cx, cy, size, windowWidth, windowHeight)) continue;
 
@@ -311,7 +315,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
 
             int alpha = (int)(SmokeAlphaMax * lifeRatio);
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
+            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
         }
     }
 
@@ -342,6 +346,6 @@ public static class WorldRenderer
 
         ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg);
 
-        if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, (int)shipType.Radius, new Color(0, 255, 0, 60));
+        if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, shipType.Radius, new Color(0, 255, 0, 60));
     }
 }

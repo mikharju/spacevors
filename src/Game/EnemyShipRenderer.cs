@@ -9,7 +9,6 @@ public static class EnemyShipRenderer
 {
     const float TurretSize = 8f;
 
-    private static readonly Color FallbackShipColor = new(180, 60, 60, 255);
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg)>> _litDraws = new();
     private static readonly List<(int X, int Y)> _turretRects = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
@@ -62,11 +61,13 @@ public static class EnemyShipRenderer
                 if (lit != null)
                     LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg);
                 else
+                    // Flat sprites draw straight away while lit ones wait for the batch flush below,
+                    // so a mixed layer draws flat variants under lit ones.
                     Raylib.DrawTexturePro(t, RenderHelpers.FullSource(t), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
             }
             else
             {
-                DrawEnemyShipFallback(shipPos.Value, shipRot.Angle, enemyShip.Radius, camX, windowWidth, camY, windowHeight, diagnostics);
+                ShipSpriteRenderer.DrawFallbackShip(screenCx, screenCy, enemyShip.Radius, angleDeg);
             }
 
             _turretRects.Add(((int)(screenCx - TurretSize / 2f), (int)(screenCy - TurretSize / 2f)));
@@ -95,31 +96,7 @@ public static class EnemyShipRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
 
-            float angle = shipRot.Angle;
-            float size = enemyShip.Radius;
-
-            float cos = (float)Math.Cos(angle);
-            float sin = (float)Math.Sin(angle);
-
-            var tipLocal = new Vector2(0f, size);
-            var tip = new Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
-
-            var leftLocal = new Vector2(-size * 0.4f, -size * 0.6f);
-            var left = new Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
-
-            var rightLocal = new Vector2(size * 0.4f, -size * 0.6f);
-            var right = new Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
-
-            var (tipX, tipY) = RenderHelpers.ToScreen(shipPos.Value + tip, camX, camY, windowWidth, windowHeight);
-            var (rightX, rightY) = RenderHelpers.ToScreen(shipPos.Value + right, camX, camY, windowWidth, windowHeight);
-            var (leftX, leftY) = RenderHelpers.ToScreen(shipPos.Value + left, camX, camY, windowWidth, windowHeight);
-
-            Raylib.DrawTriangle(
-                new System.Numerics.Vector2(tipX, tipY),
-                new System.Numerics.Vector2(rightX, rightY),
-                new System.Numerics.Vector2(leftX, leftY),
-                FallbackShipColor
-            );
+            ShipSpriteRenderer.DrawFallbackShip(cx, cy, enemyShip.Radius, shipRot.Angle * 180f / MathF.PI);
 
             Raylib.DrawRectangle(
                 (int)(cx - TurretSize / 2f),
@@ -129,39 +106,7 @@ public static class EnemyShipRenderer
                 new Color(255, 140, 30, 255)
             );
 
-            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, (int)enemyShip.Radius, new Color(255, 165, 0, 60));
-        }
-    }
-
-    private static void DrawEnemyShipFallback(Vector2 pos, float angle, float size, float camX, int windowWidth, float camY, int windowHeight, bool diagnostics)
-    {
-        float cos = (float)Math.Cos(angle);
-        float sin = (float)Math.Sin(angle);
-
-        var tipLocal = new Vector2(0f, size);
-        var tip = new Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
-
-        var leftLocal = new Vector2(-size * 0.4f, -size * 0.6f);
-        var left = new Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
-
-        var rightLocal = new Vector2(size * 0.4f, -size * 0.6f);
-        var right = new Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
-
-        var (tipX, tipY) = RenderHelpers.ToScreen(pos + tip, camX, camY, windowWidth, windowHeight);
-        var (rightX, rightY) = RenderHelpers.ToScreen(pos + right, camX, camY, windowWidth, windowHeight);
-        var (leftX, leftY) = RenderHelpers.ToScreen(pos + left, camX, camY, windowWidth, windowHeight);
-
-        Raylib.DrawTriangle(
-            new System.Numerics.Vector2(tipX, tipY),
-            new System.Numerics.Vector2(rightX, rightY),
-            new System.Numerics.Vector2(leftX, leftY),
-            Color.Red
-        );
-
-        if (diagnostics)
-        {
-            var (cx, cy) = RenderHelpers.ToScreen(pos, camX, camY, windowWidth, windowHeight);
-            Raylib.DrawCircle((int)cx, (int)cy, (int)size, new Color(255, 165, 0, 60));
+            if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, enemyShip.Radius, new Color(255, 165, 0, 60));
         }
     }
 }

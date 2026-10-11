@@ -27,7 +27,7 @@ public static class BackgroundRenderer
             cx = ((cx % windowWidth) + windowWidth) % windowWidth;
             cy = ((cy % windowHeight) + windowHeight) % windowHeight;
 
-            Raylib.DrawCircle((int)cx, (int)cy, (int)Math.Max(1f, size), color);
+            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(1f, size), color);
         }
     }
 
