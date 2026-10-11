@@ -137,9 +137,9 @@ public static class Lighting
     {
         if (_pointLightCount >= MaxPointLights || radius <= 0f || intensity <= 0f) return;
 
-        float screenX = worldPos.X - _camX + _windowWidth / 2f;
-        float screenYGl = _windowHeight - (worldPos.Y - _camY + _windowHeight / 2f);
-        PointLights[_pointLightCount++] = new System.Numerics.Vector4(screenX, screenYGl, radius, intensity);
+        // The shader works in GL screen space (origin bottom-left), so only y is flipped here.
+        var screen = RenderHelpers.ToScreen(worldPos, _camX, _camY, _windowWidth, _windowHeight);
+        PointLights[_pointLightCount++] = new System.Numerics.Vector4(screen.X, _windowHeight - screen.Y, radius, intensity);
     }
 
     public static void Init()

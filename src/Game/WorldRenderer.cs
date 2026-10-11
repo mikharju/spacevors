@@ -49,8 +49,7 @@ public static class WorldRenderer
         foreach (var (entity, asteroid, rot) in em.GetEntitiesWithComponents<Asteroid, Rotation>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float angleDeg = rot.Angle * 180f / MathF.PI;
             AsteroidSprite? sprite = GetAsteroidSprite(asteroid);
@@ -106,8 +105,7 @@ public static class WorldRenderer
         foreach (var (entity, ammo) in em.GetEntitiesWithComponents<Ammo>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             if (RenderHelpers.IsOffScreen(cx, cy, ammo.Radius, windowWidth, windowHeight)) continue;
 
@@ -128,8 +126,7 @@ public static class WorldRenderer
         foreach (var (entity, explosion) in em.GetEntitiesWithComponents<Explosion>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = explosion.Lifetime / explosion.InitialLifetime;
             float currentRadius = explosion.CurrentRadius;
@@ -166,8 +163,7 @@ public static class WorldRenderer
         foreach (var (entity, spark) in em.GetEntitiesWithComponents<DamageSpark>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
@@ -190,8 +186,7 @@ public static class WorldRenderer
             if (turret.IsEnemy) continue;
 
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float turretSize = 8f;
             if (RenderHelpers.IsOffScreen(cx, cy, turretSize / 2f, windowWidth, windowHeight)) continue;
@@ -214,8 +209,7 @@ public static class WorldRenderer
         foreach (var (entity, mine) in em.GetEntitiesWithComponents<EnemyMine>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float extent = hasTexture
                 ? RenderHelpers.HalfDiagonal(mine.Radius * 2f, mine.Radius * 2f * (float)mineTex!.Value.Height / mineTex.Value.Width)
@@ -263,8 +257,7 @@ public static class WorldRenderer
         foreach (var (entity, pickup) in em.GetEntitiesWithComponents<XpPickup>())
         {
             if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             if (RenderHelpers.IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
 
@@ -278,8 +271,7 @@ public static class WorldRenderer
         foreach (var (entity, orb) in em.GetEntitiesWithComponents<HealthOrb>())
         {
             if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
@@ -292,8 +284,7 @@ public static class WorldRenderer
         foreach (var (entity, spark) in em.GetEntitiesWithComponents<HealSpark>())
         {
             if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = spark.Lifetime / spark.InitialLifetime;
             int size = (int)Math.Max(lifeRatio * 5f, 1f);
@@ -311,8 +302,7 @@ public static class WorldRenderer
         foreach (var (entity, puff) in em.GetEntitiesWithComponents<SmokePuff>())
         {
             if (!em.TryGetComponent<Position>(entity, out var pos)) continue;
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = puff.Lifetime / puff.InitialLifetime;
             // Puffs grow to about twice their spawn radius as they fade out.
@@ -330,8 +320,7 @@ public static class WorldRenderer
         foreach (var (entity, marker) in em.GetEntitiesWithComponents<DebugMarker>())
         {
             var pos = em.GetComponent<Position>(entity);
-            float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
             float lifeRatio = marker.Lifetime / marker.InitialLifetime;
             int alpha = (int)(255f * lifeRatio);
@@ -348,8 +337,7 @@ public static class WorldRenderer
         var shipPos = em.GetComponent<Position>(playerEntity);
         var shipRot = em.GetComponent<Rotation>(playerEntity);
 
-        float screenCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-        float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+        var (screenCx, screenCy) = RenderHelpers.ToScreen(shipPos.Value, camX, camY, windowWidth, windowHeight);
         float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
         ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg);

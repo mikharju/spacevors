@@ -90,8 +90,7 @@ public static class LightGatherer
 
     static bool IsInLightRange(Vector2 worldPos, float radius, float camX, float camY, int windowWidth, int windowHeight)
     {
-        float cx = worldPos.X - camX + windowWidth / 2f;
-        float cy = worldPos.Y - camY + windowHeight / 2f;
+        var (cx, cy) = RenderHelpers.ToScreen(worldPos, camX, camY, windowWidth, windowHeight);
         return cx > -radius && cx < windowWidth + radius && cy > -radius && cy < windowHeight + radius;
     }
 }

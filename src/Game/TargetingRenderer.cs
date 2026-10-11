@@ -46,8 +46,7 @@ public static class TargetingRenderer
         if (radius <= 0f) return;
 
         var pos = em.GetComponent<Position>(target);
-        float cx = (float)pos.Value.X - camX + windowWidth / 2f;
-        float cy = (float)pos.Value.Y - camY + windowHeight / 2f;
+        var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
 
         // Extend the cull extent for the bar above the bracket.
         if (RenderHelpers.IsOffScreen(cx, cy, radius + Margin + BarGap + BarHeight, windowWidth, windowHeight)) return;

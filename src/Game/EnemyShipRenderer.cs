@@ -31,8 +31,7 @@ public static class EnemyShipRenderer
             var shipPos = em.GetComponent<Position>(entity);
             var shipRot = em.GetComponent<Rotation>(entity);
 
-            float screenCx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-            float screenCy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+            var (screenCx, screenCy) = RenderHelpers.ToScreen(shipPos.Value, camX, camY, windowWidth, windowHeight);
             float angleDeg = shipRot.Angle * 180f / MathF.PI;
 
             string? texKey = EnemyShipType.FromGraphicsId(enemyShip.GraphicsId)?.TextureKey;
@@ -92,8 +91,7 @@ public static class EnemyShipRenderer
             var shipPos = em.GetComponent<Position>(entity);
             var shipRot = em.GetComponent<Rotation>(entity);
 
-            float cx = (float)shipPos.Value.X - camX + windowWidth / 2f;
-            float cy = (float)shipPos.Value.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(shipPos.Value, camX, camY, windowWidth, windowHeight);
 
             if (RenderHelpers.IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
 
@@ -103,26 +101,23 @@ public static class EnemyShipRenderer
             float cos = (float)Math.Cos(angle);
             float sin = (float)Math.Sin(angle);
 
-            var tipLocal = new System.Numerics.Vector2(0f, size);
-            var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+            var tipLocal = new Vector2(0f, size);
+            var tip = new Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
 
-            var leftLocal = new System.Numerics.Vector2(-size * 0.4f, -size * 0.6f);
-            var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+            var leftLocal = new Vector2(-size * 0.4f, -size * 0.6f);
+            var left = new Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
 
-            var rightLocal = new System.Numerics.Vector2(size * 0.4f, -size * 0.6f);
-            var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
+            var rightLocal = new Vector2(size * 0.4f, -size * 0.6f);
+            var right = new Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
 
-            float tx1 = (float)shipPos.Value.X + tip.X - camX + windowWidth / 2f;
-            float ty1 = (float)shipPos.Value.Y + tip.Y - camY + windowHeight / 2f;
-            float tx2 = (float)shipPos.Value.X + right.X - camX + windowWidth / 2f;
-            float ty2 = (float)shipPos.Value.Y + right.Y - camY + windowHeight / 2f;
-            float tx3 = (float)shipPos.Value.X + left.X - camX + windowWidth / 2f;
-            float ty3 = (float)shipPos.Value.Y + left.Y - camY + windowHeight / 2f;
+            var (tipX, tipY) = RenderHelpers.ToScreen(shipPos.Value + tip, camX, camY, windowWidth, windowHeight);
+            var (rightX, rightY) = RenderHelpers.ToScreen(shipPos.Value + right, camX, camY, windowWidth, windowHeight);
+            var (leftX, leftY) = RenderHelpers.ToScreen(shipPos.Value + left, camX, camY, windowWidth, windowHeight);
 
             Raylib.DrawTriangle(
-                new System.Numerics.Vector2(tx1, ty1),
-                new System.Numerics.Vector2(tx2, ty2),
-                new System.Numerics.Vector2(tx3, ty3),
+                new System.Numerics.Vector2(tipX, tipY),
+                new System.Numerics.Vector2(rightX, rightY),
+                new System.Numerics.Vector2(leftX, leftY),
                 FallbackShipColor
             );
 
@@ -143,33 +138,29 @@ public static class EnemyShipRenderer
         float cos = (float)Math.Cos(angle);
         float sin = (float)Math.Sin(angle);
 
-        var tipLocal = new System.Numerics.Vector2(0f, size);
-        var tip = new System.Numerics.Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
+        var tipLocal = new Vector2(0f, size);
+        var tip = new Vector2(tipLocal.X * cos - tipLocal.Y * sin, tipLocal.X * sin + tipLocal.Y * cos);
 
-        var leftLocal = new System.Numerics.Vector2(-size * 0.4f, -size * 0.6f);
-        var left = new System.Numerics.Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
+        var leftLocal = new Vector2(-size * 0.4f, -size * 0.6f);
+        var left = new Vector2(leftLocal.X * cos - leftLocal.Y * sin, leftLocal.X * sin + leftLocal.Y * cos);
 
-        var rightLocal = new System.Numerics.Vector2(size * 0.4f, -size * 0.6f);
-        var right = new System.Numerics.Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
+        var rightLocal = new Vector2(size * 0.4f, -size * 0.6f);
+        var right = new Vector2(rightLocal.X * cos - rightLocal.Y * sin, rightLocal.X * sin + rightLocal.Y * cos);
 
-        float tx1 = (float)pos.X + tip.X - camX + windowWidth / 2f;
-        float ty1 = (float)pos.Y + tip.Y - camY + windowHeight / 2f;
-        float tx2 = (float)pos.X + right.X - camX + windowWidth / 2f;
-        float ty2 = (float)pos.Y + right.Y - camY + windowHeight / 2f;
-        float tx3 = (float)pos.X + left.X - camX + windowWidth / 2f;
-        float ty3 = (float)pos.Y + left.Y - camY + windowHeight / 2f;
+        var (tipX, tipY) = RenderHelpers.ToScreen(pos + tip, camX, camY, windowWidth, windowHeight);
+        var (rightX, rightY) = RenderHelpers.ToScreen(pos + right, camX, camY, windowWidth, windowHeight);
+        var (leftX, leftY) = RenderHelpers.ToScreen(pos + left, camX, camY, windowWidth, windowHeight);
 
         Raylib.DrawTriangle(
-            new System.Numerics.Vector2(tx1, ty1),
-            new System.Numerics.Vector2(tx2, ty2),
-            new System.Numerics.Vector2(tx3, ty3),
+            new System.Numerics.Vector2(tipX, tipY),
+            new System.Numerics.Vector2(rightX, rightY),
+            new System.Numerics.Vector2(leftX, leftY),
             Color.Red
         );
 
         if (diagnostics)
         {
-            float cx = (float)pos.X - camX + windowWidth / 2f;
-            float cy = (float)pos.Y - camY + windowHeight / 2f;
+            var (cx, cy) = RenderHelpers.ToScreen(pos, camX, camY, windowWidth, windowHeight);
             Raylib.DrawCircle((int)cx, (int)cy, (int)size, new Color(255, 165, 0, 60));
         }
     }

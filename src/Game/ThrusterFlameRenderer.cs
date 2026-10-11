@@ -146,22 +146,19 @@ public static class ThrusterFlameRenderer
         if (length <= 0f || halfWidth <= 0f) return;
 
         var tip = worldBase + dir * length;
-        float extent = length + halfWidth;
-        float baseCx = worldBase.X - camX + windowWidth / 2f;
-        float baseCy = worldBase.Y - camY + windowHeight / 2f;
-        if (baseCx < -extent || baseCx > windowWidth + extent || baseCy < -extent || baseCy > windowHeight + extent) return;
+        var (baseCx, baseCy) = RenderHelpers.ToScreen(worldBase, camX, camY, windowWidth, windowHeight);
+        if (RenderHelpers.IsOffScreen(baseCx, baseCy, length + halfWidth, windowWidth, windowHeight)) return;
 
         var perp = new Vector2(-dir.Y, dir.X);
         // Vertex order must be clockwise in screen space; counter-clockwise triangles are culled.
-        var v0 = ToScreen(worldBase - perp * halfWidth, camX, camY, windowWidth, windowHeight);
-        var v1 = ToScreen(worldBase + perp * halfWidth, camX, camY, windowWidth, windowHeight);
-        var v2 = ToScreen(tip, camX, camY, windowWidth, windowHeight);
-        Raylib.DrawTriangle(v0, v1, v2, color);
-    }
-
-    private static System.Numerics.Vector2 ToScreen(Vector2 world, float camX, float camY, int windowWidth, int windowHeight)
-    {
-        return new System.Numerics.Vector2(world.X - camX + windowWidth / 2f, world.Y - camY + windowHeight / 2f);
+        var (v0x, v0y) = RenderHelpers.ToScreen(worldBase - perp * halfWidth, camX, camY, windowWidth, windowHeight);
+        var (v1x, v1y) = RenderHelpers.ToScreen(worldBase + perp * halfWidth, camX, camY, windowWidth, windowHeight);
+        var (v2x, v2y) = RenderHelpers.ToScreen(tip, camX, camY, windowWidth, windowHeight);
+        Raylib.DrawTriangle(
+            new System.Numerics.Vector2(v0x, v0y),
+            new System.Numerics.Vector2(v1x, v1y),
+            new System.Numerics.Vector2(v2x, v2y),
+            color);
     }
 
     private static Color FlameColor(float intensity)

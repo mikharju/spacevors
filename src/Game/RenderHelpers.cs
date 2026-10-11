@@ -1,9 +1,16 @@
 using Raylib_cs;
+using Spacevors.Domain;
 
 namespace Spacevors.Game;
 
 internal static class RenderHelpers
 {
+    // World → screen position. The camera target is the centre of the window; 1 world unit = 1 px.
+    public static (float X, float Y) ToScreen(Vector2 world, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        return (world.X - camX + windowWidth / 2f, world.Y - camY + windowHeight / 2f);
+    }
+
     public static bool IsOffScreen(float cx, float cy, float extent, int windowWidth, int windowHeight)
     {
         return cx < -extent || cx > windowWidth + extent || cy < -extent || cy > windowHeight + extent;

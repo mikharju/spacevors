@@ -20,6 +20,7 @@ public static class BackgroundRenderer
     {
         foreach (var (pos, size, color, parallax) in stars)
         {
+            // Stars offset by a parallax-scaled camera, so they do not use RenderHelpers.ToScreen.
             float cx = pos.X - camX * parallax + windowWidth / 2f;
             float cy = pos.Y - camY * parallax + windowHeight / 2f;
 
@@ -36,10 +37,8 @@ public static class BackgroundRenderer
     {
         foreach (var (pos, width, height, color) in clutter)
         {
-            float cx = pos.X - camX + windowWidth / 2f;
-            float cy = pos.Y - camY + windowHeight / 2f;
-
-            if (cx < -width || cx > windowWidth + width || cy < -height || cy > windowHeight + height) continue;
+            var (cx, cy) = RenderHelpers.ToScreen(pos, camX, camY, windowWidth, windowHeight);
+            if (RenderHelpers.IsOffScreen(cx, cy, RenderHelpers.HalfDiagonal(width, height), windowWidth, windowHeight)) continue;
 
             Raylib.DrawRectangle((int)(cx - width / 2f), (int)(cy - height / 2f), (int)width, (int)height, color);
         }
