@@ -41,3 +41,12 @@ ScaffoldingReadMe.txt
 ## IDEs ##
 .idea/
 *.iml
+
+## Screenshot toolchain (see .tools/README.md) — binaries and artifacts, not source ##
+.tools/root/
+.tools/debs/
+.tools/.extracted/
+.tools/pylibs/
+.tools/shots/
+.tools/run/
+.tools/pkgs.txt

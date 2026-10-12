@@ -140,11 +140,23 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Raylib-cs defines both overloads. An all-int list resolves to the int overload (identity beats constant conversion), but a mixed list keeps both candidates viable — `255` is a constant that fits in byte, so neither overload is strictly better.
 - **Fix / Prevention**: Make all four arguments the same type: either all ints (`new(255, 80, 80, 230)`) or a typed constant for the odd one out (`private const byte OpaqueAlpha = 255; new(r, g, b, OpaqueAlpha)`).
 
-## 25. No display in the agent sandbox — game cannot launch; validate shader changes with glslang WASM instead
+## 25. No display in the agent sandbox — screenshots need the rootless toolchain in `.tools/`
 
 - **Symptom**: The "General workflow that works" recipe fails at step 2: no `Xvfb`, no `xdotool`, no `/tmp/.X11-unix`, no wayland socket, `DISPLAY` empty — `Game` and `RenderBench` both need a window and cannot run, so F12 screenshots are impossible.
 - **Cause**: The agent sandbox runs headless without X/Wayland and without root to install Xvfb. This varies per environment — check before promising screenshot verification.
-- **Fix / Prevention**: For shader edits, at least verify compilation offline: download the `glslang-wasm-validator` npm tarball with curl (npm itself fails: unwritable HOME; do download + untar + run in ONE command since /tmp is per-command), extract the shader strings from `Lighting.cs` with awk, rewrite `#version 330` → `#version 310 es` + `precision highp float;` and `{{MaxPointLights}}` → `16`, then `node package/dist/cli.mjs --vertex v.vert --fragment f.frag --json`. Passes compile+link; runtime visuals and in-game tuning still need a real display, so say so when reporting.
+- **Fix / Prevention**: A rootless toolchain for exactly this sandbox lives in `.tools/` (see `.tools/README.md` and "General workflow that works" below). If `.tools/root` is missing, rebuild it with `bash .tools/setup.sh`, which unpacks .debs without root. Only when even that is impossible (no network) fall back to offline shader validation: download the `glslang-wasm-validator` npm tarball with curl (npm itself fails: unwritable HOME; do download + untar + run in ONE command since /tmp is per-command), extract the shader strings from `Lighting.cs` with awk, rewrite `#version 330` → `#version 310 es` + `precision highp float;` and `{{MaxPointLights}}` → `16`, then `node package/dist/cli.mjs --vertex v.vert --fragment f.frag --json`. That checks compile+link only; say so when reporting.
+
+## 26. Every agent command is a fresh sandbox: /tmp, PIDs and processes do not carry over
+
+- **Symptom**: A display or game started with `setsid ... &` in one command is gone in the next (its `/tmp/.X11-unix/X99` socket with it); `pgrep`/`pkill` report nothing while the game is provably still running; `dotnet` dies with "Read-only file system : '/home/agent/.dotnet'".
+- **Cause**: Each command runs in a new mount + PID namespace over the same workspace. `/tmp` and `/dev/shm` are recreated, `HOME` is read-only, a process is killed when the command that started it ends, and processes owned by other commands are not visible to `pgrep`. Only the workspace directory persists.
+- **Fix / Prevention**: Long-lived things (Xvfb, the game) must be started as harness **background jobs**, which do survive between commands, and must talk over TCP (`DISPLAY=localhost:99`) because a unix socket in `/tmp` cannot be reached from another command. Stop them with `xdotool windowclose`, never `pkill`. Point `HOME` at `/tmp/dotnet-home` for anything dotnet writes. `.tools/env.sh` does all of this — source it instead of re-deriving it.
+
+## 27. Input sent to the game is silently dropped when it lands between two frames
+
+- **Symptom**: `xdotool key 1` / `xdotool click 1` produced nothing at all — no log line, no state change — while the same action worked when done by hand, and window focus was correct.
+- **Cause**: Under llvmpipe the game renders at ~4 fps (250 ms/frame). raylib samples input once per frame, so a press+release pair that completes between two polls is in neither one. Nothing is queued and nothing is reported.
+- **Fix / Prevention**: Hold keys and buttons longer than a frame; `.tools/input.sh key|click` does `keydown; sleep 0.4; keyup`. Do not use bare `xdotool key`/`click` against this game.
 
 ## Maybe remove
 
@@ -162,20 +174,33 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: In this raylib build (6.0 via Raylib-cs 8.0.0), `SetShaderValue*` uploads to GL state immediately, but vertex data is batched and only drawn at flush time — with whatever uniform/sampler state exists *then*. So all sprites in one block get the last-set values. A texture change forces a mid-block flush (which is why different base textures partially masked it), but scalar uniforms leak unconditionally. Upstream raylib 6.0 source does not even ship its GL layer, so this could only be established empirically via `RenderBench probe`.
 - **Fix / Prevention**: Inside one shader-mode block, every draw must share identical uniform state — group draws by sprite variant (same maps) and pass per-instance data with the vertices instead. That is why `Lighting` packs the rotation angle into the vertex color's RG channels (`EncodeAngle`) rather than using an `angleRad` uniform. Verify any future batching change with `RenderBench probe`, which pixel-compares against a frozen legacy-shader oracle.
 
-  ## General workflow that works
+## General workflow that works
+
+Headless build + run + screenshot. Details in `.tools/README.md`.
 
 ```bash
-# 1. Ensure clean state
-pgrep -a Game || true                      # must be empty, else kill by PID
+# 0. once per sandbox: unpack Xvfb/xdotool/mesa into .tools/root (no root needed)
+bash .tools/setup.sh
 
-# 2. Launch detached (Xvfb :99 already running at target resolution)
-DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 setsid ./src/Game/bin/Debug/net10.0/Game \
-    > /tmp/opencode/app.log 2>&1 < /dev/null &
+# 1. start the two long-lived processes as harness BACKGROUND JOBS
+#    (a plain `cmd &` dies with the command that started it — see entry 26)
+.tools/xvfb.sh                       # virtual display :99, 1920x1024x24
+.tools/game.sh                       # the game; log at .tools/run/app.log
 
-# 3. Verify single window, then drive with xdotool (slow clicks!)
-WID=$(DISPLAY=:99 xdotool search --name SpaceVors | head -1)   # count must be 1
+# 2. from any ordinary command: drive it and capture frames
+bash .tools/smoke.sh                 # display + window + capture + input, all PASS
+bash .tools/input.sh key 1           # hold >= one frame, llvmpipe runs at ~4 fps
+bash .tools/input.sh click 960 512
+bash .tools/shot.sh main-menu        # -> .tools/shots/main-menu.png
+bash .tools/diff.sh a.png b.png --expect-same
 
-# 4. Screenshot via F12, read the numbered file (screenshot0NN.png), verify md5sum
-
-# 5. Kill by PID when done; remove screenshot*.png artifacts from repo root
+# 3. stop: close the window (pkill cannot see processes of other commands)
+bash .tools/stop.sh
 ```
+
+Notes: run the game with `dotnet Game.dll`, not the apphost — the built `Game`
+binary asks for a linuxbrew `ld.so` that this container does not have. Whether a
+frame can be *looked at* depends on the active model: an image-capable one reads
+`.tools/shots/*.png` directly, but 1920x1024 is downscaled, so crop first when
+small text or 1-px detail matters. Keep the assertions numeric (`diff.sh`), so a
+test never depends on the model's eyes.
