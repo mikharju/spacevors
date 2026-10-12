@@ -140,7 +140,7 @@ Rendering
 
 Ship selection is shown before the game loop begins.
 
-Player chooses one of the defined ship types (`ShipType.All`: Scout, Fighter, Heavy, Shadow).
+Player chooses one of the defined ship types (`ShipType.All`: Scout, Fighter, Heavy, Shadow). In diagnostics mode the list also carries `ShipType.DiagnosticShips`: Shadow copies with one weapon each.
 
 Game pauses during upgrade choice; resumes after selection.
 

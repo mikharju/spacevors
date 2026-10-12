@@ -72,6 +72,15 @@ public readonly record struct WeaponLoadout(
     string Name,
     IReadOnlyList<TurretDefinition> Turrets)
 {
+    // Single-turret loadout using the weapon's own AddOn mount — what a ship carries when it
+    // picks that weapon at a level-up. Used by the diagnostics ships that exist to test one weapon.
+    public static WeaponLoadout MountedAsUpgrade(WeaponType weapon)
+    {
+        var mount = weapon.AddOn ?? throw new InvalidOperationException($"{weapon.Name} has no upgrade mount");
+        return new WeaponLoadout(weapon.Name, [
+            new(mount.Offset, mount.ArcOffset, mount.ArcAngle, mount.Range, weapon, mount.AutoTarget)]);
+    }
+
     public static WeaponLoadout SideShot { get; } = new("Side mounted canister shots", [
         new(new Vector2(-12f, 0f), ArcOffset: -MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun),
         new(new Vector2(12f, 0f), ArcOffset: MathF.PI / 2f, MathF.PI / 4f, 860f, WeaponType.Shotgun)]);

@@ -4,7 +4,8 @@ using Spacevors.Domain.Stats;
 
 namespace Spacevors.Game;
 
-// Ship selection screen: a scrollable vertical list of all defined ships.
+// Ship selection screen: a scrollable vertical list of all defined ships — plus the
+// diagnostics-only Shadow copies when built in diagnostics mode.
 // Browse with mouse wheel or arrow/WASD keys (the highlight auto-scrolls the view);
 // click a card or press Enter to select it. Number keys 1-9 pick directly.
 public sealed class ShipSelectScreen
@@ -27,10 +28,18 @@ public sealed class ShipSelectScreen
     float _scrollOffset;
     float _navTimer;
 
+    // The ships on offer: the real ones, plus the diagnostics copies in diagnostics mode.
+    readonly ShipType[] _ships;
+
+    public ShipSelectScreen(bool diagnostics)
+    {
+        _ships = diagnostics ? [.. ShipType.All, .. ShipType.DiagnosticShips] : ShipType.All;
+    }
+
     // Returns the chosen ship when a selection is made this frame.
     public ShipType? Update(int windowWidth, int windowHeight)
     {
-        var ships = ShipType.All;
+        var ships = _ships;
         SetScroll(_scrollOffset, windowHeight); // re-clamp after window resizes
 
         HandleNavigation(windowHeight, ships.Length);
@@ -67,7 +76,7 @@ public sealed class ShipSelectScreen
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
         Lighting.BeginFrame(0f, 0f, windowWidth, windowHeight);
 
-        var ships = ShipType.All;
+        var ships = _ships;
 
         for (int i = 0; i < ships.Length; i++)
         {
@@ -145,7 +154,7 @@ public sealed class ShipSelectScreen
             SetScroll(_scrollOffset + (cardTop + CardHeight - (ListTopMargin + viewH)), windowHeight);
     }
 
-    float GetContentHeight() => ShipType.All.Length * CardHeight + (ShipType.All.Length - 1) * CardSpacing;
+    float GetContentHeight() => _ships.Length * CardHeight + (_ships.Length - 1) * CardSpacing;
 
     // Top of the first card: centered when everything fits, otherwise shifted up by the scroll offset.
     float GetListTopY(int windowHeight)

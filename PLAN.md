@@ -337,9 +337,17 @@ Implementation (plan: plans/BULLETS_AS_LINES.md):
 - Lasers: `LaserBeam` component (static segment Start→Start+Dir·Length, `DamagePending` flag) — `TurretFiringSystem` fires it instantly at `turret.Range` when `WeaponStats.Hitscan`, `CollisionSystem` damages the **first thing hit only, exactly once**, `EffectSystem` fades the 0.12 s flash, renderer draws the fading line
 - Rendering: ammo draws as the swept line (`DrawLineEx`, thickness = 2·radius) — fast bullets as streaks; when the swept length is no longer than the bullet is wide the line would read as a bar across it, so those draw as a round dot instead
 - New weapons: **Laser Lance** (hitscan sniper), **Prism Lance** (3 parallel beams via `BeamSpacing`), **Ripple Cutter** (short 32-px-wide panic beam), **Cyclotron** (4200 px/s particle stream), **Graviton Burst** (5-pellet accelerator volley), **Flak Curtain** (slow wide flak disc — grazing does the aiming); RailGun sped up 900→2500 px/s
-- Ship loadouts: Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy = machinegun + side shotguns + Flak Curtain; Shadow keeps LoadTestWeapon for load testing; old weapons remain in the milestone upgrade pool
+- Ship loadouts: Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy = machinegun + side shotguns + Flak Curtain, Shadow = Graviton Burst; old weapons remain in the milestone upgrade pool
 - Milestone (every 5th) level-ups now offer 5 random choices instead of 3
 - 24 new tests (box query, closest-point math, tunneling, grazing, earliest-hit order, laser once-only/first-hit/blocking, hitscan firing, milestone choice count); ammo-heavy benchmark stays inside the 8.3 ms budget (CollisionSystem ≈ 7.3 ms at ~15k bullets)
+
+## Shadow weapon test ships — done
+
+Shadow carries a real weapon in normal play; the load-test spray moved to a diagnostics-only Shadow copy, joining one copy per new weapon.
+
+- Shadow = Graviton Burst (Balanced engines, 2 slots); `WeaponLoadout.MountedAsUpgrade(weapon)` builds a one-turret loadout from the weapon's own level-up mount
+- `ShipType.DiagnosticShips`: Shadow hull, engines and graphics carrying Laser Lance, Prism Lance, Ripple Cutter, Cyclotron, Graviton Burst, Flak Curtain and LoadTestWeapon — one weapon each — appended to the select list only under `SPACEVORS_DIAGNOSTIC=1`
+- 4 new tests (Shadow's weapon, clone roster and hull identity, distinct names, every clone fires in a started world)
 
 ## Difficulty scaling
 

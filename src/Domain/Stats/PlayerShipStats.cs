@@ -80,9 +80,9 @@ public readonly record struct ShipType(
     public static ShipType Shadow { get; } = new(
         Name: "Shadow",
         TextureKey: "shadow",
-        Description: "Balanced engines, LoadTestWeapon",
+        Description: "Balanced engines, graviton burst",
         Engine: EngineLayout.Balanced,
-        Weapon: WeaponLoadout.LoadTestWeapon, // Intentionally kept while development is ongoing so manual load testing is easy
+        Weapon: WeaponLoadout.MountedAsUpgrade(WeaponType.GravitonBurst),
         MaxHealth: 10,
         Radius: 58f,
         DrawR: 140,
@@ -92,4 +92,29 @@ public readonly record struct ShipType(
         PickupRadius: 160f);
 
     public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow];
+
+    // Extra ships on the select screen in diagnostics mode (SPACEVORS_DIAGNOSTIC=1): the Shadow
+    // hull, engines and graphics with one weapon each, so any weapon can be play-tested from a
+    // fresh start. LoadTestWeapon lives here now that Shadow carries a real weapon.
+    public static ShipType[] DiagnosticShips { get; } =
+    [
+        ShadowCarrying(WeaponType.LaserLance),
+        ShadowCarrying(WeaponType.PrismLance),
+        ShadowCarrying(WeaponType.RippleCutter),
+        ShadowCarrying(WeaponType.Cyclotron),
+        ShadowCarrying(WeaponType.GravitonBurst),
+        ShadowCarrying(WeaponType.FlakCurtain),
+        // LoadTestWeapon has no upgrade mount, so it keeps its hand-written loadout.
+        ShadowCarrying(WeaponType.LoadTestWeapon, WeaponLoadout.LoadTestWeapon),
+    ];
+
+    // Shadow hull with a single weapon, named after it. The weapon's level-up mount is used
+    // unless a loadout is given for it.
+    static ShipType ShadowCarrying(WeaponType weapon, WeaponLoadout? loadoutOverride = null) =>
+        Shadow with
+        {
+            Name = $"Shadow {weapon.Name}",
+            Description = $"Balanced engines, {weapon.Name}",
+            Weapon = loadoutOverride ?? WeaponLoadout.MountedAsUpgrade(weapon),
+        };
 }

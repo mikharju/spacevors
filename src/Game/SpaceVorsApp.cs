@@ -18,7 +18,7 @@ public static class SpaceVorsApp
         ImageLoader.LoadAssets();
         Lighting.Init();
 
-        var shipSelect = new ShipSelectScreen();
+        var shipSelect = new ShipSelectScreen(Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1");
         GameSession? session = null;
 
         while (!Raylib.WindowShouldClose())
