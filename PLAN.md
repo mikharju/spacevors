@@ -308,13 +308,13 @@ Implementation (plan: plans/DAMAGE_SHADING.md):
 Fast collisions between ships and asteroids (and ships vs ships) deal closing-speed damage; gentle bumps deal none, and one hit can never destroy the initial hull.
 
 Implementation (plan: plans/IMPACT_DAMAGE.md):
-- `ImpactDamage.ForMasses` (Domain/Combat): absorbed energy ½·μ·v² at the contact normal split by inverse-mass share (lighter body absorbs more); zero below 160 px/s closing speed — side-by-side flight and swarm jostling never hurt; quadratic ramp capped at 7 so a single hit leaves 1 hp on the initial 8 hp Scout hull
-- Tuning targets: normal 400 px/s ram ≈ 2 (minor); strong collision at 800 px/s closing (explosion-flung, head-on) ≈ 7 — barely survives; tune constants at the top of `ImpactDamage.cs`
+- `ImpactDamage.ForMasses` (Domain/Combat): absorbed energy ½·μ·v² at the contact normal split by inverse-mass share (lighter body absorbs more); zero below 160 px/s closing speed — side-by-side flight and swarm jostling never hurt; quadratic ramp capped at 3, so one hit costs at most 3 of the initial 8 hp Scout hull
+- Tuning targets: normal 400 px/s ram = 1 (small impact); big collision at 800 px/s closing (explosion-flung, head-on) = 3; retuned down again (was 2/7) — tune constants at the top of `ImpactDamage.cs`
 - Wired into `CollisionSystem.ResolveCollision` using the closing speed and masses the impulse solve already computes (hot-path cost: one compare); damage only on approach, so resting contact never chips hp — no cooldown state
 - Player and enemy ships take damage through the existing per-frame health accumulator, so the existing death pass runs the full kill flow (loot, explosion, sparks) for impact kills; asteroids (no Health) and mines (own contact rule) take none
-- Hits where either body absorbs ≥ 3 damage throw a spark burst (2 + damage/3, cap 6) at the contact point
+- Hits where either body absorbs ≥ 2 damage throw a spark burst (2 + damage/3, cap 6) at the contact point
 - Death graphics render fully: the fatal hit writes `Health(0)` (without it the killing blow from high hp left the hull shading scalar stale and the wreck looked pristine), and game over waits 1.2 s after the player dies — simulation keeps running so holes, ember glow, smoke and sparks play out before the overlay; input stops at death
-- 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, barely-survives calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
+- 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, 1-point ram and 3-point big-impact calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
 
 ## UI polish — done
 
@@ -335,7 +335,7 @@ Implementation (plan: plans/BULLETS_AS_LINES.md):
 - Swept collision: every ammo entity is treated as the segment `[Position − Velocity·dt, Position]` (exact — ammo velocity is constant) inflated by `Ammo.Radius` (now the capsule half-thickness); hit test is segment-vs-circle and the **earliest hit along travel** wins, so no tunneling and grazing width fall out of the same code. Enemy shots can no longer skip over the player either
 - `SpatialGrid.GetQueryItemsInBox` serves the swept segment's AABB; `Vector2.ClosestPointOnSegment` (with projection parameter t) is the shared hit math
 - Lasers: `LaserBeam` component (static segment Start→Start+Dir·Length, `DamagePending` flag) — `TurretFiringSystem` fires it instantly at `turret.Range` when `WeaponStats.Hitscan`, `CollisionSystem` damages the **first thing hit only, exactly once**, `EffectSystem` fades the 0.12 s flash, renderer draws the fading line
-- Rendering: ammo draws as the swept line (`DrawLineEx`, thickness = 2·radius) — slow bullets look like the old dots, fast ones as streaks
+- Rendering: ammo draws as the swept line (`DrawLineEx`, thickness = 2·radius) — fast bullets as streaks; when the swept length is no longer than the bullet is wide the line would read as a bar across it, so those draw as a round dot instead
 - New weapons: **Laser Lance** (hitscan sniper), **Prism Lance** (3 parallel beams via `BeamSpacing`), **Ripple Cutter** (short 32-px-wide panic beam), **Cyclotron** (4200 px/s particle stream), **Graviton Burst** (5-pellet accelerator volley), **Flak Curtain** (slow wide flak disc — grazing does the aiming); RailGun sped up 900→2500 px/s
 - Ship loadouts: Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy = machinegun + side shotguns + Flak Curtain; Shadow keeps LoadTestWeapon for load testing; old weapons remain in the milestone upgrade pool
 - Milestone (every 5th) level-ups now offer 5 random choices instead of 3

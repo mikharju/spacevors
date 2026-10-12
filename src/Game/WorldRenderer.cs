@@ -120,8 +120,7 @@ public static class WorldRenderer
     {
         foreach (var (entity, ammo, pos) in em.GetEntitiesWithComponents<Ammo, Position>())
         {
-            // Same segment the collision system swept: fast bullets draw as streaks,
-            // slow ones as short thick dashes (effectively the old dot).
+            // Same segment the collision system swept: fast bullets draw as streaks.
             Vector2 from = pos.Value - ammo.Velocity * GameSession.FixedDeltaTime;
             var (fromX, fromY) = RenderHelpers.ToScreen(from, camX, camY, windowWidth, windowHeight);
             var (toX, toY) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -130,11 +129,19 @@ public static class WorldRenderer
             if (MathF.Max(fromX, toX) < -extent || MathF.Min(fromX, toX) > windowWidth + extent ||
                 MathF.Max(fromY, toY) < -extent || MathF.Min(fromY, toY) > windowHeight + extent) continue;
 
-            Raylib.DrawLineEx(
-                new System.Numerics.Vector2(fromX, fromY),
-                new System.Numerics.Vector2(toX, toY),
-                MathF.Max(1f, ammo.Radius * 2f),
-                AmmoColorOf(ammo.Color));
+            var color = AmmoColorOf(ammo.Color);
+            float diameter = MathF.Max(1f, ammo.Radius * 2f);
+            float streak = ammo.Velocity.Magnitude * GameSession.FixedDeltaTime;
+
+            // A thick line shorter than it is wide draws as a bar across the bullet, so a bullet
+            // that barely moves in one tick stays a round dot; only fast ones stretch into streaks.
+            if (streak <= diameter) Raylib.DrawCircle((int)toX, (int)toY, ammo.Radius, color);
+            else
+                Raylib.DrawLineEx(
+                    new System.Numerics.Vector2(fromX, fromY),
+                    new System.Numerics.Vector2(toX, toY),
+                    diameter,
+                    color);
         }
     }
 

@@ -28,49 +28,53 @@ public class ImpactDamageTest
     }
 
     [Fact]
-    public void DamageScalesQuadraticallyWithClosingSpeed()
+    public void DamageGrowsQuadraticallyWithClosingSpeed()
     {
-        var (a200, _) = ImpactDamage.ForMasses(10000f, 10000f, 200f);
-        var (a400, _) = ImpactDamage.ForMasses(10000f, 10000f, 400f);
-        Assert.Equal(1, a200);
-        Assert.Equal(4, a400); // double speed = four times the energy
+        // Equal masses: raw damage is 9e-6·v², so doubling the speed quadruples it
+        // (0.81 at 300 → 3.24 at 600). The 0.5 floor and the 3-point cap clip both ends.
+        int DamageAt(float speed) => ImpactDamage.ForMasses(10000f, 10000f, speed).DamageA;
+
+        Assert.Equal(0, DamageAt(200f));
+        Assert.Equal(1, DamageAt(300f));
+        Assert.Equal(2, DamageAt(400f));
+        Assert.Equal(3, DamageAt(500f));
+        Assert.Equal(3, DamageAt(600f)); // capped
     }
 
     [Fact]
     public void LighterBodyAbsorbsMoreDamage()
     {
-        var (light, heavy) = ImpactDamage.ForMasses(3000f, 30000f, 500f);
-        Assert.Equal(6, light);
+        var (light, heavy) = ImpactDamage.ForMasses(3000f, 30000f, 800f);
+        Assert.Equal(3, light);
         Assert.Equal(1, heavy);
     }
 
     [Fact]
     public void DamageIsCappedSoOneHitNeverKillsTheInitialHull()
     {
-        Assert.Equal(7, ImpactDamage.MaxImpactDamage); // 8 hp Scout keeps 1 hp
+        Assert.Equal(3, ImpactDamage.MaxImpactDamage); // 8 hp Scout keeps 5
         var (a, b) = ImpactDamage.ForMasses(PlayerMass, BigAsteroidMass, 5000f);
         Assert.True(a <= ImpactDamage.MaxImpactDamage);
         Assert.True(b <= ImpactDamage.MaxImpactDamage);
     }
 
     [Fact]
-    public void StrongCollision_BarelySurvivesInitialHull()
+    public void StrongCollision_IsThreePointsOfDamage()
     {
         // Scout hull (r=46 -> mass 6648) at 800 px/s closing into a large asteroid:
-        // the strong collision the tuning targets — 8 hp minus damage leaves exactly 1.
+        // the big impact the tuning targets — 3 of its 8 hp.
         var (asteroidDamage, playerDamage) = ImpactDamage.ForMasses(BigAsteroidMass, 6648f, 800f);
-        Assert.Equal(7, playerDamage);
-        Assert.Equal(1, 8 - playerDamage);
+        Assert.Equal(3, playerDamage);
+        Assert.Equal(5, 8 - playerDamage);
         Assert.True(asteroidDamage >= playerDamage); // the (indestructible) rock absorbs at least as much
     }
 
     [Fact]
-    public void FullSpeedRam_IsOnlyMinorDamage()
+    public void FullSpeedRam_IsOnePointOfDamage()
     {
-        // Player top speed is 400 px/s: a normal ram is a medium hit since the
-        // speed doubling moved "strong" to 800 px/s closing.
+        // Player top speed is 400 px/s: the ram a pilot does on purpose is a small hit.
         var (_, playerDamage) = ImpactDamage.ForMasses(BigAsteroidMass, 6648f, 400f);
-        Assert.Equal(2, playerDamage);
+        Assert.Equal(1, playerDamage);
     }
 
     [Fact]
@@ -100,7 +104,7 @@ public class ImpactDamageTest
     {
         var player = em.CreateEntity();
         em.AddComponent(player, new Position(pos));
-        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10, Radius: 46f)); // Scout hull: impact damage depends on mass
         em.AddComponent(player, new Health(hp, 10));
         em.AddComponent(player, new Velocity(vel));
         return player;
@@ -144,9 +148,9 @@ public class ImpactDamageTest
         system.Update(view, 1 / 120f, commands);
         commands.Apply(em);
 
-        // 800 px/s closing, ship mass 3000 vs asteroid 5027: absorbs the capped 7 damage.
-        Assert.Equal(23, em.GetComponent<Health>(ship).Current);
-        Assert.Equal(4, CountSparks(view)); // damage 7 >= SparkDamageThreshold -> 2 + 7/3 sparks
+        // 800 px/s closing, ship mass 3000 vs asteroid 5027: the big impact, 3 damage.
+        Assert.Equal(27, em.GetComponent<Health>(ship).Current);
+        Assert.Equal(3, CountSparks(view)); // damage 3 >= SparkDamageThreshold -> 2 + 3/3 sparks
     }
 
     [Fact]
@@ -193,15 +197,15 @@ public class ImpactDamageTest
         system.Update(view, 1 / 120f, commands);
         commands.Apply(em);
 
-        // 400 px/s closing is a medium hit since the speed doubling: 2 damage.
-        Assert.Equal(8, em.GetComponent<Health>(player).Current);
+        // 400 px/s closing is the ram a pilot does on purpose: one point of damage.
+        Assert.Equal(9, em.GetComponent<Health>(player).Current);
     }
 
     [Fact]
     public void PlayerRamsAsteroid_LethalImpact_PlayerDies()
     {
         var (em, view, system) = Setup();
-        var player = AddPlayer(em, Vector2.Zero, new Vector2(400f, 0f), 2);
+        var player = AddPlayer(em, Vector2.Zero, new Vector2(800f, 0f), 2);
         AddAsteroid(em, new Vector2(30f, 0f), 40f);
 
         var commands = new CommandBuffer();
@@ -248,7 +252,7 @@ public class ImpactDamageTest
         commands.Apply(em);
 
         // Mines keep their own contact rule: the ship absorbs the hit, the mine does not.
-        Assert.Equal(26, em.GetComponent<Health>(ship).Current);
+        Assert.Equal(28, em.GetComponent<Health>(ship).Current);
         Assert.Equal(50, em.GetComponent<Health>(mine).Current);
     }
 }

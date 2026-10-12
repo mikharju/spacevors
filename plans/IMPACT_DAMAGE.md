@@ -12,6 +12,9 @@ strong collision (800 px/s closing into a large asteroid leaves exactly 1 hp).
 Also fixed: the fatal hit now writes `Health(0)` (the stale high value left the hull
 shading rendering a pristine wreck), and game over is delayed 1.2 s after the player
 dies so the damage graphics play out before the overlay.
+Retuned softer again (2026-10-12): `ImpactScale` 1.8e-8 → 7.2e-9 and `MaxImpactDamage`
+7 → 3, so a big impact (800 px/s closing) costs 3 hp and a full-speed 400 px/s ram costs
+1. `SparkDamageThreshold` 3 → 2 keeps sparks firing on the same physical hits as before.
 Feel tuning of the constants may still want further playtesting.
 
 ## Requirements (from the request)
@@ -70,10 +73,10 @@ if damage < 0.5 → 0, else round up; clamp to MaxImpactDamage
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `MinClosingSpeed` | 80 px/s | below: zero damage (enemy chase speeds are ≤ 90, closing speeds in jostling are far below) |
-| `ImpactScale` | 4.6e-8 | damage per unit of absorbed energy — calibrated by the table below |
-| `MaxImpactDamage` | 15 | per hit per body — a RailGun shot, the "nothing worse than a rail-gun hit" cap |
-| `ImpactSparkDamage` | 3 | a body taking ≥ this gets a spark burst at the contact point |
+| `MinClosingSpeed` | 160 px/s | below: zero damage (enemy chase speeds are ≤ 90, closing speeds in jostling are far below) |
+| `ImpactScale` | 7.2e-9 | damage per unit of absorbed energy — calibrated by the table below |
+| `MaxImpactDamage` | 3 | per hit per body — one hit is never lethal on the 8 hp Scout hull |
+| `SparkDamageThreshold` | 2 | a body taking ≥ this gets a spark burst at the contact point |
 
 ### Calibration table (what a human should feel)
 
@@ -81,16 +84,16 @@ if damage < 0.5 → 0, else round up; clamp to MaxImpactDamage
 |---|---|---|
 | Two enemies jostling while chasing | ~30 | 0 |
 | Enemy drifts into an asteroid while patrolling | ~60 | 0 |
-| Player gently backs into an asteroid | ~85 | 0–1 |
-| Interceptor (3000) rams player head-on (490) | 490 | player ~3, interceptor ~10 |
-| Player full-ram into a large asteroid (400) | 400 | player ~4 |
-| Player full-ram into a small pebble | 400 | player ~1 (pebble absorbs the hit) |
-| Player flung at 800 px/s by an explosion into an asteroid | 800 | ~15 → lethal |
+| Player gently backs into an asteroid | ~85 | 0 |
+| Interceptor (3000) rams player head-on | 490 | player 1, interceptor 2 |
+| Player full-ram into a large asteroid | 400 | player 1 (the small impact) |
+| Player full-ram into a small pebble | 400 | 0 (too little energy to matter) |
+| Player flung at 800 px/s by an explosion into an asteroid | 800 | 3 (the big impact) |
 
 ### Sparks
 
 One burst per collision (not per body) at the contact point
-(`aPos + normal · aRadius`), when either body's damage ≥ `ImpactSparkDamage`:
+(`aPos + normal · aRadius`), when either body's damage ≥ `SparkDamageThreshold`:
 `2 + damage/3` sparks (cap 6) through the existing `SpawnSpark`. Heavy hits also read
 through the already-shipped hull damage shading and smoke as hp drops.
 
