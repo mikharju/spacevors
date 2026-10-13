@@ -666,4 +666,42 @@ public class CollisionSystemTests
         view.GetEntitiesWithComponents<Player, Health>().TryFirst(out var playerTuple);
         Assert.Equal(8, playerTuple.Value2.Current);
     }
+
+    // Regression: a query buffer that is too small makes the grid drop candidates, and a dropped
+    // candidate is a missed collision. All 600 mines sit in one grid cell and overlap the asteroid,
+    // so every one must be resolved even though the initial buffer holds far fewer.
+    [Fact]
+    public void MineVsAsteroid_DenseCluster_EveryOverlappingMineResolved()
+    {
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(64f, 64f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 30f));
+
+        var rng = new Random(5);
+        var mines = new List<Entity>();
+        for (int i = 0; i < 600; i++)
+        {
+            double angle = rng.NextDouble() * MathF.PI * 2;
+            float dist = 5f + (float)rng.NextDouble() * 20f;
+            var mine = em.CreateEntity();
+            em.AddComponent(mine, new Position(new Vector2(64f + (float)(Math.Cos(angle) * dist), 64f + (float)(Math.Sin(angle) * dist))));
+            em.AddComponent(mine, new EnemyMine(MineSize.Small, Speed: 0f, Angle: 0f));
+            em.AddComponent(mine, new Health(1, 1));
+            mines.Add(mine);
+        }
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        int corrected = commands.Commands
+            .OfType<AddComponentCommand<Position>>()
+            .Select(c => c.TargetEntity)
+            .Where(mines.Contains)
+            .Distinct()
+            .Count();
+
+        Assert.Equal(mines.Count, corrected);
+    }
 }

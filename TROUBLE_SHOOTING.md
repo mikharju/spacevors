@@ -158,6 +158,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Under llvmpipe the game renders at ~4 fps (250 ms/frame). raylib samples input once per frame, so a press+release pair that completes between two polls is in neither one. Nothing is queued and nothing is reported.
 - **Fix / Prevention**: Hold keys and buttons longer than a frame; `.tools/input.sh key|click` does `keydown; sleep 0.4; keyup`. Do not use bare `xdotool key`/`click` against this game.
 
+## 28. `PerformanceBenchmark` frame-budget failures are timing noise, not proof your change regressed perf
+
+- **Symptom**: A full `dotnet test` run fails with "5k ammo + 100 ships: average frame time 12.55ms exceeds budget 8.33ms" right after adding tests, while the same test passes on the untouched tree and passes again on re-run.
+- **Cause**: That scenario measures 7.9-8.1 ms against an 8.33 ms budget, so it fails whenever the machine is busy (parallel test collections, cold JIT on the first run after a build). The reported number is not reproducible run to run.
+- **Fix / Prevention**: Before blaming a change for a benchmark failure, re-run the benchmark alone (`dotnet test src/Tests/Tests.csproj --filter "FullyQualifiedName~PerformanceBenchmark"`) three times with the change and three times with it stashed, and compare the same scenario line. Only a stable difference across runs counts.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.
