@@ -140,7 +140,7 @@ Enemy variants (stats in `EnemyShipType`, all ammo does 1 damage):
 - Interceptor: radius 45px, speed 90, high acceleration (85), low fire rate (0.6/s), 2 hp
 - Heavy Cannon: radius 78px, slow (speed 50), slow ammo (160 px/s), fire rate 0.8/s, 5 hp
 - Standard: radius 20px, speed 65, acceleration 45, baseline fire rate (1.5/s), 3 hp
-- All three spawn equally (~33% each); enemy turret ammo does 1 damage at base (time-based tiers in Phase 4d add on top)
+- All three spawn equally (~33% each); enemy turret ammo does 1 damage at base (time-based tiers in Phase 4d add on top). A fourth type joined later — see *Skirmisher enemy variant — done* for the current mix
 
 ## Phase 4d
 
@@ -348,6 +348,17 @@ Shadow carries a real weapon in normal play; the load-test spray moved to a diag
 - Shadow = Graviton Burst (Balanced engines, 2 slots); `WeaponLoadout.MountedAsUpgrade(weapon)` builds a one-turret loadout from the weapon's own level-up mount
 - `ShipType.DiagnosticShips`: Shadow hull, engines and graphics carrying Laser Lance, Prism Lance, Ripple Cutter, Cyclotron, Graviton Burst, Flak Curtain and LoadTestWeapon — one weapon each — appended to the select list only under `SPACEVORS_DIAGNOSTIC=1`
 - 4 new tests (Shadow's weapon, clone roster and hull identity, distinct names, every clone fires in a started world)
+
+## Skirmisher enemy variant — done
+
+Fourth enemy archetype — a light, fast pursuer added as pure `EnemyShipType` data: no new system, AI, component or dependency.
+
+- `EnemyShipType.Skirmisher` (GraphicsId 3, texture key `skirmisher`): radius 15px, speed 105, turn rate 1.6, acceleration 100, firing range 500px (presses closer than the other three before stopping to shoot), fire rate 0.5/s, 5 hp — smallest, quickest and frailest hull; Standard stays tougher at 15 hp
+- Behavior stays the existing chase AI; the Phase 4d time-based tiers apply untouched because the type flows through `EnemyShipFactory` (HP ×, damage +, fire rate ×) on both spawn paths (`CreateComponents` for the spawner, `AddComponents` for the initial world)
+- Spawn balance: `SpawnWeight` 0.5 against 1 for the other three → Skirmisher ~14% of spawns, each existing type 33% → ~29%; the relative mix of the original three is unchanged and the half weight keeps a fast pursuer from flooding the field
+- `PickRandomType` still consumes exactly one RNG draw per call, so the shared world RNG stream (spawn direction → type → interval) stays deterministic (`WorldRngTest`)
+- No sprite asset yet: `EnemyShipRenderer` resolves the unknown `skirmisher` key to the shared placeholder hull, so it renders correctly before art exists
+- 10 new tests (`EnemySkirmisherTest`, plus Skirmisher tier assertions in `EnemyTierStatsTest`): stat contract against Standard, registration + unique graphics ids/texture keys, factory components on both paths, tier scaling at every tier, weighted pick share, one draw per pick, and an off-screen Skirmisher through `EnemyShipSpawnSystem`
 
 ## Difficulty scaling
 

@@ -57,6 +57,11 @@ public class EnemyTierStatsTest
         var (hpHeavy, turretHeavy) = Spawn(EnemyShipType.HeavyCannon, 120f);
         Assert.Equal(ExpectedHealth(EnemyShipType.HeavyCannon, 2), hpHeavy);
         Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2), turretHeavy.Weapon.Damage);
+
+        var (hpSkirm, turretSkirm) = Spawn(EnemyShipType.Skirmisher, 120f);
+        Assert.Equal(ExpectedHealth(EnemyShipType.Skirmisher, 2), hpSkirm);
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2), turretSkirm.Weapon.Damage);
+        Assert.Equal(ExpectedFireRate(EnemyShipType.Skirmisher, 2), turretSkirm.Weapon.FireRate, precision: 3);
     }
 
     [Fact]

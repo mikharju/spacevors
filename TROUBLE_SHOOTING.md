@@ -158,6 +158,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: Under llvmpipe the game renders at ~4 fps (250 ms/frame). raylib samples input once per frame, so a press+release pair that completes between two polls is in neither one. Nothing is queued and nothing is reported.
 - **Fix / Prevention**: Hold keys and buttons longer than a frame; `.tools/input.sh key|click` does `keydown; sleep 0.4; keyup`. Do not use bare `xdotool key`/`click` against this game.
 
+## 28. `X Error: BadDrawable` in the game log is screenshot-tool noise, not a crash
+
+- **Symptom**: While driving the game through the `.tools/` recipe, `.tools/run/app.log` ends with `X Error: BadDrawable / Request Major code 14` and the game job exits with code 1 after `stop.sh`, which reads like the game crashed mid-run.
+- **Cause**: The F12 screenshot path (and `xdotool windowfocus --sync`) destroys X drawables the GLFW window still references; X11 reports the protocol error asynchronously to raylib's error handler and keeps running. `stop.sh` closes the window, which the harness reports as a non-zero job exit.
+- **Fix / Prevention**: Treat that error as noise. Verify liveness with `xdotool search --class SpaceVors` (a window id means the game is alive) and with a fresh `.tools/shot.sh` capture, which still succeeds after it. Only a missing window plus a Python/`Unhandled` stack trace in the log is a real crash.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.
