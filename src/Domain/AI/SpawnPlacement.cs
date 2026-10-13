@@ -7,13 +7,20 @@ public static class SpawnPlacement
     public const float MinDirectionalSpeed = 0.1f;
     private const float ForwardConeHalfAngle = MathF.PI / 4f;
 
-    // Point just outside the screen rectangle (centered on `center`) along unit vector `direction`.
+    // Point just outside the screen rectangle (centered on `center`) along `direction`.
+    // Any nonzero finite direction works; its length is irrelevant. A zero-length or
+    // non-finite direction has no defined ray: falls back to the right edge, same margin.
     public static Vector2 OutsideScreen(Vector2 center, Vector2 viewportSize, Vector2 direction)
     {
         var half = viewportSize * 0.5f + new Vector2(ScreenMargin, ScreenMargin);
-        float tx = half.X / Math.Abs(direction.X);
-        float ty = half.Y / Math.Abs(direction.Y);
-        return center + direction * Math.Min(tx, ty);
+        float length = direction.Magnitude;
+        if (length == 0f || !float.IsFinite(length))
+            return center + new Vector2(half.X, 0f);
+
+        var unit = direction / length;
+        float tx = half.X / Math.Abs(unit.X);
+        float ty = half.Y / Math.Abs(unit.Y);
+        return center + unit * Math.Min(tx, ty);
     }
 
     // Random unit vector within +/-45 degrees of `velocityDir`.

@@ -43,6 +43,97 @@ public class OffScreenSpawnTest
     }
 
     [Fact]
+    public void OutsideScreen_ZeroDirection_FallsBackToRightEdge()
+    {
+        var viewport = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, Vector2.Zero);
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"non-finite result {p}");
+        Assert.Equal(viewport.X * 0.5f + SpawnPlacement.ScreenMargin, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+    }
+
+    [Fact]
+    public void OutsideScreen_ZeroDirection_FallbackIsRelativeToCenter()
+    {
+        var center = new Vector2(120f, -45f);
+        var viewport = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(center, viewport, Vector2.Zero);
+
+        Assert.Equal(center.X + viewport.X * 0.5f + SpawnPlacement.ScreenMargin, p.X, 3);
+        Assert.Equal(center.Y, p.Y, 3);
+    }
+
+    [Theory]
+    [InlineData(float.NaN, 0f)]
+    [InlineData(0f, float.NaN)]
+    [InlineData(float.NaN, float.NaN)]
+    [InlineData(float.PositiveInfinity, 0f)]
+    [InlineData(float.PositiveInfinity, float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity, float.NegativeInfinity)]
+    public void OutsideScreen_NonFiniteDirection_FallsBackToRightEdge(float x, float y)
+    {
+        var viewport = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(x, y));
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"non-finite result {p}");
+        Assert.Equal(viewport.X * 0.5f + SpawnPlacement.ScreenMargin, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+    }
+
+    [Fact]
+    public void OutsideScreen_AxisAlignedDirections_SitOnMargin()
+    {
+        var viewport = new Vector2(800f, 600f);
+        float halfW = viewport.X * 0.5f + SpawnPlacement.ScreenMargin;
+        float halfH = viewport.Y * 0.5f + SpawnPlacement.ScreenMargin;
+
+        AssertNear(new Vector2(halfW, 0f), SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(1f, 0f)));
+        AssertNear(new Vector2(-halfW, 0f), SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(-1f, 0f)));
+        AssertNear(new Vector2(0f, halfH), SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(0f, 1f)));
+        AssertNear(new Vector2(0f, -halfH), SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(0f, -1f)));
+    }
+
+    [Fact]
+    public void OutsideScreen_NearZeroDirection_MatchesExactDirection()
+    {
+        var viewport = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(1e-20f, 1e-20f));
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"non-finite result {p}");
+        AssertNear(SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(1f, 1f)), p);
+    }
+
+    [Fact]
+    public void OutsideScreen_SubnormalDirection_TreatedAsZeroLength()
+    {
+        // Magnitude of (float.Epsilon, float.Epsilon) underflows to 0: treated as zero-length, right-edge fallback.
+        var viewport = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, new Vector2(float.Epsilon, float.Epsilon));
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"non-finite result {p}");
+        Assert.Equal(viewport.X * 0.5f + SpawnPlacement.ScreenMargin, p.X, 3);
+        Assert.Equal(0f, p.Y, 3);
+    }
+
+    [Fact]
+    public void OutsideScreen_DirectionLengthDoesNotMatter()
+    {
+        var viewport = new Vector2(800f, 600f);
+        var dir = new Vector2(0.6f, -0.8f);
+
+        AssertNear(
+            SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, dir),
+            SpawnPlacement.OutsideScreen(Vector2.Zero, viewport, dir * 123.456f));
+    }
+
+    private static void AssertNear(Vector2 expected, Vector2 actual)
+    {
+        Assert.Equal(expected.X, actual.X, 3);
+        Assert.Equal(expected.Y, actual.Y, 3);
+    }
+
+    [Fact]
     public void ForwardDirection_StaysWithinForwardCone()
     {
         var rng = new Random(7);
