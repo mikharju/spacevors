@@ -43,6 +43,101 @@ public class OffScreenSpawnTest
     }
 
     [Fact]
+    public void OutsideScreen_ZeroDirection_FallsBackToRightEdgeWithoutNaN()
+    {
+        var viewports = new[] { new Vector2(1920f, 1024f), new Vector2(800f, 600f) };
+
+        foreach (var vp in viewports)
+        {
+            var p = SpawnPlacement.OutsideScreen(Vector2.Zero, vp, Vector2.Zero);
+            float halfW = vp.X * 0.5f;
+            float halfH = vp.Y * 0.5f;
+
+            Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"zero direction gave non-finite point {p}");
+            AssertNear(new Vector2(halfW + SpawnPlacement.ScreenMargin, 0f), p, "zero direction fallback");
+            Assert.False(IsInside(p, halfW, halfH), $"zero direction spawned inside the screen at {p}");
+        }
+    }
+
+    [Fact]
+    public void OutsideScreen_ZeroDirection_FallbackIsRelativeToCenter()
+    {
+        var center = new Vector2(500f, -300f);
+        var p = SpawnPlacement.OutsideScreen(center, new Vector2(800f, 600f), Vector2.Zero);
+
+        AssertNear(new Vector2(500f + 400f + SpawnPlacement.ScreenMargin, -300f), p, "centered fallback");
+    }
+
+    [Theory]
+    [InlineData(0.0, 0.0)]
+    [InlineData(double.NaN, 0.0)]
+    [InlineData(0.0, double.NaN)]
+    [InlineData(double.NaN, double.NaN)]
+    [InlineData(double.PositiveInfinity, 0.0)]
+    [InlineData(0.0, double.PositiveInfinity)]
+    [InlineData(double.PositiveInfinity, double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity, 1.0)]
+    [InlineData(1.0, double.NegativeInfinity)]
+    public void OutsideScreen_DirectionWithoutUsableRay_FallsBackToFinitePointOutsideScreen(double dx, double dy)
+    {
+        var vp = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2((float)dx, (float)dy));
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), $"direction ({dx}, {dy}) gave non-finite point {p}");
+        Assert.False(IsInside(p, vp.X * 0.5f, vp.Y * 0.5f), $"direction ({dx}, {dy}) spawned inside the screen at {p}");
+    }
+
+    [Fact]
+    public void OutsideScreen_DirectionSoSmallItUnderflows_IsTreatedAsZero()
+    {
+        var vp = new Vector2(800f, 600f);
+        var p = SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2(1e-30f, 1e-30f));
+
+        Assert.True(float.IsFinite(p.X) && float.IsFinite(p.Y), "underflowing direction gave a non-finite point");
+        AssertNear(new Vector2(400f + SpawnPlacement.ScreenMargin, 0f), p, "underflowing direction fallback");
+    }
+
+    [Fact]
+    public void OutsideScreen_SmallAndNonUnitDirections_MatchTheirNormalizedDirection()
+    {
+        var vp = new Vector2(800f, 600f);
+
+        var directions = new[]
+        {
+            new Vector2(1f, 1f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(1e-4f, 1e-4f),
+            new Vector2(-3f, 3f)
+        };
+
+        foreach (var dir in directions)
+        {
+            var p = SpawnPlacement.OutsideScreen(Vector2.Zero, vp, dir);
+            AssertNear(SpawnPlacement.OutsideScreen(Vector2.Zero, vp, dir.Normalized), p, $"direction {dir}");
+            Assert.False(IsInside(p, vp.X * 0.5f, vp.Y * 0.5f), $"direction {dir} spawned inside the screen at {p}");
+        }
+    }
+
+    [Fact]
+    public void OutsideScreen_AxisDirections_LandOnEdgeMidpoints()
+    {
+        var vp = new Vector2(800f, 600f);
+        float edgeX = 400f + SpawnPlacement.ScreenMargin;
+        float edgeY = 300f + SpawnPlacement.ScreenMargin;
+
+        AssertNear(new Vector2(edgeX, 0f), SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2(1f, 0f)), "+X");
+        AssertNear(new Vector2(-edgeX, 0f), SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2(-1f, 0f)), "-X");
+        AssertNear(new Vector2(0f, edgeY), SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2(0f, 1f)), "+Y");
+        AssertNear(new Vector2(0f, -edgeY), SpawnPlacement.OutsideScreen(Vector2.Zero, vp, new Vector2(0f, -1f)), "-Y");
+    }
+
+    private static void AssertNear(Vector2 expected, Vector2 actual, string what)
+    {
+        Assert.True(Math.Abs(actual.X - expected.X) < Eps && Math.Abs(actual.Y - expected.Y) < Eps,
+            $"{what}: expected {expected}, got {actual}");
+    }
+
+    [Fact]
     public void ForwardDirection_StaysWithinForwardCone()
     {
         var rng = new Random(7);

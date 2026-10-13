@@ -8,9 +8,16 @@ public static class SpawnPlacement
     private const float ForwardConeHalfAngle = MathF.PI / 4f;
 
     // Point just outside the screen rectangle (centered on `center`) along unit vector `direction`.
+    // A direction with no usable ray (zero-length, or non-finite components) falls back to the
+    // right edge: the result is always a finite point outside the screen, never NaN.
     public static Vector2 OutsideScreen(Vector2 center, Vector2 viewportSize, Vector2 direction)
     {
         var half = viewportSize * 0.5f + new Vector2(ScreenMargin, ScreenMargin);
+
+        float length = direction.Magnitude;
+        if (length == 0f || !float.IsFinite(length))
+            return center + new Vector2(half.X, 0f);
+
         float tx = half.X / Math.Abs(direction.X);
         float ty = half.Y / Math.Abs(direction.Y);
         return center + direction * Math.Min(tx, ty);
