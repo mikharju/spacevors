@@ -349,6 +349,16 @@ Shadow carries a real weapon in normal play; the load-test spray moved to a diag
 - `ShipType.DiagnosticShips`: Shadow hull, engines and graphics carrying Laser Lance, Prism Lance, Ripple Cutter, Cyclotron, Graviton Burst, Flak Curtain and LoadTestWeapon — one weapon each — appended to the select list only under `SPACEVORS_DIAGNOSTIC=1`
 - 4 new tests (Shadow's weapon, clone roster and hull identity, distinct names, every clone fires in a started world)
 
+## Skirmisher enemy ship — done
+
+A fourth enemy archetype: lightweight, fast pursuer, fragile.
+
+- `EnemyShipType.Skirmisher` (GraphicsId 3, texture key `skirmisher`): radius 16, speed 110 (fastest), acceleration 90, fire rate 1.0/s, 5 hp — less than Standard's 15. No new AI: the existing `EnemyShipSystem` chase/drift-cancel drives it; its speed cap (2× base) and cull rules apply unchanged
+- Added to `EnemyShipType.All` with the default equal `SpawnWeight` → all four types now spawn ~25% each (was ~33% each for the three). `PickRandomType` still draws exactly once per spawn, so world-RNG ownership and determinism are unchanged (`WorldRngTest` passes)
+- No sprite asset yet: `EnemyShipRenderer` falls back to the generic fallback ship for the unknown texture key — no rendering changes
+- Time-based tiers apply automatically via `EnemyShipFactory` (HP ×(1+0.25·tier), fire rate ×(1+0.1·tier))
+- Tests: `EnemySkirmisherTest` (base stats vs Standard, graphics-id registration, pick determinism + equal-weight shares, factory components, spawn-system integration with tiered hp) + Skirmisher tier assertions in `EnemyTierStatsTest`
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

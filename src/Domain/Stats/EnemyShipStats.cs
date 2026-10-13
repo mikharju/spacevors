@@ -17,8 +17,10 @@ public readonly record struct EnemyShipType(
     public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 15);
     public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 7);
     public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 30);
+    // Lightweight fast pursuer: fastest and smallest ship, fragile (less hp than Standard).
+    public static EnemyShipType Skirmisher { get; } = new(3, "skirmisher", 16f, 110f, 1.0f, 700f, 1.0f, 200f, 90.0f, 5);
 
-    public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon];
+    public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon, Skirmisher];
 
     public static EnemyShipType? FromGraphicsId(byte graphicsId) => graphicsId < All.Length ? All[graphicsId] : null;
 }
