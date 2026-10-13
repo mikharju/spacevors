@@ -26,6 +26,54 @@ public class PerformanceBenchmark
         }
     }
 
+    // SpatialGrid microbenchmark: hot-path small queries and a large-radius scan.
+    // Budgets are ~10x the measured cost on dev hardware — tripwires for pathological
+    // regressions (e.g. per-query allocations), not tight performance targets.
+    [Fact]
+    public void SpatialGrid_QueryThroughput()
+    {
+        const int entityCount = 10_000;
+        const int smallQueryCount = 20_000;
+        const int largeQueryCount = 200;
+        const double smallBudgetMs = 60.0;
+        const double largeBudgetMs = 60.0;
+
+        var rng = new Random(42);
+        var grid = new SpatialGrid(128f);
+        var positions = new Vector2[entityCount];
+        for (int i = 0; i < entityCount; i++)
+        {
+            positions[i] = new Vector2((float)(rng.NextDouble() - 0.5) * 12800f, (float)(rng.NextDouble() - 0.5) * 12800f);
+            grid.Insert(new Entity(i + 1), SpatialGrid.CollisionKind.Asteroid, positions[i], 10f);
+        }
+
+        var results = new SpatialGrid.SpatialItem[256];
+        int touched = 0;
+
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < smallQueryCount; i++)
+            touched += grid.GetQueryItems(positions[i % entityCount], 20f, results, out _);
+        sw.Stop();
+        double smallMs = sw.Elapsed.TotalMilliseconds;
+
+        var swLarge = Stopwatch.StartNew();
+        for (int i = 0; i < largeQueryCount; i++)
+            touched += grid.GetQueryItems(new Vector2(i * 7f, i * 13f), 1500f, results, out _);
+        swLarge.Stop();
+        double largeMs = swLarge.Elapsed.TotalMilliseconds;
+
+        Assert.True(touched > 0);
+        Console.WriteLine();
+        Console.WriteLine("=== SpatialGrid query throughput ===");
+        Console.WriteLine($"  {($"Small queries ({smallQueryCount}x, r=20)"),-35} {smallMs,6:F2}ms");
+        Console.WriteLine($"  {($"Large queries ({largeQueryCount}x, r=1500)"),-35} {largeMs,6:F2}ms");
+
+        if (smallMs >= smallBudgetMs)
+            Assert.Fail($"SpatialGrid: {smallQueryCount} small queries took {smallMs:F2}ms, budget {smallBudgetMs:F0}ms");
+        if (largeMs >= largeBudgetMs)
+            Assert.Fail($"SpatialGrid: {largeQueryCount} large queries took {largeMs:F2}ms, budget {largeBudgetMs:F0}ms");
+    }
+
     private void RunScenario(string name, int ammoCount, int shipCount, int asteroidCount, int mineCount, bool mustMeetBudget)
     {
         const int iterations = 3;
