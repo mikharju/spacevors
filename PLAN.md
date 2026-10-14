@@ -376,6 +376,13 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - `src/ScenarioBench` — sim-only host, no Raylib. Verified in the sandbox: `ammo-spray-miss` with 7,000 bullets, 1.23 ms median per tick, 236 ns/entity.
 - No warm-up phase by decision: cold JIT is handled by discarding the first whole run (`--iters N` runs N+1) and the first frame of each pooled run.
 
+## Render cost: shape batching — done
+
+- The baselines settled where the frame goes: ~**1.1 µs per drawn shape** (sparks, bullets, explosions — measured six times across three scenarios), i.e. the cost is per GL draw call, not per entity or pixel. `world.sparks` is 58% of `ammo-spray` render and 78% of `impact-storm`; sim is 6-11%.
+- `Game/ShapeBatch.cs` accumulates the same geometry between `Rlgl.Begin(DrawMode.Triangles)`/`Rlgl.End()` with per-vertex colour, closing every 16k vertices. The five shape passes (`ammo`, `sparks`, `healSparks`, `explosions`, `smoke`) now emit into it instead of calling `Raylib.DrawCircle`/`DrawLineEx` per entity.
+- Sandbox effect (llvmpipe): `world.ammo` 15.6 ms → 0.42 ms, `world.sparks` 1.07 ms for ~7k particles; `present` is now the largest sandbox pass.
+- Open: re-take the real-GPU baselines (`--update-baseline`) and confirm the passes on a real display — the sandbox cannot show the visual result honestly.
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

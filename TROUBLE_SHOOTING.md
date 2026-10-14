@@ -204,6 +204,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: The seeder used `RandomInDisc(radius, rng)`, which was `(rand*2-1)*radius` on each axis — a square of ±radius, so its corners sit at 1.41 radius, outside the rock. Nothing in the trace revealed it: the count was flat and the cost plausible. A geometric helper written to be plausible rather than checked.
 - **Fix / Prevention**: Place seeded particles at the entry points solved from the seeded bullets' own rays, so the impact area is derived from the stream rather than assumed from the target's bounding circle. Guard the property directly (`SeededParticles_SitOnTheRockTheStreamHits`: every seeded particle must touch an asteroid). Two lessons: sample a shape by the shape, and when a rendering/scenario output looks wrong, *look at it* — cost traces cannot see placement. Also watch tolerance units: adding a pixel slack to a squared distance is 1000× too tight.
 
+## 33. raylib shape draws are one GL call each, and in-game screenshots land in the process cwd
+
+- **Symptom**: (a) `world.sparks`/`world.ammo` dominated the render total with cost proportional to entity count and nothing else. (b) Three attempts to screenshot a scenario window with `.tools/shot.sh` all reported "no screenshot written", while screenshots were in fact being produced.
+- **Cause**: (a) `Raylib.DrawCircle`/`DrawLineEx` flush raylib's 2D render batch and issue their own draw call per shape, ~1.1 µs each on a real GPU. Nothing in the entity counts or system traces shows this — only per-pass render timing does. (b) `TakeScreenshot` writes to the *process* cwd: `.tools/run/` for `game.sh`, but `.tools/run/scenario-<name>-<utc>/` for `scenario.sh`, which `shot.sh` did not search. Separately, `xdotool key --window <id>` does not reach raylib at all (GLFW ignores sent events); the key must go to the focused window via XTEST.
+- **Fix / Prevention**: Batch shapes into one `Rlgl.Begin(DrawMode.Triangles)` … `Rlgl.End()` block (`Game/ShapeBatch.cs`) with per-vertex colour. `shot.sh` now searches the whole `.tools/run` tree for the newest screenshot. When a screenshot tool reports nothing, check where the *program's* cwd is before assuming the capture failed.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

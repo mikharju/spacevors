@@ -12,12 +12,17 @@ run="$_TOOLS/run"
 wid="$(xdotool search --class SpaceVors | head -1)"
 [ -n "$wid" ] || { echo "no SpaceVors window running (start .tools/game.sh)" >&2; exit 1; }
 
-rm -f "$run"/screenshot*.png
+# The game writes screenshots into its own working directory, which is .tools/run for game.sh but
+# .tools/run/scenario-<name>-<utc> for scenario.sh, so search the whole tree.
+clear_shots() { find "$run" -name 'screenshot*.png' -delete 2>/dev/null; }
+newest_shot() { find "$run" -name 'screenshot*.png' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-; }
+
+clear_shots
 for _ in 1 2 3; do
     xdotool windowfocus --sync "$wid"
     xdotool key --clearmodifiers F12
     for _ in $(seq 20); do
-        shot="$(ls -1t "$run"/screenshot*.png 2>/dev/null | head -1)"
+        shot="$(newest_shot)"
         [ -n "$shot" ] && break
         sleep 0.2
     done
@@ -27,5 +32,5 @@ done
 
 mkdir -p "$_TOOLS/shots"
 mv "$shot" "$_TOOLS/shots/$name.png"
-rm -f "$run"/screenshot*.png
+clear_shots
 md5sum "$_TOOLS/shots/$name.png"

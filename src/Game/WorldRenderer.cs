@@ -134,6 +134,7 @@ public static class WorldRenderer
 
     private static void DrawAmmo(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        ShapeBatch.Begin();
         foreach (var (entity, ammo, pos) in em.GetEntitiesWithComponents<Ammo, Position>())
         {
             // Same segment the collision system swept: fast bullets draw as streaks.
@@ -151,14 +152,15 @@ public static class WorldRenderer
 
             // A thick line shorter than it is wide draws as a bar across the bullet, so a bullet
             // that barely moves in one tick stays a round dot; only fast ones stretch into streaks.
-            if (streak <= diameter) Raylib.DrawCircle((int)toX, (int)toY, ammo.Radius, color);
+            if (streak <= diameter) ShapeBatch.AddCircle(toX, toY, ammo.Radius, color);
             else
-                Raylib.DrawLineEx(
+                ShapeBatch.AddStreak(
                     new System.Numerics.Vector2(fromX, fromY),
                     new System.Numerics.Vector2(toX, toY),
                     diameter,
                     color);
         }
+        ShapeBatch.End();
     }
 
     public static Color AmmoColorOf(AmmoColor color) => color switch
@@ -196,6 +198,7 @@ public static class WorldRenderer
 
     private static void DrawExplosions(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        ShapeBatch.Begin();
         foreach (var (entity, explosion, pos) in em.GetEntitiesWithComponents<Explosion, Position>())
         {
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -226,12 +229,14 @@ public static class WorldRenderer
                 color = new Color(255, 140, 30, alpha);
             }
 
-            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(currentRadius, 1f), color);
+            ShapeBatch.AddCircle(cx, cy, currentRadius, color);
         }
+        ShapeBatch.End();
     }
 
     private static void DrawDamageSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        ShapeBatch.Begin();
         foreach (var (entity, spark, pos) in em.GetEntitiesWithComponents<DamageSpark, Position>())
         {
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -246,8 +251,9 @@ public static class WorldRenderer
             int b = 0;
             int alpha = (int)(lifeRatio * 255);
 
-            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(r, g, b, alpha));
+            ShapeBatch.AddCircle(cx, cy, size, new Color(r, g, b, alpha));
         }
+        ShapeBatch.End();
     }
 
     private static void DrawTurrets(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
@@ -341,6 +347,7 @@ public static class WorldRenderer
 
     private static void DrawHealSparks(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        ShapeBatch.Begin();
         foreach (var (entity, spark, pos) in em.GetEntitiesWithComponents<HealSpark, Position>())
         {
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -352,12 +359,14 @@ public static class WorldRenderer
 
             int alpha = (int)(lifeRatio * 255);
 
-            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
+            ShapeBatch.AddCircle(cx, cy, size, new Color(50, 255, 100, alpha));
         }
+        ShapeBatch.End();
     }
 
     private static void DrawSmokePuffs(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        ShapeBatch.Begin();
         foreach (var (entity, puff, pos) in em.GetEntitiesWithComponents<SmokePuff, Position>())
         {
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -369,8 +378,9 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
 
             int alpha = (int)(SmokeAlphaMax * lifeRatio);
-            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
+            ShapeBatch.AddCircle(cx, cy, radius, new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
         }
+        ShapeBatch.End();
     }
 
     private static void DrawDebugMarkers(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
