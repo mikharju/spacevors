@@ -14,8 +14,10 @@ import numpy as np
 ROW = re.compile(r"\[PERF\] (.*)$")
 FIELD = re.compile(r"(\w+)=(-?[\d.]+)")
 BEGIN = re.compile(r"\[PERF-BEGIN\] scenario=(\S+) .*budgetFrameMs=([\d.]+)")
+PASS = re.compile(r"\[RENDER-PASS\] ([\w.]+): ([\d.]+)ms")
 SECONDS = ["dt", "sim", "apply", "render", "other"]
 COUNTS = ["ents", "ammo", "sparks", "explosions", "beams", "mines", "ships", "asteroids", "pickups"]
+GC = ["gen0", "gen1", "gen2"]
 
 
 def read_frames(run: Path, logs: int) -> tuple[list[dict], float]:
@@ -30,6 +32,47 @@ def read_frames(run: Path, logs: int) -> tuple[list[dict], float]:
     return frames, budget
 
 
+def read_passes(run: Path, logs: int) -> list[dict]:
+    """Mean ms per render pass, worst first. Each pass is emitted once per frame, so its mean is its
+    per-frame contribution and the shares show where the single [RENDER] total actually goes."""
+    samples: dict[str, list[float]] = {}
+    for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
+        for name, ms in PASS.findall((run / f"iter-{index}.log").read_text(errors="replace")):
+            samples.setdefault(name, []).append(float(ms))
+
+    means = {name: float(np.mean(values)) for name, values in samples.items()}
+    total = sum(means.values()) or 1.0
+    return [{"pass": name, "meanMs": round(ms, 3), "shareOfRender": round(ms / total, 4)}
+            for name, ms in sorted(means.items(), key=lambda item: -item[1])]
+
+
+def gc_summary(frames: list[dict]) -> dict:
+    """Collection counts per frame plus the frame-time difference between frames that collected and
+    frames that did not - the direct test of whether GC explains the sim p99 spikes."""
+    if not frames or "gc0" not in frames[0]:
+        return {}
+
+    def collected(frame: dict) -> int:
+        return int(frame.get("gc0", 0) + frame.get("gc1", 0) + frame.get("gc2", 0))
+
+    with_gc = [f["dt"] for f in frames if collected(f) > 0]
+    without_gc = [f["dt"] for f in frames if collected(f) == 0]
+    alloc = [f.get("allocKb", 0.0) for f in frames]
+
+    return {
+        "collections": {label: int(sum(f.get(key, 0) for f in frames))
+                        for label, key in [("gen0", "gc0"), ("gen1", "gc1"), ("gen2", "gc2")]},
+        "framesWithGc": len(with_gc),
+        "allocKbPerFrame": {"mean": round(float(np.mean(alloc)), 1),
+                            "p99": round(float(np.percentile(alloc, 99)), 1),
+                            "max": round(float(np.max(alloc)), 1)},
+        "frameMsMedian": {
+            "withGc": round(float(np.median(with_gc)), 3) if with_gc else None,
+            "withoutGc": round(float(np.median(without_gc)), 3) if without_gc else None,
+        },
+    }
+
+
 def stats(values: list[float]) -> dict:
     a = np.array(values)
     return {
@@ -41,7 +84,7 @@ def stats(values: list[float]) -> dict:
     }
 
 
-def summarize(frames: list[dict], name: str, iterations: int, budget: float) -> dict:
+def summarize(frames: list[dict], name: str, iterations: int, budget: float, passes: list[dict]) -> dict:
     ms = {key: [f[key] for f in frames] for key in SECONDS}
     fps = [1000.0 / f["dt"] for f in frames]
     entities = [f["ents"] for f in frames]
@@ -63,6 +106,8 @@ def summarize(frames: list[dict], name: str, iterations: int, budget: float) -> 
         "simMs": stats(ms["sim"]),
         "applyMs": stats(ms["apply"]),
         "renderMs": stats(ms["render"]),
+        "renderPasses": passes[:12],
+        "gc": gc_summary(frames),
         "perEntityNs": {
             "sim": round(1e6 * np.mean(ms["sim"]) / np.mean(entities), 1),
             "render": round(1e6 * np.mean(ms["render"]) / np.mean(entities), 1),
@@ -108,10 +153,18 @@ def main() -> None:
         for frame in frames:
             out.write(json.dumps(frame) + "\n")
 
-    summary = summarize(frames, args.name, args.iters, budget)
+    summary = summarize(frames, args.name, args.iters, budget, read_passes(args.run, args.logs))
     (args.run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 
     print(json.dumps({k: summary[k] for k in ["frameMs", "fps", "fraction", "perEntityNs", "budget"]}, indent=2))
+
+    if summary["gc"]:
+        print("gc:", json.dumps(summary["gc"]))
+
+    if summary["renderPasses"]:
+        print(f"{'pass':<24} {'meanMs':>8} {'share':>7}")
+        for row in summary["renderPasses"]:
+            print(f"{row['pass']:<24} {row['meanMs']:>8} {row['shareOfRender'] * 100:>6.1f}%")
 
 
 if __name__ == "__main__":

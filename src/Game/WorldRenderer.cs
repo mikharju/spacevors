@@ -33,24 +33,40 @@ public static class WorldRenderer
         float camX, float camY, int windowWidth, int windowHeight)
     {
         DrawAsteroids(em, camX, camY, windowWidth, windowHeight, diagnostics);
+        RenderTimings.Pass("world.asteroids");
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.ammo");
         DrawLaserBeams(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.beams");
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.explosions");
         DrawDamageSparks(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.sparks");
         DrawHealSparks(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.healSparks");
         DrawSmokePuffs(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.smoke");
         ThrusterFlameRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.thrusters");
         DrawPlayerShip(em, playerEntity, camX, camY, windowWidth, windowHeight, shipType, diagnostics);
+        RenderTimings.Pass("world.player");
         EnemyShipRenderer.Draw(em, camX, camY, windowWidth, windowHeight, diagnostics);
+        RenderTimings.Pass("world.enemyShips");
         DrawMines(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.mines");
         TargetingRenderer.Draw(em, playerEntity, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.targeting");
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.xpPickups");
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.healthOrbs");
         DrawTurrets(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.turrets");
 
         if (diagnostics)
         {
             DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
+            RenderTimings.Pass("world.debugMarkers");
         }
     }
 

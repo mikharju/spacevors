@@ -66,6 +66,8 @@ public sealed class GameSession
     private long _lastSimTicks;
     private long _lastApplyTicks;
     private long _lastRenderTicks;
+    private int _lastGc0, _lastGc1, _lastGc2;
+    private long _lastAllocBytes;
 
     public bool ScenarioFinished => _scenario is not null && _scenarioFramesMeasured >= _scenario.MeasureTicks;
 
@@ -95,6 +97,7 @@ public sealed class GameSession
         {
             _worldView.ViewportSize = viewport;
             ScenarioWorld.Apply(em, playerEntity, scenario);
+            MarkGcCounters();
             Console.WriteLine($"[PERF-BEGIN] scenario={scenario.Name} ticks={scenario.MeasureTicks} bullets={scenario.BulletCount} budgetFrameMs={scenario.FrameMsBudget:F2}");
         }
     }
@@ -443,10 +446,36 @@ public sealed class GameSession
             $"[PERF] frame={++_scenarioFramesMeasured} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +
             $"render={renderMs:F2} other={frameMs - simMs - renderMs:F2} " +
             $"ents={Count<Position>()} ammo={Count<Ammo>()} sparks={Count<DamageSpark>()} explosions={Count<Explosion>()} " +
-            $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()}");
+            $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()} " +
+            GcColumns());
 
         if (_scenarioFramesMeasured == _scenario!.MeasureTicks)
             Console.WriteLine($"[PERF-END] scenario={_scenario.Name} budgetFrameMs={_scenario.FrameMsBudget:F2}");
+    }
+
+    // Garbage collected since the last row, plus bytes allocated in it: the sim's p99 spikes are
+    // otherwise invisible in a timing-only trace, and the scenario runner correlates them with the
+    // frames that were slow.
+    private string GcColumns()
+    {
+        int gen0 = GC.CollectionCount(0), gen1 = GC.CollectionCount(1), gen2 = GC.CollectionCount(2);
+        long allocated = GC.GetTotalAllocatedBytes(precise: false);
+
+        string columns = $"gc0={gen0 - _lastGc0} gc1={gen1 - _lastGc1} gc2={gen2 - _lastGc2} allocKb={(allocated - _lastAllocBytes) / 1024}";
+
+        _lastGc0 = gen0;
+        _lastGc1 = gen1;
+        _lastGc2 = gen2;
+        _lastAllocBytes = allocated;
+        return columns;
+    }
+
+    private void MarkGcCounters()
+    {
+        _lastGc0 = GC.CollectionCount(0);
+        _lastGc1 = GC.CollectionCount(1);
+        _lastGc2 = GC.CollectionCount(2);
+        _lastAllocBytes = GC.GetTotalAllocatedBytes(precise: false);
     }
 
     private static double TicksToMs(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;

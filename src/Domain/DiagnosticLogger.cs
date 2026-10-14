@@ -64,6 +64,10 @@ public static class DiagnosticLogger
 
     public static void LogApply(string phase, long elapsedTicks) => LogTiming("APPLY", phase, elapsedTicks);
 
+    // One line per render pass, so the frame's draw cost can be attributed to a pass instead of
+    // being a single [RENDER] total.
+    public static void LogRenderPass(string pass, long elapsedTicks) => LogTiming("RENDER-PASS", pass, elapsedTicks);
+
     private static void LogTiming(string tag, string name, long elapsedTicks)
     {
         if (!_enabled) return;

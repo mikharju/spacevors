@@ -19,6 +19,7 @@ public static class Renderer
         bool diagnostics)
     {
         Raylib.BeginDrawing();
+        RenderTimings.BeginFrame();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
 
         if (gameOver)
@@ -29,8 +30,10 @@ public static class Renderer
         {
             HudRenderer.ResetGameOverFade();
         }
+        RenderTimings.Pass("hud.gameOverFade");
 
         Raylib.EndDrawing();
+        RenderTimings.Pass("present");
     }
 
     // The paused stats/upgrade overlay. Prepared once per frame so hover hit-testing and drawing
@@ -69,14 +72,24 @@ public static class Renderer
         bool diagnostics)
     {
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
+        RenderTimings.Pass("clear");
 
         Lighting.BeginFrame(camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("lighting.begin");
         LightGatherer.Collect(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("lights.collect");
 
         BackgroundRenderer.Draw(stars, clutter, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("background");
+
+        // WorldRenderer reports its own world.* passes on the same stopwatch, so there is no
+        // aggregate "world" line: summing those passes gives it.
         WorldRenderer.Draw(em, playerEntity, shipType, diagnostics, camX, camY, windowWidth, windowHeight);
+
         HudRenderer.DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
+        RenderTimings.Pass("hud.health");
         HudRenderer.DrawXpBar(em, playerEntity, windowWidth, windowHeight);
+        RenderTimings.Pass("hud.xp");
     }
 
 }
