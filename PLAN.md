@@ -383,6 +383,14 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - Sandbox pass effect: `world.sparks` 18.6 → 1.53 ms, `world.ammo` 13.4 → 0.60 ms, `world.explosions` 5.0 → 0.24 ms (llvmpipe). Re-take the real-GPU baselines to get the meaningful numbers.
 - Scenario shots: `SPACEVORS_SCENARIO_SHOTS=start,mid,end` writes PNGs of those frames into the run dir, so a render change can be verified with one command instead of pressing F12 into an unfocused window.
 
+## Perf gates — done
+
+- Every scenario now carries the real target, 1000/120 ms. Budgets used to be per-scenario and loose (10-32 ms), which is how a render regression that ate 89% of the frame sat green. `impact-storm` is marked `ExpectedOverBudget` instead: 23,876 entities are knowingly over 120 fps, and clearing that flag is how the shortfall gets closed.
+- An unmarked breach exits non-zero, prints `budget: regression median X against Y`, and records the verdict in `index.tsv`. `--check-baseline` gates a run against its committed baseline (median x1.15, p99 x1.25, per-shape cost x2.0) and is host-aware: a sim-host run against a window baseline reports the deltas as information instead of comparing incomparable milliseconds.
+- `perShapeNs` — mean pass ms divided by the entities that pass drew — is the render metric that transfers between machines: ~1.1 µs per shape before batching, ~0.1 µs after. A jump back up is the signature of per-shape draw calls returning, which is the regression most likely to be silent.
+- `Tests/ScenarioPerformanceTest.cs` drives the scenario specs headless (median of measured ticks, warm-up discarded) against characterized ceilings, replacing `Tests/PerformanceBenchmark.cs` — a second, weaker source of truth with three `mustMeetBudget: false` phases and a stale CollisionSystem claim. The Linux CI job now runs `dotnet test`.
+- The habit is written into AGENTS.md: after a sim or render change, run `.tools/scenario.sh <name> --sim --iters 3` and report the delta as a verdict - keep, optimize, or revert.
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

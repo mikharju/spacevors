@@ -27,6 +27,15 @@ jobs:
         run: |
           dotnet restore src/Game/Game.csproj
 
+      # The suite includes scenario-driven simulation timing, so a sim regression fails the build
+      # instead of waiting for someone to run a scenario by hand. The tests never open a window, but
+      # they load the Raylib-cs assembly, which needs the GL runtime present.
+      - name: Test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglu1-mesa
+          dotnet test src/Tests/Tests.csproj --configuration Release --nologo
+
       - name: Publish SpaceVors
         run: |
           dotnet publish src/Game/Game.csproj \

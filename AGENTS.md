@@ -60,6 +60,17 @@ For every task:
 4. Verify behavior.
 5. Update PLAN.md and ARCHITECTURE.md if needed.
 
+After changing simulation systems or rendering, measure instead of assuming:
+
+    .tools/scenario.sh <scenario> --sim --iters 3
+
+Headless, tagged host=sim, so it never disturbs the real-GPU baselines. Compare median, p99 and
+perShapeNs against the previous row of `.tools/run/index.tsv` and put the verdict in the reply:
+"this change costs X% - keep, optimize, or revert?" A budget breach or a `--check-baseline` failure
+exits non-zero, so the check cannot be quietly skipped. For render changes also look at the run's
+start/mid/end shots: a pass that got cheaper than its geometry can justify means the geometry is
+not being drawn.
+
 Never mix unrelated changes.
 
 Check TROUBLE_SHOOTING.md for problems encountered before and avoid
