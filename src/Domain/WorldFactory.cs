@@ -10,8 +10,11 @@ namespace Spacevors.Domain;
 // generates the starfield that way) and must get the same world for the same seed.
 public static class WorldFactory
 {
+    // testAsteroid pins the first asteroid directly ahead of the ship, so a weapon always has the
+    // same target. Diagnostics mode does this through the env var; scenarios ask for it directly
+    // rather than depending on an env var being set.
     public static (EntityManager em, Entity playerEntity, Entity cameraEntity) Create(
-        ShipType shipType, Vector2 viewportSize, int seed = EntityManager.DefaultRngSeed)
+        ShipType shipType, Vector2 viewportSize, int seed = EntityManager.DefaultRngSeed, bool testAsteroid = false)
     {
         var em = new EntityManager(seed);
 
@@ -29,7 +32,7 @@ public static class WorldFactory
         int usedSlots = shipType.Weapon.Turrets.Select(t => t.Weapon.Name).Distinct().Count();
         em.AddComponent(playerEntity, new WeaponSlots(usedSlots, shipType.MaxWeaponSlots));
 
-        bool diagnostics = Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
+        bool pinnedAsteroid = testAsteroid || Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
 
         // Create camera
         var cameraEntity = em.CreateEntity();
@@ -38,14 +41,15 @@ public static class WorldFactory
         var rand = em.Rng;
 
         // One close asteroid within initial view range.
-        // Diagnostics: fixed position directly ahead of the ship so weapon firing is testable deterministically.
+        // Pinned (diagnostics, scenarios): fixed position directly ahead of the ship, so weapon
+        // behaviour is testable deterministically.
         {
             var asteroid = em.CreateEntity();
-            float angle = diagnostics ? 3f * MathF.PI / 2f : (float)(rand.NextDouble() * Math.PI * 2f);
-            float dist = diagnostics ? 300f : 150f + (float)rand.NextDouble() * 1500f;
+            float angle = pinnedAsteroid ? 3f * MathF.PI / 2f : (float)(rand.NextDouble() * Math.PI * 2f);
+            float dist = pinnedAsteroid ? 300f : 150f + (float)rand.NextDouble() * 1500f;
             float ax = (float)Math.Cos(angle) * dist;
             float ay = (float)Math.Sin(angle) * dist;
-            float aSpeed = diagnostics ? 10f : 15f + (float)rand.NextDouble() * 35f;
+            float aSpeed = pinnedAsteroid ? 10f : 15f + (float)rand.NextDouble() * 35f;
             float aAngle = angle;
             AsteroidFactory.AddAsteroidComponents(em, asteroid, new Vector2(ax, ay), aSpeed, aAngle, rand);
         }

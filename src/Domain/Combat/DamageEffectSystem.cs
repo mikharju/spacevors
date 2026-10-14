@@ -27,8 +27,9 @@ public class DamageEffectSystem : GameSystem
     private const int MaxSmokePerTick = 1;
     private const int MaxSparksPerTick = 1;
 
-    // Requirement: smoke and sparks fade away after 1 second.
-    private const float EffectLifetime = 1f;
+    // Requirement: smoke and sparks fade away after 1 second. Shared with the perf scenarios, which
+    // seed an impact area at its steady-state particle count instead of playing seconds to reach it.
+    public const float EffectLifetime = 1f;
 
     // Puffs inherit this fraction of the ship's velocity, so they trail behind moving ships.
     private const float FollowFactor = 0.5f;
@@ -37,8 +38,8 @@ public class DamageEffectSystem : GameSystem
     private const float PuffJitterSpeed = 20f;
 
     // Spark speed range (px/s).
-    private const float SparkSpeedMin = 60f;
-    private const float SparkSpeedMax = 140f;
+    public const float SparkSpeedMin = 60f;
+    public const float SparkSpeedMax = 140f;
 
     // Ships within this many pixels past the viewport edge still emit, so smoke does not pop at screen borders.
     private const float EmitMargin = 100f;

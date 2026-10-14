@@ -81,7 +81,7 @@ public sealed class GameSession
             : WorldView.DefaultViewportSize;
 
         var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(
-            ship, viewport, scenario?.Seed ?? EntityManager.DefaultRngSeed);
+            ship, viewport, scenario?.Seed ?? EntityManager.DefaultRngSeed, scenario is not null);
         _em = em;
         _worldView = new WorldView(em);
         _playerEntity = playerEntity;

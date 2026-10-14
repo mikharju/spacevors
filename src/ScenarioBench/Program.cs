@@ -35,7 +35,7 @@ public static class Program
     static int Run(ScenarioSpec spec, int ticks)
     {
         // WorldView starts with the pinned viewport and a centred mouse, which is what a scenario wants.
-        var (em, playerEntity, _) = WorldFactory.Create(spec.Ship, WorldView.DefaultViewportSize, spec.Seed);
+        var (em, playerEntity, _) = WorldFactory.Create(spec.Ship, WorldView.DefaultViewportSize, spec.Seed, testAsteroid: true);
         var view = new WorldView(em);
         ScenarioWorld.Apply(em, playerEntity, spec);
 

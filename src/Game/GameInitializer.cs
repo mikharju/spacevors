@@ -18,9 +18,9 @@ public static class GameInitializer
     ];
 
     public static (EntityManager em, Entity playerEntity, Entity cameraEntity, List<(Vector2 Position, float Size, Color Color, float Parallax)> stars, List<(Vector2 Position, float Width, float Height, Color Color)> clutter) Initialize(
-        ShipType shipType, Vector2 viewportSize, int seed = EntityManager.DefaultRngSeed)
+        ShipType shipType, Vector2 viewportSize, int seed = EntityManager.DefaultRngSeed, bool testAsteroid = false)
     {
-        var (em, playerEntity, cameraEntity) = WorldFactory.Create(shipType, viewportSize, seed);
+        var (em, playerEntity, cameraEntity) = WorldFactory.Create(shipType, viewportSize, seed, testAsteroid);
 
         // Starfield and clutter are presentation-only, but they draw from the world RNG after the
         // entities, so their position here is part of the deterministic world.

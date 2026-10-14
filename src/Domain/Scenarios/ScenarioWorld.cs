@@ -16,8 +16,18 @@ public static class ScenarioWorld
     {
         var playerPos = em.GetComponent<Position>(playerEntity).Value;
 
+        // The offset is applied as a rotation around the turret, so the stream passes AimOffsetPx
+        // beside the target instead of through its centre.
+        ImpactTarget? target = TryFindAimTarget(em, playerPos, spec.AimDirection);
+        Vector2 aim = target is { } found && spec.AimOffsetPx != 0f
+            ? SpawnPlacement.Rotate(spec.AimDirection, spec.AimOffsetPx / found.Along)
+            : spec.AimDirection;
+
         if (spec.SeededWeapon is { } weapon)
-            SeedVolleyInFlight(em, playerPos, weapon, spec.BulletCount, spec.AimDirection, spec.StreamLength, em.Rng);
+            SeedVolleyInFlight(em, playerPos, weapon, spec.BulletCount, aim, spec.StreamLength, em.Rng);
+
+        if (target is { } impact && spec.Effects is { } effects)
+            SeedEffects(em, impact.Center, impact.Radius, effects, em.Rng);
 
         if (!spec.WeaponFires)
             SilencePlayerTurrets(em);
@@ -68,6 +78,64 @@ public static class ScenarioWorld
         }
         return false;
     }
+
+    // The nearest asteroid the seeded stream is aimed at: its centre and radius define the impact
+    // area, its distance defines the lever arm the lateral aim offset is divided by.
+    private readonly record struct ImpactTarget(Vector2 Center, float Radius, float Along);
+
+    private static ImpactTarget? TryFindAimTarget(EntityManager em, Vector2 origin, Vector2 aim)
+    {
+        ImpactTarget? nearest = null;
+
+        foreach (var (_, position, asteroid) in em.GetEntitiesWithComponents<Position, Asteroid>())
+        {
+            Vector2 to = position.Value - origin;
+            float along = to.X * aim.X + to.Y * aim.Y;
+            if (along <= 0f || (nearest is { } current && along >= current.Along)) continue;
+
+            Vector2 lateral = to - aim * along;
+            if (lateral.X * lateral.X + lateral.Y * lateral.Y > asteroid.Radius * asteroid.Radius) continue;
+
+            nearest = new ImpactTarget(position.Value, asteroid.Radius, along);
+        }
+
+        return nearest;
+    }
+
+    // The impact area of a scenario that hits something already holds particles when the measured
+    // window opens. Ages are uniform in [0, lifetime] so the live count is flat from the first tick
+    // instead of ramping up and then dropping off a cliff.
+    private static void SeedEffects(EntityManager em, Vector2 center, float radius, SeededEffects effects, Random rng)
+    {
+        for (int i = 0; i < effects.Sparks; i++)
+        {
+            float angle = (float)(rng.NextDouble() * MathF.PI * 2d);
+            float speed = DamageEffectSystem.SparkSpeedMin +
+                (float)rng.NextDouble() * (DamageEffectSystem.SparkSpeedMax - DamageEffectSystem.SparkSpeedMin);
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(center + RandomInDisc(radius, rng)));
+            em.AddComponent(entity, new Velocity(new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed));
+            em.AddComponent(entity, new DamageSpark(
+                RandomAge(DamageEffectSystem.EffectLifetime, rng), DamageEffectSystem.EffectLifetime));
+        }
+
+        for (int i = 0; i < effects.Explosions; i++)
+        {
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(center + RandomInDisc(radius, rng)));
+            em.AddComponent(entity, new Explosion(ExplosionRadius, RandomAge(ExplosionLifetime, rng), ExplosionLifetime));
+        }
+    }
+
+    // Typical mine-death blast, which is what the seeded impact area contains.
+    private const float ExplosionRadius = 12f;
+    private const float ExplosionLifetime = 0.5f;
+
+    private static Vector2 RandomInDisc(float radius, Random rng) =>
+        new Vector2((float)(rng.NextDouble() * 2d - 1d) * radius, (float)(rng.NextDouble() * 2d - 1d) * radius);
+
+    private static float RandomAge(float lifetime, Random rng) => (float)rng.NextDouble() * lifetime;
 
     // Player turrets are the ones carrying a TurretOffset; enemy ship turrets are not.
     private static void SilencePlayerTurrets(EntityManager em)
