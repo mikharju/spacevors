@@ -16,6 +16,20 @@ FIELD = re.compile(r"(\w+)=(-?[\d.]+)")
 BEGIN = re.compile(r"\[PERF-BEGIN\] scenario=(\S+) .*budgetFrameMs=([\d.]+)(?: expectedOverBudget=(\S+))?")
 PASS = re.compile(r"\[RENDER-PASS\] ([\w.]+): ([\d.]+)ms")
 
+# Per-system lines are already emitted whenever diagnostics are on, so attribution needs no new
+# instrumentation - only a reader. System totals look like "CollisionSystem: 10.50ms"; the phases
+# nested inside them carry a prefix, e.g. "Collision: detection: 10.30ms", and must not be summed
+# with their parent.
+SYSTEM = re.compile(r"^\[SYSTEM\] (.+): ([\d.]+)ms(?: \((\d+) entities\))?$")
+FRAME_MARK = re.compile(r"^\[FRAME\]$")
+SIM_LINE = re.compile(r"^\[SIM\] tick: ([\d.]+)ms")
+SPIKE_FRAMES = 3
+
+# A pass has fixed overhead, so dividing it by a handful of entities invents a huge per-shape cost
+# (hull-damage reported 6.7us per spark when only a few existed). Below this population the metric is
+# meaningless and is left out rather than gated on.
+MIN_SHAPES_FOR_CANARY = 100
+
 # Which count divides which pass mean to give the cost of one drawn shape. This is the render metric
 # that transfers between machines: absolute pass ms are not comparable across a real GPU and a
 # software rasterizer, but "one spark costs 0.1us instead of 1.1us" is, and it is the signature of
@@ -175,10 +189,74 @@ def shape_costs(passes: list[dict], frames: list[dict]) -> dict:
 
     for name, count_key in SHAPE_PASSES.items():
         count = float(np.mean([frame[count_key] for frame in frames])) if frames else 0.0
-        if name in means and count > 0:
+        if name in means and count >= MIN_SHAPES_FOR_CANARY:
             costs[name] = round(1e6 * means[name] / count, 1)
 
     return costs
+
+
+def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict]]:
+    """Per-system mean ms (worst first), plus the systems behind the slowest measured frames. The
+    first frame of an iteration is skipped as in read_frames, so the two agree on what was measured."""
+    samples: dict[str, list[float]] = {}
+    frames = []
+
+    for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
+        systems: dict[str, float] = {}
+        phases: dict[str, float] = {}
+
+        for line in (run / f"iter-{index}.log").read_text(errors="replace").splitlines():
+            if FRAME_MARK.match(line):
+                systems, phases = {}, {}
+                continue
+
+            match = SYSTEM.match(line)
+            if match:
+                name, ms = match.group(1), float(match.group(2))
+                (phases if ": " in name else systems)[name] = ms
+                continue
+
+            if SIM_LINE.match(line):
+                sim_ms = float(SIM_LINE.match(line).group(1))
+                continue
+
+            if not ROW.match(line):
+                continue
+
+            row = {key: float(value) for key, value in FIELD.findall(line)}
+            number = int(row["frame"])
+            if number == 1:
+                continue
+
+            for name, ms in systems.items():
+                samples.setdefault(name, []).append(ms)
+
+            frames.append({"frame": number, "iteration": index, "dt": row["dt"], "sim": sim_ms,
+                           "systems": systems, "phases": phases})
+
+    means = {name: float(np.mean(values)) for name, values in samples.items()}
+    total = sum(means.values()) or 1.0
+    per_system = [{"system": name, "meanMs": round(ms, 3), "shareOfSim": round(ms / total, 4)}
+                  for name, ms in sorted(means.items(), key=lambda item: -item[1])]
+
+    # One row per distinct frame index (the worst iteration for it), otherwise a spike that repeats at
+    # the same tick in every iteration fills the report with copies of itself.
+    worst_by_frame: dict[int, dict] = {}
+    for frame in frames:
+        current = worst_by_frame.get(frame["frame"])
+        if current is None or frame["sim"] > current["sim"]:
+            worst_by_frame[frame["frame"]] = frame
+
+    spikes = []
+    for frame in sorted(worst_by_frame.values(), key=lambda item: -item["sim"])[:SPIKE_FRAMES]:
+        worst = sorted(frame["systems"].items(), key=lambda item: -item[1])[:3]
+        spikes.append({"frame": frame["frame"], "iteration": frame["iteration"],
+                       "dtMs": frame["dt"], "simMs": round(frame["sim"], 2),
+                       "systems": [{"system": name, "ms": ms} for name, ms in worst],
+                       "phases": [{"phase": name, "ms": ms} for name, ms in
+                                  sorted(frame["phases"].items(), key=lambda item: -item[1])[:3]]})
+
+    return per_system, spikes
 
 
 def check_baseline(baseline: dict, current: dict) -> bool:
@@ -263,6 +341,11 @@ def main() -> None:
 
     summary = summarize(frames, args.name, args.iters, budget, read_passes(args.run, args.logs),
                         args.host, expected_over_budget)
+
+    systems, spikes = read_systems(args.run, args.logs)
+    summary["systemMs"] = systems[:10]
+    summary["spikeFrames"] = spikes
+
     (args.run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     if args.index:
         append_index(args.index, args.run, summary, args.host)
@@ -276,6 +359,19 @@ def main() -> None:
         print(f"{'pass':<24} {'meanMs':>8} {'share':>7}")
         for row in summary["renderPasses"]:
             print(f"{row['pass']:<24} {row['meanMs']:>8} {row['shareOfRender'] * 100:>6.1f}%")
+
+    if summary["systemMs"]:
+        print(f"{'system':<30} {'meanMs':>8} {'shareSim':>9}")
+        for row in summary["systemMs"]:
+            print(f"{row['system']:<30} {row['meanMs']:>8.3f} {row['shareOfSim'] * 100:>8.1f}%")
+
+    if summary["spikeFrames"]:
+        print("slowest measured frames:")
+        for frame in summary["spikeFrames"]:
+            systems = ", ".join(f"{item['system']} {item['ms']:.2f}ms" for item in frame["systems"])
+            phases = ", ".join(f"{item['phase']} {item['ms']:.2f}ms" for item in frame["phases"])
+            print(f"  iter {frame['iteration']} frame {frame['frame']}: dt {frame['dtMs']:.2f} "
+                  f"sim {frame['simMs']:.2f} -> {systems}" + (f" | phases: {phases}" if phases else ""))
 
     budget_info = summary["budget"]
     print(f"budget: {budget_info['verdict']}  median {budget_info['medianMs']}ms against "
