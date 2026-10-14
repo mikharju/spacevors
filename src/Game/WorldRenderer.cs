@@ -151,9 +151,9 @@ public static class WorldRenderer
 
             // A thick line shorter than it is wide draws as a bar across the bullet, so a bullet
             // that barely moves in one tick stays a round dot; only fast ones stretch into streaks.
-            if (streak <= diameter) Raylib.DrawCircle((int)toX, (int)toY, ammo.Radius, color);
+            if (streak <= diameter) ShapeSprites.DrawCircle(toX, toY, ammo.Radius, color);
             else
-                Raylib.DrawLineEx(
+                ShapeSprites.DrawStreak(
                     new System.Numerics.Vector2(fromX, fromY),
                     new System.Numerics.Vector2(toX, toY),
                     diameter,
@@ -226,7 +226,7 @@ public static class WorldRenderer
                 color = new Color(255, 140, 30, alpha);
             }
 
-            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(currentRadius, 1f), color);
+            ShapeSprites.DrawCircle(cx, cy, Math.Max(currentRadius, 1f), color);
         }
     }
 
@@ -246,7 +246,7 @@ public static class WorldRenderer
             int b = 0;
             int alpha = (int)(lifeRatio * 255);
 
-            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(r, g, b, alpha));
+            ShapeSprites.DrawCircle(cx, cy, size, new Color(r, g, b, alpha));
         }
     }
 
@@ -352,7 +352,7 @@ public static class WorldRenderer
 
             int alpha = (int)(lifeRatio * 255);
 
-            Raylib.DrawCircle((int)cx, (int)cy, size, new Color(50, 255, 100, alpha));
+            ShapeSprites.DrawCircle(cx, cy, size, new Color(50, 255, 100, alpha));
         }
     }
 
@@ -369,7 +369,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
 
             int alpha = (int)(SmokeAlphaMax * lifeRatio);
-            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
+            ShapeSprites.DrawCircle(cx, cy, Math.Max(radius, 1f), new Color(SmokeColorR, SmokeColorG, SmokeColorB, alpha));
         }
     }
 
