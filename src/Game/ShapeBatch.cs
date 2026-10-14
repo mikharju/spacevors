@@ -12,6 +12,11 @@ namespace Spacevors.Game;
 // VertexBudget shapes. Geometry mirrors raylib's own circles so the picture does not change.
 static class ShapeBatch
 {
+    // GL_TRIANGLES passed as the raw mode: Raylib_cs.DrawMode is declared Lines, Triangles, Quads
+    // without explicit values, which is 0/1/2 - not GL_POINTS/LINES/TRIANGLES (0/1/4). Passing
+    // DrawMode.Triangles draws the fans as lines.
+    const int GlTriangles = 0x0004;
+
     // rlgl's dynamic vertex buffer is finite, so a frame of many particles becomes a handful of draws
     // rather than one enormous one. 16k vertices is ~2.7k small circles.
     const int VertexBudget = 16384;
@@ -91,7 +96,7 @@ static class ShapeBatch
 
     static void Open()
     {
-        Rlgl.Begin(DrawMode.Triangles);
+        Rlgl.Begin(GlTriangles);
         _vertices = 0;
         _open = true;
     }

@@ -210,6 +210,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: (a) `Raylib.DrawCircle`/`DrawLineEx` flush raylib's 2D render batch and issue their own draw call per shape, ~1.1 µs each on a real GPU. Nothing in the entity counts or system traces shows this — only per-pass render timing does. (b) `TakeScreenshot` writes to the *process* cwd: `.tools/run/` for `game.sh`, but `.tools/run/scenario-<name>-<utc>/` for `scenario.sh`, which `shot.sh` did not search. Separately, `xdotool key --window <id>` does not reach raylib at all (GLFW ignores sent events); the key must go to the focused window via XTEST.
 - **Fix / Prevention**: Batch shapes into one `Rlgl.Begin(DrawMode.Triangles)` … `Rlgl.End()` block (`Game/ShapeBatch.cs`) with per-vertex colour. `shot.sh` now searches the whole `.tools/run` tree for the newest screenshot. When a screenshot tool reports nothing, check where the *program's* cwd is before assuming the capture failed.
 
+## 34. `Raylib_cs.DrawMode` values are not the GL constants they name
+
+- **Symptom**: After switching shape draws to a batched `rlgl` block, particles became almost invisible — a faint glow where thousands of sparks should be. The pass timings *improved*, which initially read as a win.
+- **Cause**: `Rlgl.Begin(DrawMode.Triangles)` compiles and runs, but `DrawMode` is declared `Lines, Triangles, Quads` with no explicit values, so `Triangles` is 1 — which in GL is `GL_LINES` (GL_TRIANGLES is 0x0004). The fans were submitted and rasterized as wireframe lines. Cheap, wrong and easy to mistake for a speed-up.
+- **Fix / Prevention**: Pass the raw GL mode (`Rlgl.Begin(0x0004)`) and name the constant. Generalise: when a binding layer re-declares an enum, do not assume its values match the native constants — check, or pass the native value. And read a suspicious win with suspicion: a pass that gets cheaper than the geometry it must rasterize can justify is telling you the geometry is not being drawn.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.
