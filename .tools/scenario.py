@@ -21,8 +21,6 @@ PASS = re.compile(r"\[RENDER-PASS\] ([\w.]+): ([\d.]+)ms")
 # nested inside them carry a prefix, e.g. "Collision: detection: 10.30ms", and must not be summed
 # with their parent.
 SYSTEM = re.compile(r"^\[SYSTEM\] (.+): ([\d.]+)ms(?: \((\d+) entities\))?$")
-FRAME_MARK = re.compile(r"^\[FRAME\]$")
-SIM_LINE = re.compile(r"^\[SIM\] tick: ([\d.]+)ms")
 SPIKE_FRAMES = 3
 
 # A pass has fixed overhead, so dividing it by a handful of entities invents a huge per-shape cost
@@ -195,10 +193,13 @@ def shape_costs(passes: list[dict], frames: list[dict]) -> dict:
     return costs
 
 
-def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict]]:
-    """Per-system mean ms (worst first), plus the systems behind the slowest measured frames. The
-    first frame of an iteration is skipped as in read_frames, so the two agree on what was measured."""
-    samples: dict[str, list[float]] = {}
+def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict], list[dict]]:
+    """Per-system mean ms (worst first), the same for the named phases inside a system, plus the
+    systems behind the slowest measured frames. The first frame of an iteration is skipped as in
+    read_frames, so the two agree on what was measured. A --sim run logs only phases, so a report
+    that looked at totals alone would be empty exactly where the harness habit points."""
+    system_samples: dict[str, list[float]] = {}
+    phase_samples: dict[str, list[float]] = {}
     frames = []
 
     for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
@@ -206,38 +207,42 @@ def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict]]:
         phases: dict[str, float] = {}
 
         for line in (run / f"iter-{index}.log").read_text(errors="replace").splitlines():
-            if FRAME_MARK.match(line):
-                systems, phases = {}, {}
-                continue
-
             match = SYSTEM.match(line)
             if match:
                 name, ms = match.group(1), float(match.group(2))
                 (phases if ": " in name else systems)[name] = ms
                 continue
 
-            if SIM_LINE.match(line):
-                sim_ms = float(SIM_LINE.match(line).group(1))
-                continue
-
             if not ROW.match(line):
                 continue
 
+            # The [PERF] row closes the block. Grouping on it rather than on the game's [FRAME] marker
+            # is what makes this work for --sim runs too, which emit no frame markers at all.
             row = {key: float(value) for key, value in FIELD.findall(line)}
             number = int(row["frame"])
-            if number == 1:
-                continue
 
-            for name, ms in systems.items():
-                samples.setdefault(name, []).append(ms)
+            if number > 1:
+                # Sampled here, not on the [SYSTEM] lines, so the cold first tick stays out of the means.
+                for name, ms in systems.items():
+                    system_samples.setdefault(name, []).append(ms)
+                for name, ms in phases.items():
+                    phase_samples.setdefault(name, []).append(ms)
 
-            frames.append({"frame": number, "iteration": index, "dt": row["dt"], "sim": sim_ms,
-                           "systems": systems, "phases": phases})
+                frames.append({"frame": number, "iteration": index, "dt": row["dt"], "sim": row["sim"],
+                               "systems": systems, "phases": phases})
 
-    means = {name: float(np.mean(values)) for name, values in samples.items()}
-    total = sum(means.values()) or 1.0
-    per_system = [{"system": name, "meanMs": round(ms, 3), "shareOfSim": round(ms / total, 4)}
-                  for name, ms in sorted(means.items(), key=lambda item: -item[1])]
+            # Frame 1 is skipped as a cold start, but its system costs still have to be dropped before
+            # the next block, or they leak into frame 2's numbers.
+            systems, phases = {}, {}
+
+    def ranked(samples: dict[str, list[float]], name_key: str, share_key: str) -> list[dict]:
+        means = {name: float(np.mean(values)) for name, values in samples.items()}
+        total = sum(means.values()) or 1.0
+        return [{name_key: name, "meanMs": round(ms, 3), share_key: round(ms / total, 4)}
+                for name, ms in sorted(means.items(), key=lambda item: -item[1])]
+
+    per_system = ranked(system_samples, "system", "shareOfSim")
+    per_phase = ranked(phase_samples, "phase", "shareOfPhases")
 
     # One row per distinct frame index (the worst iteration for it), otherwise a spike that repeats at
     # the same tick in every iteration fills the report with copies of itself.
@@ -249,14 +254,16 @@ def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict]]:
 
     spikes = []
     for frame in sorted(worst_by_frame.values(), key=lambda item: -item["sim"])[:SPIKE_FRAMES]:
-        worst = sorted(frame["systems"].items(), key=lambda item: -item[1])[:3]
+        # In a --sim run the phases are the only attribution available, so fall back to them instead of
+        # reporting a slow frame with nothing to blame.
+        worst = sorted((frame["systems"] or frame["phases"]).items(), key=lambda item: -item[1])[:3]
         spikes.append({"frame": frame["frame"], "iteration": frame["iteration"],
                        "dtMs": frame["dt"], "simMs": round(frame["sim"], 2),
                        "systems": [{"system": name, "ms": ms} for name, ms in worst],
                        "phases": [{"phase": name, "ms": ms} for name, ms in
                                   sorted(frame["phases"].items(), key=lambda item: -item[1])[:3]]})
 
-    return per_system, spikes
+    return per_system, per_phase, spikes
 
 
 def check_baseline(baseline: dict, current: dict) -> bool:
@@ -342,8 +349,9 @@ def main() -> None:
     summary = summarize(frames, args.name, args.iters, budget, read_passes(args.run, args.logs),
                         args.host, expected_over_budget)
 
-    systems, spikes = read_systems(args.run, args.logs)
+    systems, phases, spikes = read_systems(args.run, args.logs)
     summary["systemMs"] = systems[:10]
+    summary["phaseMs"] = phases[:10]
     summary["spikeFrames"] = spikes
 
     (args.run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -364,6 +372,11 @@ def main() -> None:
         print(f"{'system':<30} {'meanMs':>8} {'shareSim':>9}")
         for row in summary["systemMs"]:
             print(f"{row['system']:<30} {row['meanMs']:>8.3f} {row['shareOfSim'] * 100:>8.1f}%")
+
+    if summary["phaseMs"]:
+        print(f"{'phase':<30} {'meanMs':>8} {'sharePh':>9}")
+        for row in summary["phaseMs"][:6]:
+            print(f"{row['phase']:<30} {row['meanMs']:>8.3f} {row['shareOfPhases'] * 100:>8.1f}%")
 
     if summary["spikeFrames"]:
         print("slowest measured frames:")
