@@ -1,0 +1,188 @@
+{
+  "scenario": "baseline-idle",
+  "iterations": 3,
+  "frames": 357,
+  "discarded": {
+    "iterations": 1,
+    "firstFramePerIteration": true
+  },
+  "frameMs": {
+    "mean": 0.887,
+    "median": 0.84,
+    "p90": 0.994,
+    "p99": 1.624,
+    "max": 1.79
+  },
+  "fps": {
+    "mean": 1150.5,
+    "median": 1190.5,
+    "low1": 615.6,
+    "low10": 1006.1
+  },
+  "fraction": {
+    "sim": 0.3315,
+    "render": 0.656,
+    "other": 0.0125
+  },
+  "simMs": {
+    "mean": 0.294,
+    "median": 0.28,
+    "p90": 0.35,
+    "p99": 0.569,
+    "max": 0.66
+  },
+  "applyMs": {
+    "mean": 0.011,
+    "median": 0.01,
+    "p90": 0.01,
+    "p99": 0.02,
+    "max": 0.03
+  },
+  "renderMs": {
+    "mean": 0.582,
+    "median": 0.55,
+    "p90": 0.64,
+    "p99": 1.054,
+    "max": 1.21
+  },
+  "renderPasses": [
+    {
+      "pass": "background",
+      "meanMs": 0.283,
+      "shareOfRender": 0.4483
+    },
+    {
+      "pass": "world.asteroids",
+      "meanMs": 0.13,
+      "shareOfRender": 0.2062
+    },
+    {
+      "pass": "present",
+      "meanMs": 0.073,
+      "shareOfRender": 0.1163
+    },
+    {
+      "pass": "hud.health",
+      "meanMs": 0.05,
+      "shareOfRender": 0.0792
+    },
+    {
+      "pass": "world.thrusters",
+      "meanMs": 0.019,
+      "shareOfRender": 0.0303
+    },
+    {
+      "pass": "lights.collect",
+      "meanMs": 0.017,
+      "shareOfRender": 0.0276
+    },
+    {
+      "pass": "world.enemyShips",
+      "meanMs": 0.016,
+      "shareOfRender": 0.026
+    },
+    {
+      "pass": "world.player",
+      "meanMs": 0.004,
+      "shareOfRender": 0.0067
+    },
+    {
+      "pass": "world.turrets",
+      "meanMs": 0.004,
+      "shareOfRender": 0.0064
+    },
+    {
+      "pass": "world.sparks",
+      "meanMs": 0.004,
+      "shareOfRender": 0.006
+    },
+    {
+      "pass": "world.debugMarkers",
+      "meanMs": 0.004,
+      "shareOfRender": 0.0058
+    },
+    {
+      "pass": "world.targeting",
+      "meanMs": 0.004,
+      "shareOfRender": 0.0058
+    }
+  ],
+  "gc": {
+    "collections": {
+      "gen0": 0,
+      "gen1": 0,
+      "gen2": 0
+    },
+    "framesWithGc": 0,
+    "allocKbPerFrame": {
+      "mean": 16.5,
+      "p99": 24.0,
+      "max": 45.0
+    },
+    "frameMsMedian": {
+      "withGc": null,
+      "withoutGc": 0.84
+    }
+  },
+  "perEntityNs": {
+    "sim": 5655.0,
+    "render": 11191.6
+  },
+  "entities": {
+    "start": 52,
+    "end": 52,
+    "mean": 52.0
+  },
+  "counts": {
+    "ents": {
+      "start": 52,
+      "end": 52,
+      "mean": 52.0
+    },
+    "ammo": {
+      "start": 0,
+      "end": 0,
+      "mean": 0.0
+    },
+    "sparks": {
+      "start": 0,
+      "end": 0,
+      "mean": 0.0
+    },
+    "explosions": {
+      "start": 0,
+      "end": 0,
+      "mean": 0.0
+    },
+    "beams": {
+      "start": 0,
+      "end": 0,
+      "mean": 0.0
+    },
+    "mines": {
+      "start": 9,
+      "end": 9,
+      "mean": 9.0
+    },
+    "ships": {
+      "start": 6,
+      "end": 6,
+      "mean": 6.0
+    },
+    "asteroids": {
+      "start": 35,
+      "end": 35,
+      "mean": 35.0
+    },
+    "pickups": {
+      "start": 0,
+      "end": 0,
+      "mean": 0.0
+    }
+  },
+  "budget": {
+    "frameMs": 10.0,
+    "pass": true,
+    "framesOverBudget": 0
+  }
+}

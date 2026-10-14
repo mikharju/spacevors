@@ -16,10 +16,11 @@ public sealed record ScenarioSpec(
     int BulletCount,
     // Direction the seeded stream travels. The target asteroid sits along it.
     Vector2 AimDirection,
-    // Lateral shift of the stream, in pixels, measured at the target's range: 0 aims dead centre and
-    // puts every pellet into the rock. Real auto-target fire is a wide cone around a small target, so
-    // sustained play destroys far fewer bullets per tick; this is what matches that hit rate.
-    float AimOffsetPx,
+    // Lateral shift of the stream, in target radii: 0 is dead centre, 1 grazes the rim, above 1 the
+    // stream misses entirely. Real auto-target fire is a wide cone around a small target, so sustained
+    // play destroys far fewer bullets per tick than a centred stream does. Expressed in radii because
+    // the test asteroid's size comes from the seed.
+    float AimOffsetR,
     // How far along AimDirection the seeded stream is spread; 0 = the weapon's full reach.
     // Shorter than the distance to a target, otherwise bullets are placed inside and behind it and
     // are destroyed in the first ticks — a transient that is not part of steady-state cost.
@@ -66,39 +67,40 @@ public static class Scenarios
         new("baseline-idle",
             "Normal starting world, player idle, no seeded bullets, turrets silenced.",
             Ship: ShipType.Shadow, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
-            AimOffsetPx: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 1f,
+            AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 1f,
             MeasureTicks: DefaultMeasureTicks, FrameMsBudget: IdleFrameMsBudget),
 
         new("ammo-spray",
-            "Seeded LoadTestWeapon volley passing just beside the test asteroid: dense ammo, almost " +
-            "no impacts. Prices broad-phase candidate testing and lifetime churn at ~5.5k bullets. The " +
-            "stream drains by expiry at ~24/tick, so density halves over the window - frames.jsonl " +
-            "reports the counts per frame. Turrets stay silenced so no 8000-pellet volley lands inside " +
-            "the measured window.",
+            "Seeded LoadTestWeapon volley grazing the rim of the test asteroid: dense ammo and a few " +
+            "impacts per tick, which is the mix a playthrough records (its ~1k live sparks imply only " +
+            "1-2 impacts per tick, since one impact spawns ~7 particles). Prices broad-phase candidate " +
+            "testing, lifetime expiry churn and a realistic amount of impact resolution at ~5.5k " +
+            "bullets. Turrets stay silenced so no 8000-pellet volley lands inside the measured window.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
-            AimDirection: TowardTestAsteroid, AimOffsetPx: 200f, StreamLength: 0f, WeaponFires: false,
-            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: HeavyFrameMsBudget),
+            AimDirection: TowardTestAsteroid, AimOffsetR: 1.05f, StreamLength: 0f, WeaponFires: false,
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: HeavyFrameMsBudget,
+            Effects: new SeededEffects(Sparks: 6000, Explosions: 1200)),
 
         new("ammo-spray-miss",
             "Same seeded volley aimed into empty space: detection with no candidate hits at all. The " +
             "pair with ammo-spray prices broad-phase candidate testing against a rock.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
-            AimDirection: IntoEmptySpace, AimOffsetPx: 0f, StreamLength: 0f, WeaponFires: false,
+            AimDirection: IntoEmptySpace, AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false,
             PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: HeavyFrameMsBudget),
 
         new("impact-storm",
-            "The same volley driven through the asteroid on purpose: ~15-20 impacts per tick, and each " +
-            "impact spawns ~7 particles, so this is the worst case for collision resolution, effect " +
-            "spawning and spark rendering. A stress case, not a representative one.",
+            "The same volley driven near the centre of the asteroid on purpose: ~12 impacts per tick, " +
+            "and each impact spawns ~7 particles, so this is the worst case for collision resolution, " +
+            "effect spawning and spark rendering (~16-20k entities). A stress case, not a representative one.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
-            AimDirection: TowardTestAsteroid, AimOffsetPx: 60f, StreamLength: 0f, WeaponFires: false,
+            AimDirection: TowardTestAsteroid, AimOffsetR: 0.3f, StreamLength: 0f, WeaponFires: false,
             PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: StormFrameMsBudget,
-            Effects: new SeededEffects(Sparks: 12000, Explosions: 2000)),
+            Effects: new SeededEffects(Sparks: 15000, Explosions: 2000)),
 
         new("hull-damage",
             "Player hull at 10%: damage shading, embers and smoke, no bullets in flight.",
             Ship: ShipType.Heavy, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
-            AimOffsetPx: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 0.1f,
+            AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 0.1f,
             MeasureTicks: DefaultMeasureTicks, FrameMsBudget: MediumFrameMsBudget),
     ];
 

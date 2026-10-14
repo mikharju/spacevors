@@ -16,11 +16,11 @@ public static class ScenarioWorld
     {
         var playerPos = em.GetComponent<Position>(playerEntity).Value;
 
-        // The offset is applied as a rotation around the turret, so the stream passes AimOffsetPx
-        // beside the target instead of through its centre.
+        // The offset is applied as a rotation around the turret, in target radii, so the stream passes
+        // that many radii beside the target instead of through its centre.
         ImpactTarget? target = TryFindAimTarget(em, playerPos, spec.AimDirection);
-        Vector2 aim = target is { } found && spec.AimOffsetPx != 0f
-            ? SpawnPlacement.Rotate(spec.AimDirection, spec.AimOffsetPx / found.Along)
+        Vector2 aim = target is { } found && spec.AimOffsetR != 0f
+            ? SpawnPlacement.Rotate(spec.AimDirection, spec.AimOffsetR * found.Radius / found.Along)
             : spec.AimDirection;
 
         if (spec.SeededWeapon is { } weapon)

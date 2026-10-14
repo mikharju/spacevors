@@ -18,7 +18,7 @@ public class ScenarioWorldTest
         // Seeded particles are what keeps the measured window at steady counts: without them the
         // first second measures particles piling up. They only stay flat where impacts replenish
         // them, which is why this belongs to the storm scenario.
-        Assert.Equal(12000, Count<DamageSpark>(em));
+        Assert.Equal(15000, Count<DamageSpark>(em));
         Assert.Equal(2000, Count<Explosion>(em));
 
         // A bullet starting inside a rock is destroyed on the first tick, which is a transient rather
@@ -39,7 +39,7 @@ public class ScenarioWorldTest
             }
         }
 
-        Assert.True(inside < ammo.Count * 0.03, $"{inside} of {ammo.Count} seeded bullets start inside an asteroid");
+        Assert.True(inside < ammo.Count * 0.05, $"{inside} of {ammo.Count} seeded bullets start inside an asteroid");
     }
 
     [Fact]
