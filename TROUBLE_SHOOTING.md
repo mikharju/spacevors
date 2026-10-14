@@ -164,6 +164,18 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: That scenario measures 7.9-8.1 ms against an 8.33 ms budget, so it fails whenever the machine is busy (parallel test collections, cold JIT on the first run after a build). The reported number is not reproducible run to run.
 - **Fix / Prevention**: Before blaming a change for a benchmark failure, re-run the benchmark alone (`dotnet test src/Tests/Tests.csproj --filter "FullyQualifiedName~PerformanceBenchmark"`) three times with the change and three times with it stashed, and compare the same scenario line. Only a stable difference across runs counts.
 
+## 29. `.tools/env.sh` cannot be sourced under `set -u`
+
+- **Symptom**: A new `.tools/*.sh` script died at once with `env.sh: line 13: LD_LIBRARY_PATH: unbound variable`.
+- **Cause**: env.sh appends to variables that are legitimately unset in a fresh shell (`${LD_LIBRARY_PATH:+…}`); `set -u` makes that fatal. The other tool scripts deliberately do not use `set -u`.
+- **Fix / Prevention**: Do not put `set -u` in a script that sources `.tools/env.sh`. Related bash trap: an expanded word is never an assignment prefix, so a conditional env var must be `export`ed before the command instead of written inline as `${var:+NAME=$var} cmd`.
+
+## 30. `Raylib.GetFrameTime()` describes the previous frame, so per-frame cost splits go negative
+
+- **Symptom**: A frame breakdown printed `other=-703ms` — the sum of the measured stages was far larger than the frame interval they were supposed to fit inside.
+- **Cause**: `GetFrameTime()` returns the time since the *last* call, read at the top of the update. The sim and render measured after it belong to a different interval, so subtracting them from it compares two different frames.
+- **Fix / Prevention**: When splitting a frame into stages, time the whole frame with your own `Stopwatch` around the stage calls and derive `other = frame - stages`. Use `GetFrameTime()` only for physics accumulation.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.

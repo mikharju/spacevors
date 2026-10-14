@@ -360,6 +360,19 @@ The diagnostic log now shows which half of the frame costs what, so performance 
 - `[RENDER]` includes raylib's `SetTargetFPS(120)` pacing wait (raylib waits inside `EndDraw`), so it floors at ~8 ms while the game is at the cap — read it against `[FRAME] dt=`
 - Verified headless (Xvfb + llvmpipe, 116 fps, ~85 entities): `[SIM] 0.15–0.33ms` vs `[RENDER] 7.95–8.17ms`; full suite green (248 passed)
 
+## Perf scenario harness — done
+
+Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded state, run ~1 s in a real window and record a machine-readable trace.
+
+- `Domain/WorldFactory.cs` — the entity world (player, camera, turrets, 35 asteroids, mines, enemy ships) moved out of `GameInitializer`, so a world can be built without Raylib. `GameInitializer` keeps the starfield and clutter, which still draw from `em.Rng` in the same order.
+- `Domain/Scenarios/` — `ScenarioSpec` (ship, seed, bullet count, aim, stream length, health ratio, measured ticks, frame budget) plus four scenarios: `baseline-idle`, `ammo-spray`, `ammo-spray-miss`, `hull-damage`. `ScenarioWorld` seeds a `LoadTestWeapon` volley already in flight (uniform ages, resampled clear of every asteroid), silences player turrets and sets hull damage.
+- `SimulationRunner.RunTick` — the four phases with a command flush after each now live in one method, used by `GameSession` and `ScenarioBench` alike.
+- Scenario mode in the game: `SPACEVORS_SCENARIO`, `_CAP` (0 = uncapped), `_TICKS`, `_HOLD`; pinned 1920×1024 viewport and centred mouse, one tick per frame, upgrades applied without pausing, auto-exit after the measured ticks.
+- `[PERF]` row per measured frame: `dt sim apply render other` ms + counts (ents/ammo/sparks/explosions/beams/mines/ships/asteroids/pickups), delimited by `[PERF-BEGIN]`/`[PERF-END]`.
+- `.tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold S] [--cap FPS] [--out DIR] [--compare] [--update-baseline]` and `.tools/scenario.py` produce `frames.jsonl` + `summary.json`: frameMs mean/median/p90/p99/max, fps mean/median/low1/low10, sim/render/other fractions, perEntity ns, entity counts, budget pass. Baselines live in `.tools/baselines/`.
+- `src/ScenarioBench` — sim-only host, no Raylib. Verified in the sandbox: `ammo-spray-miss` with 7,000 bullets, 1.23 ms median per tick, 236 ns/entity.
+- No warm-up phase by decision: cold JIT is handled by discarding the first whole run (`--iters N` runs N+1) and the first frame of each pooled run.
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

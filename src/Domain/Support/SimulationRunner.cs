@@ -43,6 +43,46 @@ public sealed class SimulationRunner
         };
     }
 
+    // One fixed-timestep tick: the four phases in contractual order, each followed by the command
+    // flush. Timing callbacks are optional; callers must not reorder the phases.
+    public void RunTick(
+        WorldView view,
+        EntityManager em,
+        CommandBuffer commands,
+        float deltaTime,
+        Action<string, long>? onSystemComplete = null,
+        Action<string, long>? onApplyComplete = null)
+    {
+        RunPhaseAndApply(view, em, commands, MovementSystems, "Movement", deltaTime, onSystemComplete, onApplyComplete);
+        RunPhaseAndApply(view, em, commands, ActionSystems, "Action", deltaTime, onSystemComplete, onApplyComplete);
+        RunPhaseAndApply(view, em, commands, ResolutionSystems, "Resolution", deltaTime, onSystemComplete, onApplyComplete);
+        RunPhaseAndApply(view, em, commands, IntentSystems, "Intent", deltaTime, onSystemComplete, onApplyComplete);
+    }
+
+    private void RunPhaseAndApply(
+        WorldView view,
+        EntityManager em,
+        CommandBuffer commands,
+        GameSystem[] phaseSystems,
+        string phaseName,
+        float deltaTime,
+        Action<string, long>? onSystemComplete,
+        Action<string, long>? onApplyComplete)
+    {
+        RunPhase(view, commands, phaseSystems, deltaTime, onSystemComplete);
+
+        if (onApplyComplete is null)
+        {
+            commands.Apply(em);
+            return;
+        }
+
+        var applySw = System.Diagnostics.Stopwatch.StartNew();
+        commands.Apply(em);
+        applySw.Stop();
+        onApplyComplete(phaseName, applySw.ElapsedTicks);
+    }
+
     public void RunPhase(
         WorldView view,
         CommandBuffer commands,

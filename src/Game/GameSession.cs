@@ -41,7 +41,6 @@ public sealed class GameSession
     // Diagnostics timing. Reused instances: a fresh Stopwatch per tick/frame would allocate on the
     // hot path, and DiagnosticLogger no-ops when SPACEVORS_DIAGNOSTIC is off.
     private readonly Stopwatch _tickSw = new();
-    private readonly Stopwatch _applySw = new();
     private readonly Stopwatch _renderSw = new();
     private readonly Stopwatch _frameSw = new();
 
@@ -412,10 +411,7 @@ public sealed class GameSession
 
             _tickSw.Restart();
             _lastApplyTicks = 0;
-            RunPhaseAndApply(_runner.MovementSystems, "Movement", onSystemComplete);
-            RunPhaseAndApply(_runner.ActionSystems, "Action", onSystemComplete);
-            RunPhaseAndApply(_runner.ResolutionSystems, "Resolution", onSystemComplete);
-            RunPhaseAndApply(_runner.IntentSystems, "Intent", onSystemComplete);
+            _runner.RunTick(_worldView, _em, _commands, FixedDeltaTime, onSystemComplete, LogApplyTiming);
             _tickSw.Stop();
             _lastSimTicks = _tickSw.ElapsedTicks;
             DiagnosticLogger.LogSimTotal(_tickSw.ElapsedTicks);
@@ -425,16 +421,10 @@ public sealed class GameSession
         }
     }
 
-    // Phase name is a diagnostics label only; the phase order is fixed by SimulationRunner.
-    private void RunPhaseAndApply(GameSystem[] phaseSystems, string phaseName, Action<string, long>? onSystemComplete)
+    private void LogApplyTiming(string phase, long elapsedTicks)
     {
-        _runner.RunPhase(_worldView, _commands, phaseSystems, FixedDeltaTime, onSystemComplete);
-
-        _applySw.Restart();
-        _commands.Apply(_em);
-        _applySw.Stop();
-        _lastApplyTicks += _applySw.ElapsedTicks;
-        DiagnosticLogger.LogApply(phaseName, _applySw.ElapsedTicks);
+        _lastApplyTicks += elapsedTicks;
+        DiagnosticLogger.LogApply(phase, elapsedTicks);
     }
 
     private static void LogSystemTiming(string name, long ticks) => DiagnosticLogger.LogSystem(name, ticks);

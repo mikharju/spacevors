@@ -182,9 +182,9 @@ Examples:
 src/
 
     Game/                    -- app layer: window, input, rendering (Raylib-cs)
-        SpaceVorsApp.cs          -- entry point: window + top-level loop (ship select <-> session)
-        GameSession.cs           -- one playthrough: player input, fixed-timestep stepping, pause/menu, upgrades
-        GameInitializer.cs       -- entity setup + world generation
+        SpaceVorsApp.cs          -- entry point: window + top-level loop (ship select <-> session; SPACEVORS_SCENARIO* runs a perf scenario instead)
+        GameSession.cs           -- one playthrough: player input, fixed-timestep stepping, pause/menu, upgrades, scenario [PERF] rows
+        GameInitializer.cs       -- starfield + world clutter (the entities themselves come from Domain WorldFactory)
         Renderer.cs              -- frame orchestration (scene composition)
         BackgroundRenderer.cs    -- starfield + clutter layers
         WorldRenderer.cs         -- world entities: asteroids, ammo, effects, pickups
@@ -215,7 +215,7 @@ src/
         Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull)
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
-        Support/               -- SimulationRunner (phase ordering)
+        Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)
         EntityManager.cs       -- EntityManager + ComponentStorageBase + ComponentQuery<T1..T4>
         ComponentStorage.cs    -- ComponentStorage<T>: compact arrays, swap-pop
         Entity.cs              -- entity id type
@@ -226,9 +226,12 @@ src/
         SpatialGrid.cs         -- broad-phase spatial hash
         Vector2.cs             -- 2D math
         CoolDownHelper.cs      -- FireCooldown read helper
-        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, per-tick sim total, render total, per-phase command-flush total, events)
+        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, per-tick sim total, render total, per-phase command-flush total, events); EnvVar is the single source for the gate
+        WorldFactory.cs        -- starting world: player, camera, turrets, asteroids, mines, enemy ships (seeded, no Raylib)
+        Scenarios/             -- ScenarioSpec + the named perf scenarios + ScenarioWorld (seeded start states)
 
     RenderBench/             -- headless render benchmark (lit-sprite draw cost)
+    ScenarioBench/           -- headless sim-only scenario runner: same [PERF] rows, no renderer
 
     Tests/                   -- xunit tests for domain logic + matchers
 ```
@@ -249,6 +252,7 @@ For example: All ship related data in record structs related to ship, no ship co
 - ComponentStorage<T>: compact arrays + entity→slot direct-index map (O(1) lookup), swap-pop deletion for O(1) removal; entity IDs stay stable across compaction. Iteration order is not insertion order — do not rely on it.
 - Multi-component queries iterate the smallest participating storage and probe the rest with O(1) slot lookups, so iteration cost scales with the smallest set instead of N log N.
 - Frame-cost split: with `SPACEVORS_DIAGNOSTIC=1` each tick logs `[SIM] tick: Xms` (all four phases plus their command flushes), each flush logs `[APPLY] <phase>: Xms`, and each frame logs `[RENDER] frame: Xms` around the draw call. `[RENDER]` includes raylib's `SetTargetFPS` pacing wait, which happens inside `EndDraw`, so it floors at ~1000/MaxFps ms whenever the game is fast enough to hit the cap — read it against `[FRAME] dt=` to tell whether a frame is sim-bound or render-bound. Never sum `[SYSTEM]` system totals together with their sub-stage lines (`CollisionSystem` and `Collision: *` overlap).
+- Perf scenarios: `SPACEVORS_SCENARIO=<name>` opens a seeded scenario in a real window instead of ship select — pinned 1920×1024 viewport, centred mouse, exactly one tick per frame, upgrades applied without pausing, uncapped frame rate (`SPACEVORS_SCENARIO_CAP=<fps>` restores pacing), then `SPACEVORS_SCENARIO_HOLD` seconds of unmeasured aftermath. Each measured frame prints one `[PERF]` row (dt/sim/apply/render/other ms + entity counts by kind); `.tools/scenario.sh` pools runs into `frames.jsonl` + `summary.json`. `--sim` uses `ScenarioBench`, which drives the same `WorldFactory` + `ScenarioWorld` + `SimulationRunner.RunTick` with no renderer at all. The scenario start state is built in code (`Domain/Scenarios`), never reached by playing, and there is no warm-up phase.
 - Current status: Tests/PerformanceBenchmark.cs runs the full four-phase simulation at a fixed 120 fps timestep and checks an 8.3 ms frame budget per scenario. Ammo-heavy scenarios (up to ~15k live bullets) meet the budget; ship/asteroid-heavy scenarios currently exceed it — CollisionSystem is the known bottleneck (see plans/CODE_REVIEW.md, chunk 2).
 
 ## Troubleshooting

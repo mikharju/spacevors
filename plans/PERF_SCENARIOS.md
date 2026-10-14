@@ -33,7 +33,7 @@ with entity counts, stored baselines, a trace wrapper, and a way to bypass ship 
 **Scenario spec** — plain data + a builder in **Domain** (no Raylib reference):
 
 ```
-Name, ShipType/Loadout, Seed, MeasureTicks, WarmupTicks (default 0), ViewportSize,
+Name, ShipType/Loadout, Seed, MeasureTicks, ViewportSize,
 StartState   : spawn primitives — asteroids / ships / mines / **ammo already in flight** /
                effect entities with randomized ages / player health ratio,
                built from AsteroidFactory, EnemyShipFactory, WeaponStats, SpawnPlacement
@@ -81,11 +81,14 @@ Pins a scenario **must** set, or runs are not comparable:
 
 ## 4. Run structure and output
 
-### 4.1 Start state: seeded by default, warm-up as the escape hatch
+### 4.1 Start state: seeded — no warm-up phase
 
 A measured window of ~1 s (120 ticks at the fixed 1/120 step) is the right size for something you can
 watch, but it is not enough to *reach* an interesting state by playing — `LoadTestWeapon` needs
-seconds of firing to build the ~7k live bullets seen in the pasted log. Two ways to get there:
+seconds of firing to build the ~7k live bullets seen in the pasted log. So the scenario builds the
+state it wants to measure. There is deliberately **no warm-up phase**: it would add a knob per
+scenario, slow every run down, and hide which state is actually being measured. Cold JIT is handled
+outside the scenario instead — `--iters N` pools N runs and discards the first whole run (§4.4).
 
 **A. Seed the state directly (default).** The scenario builds the world it wants to measure: bullets
 already in flight, an asteroid in the right place, ships in a cluster, player at 10 % hp.
@@ -94,16 +97,12 @@ already in flight, an asteroid in the right place, ships in a cluster, player at
 - The scenario *is* the start state: readable, reviewable, diffable in git.
 - Stronger determinism — the measured state does not depend on 900 ticks of every system's behaviour,
   so tuning a fire rate cannot silently change what a scenario measures.
-- **Reaches states play cannot produce** — `scale-ladder` at 20k–100k entities is impossible to warm up
-  into, and deliberate worst cases (all bullets inside one grid cell) are only constructible.
+- **Reaches states play cannot produce** — `scale-ladder` at 20k–100k entities is impossible to reach
+  by playing, and deliberate worst cases (all bullets inside one grid cell) are only constructible.
 
-**B. Warm-up (escape hatch, unrendered by default).** Run N ticks with no draws, then open the window
-and measure: ~1.6 s of sim for 900 ticks. Use it only for states that are genuinely hard to construct,
-e.g. "the world 30 s into a run with four upgrades applied".
-
-**C. Snapshot files — deliberately not planned.** Dumping and reloading the world would give real
+**Snapshot files — deliberately not planned.** Dumping and reloading the world would give real
 states with instant restarts, but it needs a serializer for ~25 component types and produces an opaque
-fixture. Skip it unless A and B both prove insufficient.
+fixture. Skip it unless seeding proves insufficient.
 
 Rules that keep seeded states honest:
 
@@ -114,13 +113,16 @@ Rules that keep seeded states honest:
 - **Randomize effect-entity ages.** Sparks created at tick 0 all expire on the same tick, producing a
   sawtooth in entity counts and cost. Give each a random remaining lifetime.
 - **Check for a settling transient.** Bullets placed touching an asteroid fire a burst of impacts in
-  the first ticks. Compare the first 20 measured ticks with the last 20; if they differ materially,
-  move the entities apart or add a short unrendered warm-up.
+  the first ticks. Implemented guard: a seeded bullet is resampled until it is clear of every asteroid.
+  Compare the first 20 measured ticks with the last 20; if they still differ materially, move the
+  entities apart.
 - **Density decays.** 7,400 seeded bullets converging on one asteroid are destroyed as they hit, so the
-  measured second covers a falling density. Acceptable because `frames.jsonl` reports counts per frame
-  and `perEntity` normalizes by them — but keep a *sustained* variant (`ammo-spray`: seeded load plus
-  the weapon still firing, holding density steady) alongside a *draining* one (`ammo-spray-miss`: no
-  firing).
+   measured second covers a falling density. Acceptable because `frames.jsonl` reports counts per frame
+   and `perEntity` normalizes by them. Both `ammo-spray` and `ammo-spray-miss` therefore keep the
+   turrets **silenced**: `LoadTestWeapon` fires 8,000 pellets per volley, and a volley landing inside
+   the measured second doubles the bullet count in one frame and swamps everything else. A sustained
+   (still-firing) variant needs a ~2 s window to cover one volley cycle — deferred until the numbers
+   from the draining pair are known.
 
 Measured phase: `measure=120` ticks by default, delimited by `[PERF-BEGIN]` / `[PERF-END]` in the log.
 
@@ -129,6 +131,9 @@ Measured phase: `measure=120` ticks by default, delimited by `[PERF-BEGIN]` / `[
 - Scenario runs open the **real window by default**; `--sim` is the opt-in headless mode.
 - **Disable the fps cap in scenario mode** (`SetTargetFPS(0)`). With the 120 cap active, `dt` floors
   at 8.33 ms and both the fps percentiles and the sim/render fractions are meaningless.
+- **`--cap <fps>` opts back into pacing** (`SPACEVORS_SCENARIO_CAP`, 0 = uncapped) for the question the
+  uncapped run cannot answer: what a player actually feels at the shipped 120 fps target. Expect
+  `[RENDER]` to absorb raylib's pacing sleep there — that variant measures pacing, not headroom.
 - Force **exactly one sim tick per rendered frame** — the accumulator's ~1.9 ticks/frame is
   wall-clock noise. A slow scenario advances the sim slower than real time; irrelevant, since
   scenarios are defined in ticks.
@@ -214,12 +219,13 @@ resolution + effects directly.
 ## 6. Shell interface
 
 ```
-.tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold 3|key] [--seed N]
-                          [--warmup N] [--trace] [--apitrace] [--shot] [--compare] [--out DIR]
+.tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold S] [--cap FPS] [--seed N]
+                          [--trace] [--apitrace] [--shot] [--compare] [--out DIR]
 ```
 
-`--warmup` is the escape hatch from §4.1B and defaults to 0 — a scenario's own seeded state is the
-start state.
+The runner maps its flags onto the game's scenario seams — `SPACEVORS_SCENARIO`,
+`SPACEVORS_SCENARIO_CAP`, `SPACEVORS_SCENARIO_TICKS`, `SPACEVORS_SCENARIO_HOLD` — the same variables a
+manual run can set. There is no `--warmup`: a scenario's seeded state *is* the start state (§4.1).
 
 Default is the **real window** (`--sim` opts out of rendering). Steps: build Release once → if running
 in the sandbox (`.tools/root` exists) source `.tools/env.sh` and start Xvfb as a harness **background
@@ -294,7 +300,6 @@ Still open:
   cheap? Proposed check — run each seeded scenario once and compare its `perEntity` numbers against
   the same stage measured during a real playthrough (`SPACEVORS_DIAGNOSTIC=1` log). A large gap means
   the seed is unrealistic and the primitive needs fixing.
-- Whether `--warmup` should stay in the tool at all once the first four scenarios are seeded, or be
-  added only when a state proves hard to construct.
-- Whether to keep a **capped variant** (`--cap 120`) that reports what a player would actually feel,
-  alongside the uncapped headroom measurement.
+
+Resolved since the first draft: warm-up is out (§4.1); the capped variant is a startup parameter
+rather than a separate scenario (§4.2).
