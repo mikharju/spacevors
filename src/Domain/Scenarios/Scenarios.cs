@@ -94,10 +94,9 @@ public static class Scenarios
             "effect spawning and spark rendering (~16-20k entities). A stress case, not a representative one.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
             AimDirection: TowardTestAsteroid, AimOffsetR: 0.3f, StreamLength: 0f, WeaponFires: false,
-            // 23,876 entities and ~15k sparks: knowingly over 120 fps today, and the reason the tail
-            // investigation exists. The number is reported every run; the gate stays green on purpose.
+            // Was marked ExpectedOverBudget at 29.48ms while every shape was its own GL draw call.
+            // Shape batching took it to 4.76ms, inside the 120fps budget, so the mark is gone.
             PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
-            ExpectedOverBudget: true,
             Effects: new SeededEffects(Sparks: 15000, Explosions: 2000)),
 
         new("hull-damage",
