@@ -31,6 +31,10 @@ jobs:
       # instead of waiting for someone to run a scenario by hand. The tests never open a window, but
       # they load the Raylib-cs assembly, which needs the GL runtime present.
       - name: Test
+        env:
+          # Selects the CI ceiling set in ScenarioPerformanceTest: this runner is about 3x slower on
+          # single-core work than the desktop those desktop ceilings came from.
+          SPACEVORS_PERF_HOST: ci
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgl1 libglu1-mesa
