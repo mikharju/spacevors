@@ -24,14 +24,14 @@ public class ScenarioPerformanceTest
     const int WarmupTicks = 20;
     const int MeasuredTicks = 100;
 
-    // Worst median this machine produced per scenario over repeated `dotnet test` runs, times at
-    // least 2.5, rounded up to a clean number: baseline-idle 0.10ms, hull-damage 0.28ms,
-    // ammo-spray 1.73ms, ammo-spray-miss 0.86ms, impact-storm 1.94ms. xunit runs test classes in
-    // parallel, so the medians carry scheduling noise - ammo-spray-miss and impact-storm move by
-    // close to 2x between runs - and the multiples are what absorb it.
+    // Worst median observed per scenario across the hosts that run this suite, times at least 2.5,
+    // rounded up. The hosts matter: the CI runner measured ammo-spray at 5.28ms median where a dev
+    // desktop sees 1.73ms, so a ceiling derived from one machine fails on hardware instead of code.
+    // Known medians: baseline-idle 0.10, hull-damage 0.28, ammo-spray 5.28 (CI) / 1.73 (desktop),
+    // ammo-spray-miss 0.86, impact-storm 1.94. Tightening one needs a rerun on every host in the list.
     const double BaselineIdleCeilingMs = 0.5;
     const double HullDamageCeilingMs = 1.0;
-    const double AmmoSprayCeilingMs = 5.0;
+    const double AmmoSprayCeilingMs = 15.0;
     const double AmmoSprayMissCeilingMs = 2.5;
     const double ImpactStormCeilingMs = 5.0;
 
@@ -51,7 +51,9 @@ public class ScenarioPerformanceTest
         Console.WriteLine($"[PERF] scenario={spec.Name} medianTickMs={medianMs:F3} ceilingMs={ceilingMs:F2}");
 
         Assert.True(medianMs <= ceilingMs,
-            $"{spec.Name}: median tick {medianMs:F2}ms exceeds the {ceilingMs:F2}ms characterization ceiling");
+            $"{spec.Name}: median tick {medianMs:F2}ms exceeds the {ceilingMs:F2}ms characterization " +
+            $"ceiling on a host with {Environment.ProcessorCount} logical CPUs - check the medians " +
+            "listed with the ceilings before assuming the code got slower");
     }
 
     private static double MedianTickMs(ScenarioSpec spec)

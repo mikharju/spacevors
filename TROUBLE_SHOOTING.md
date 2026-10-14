@@ -234,6 +234,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: Run dirs are `.tools/run/scenario-<name>-<utc>/`, so `ls -1dt .tools/run/scenario-ammo-spray-*` matches the `ammo-spray-miss` dirs too, and they were newer. Scenario names are not disjoint under glob prefixes.
 - **Fix / Prevention**: Anchor the pattern on what follows the name - `scenario-$name-[0-9]*` - or select the dir another way. When scripting over scenarios, print which run dir was picked before using it: an ambiguous glob fails silently, and in perf work a wrong number is worse than a missing one.
 
+## 38. A characterization ceiling measured on one host fails on another
+
+- **Symptom**: The first CI run of the new scenario perf test failed: `ammo-spray: median tick 5.28ms exceeds the 5.00ms characterization ceiling` - 5.6% over - while the same suite was green locally, twice, at ~1.7ms for that scenario.
+- **Cause**: The ceilings were derived from the worst median seen on the machine that wrote them, and two host differences were missing from that picture. A CI runner's single-core throughput is roughly 3x slower, and xunit runs test classes in parallel, so on a small runner the timed ticks compete with every other class.
+- **Fix / Prevention**: Derive ceilings from the **worst host that runs the suite**, and keep that host list in the comment next to them (it names CI explicitly now). `[assembly: CollectionBehavior(DisableTestParallelization = true)]` in `Tests/AssemblySettings.cs` removes the scheduling penalty for about a second of suite time. Failure messages print `Environment.ProcessorCount` so a breach shows its host. Do not "fix" this by asserting the game's real 8.33ms budget - that number belongs to a machine with a GPU and is already gated by `.tools/scenario.sh`. If the ceilings stay too blunt to be useful, calibrate inside the test (timed fixed-work loop, scale the ceilings) rather than skipping the assertion.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.
