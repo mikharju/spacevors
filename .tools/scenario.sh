@@ -9,8 +9,11 @@
 # Exits non-zero when the run breaches its frame budget without being marked expected-over-budget, or
 # (with --check-baseline) regresses past the committed baseline's limits.
 #
-# The game writes PNGs of --shots frames (default start,mid,end) into the run dir itself, so a run
-# records what it looked like without anyone pressing F12 into a window that may not be focused.
+# --iters N runs N+1 times: the first run pays cold startup and is discarded, so window mode opens
+# N+1 windows. The game writes PNGs of --shots frames (default start,mid,end) into the run dir, so a
+# run records what it looked like without anyone pressing F12 into a window that may not be focused.
+# Only the last run takes them: earlier runs write the same filenames, and each encode stalls that
+# window for ~0.1-0.2s of wall time that no frame statistic can see.
 #
 # Default host is the real game window on whatever display this shell has. --sim runs ScenarioBench
 # instead: no window, no renderer, so the numbers are pure ECS cost.
@@ -99,10 +102,21 @@ export SPACEVORS_DIAGNOSTIC=1 SPACEVORS_SCENARIO="$name"
 export SPACEVORS_SCENARIO_HOLD="$hold" SPACEVORS_SCENARIO_CAP="$cap" SPACEVORS_SCENARIO_SHOTS="$shots"
 if [ -n "$measure" ]; then export SPACEVORS_SCENARIO_TICKS="$measure"; fi
 
-# One extra iteration beyond the pooled ones: the first run pays cold JIT and is discarded.
+# One extra iteration beyond the pooled ones: the first run pays cold startup and is discarded, so
+# `--iters 2` opens three windows. Say it up front, because three windows for "2" looks like a bug.
+runs=$((iters + 1))
+echo "iterations: $runs runs = $iters measured + 1 discarded cold run"
+[ "$sim" = 1 ] || echo "            each run opens its own window, so --iters 2 shows three"
+if [ "$sim" != 1 ] && [ -n "$shots" ]; then
+    echo "shots: only in the last run ($shots); each PNG stalls that window ~0.1-0.2s"
+fi
 echo "artifact: $APP/$app_dll (ReadyToRun)"
 [ "$sim" = 1 ] || echo "display: ${DISPLAY:-$WAYLAND_DISPLAY}"
-for i in $(seq 1 "$((iters + 1))"); do
+for i in $(seq 1 "$runs"); do
+    # Screenshots in the final run only: earlier iterations write the same filenames and their PNGs are
+    # overwritten, so every extra encode is pure stall. Kept out of the other runs' logs as well, so no
+    # measured frame near a shot carries screenshot work in its render time.
+    if [ "$i" = "$runs" ]; then export SPACEVORS_SCENARIO_SHOTS="$shots"; else export SPACEVORS_SCENARIO_SHOTS=""; fi
     if [ "$sim" = 1 ]; then
         dotnet "$APP/ScenarioBench.dll" "$name" ${measure:-} > "iter-$i.log" 2>&1
     else

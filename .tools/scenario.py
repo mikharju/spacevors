@@ -63,13 +63,50 @@ def read_frames(run: Path, logs: int) -> tuple[list[dict], float, bool]:
     return frames, budget, expected_over_budget
 
 
+def measured_blocks(run: Path, logs: int):
+    """Yield (row, systems, phases, passes) for every frame that counts toward the statistics.
+
+    Three kinds of frame are out, and the rule lives here so every statistic agrees about them:
+    frame 1 of an iteration is a cold start; a frame that took a screenshot paid for a PNG encode
+    that lands *between* rows, so it is invisible to dt but its successor carries the GPU readback;
+    and the successor of such a frame is that successor. Pass lines are collected per block, so a
+    pass mean can never be averaged over a frame the frame-time statistics already dropped."""
+    for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
+        systems: dict[str, float] = {}
+        phases: dict[str, float] = {}
+        passes: dict[str, list[float]] = {}
+        after_shot = False
+
+        for line in (run / f"iter-{index}.log").read_text(errors="replace").splitlines():
+            match = SYSTEM.match(line)
+            if match:
+                name, ms = match.group(1), float(match.group(2))
+                (phases if ": " in name else systems)[name] = ms
+                continue
+
+            match = PASS.match(line)
+            if match:
+                passes.setdefault(match.group(1), []).append(float(match.group(2)))
+                continue
+
+            if not ROW.match(line):
+                continue
+
+            row = {key: float(value) for key, value in FIELD.findall(line)}
+            took_shot = row.get("shot", 0.0) > 0
+            if int(row["frame"]) > 1 and not took_shot and not after_shot:
+                yield index, row, systems, phases, passes
+            after_shot = took_shot
+            systems, phases, passes = {}, {}, {}
+
+
 def read_passes(run: Path, logs: int) -> list[dict]:
     """Mean ms per render pass, worst first. Each pass is emitted once per frame, so its mean is its
     per-frame contribution and the shares show where the single [RENDER] total actually goes."""
     samples: dict[str, list[float]] = {}
-    for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
-        for name, ms in PASS.findall((run / f"iter-{index}.log").read_text(errors="replace")):
-            samples.setdefault(name, []).append(float(ms))
+    for _, _, _, _, block_passes in measured_blocks(run, logs):
+        for name, values in block_passes.items():
+            samples.setdefault(name, []).extend(values)
 
     means = {name: float(np.mean(values)) for name, values in samples.items()}
     total = sum(means.values()) or 1.0
@@ -195,45 +232,20 @@ def shape_costs(passes: list[dict], frames: list[dict]) -> dict:
 
 def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict], list[dict]]:
     """Per-system mean ms (worst first), the same for the named phases inside a system, plus the
-    systems behind the slowest measured frames. The first frame of an iteration is skipped as in
-    read_frames, so the two agree on what was measured. A --sim run logs only phases, so a report
+    systems behind the slowest measured frames. measured_blocks decides what was measured, so these
+    tables and the frame-time statistics never disagree. A --sim run logs only phases, so a report
     that looked at totals alone would be empty exactly where the harness habit points."""
     system_samples: dict[str, list[float]] = {}
     phase_samples: dict[str, list[float]] = {}
     frames = []
 
-    for index in range(2, logs + 1):  # iteration 1 is the discarded cold run
-        systems: dict[str, float] = {}
-        phases: dict[str, float] = {}
-
-        for line in (run / f"iter-{index}.log").read_text(errors="replace").splitlines():
-            match = SYSTEM.match(line)
-            if match:
-                name, ms = match.group(1), float(match.group(2))
-                (phases if ": " in name else systems)[name] = ms
-                continue
-
-            if not ROW.match(line):
-                continue
-
-            # The [PERF] row closes the block. Grouping on it rather than on the game's [FRAME] marker
-            # is what makes this work for --sim runs too, which emit no frame markers at all.
-            row = {key: float(value) for key, value in FIELD.findall(line)}
-            number = int(row["frame"])
-
-            if number > 1:
-                # Sampled here, not on the [SYSTEM] lines, so the cold first tick stays out of the means.
-                for name, ms in systems.items():
-                    system_samples.setdefault(name, []).append(ms)
-                for name, ms in phases.items():
-                    phase_samples.setdefault(name, []).append(ms)
-
-                frames.append({"frame": number, "iteration": index, "dt": row["dt"], "sim": row["sim"],
-                               "systems": systems, "phases": phases})
-
-            # Frame 1 is skipped as a cold start, but its system costs still have to be dropped before
-            # the next block, or they leak into frame 2's numbers.
-            systems, phases = {}, {}
+    for index, row, systems, phases, _ in measured_blocks(run, logs):
+        for name, ms in systems.items():
+            system_samples.setdefault(name, []).append(ms)
+        for name, ms in phases.items():
+            phase_samples.setdefault(name, []).append(ms)
+        frames.append({"frame": int(row["frame"]), "iteration": index, "dt": row["dt"],
+                       "sim": row["sim"], "systems": systems, "phases": phases})
 
     def ranked(samples: dict[str, list[float]], name_key: str, share_key: str) -> list[dict]:
         means = {name: float(np.mean(values)) for name, values in samples.items()}
