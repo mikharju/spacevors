@@ -3,7 +3,11 @@
 # frames.jsonl + summary.json.
 #
 #   .tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold S] [--cap FPS]
-#                           [--shots LIST] [--no-shots] [--out DIR] [--compare] [--update-baseline]
+#                           [--shots LIST] [--no-shots] [--out DIR] [--compare] [--check-baseline]
+#                           [--update-baseline]
+#
+# Exits non-zero when the run breaches its frame budget without being marked expected-over-budget, or
+# (with --check-baseline) regresses past the committed baseline's limits.
 #
 # The game writes PNGs of --shots frames (default start,mid,end) into the run dir itself, so a run
 # records what it looked like without anyone pressing F12 into a window that may not be focused.
@@ -25,7 +29,7 @@
 _TOOLS="$(cd "$(dirname "$0")" && pwd)"
 
 name="${1:-}"; shift || true
-measure=""; iters=5; hold=0; cap=0; out=""; compare=0; update_baseline=0; sim=0
+measure=""; iters=5; hold=0; cap=0; out=""; compare=0; update_baseline=0; sim=0; gate=0; gate_status=0
 shots="start,mid,end"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -38,6 +42,7 @@ while [ $# -gt 0 ]; do
         --cap) cap="$2"; shift 2 ;;
         --out) out="$2"; shift 2 ;;
         --compare) compare=1; shift ;;
+        --check-baseline) check_baseline=1; shift ;;
         --update-baseline) update_baseline=1; shift ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
@@ -99,8 +104,10 @@ for i in $(seq 1 "$((iters + 1))"); do
 done
 
 export PYTHONPATH="$_TOOLS/pylibs${PYTHONPATH:+:}$PYTHONPATH"
+# An unmarked budget breach exits 1; capture it rather than aborting, so the run's logs, shots and
+# index row are still reported before the script returns the failure.
 python3 "$_TOOLS/scenario.py" --run "$run" --name "$name" --iters "$iters" --logs "$((iters + 1))" \
-    --index "$logs/index.tsv" --host "$host" || exit 1
+    --index "$logs/index.tsv" --host "$host" || gate=1
 [ -f "$run/summary.json" ] || { echo "no summary.json produced; baseline left untouched" >&2; exit 1; }
 
 baseline="$_TOOLS/baselines/$name.json"
@@ -112,9 +119,23 @@ if [ "$compare" = 1 ]; then
     [ -f "$baseline" ] && python3 "$_TOOLS/scenario.py" --compare "$baseline" "$run/summary.json" \
         || echo "no baseline for $name yet ($baseline)" >&2
 fi
+if [ "$check_baseline" = 1 ]; then
+    if [ -f "$baseline" ]; then
+        python3 "$_TOOLS/scenario.py" --check-baseline "$baseline" "$run/summary.json" || gate=1
+    else
+        echo "no baseline for $name yet ($baseline): nothing to gate against" >&2
+    fi
+fi
 ln -sfn "$run" "$logs/latest"
 shots_written=$(find "$run" -maxdepth 1 -name 'scenario-*.png' | wc -l)
 [ "$shots_written" = 0 ] || echo "shots:    $(cd "$run" && ls -1 scenario-*.png | tr '\n' ' ')"
 echo "log dir:  $run"
 echo "newest:   $logs/latest  (raw rows iter-N.log, per-frame frames.jsonl, headline summary.json)"
 echo "index:    $logs/index.tsv"
+
+# The one place that knows the run failed: every caller - a shell chain, a wrapper target, a hook, CI
+# or a later agent - reads this instead of parsing the tables above.
+if [ "$gate" = 1 ]; then
+    echo "PERF COST: $name failed a perf gate (budget breach or baseline regression). Details above; data in $run" >&2
+    exit 1
+fi
