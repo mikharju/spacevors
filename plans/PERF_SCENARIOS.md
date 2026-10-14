@@ -143,7 +143,10 @@ Measured phase: `measure=120` ticks by default, delimited by `[PERF-BEGIN]` / `[
 
 ### 4.3 Output files
 
-Per run, under `.tools/run/<scenario>-<utc>/`:
+Per run, under `.tools/run/scenario-<scenario>-<utc>/`. `.tools/run/latest` symlinks to the newest
+run, `.tools/run/index.tsv` lists every run kept (scenario, host, frames, median/p99 ms, sim share,
+budget verdict, directory), and anything older than a day is cleared by the next run. The logs are
+gitignored; the scripts that write them are not.
 
 Source of truth is one diagnostics-gated log line per measured frame (reused stopwatch, no
 allocation), which the script parses into `frames.jsonl`:

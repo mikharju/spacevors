@@ -73,6 +73,22 @@ def gc_summary(frames: list[dict]) -> dict:
     }
 
 
+def append_index(index: Path, run: Path, summary: dict, host: str) -> None:
+    """One TSV row per run. Logs are disposable and timestamped, so without an index the only way to
+    find a past run is shell history; an index makes "read the scenario logs" enough for a reader who
+    was not present when they were produced."""
+    if not index.exists():
+        index.write_text("scenario\thost\tframes\tmedianMs\tp99Ms\tsimShare\tbudget\trunDir\n")
+
+    frame = summary["frameMs"]
+    row = [summary["scenario"], host, str(summary["frames"]),
+           f"{frame['median']:.2f}", f"{frame['p99']:.2f}", f"{summary['fraction']['sim']:.3f}",
+           "pass" if summary["budget"]["pass"] else "fail", str(run.resolve())]
+
+    with index.open("a") as handle:
+        handle.write("\t".join(row) + "\n")
+
+
 def stats(values: list[float]) -> dict:
     a = np.array(values)
     return {
@@ -139,6 +155,8 @@ def main() -> None:
     parser.add_argument("--iters", type=int, default=5)
     parser.add_argument("--logs", type=int, default=6)
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("BASELINE", "CURRENT"))
+    parser.add_argument("--index", type=Path)
+    parser.add_argument("--host", default="window")
     args = parser.parse_args()
 
     if args.compare:
@@ -155,6 +173,8 @@ def main() -> None:
 
     summary = summarize(frames, args.name, args.iters, budget, read_passes(args.run, args.logs))
     (args.run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    if args.index:
+        append_index(args.index, args.run, summary, args.host)
 
     print(json.dumps({k: summary[k] for k in ["frameMs", "fps", "fraction", "perEntityNs", "budget"]}, indent=2))
 

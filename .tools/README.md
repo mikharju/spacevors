@@ -43,6 +43,7 @@ Then, from any ordinary command:
 .tools/input.sh key 1                  # hold a key one frame (1 = pick ship)
 .tools/input.sh click 960 512          # move + hold left button one frame
 .tools/diff.sh a.png b.png --expect-different
+.tools/scenario.sh ammo-spray --sim    # perf scenario; logs + index.tsv under .tools/run/
 bash .tools/stop.sh                    # close the game window
 ```
 

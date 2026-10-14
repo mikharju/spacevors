@@ -13,6 +13,12 @@
 # game at a display that does not exist. In the sandbox, source it first:
 #   .tools/xvfb.sh                      # as a background job
 #   . .tools/env.sh && .tools/scenario.sh ammo-spray --iters 5
+#
+# Logs outlive the terminal. Each run lands in .tools/run/scenario-<name>-<utc>/ (iter-N.log with the
+# raw [PERF]/[RENDER-PASS]/[SIM] rows, frames.jsonl, summary.json); `.tools/run/latest` points at the
+# newest one and `.tools/run/index.tsv` lists every run kept, with its headline numbers, so a later
+# reader can find a log without being told its path. Anything older than a day is cleared on the next
+# run. The logs are gitignored; these scripts are not.
 _TOOLS="$(cd "$(dirname "$0")" && pwd)"
 
 name="${1:-}"; shift || true
@@ -45,8 +51,20 @@ else
     fi
 fi
 
-run="${out:-$_TOOLS/run/scenario-$name-$(date -u +%Y%m%dT%H%M%SZ)}"
+host=$([ "$sim" = 1 ] && echo sim || echo window)
+
+logs="$_TOOLS/run"
+keep_minutes=1440
+mkdir -p "$logs" || exit 1
+
+# A day is long enough to come back to a run in the next session; past that the raw rows are just
+# disk. Cleared before the new run so the index never lists a directory that is already gone.
+stale=$(find "$logs" -mindepth 1 -maxdepth 1 -mmin +"$keep_minutes" -print -exec rm -rf {} + | wc -l)
+[ "$stale" = 0 ] || echo "logs: cleared $stale item(s) older than $((keep_minutes / 60)) h"
+
+run="${out:-$logs/scenario-$name-$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$run" || exit 1
+run="$(cd "$run" && pwd)"
 cd "$run" || exit 1
 
 export SPACEVORS_DIAGNOSTIC=1 SPACEVORS_SCENARIO="$name"
@@ -75,7 +93,8 @@ for i in $(seq 1 "$((iters + 1))"); do
 done
 
 export PYTHONPATH="$_TOOLS/pylibs${PYTHONPATH:+:}$PYTHONPATH"
-python3 "$_TOOLS/scenario.py" --run "$run" --name "$name" --iters "$iters" --logs "$((iters + 1))" || exit 1
+python3 "$_TOOLS/scenario.py" --run "$run" --name "$name" --iters "$iters" --logs "$((iters + 1))" \
+    --index "$logs/index.tsv" --host "$host" || exit 1
 [ -f "$run/summary.json" ] || { echo "no summary.json produced; baseline left untouched" >&2; exit 1; }
 
 baseline="$_TOOLS/baselines/$name.json"
@@ -87,4 +106,7 @@ if [ "$compare" = 1 ]; then
     [ -f "$baseline" ] && python3 "$_TOOLS/scenario.py" --compare "$baseline" "$run/summary.json" \
         || echo "no baseline for $name yet ($baseline)" >&2
 fi
-echo "run dir: $run"
+ln -sfn "$run" "$logs/latest"
+echo "log dir:  $run"
+echo "newest:   $logs/latest  (raw rows iter-N.log, per-frame frames.jsonl, headline summary.json)"
+echo "index:    $logs/index.tsv"
