@@ -50,3 +50,4 @@ ScaffoldingReadMe.txt
 .tools/shots/
 .tools/run/
 .tools/pkgs.txt
+__pycache__/
