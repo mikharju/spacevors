@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Scenarios;
 using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 
@@ -42,6 +43,7 @@ public sealed class GameSession
     private readonly Stopwatch _tickSw = new();
     private readonly Stopwatch _applySw = new();
     private readonly Stopwatch _renderSw = new();
+    private readonly Stopwatch _frameSw = new();
 
     private float _accumulator;
     private bool _gameOver;
@@ -57,9 +59,30 @@ public sealed class GameSession
     // Diagnostics: position the player is pinned to while T freeze is active.
     private Vector2? _diagnosticFreezePosition;
 
-    public GameSession(ShipType ship)
+    // Non-null in perf-scenario mode: a seeded world, one tick per frame, no pause, auto-exit.
+    private readonly ScenarioSpec? _scenario;
+    private int _scenarioFramesMeasured;
+
+    // Last frame's stage totals, in stopwatch ticks, for the [PERF] line.
+    private long _lastSimTicks;
+    private long _lastApplyTicks;
+    private long _lastRenderTicks;
+
+    public bool ScenarioFinished => _scenario is not null && _scenarioFramesMeasured >= _scenario.MeasureTicks;
+
+    public GameSession(ShipType ship, ScenarioSpec? scenario = null)
     {
-        var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(ship, new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight()));
+        _scenario = scenario;
+
+        // A scenario pins the viewport: world generation places mines and ships relative to the
+        // screen and the renderer culls by screen box, so a different window would measure a
+        // different world.
+        var viewport = scenario is null
+            ? new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight())
+            : WorldView.DefaultViewportSize;
+
+        var (em, playerEntity, cameraEntity, stars, clutter) = GameInitializer.Initialize(
+            ship, viewport, scenario?.Seed ?? EntityManager.DefaultRngSeed);
         _em = em;
         _worldView = new WorldView(em);
         _playerEntity = playerEntity;
@@ -67,7 +90,14 @@ public sealed class GameSession
         _stars = stars;
         _clutter = clutter;
         _ship = ship;
-        _diagnostics = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+        _diagnostics = Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
+
+        if (scenario is not null)
+        {
+            _worldView.ViewportSize = viewport;
+            ScenarioWorld.Apply(em, playerEntity, scenario);
+            Console.WriteLine($"[PERF-BEGIN] scenario={scenario.Name} ticks={scenario.MeasureTicks} bullets={scenario.BulletCount} budgetFrameMs={scenario.FrameMsBudget:F2}");
+        }
     }
 
     // Returns true when the player restarts from game over (caller returns to ship select).
@@ -94,6 +124,14 @@ public sealed class GameSession
         // Escape is not used: raylib's default exit key would close the window.
         if (!_gameOver && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
 
+        // Scenario mode never pauses: a level-up applies its first option immediately, so a
+        // PendingChoice cannot insert unmeasured frames into the run.
+        if (_scenario is not null && hasPendingChoice)
+        {
+            ApplySelectedUpgrade(0);
+            hasPendingChoice = false;
+        }
+
         bool paused = hasPendingChoice || _showStats;
 
         // Entering pause: stop the ship's thrusters so flames/lights don't burn behind the menu.
@@ -109,6 +147,7 @@ public sealed class GameSession
 
     private void UpdateRunning(float frameTime)
     {
+        _frameSw.Restart();
         _accumulator = Math.Min(_accumulator + frameTime, MaxAccumulator);
 
         bool playerDead = _em.HasComponent<Dead>(_playerEntity);
@@ -127,6 +166,12 @@ public sealed class GameSession
         }
 
         RenderGame();
+        _frameSw.Stop();
+
+        // The frame interval is measured here rather than taken from Raylib.GetFrameTime(): that
+        // value describes the *previous* frame, which makes `other` land on the wrong row and can
+        // even go negative.
+        if (_scenario is not null) ReportScenarioFrame(TicksToMs(_frameSw.ElapsedTicks));
     }
 
     private void ReadPlayerInput()
@@ -347,19 +392,32 @@ public sealed class GameSession
         // every tick. Apply() clears the buffer after each phase.
         Action<string, long>? onSystemComplete = DiagnosticLogger.IsEnabled ? LogSystemTiming : null;
 
+        // Scenario mode runs exactly one tick per rendered frame — the accumulator's 1-2 ticks per
+        // frame is wall-clock noise — and pins the camera so screen culling cannot vary between runs.
+        if (_scenario is not null)
+        {
+            _accumulator = FixedDeltaTime;
+            _worldView.MouseScreenPosition = _worldView.ViewportSize * 0.5f;
+        }
+
         while (_accumulator >= FixedDeltaTime)
         {
             DiagnosticLogger.LogFrameStart();
 
-            _worldView.ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
-            _worldView.MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY());
+            if (_scenario is null)
+            {
+                _worldView.ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+                _worldView.MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY());
+            }
 
             _tickSw.Restart();
+            _lastApplyTicks = 0;
             RunPhaseAndApply(_runner.MovementSystems, "Movement", onSystemComplete);
             RunPhaseAndApply(_runner.ActionSystems, "Action", onSystemComplete);
             RunPhaseAndApply(_runner.ResolutionSystems, "Resolution", onSystemComplete);
             RunPhaseAndApply(_runner.IntentSystems, "Intent", onSystemComplete);
             _tickSw.Stop();
+            _lastSimTicks = _tickSw.ElapsedTicks;
             DiagnosticLogger.LogSimTotal(_tickSw.ElapsedTicks);
 
             _accumulator -= FixedDeltaTime;
@@ -375,10 +433,35 @@ public sealed class GameSession
         _applySw.Restart();
         _commands.Apply(_em);
         _applySw.Stop();
+        _lastApplyTicks += _applySw.ElapsedTicks;
         DiagnosticLogger.LogApply(phaseName, _applySw.ElapsedTicks);
     }
 
     private static void LogSystemTiming(string name, long ticks) => DiagnosticLogger.LogSystem(name, ticks);
+
+    // One machine-readable row per measured scenario frame; .tools/scenario.sh turns these into
+    // frames.jsonl. `apply` is already contained in `sim`; `other` is what neither stage accounts
+    // for (input, camera, UI, GC, present wait) and should keep the fractions summing to ~1.
+    private void ReportScenarioFrame(double frameMs)
+    {
+        if (ScenarioFinished) return;
+
+        double simMs = TicksToMs(_lastSimTicks);
+        double renderMs = TicksToMs(_lastRenderTicks);
+
+        Console.WriteLine(
+            $"[PERF] frame={++_scenarioFramesMeasured} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +
+            $"render={renderMs:F2} other={frameMs - simMs - renderMs:F2} " +
+            $"ents={Count<Position>()} ammo={Count<Ammo>()} sparks={Count<DamageSpark>()} explosions={Count<Explosion>()} " +
+            $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()}");
+
+        if (_scenarioFramesMeasured == _scenario!.MeasureTicks)
+            Console.WriteLine($"[PERF-END] scenario={_scenario.Name} budgetFrameMs={_scenario.FrameMsBudget:F2}");
+    }
+
+    private static double TicksToMs(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
+
+    private int Count<T>() where T : notnull => _em.TryGetStorage(out ComponentStorage<T> storage) ? storage.Count : 0;
 
     private void StopThrusters()
     {
@@ -394,6 +477,7 @@ public sealed class GameSession
         _renderSw.Restart();
         Renderer.Render(_em, renderCam.Target.X, renderCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _gameOver, _stars, _clutter, _playerEntity, _ship, _diagnostics);
         _renderSw.Stop();
+        _lastRenderTicks = _renderSw.ElapsedTicks;
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 

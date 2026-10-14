@@ -34,7 +34,8 @@ public static class SpawnPlacement
     public static float AngleFromTo(Vector2 from, Vector2 to) =>
         (float)Math.Atan2(to.X - from.X, -(to.Y - from.Y));
 
-    private static Vector2 Rotate(Vector2 v, float angle)
+    // Rotate a vector by an angle in radians (game angle convention is irrelevant here).
+    public static Vector2 Rotate(Vector2 v, float angle)
     {
         float cosA = (float)Math.Cos(angle);
         float sinA = (float)Math.Sin(angle);

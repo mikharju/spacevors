@@ -7,7 +7,7 @@ public class LevelUpSystem : GameSystem
 {
     const int MilestoneLevelInterval = 5;
     const int MilestoneChoiceCount = 5;
-    const string DiagnosticEnvVar = "SPACEVORS_DIAGNOSTIC";
+    const string DiagnosticEnvVar = DiagnosticLogger.EnvVar;
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
     // Fallback for when the WeaponSlots component is missing (always present in production).

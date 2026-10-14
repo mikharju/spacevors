@@ -11,6 +11,11 @@ public class TurretFiringSystem : GameSystem
     // Distance (or squared distance) below which positions are treated as coincident.
     private const float Epsilon = 0.001f;
 
+    // A bullet spawns this far in front of its turret, and its speed varies by this fraction.
+    // Shared with the perf scenarios, which seed volleys that must look like fired ones.
+    public const float AmmoSpawnOffset = 20f;
+    public const float AmmoSpeedVariation = 0.3f;
+
     // A manually selected target may be engaged at this multiple of normal range, capped by ammo reach.
     private const float TargetedRangeMultiplier = 3f;
 
@@ -40,7 +45,7 @@ public class TurretFiringSystem : GameSystem
                     FireAtTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle, selection.Value, commands);
                     commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
 
-                    if (Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1")
+                    if (Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1")
                     {
                         commands.AddEntity(new Position(selection.Value.PredictedPosition), new DebugMarker(0.5f));
                     }
@@ -408,9 +413,9 @@ public class TurretFiringSystem : GameSystem
                 ammoDir.X * sinOff + ammoDir.Y * cosOff
             );
 
-            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * 0.3f;
+            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * AmmoSpeedVariation;
 
-            Vector2 spawnOffset = pelletDir * 20f;
+            Vector2 spawnOffset = pelletDir * AmmoSpawnOffset;
             if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))
             {
                 float forwardOffset = ship.Radius + 5f;

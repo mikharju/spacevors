@@ -4,7 +4,11 @@ namespace Spacevors.Domain;
 
 public static class DiagnosticLogger
 {
-    private static readonly bool _enabled = Environment.GetEnvironmentVariable("SPACEVORS_DIAGNOSTIC") == "1";
+    // Single source of truth for the diagnostics gate, so the env-var name cannot drift between
+    // the logger, world generation and the renderers.
+    public const string EnvVar = "SPACEVORS_DIAGNOSTIC";
+
+    private static readonly bool _enabled = Environment.GetEnvironmentVariable(EnvVar) == "1";
     private static readonly object _lock = new();
 
     public static bool IsEnabled => _enabled;
