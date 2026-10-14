@@ -1,158 +1,158 @@
 {
   "scenario": "impact-storm",
-  "iterations": 3,
-  "frames": 357,
+  "iterations": 5,
+  "frames": 580,
   "discarded": {
     "iterations": 1,
     "firstFramePerIteration": true
   },
   "frameMs": {
-    "mean": 28.671,
-    "median": 29.48,
-    "p90": 32.708,
-    "p99": 41.789,
-    "max": 42.78
+    "mean": 4.845,
+    "median": 4.78,
+    "p90": 6.087,
+    "p99": 14.556,
+    "max": 15.96
   },
   "fps": {
-    "mean": 35.8,
-    "median": 33.9,
-    "low1": 23.9,
-    "low10": 30.6
+    "mean": 230.2,
+    "median": 209.2,
+    "low1": 68.7,
+    "low10": 164.3
   },
   "fraction": {
-    "sim": 0.0575,
-    "render": 0.942,
-    "other": 0.0004
+    "sim": 0.4574,
+    "render": 0.5404,
+    "other": 0.0023
   },
   "simMs": {
-    "mean": 1.65,
-    "median": 0.94,
-    "p90": 2.858,
-    "p99": 11.126,
-    "max": 11.78
+    "mean": 2.216,
+    "median": 2.05,
+    "p90": 3.134,
+    "p99": 11.213,
+    "max": 12.07
   },
   "applyMs": {
-    "mean": 0.404,
-    "median": 0.23,
-    "p90": 0.704,
-    "p99": 5.098,
-    "max": 5.19
+    "mean": 0.846,
+    "median": 0.665,
+    "p90": 1.544,
+    "p99": 5.064,
+    "max": 5.62
   },
   "renderMs": {
-    "mean": 27.008,
-    "median": 28.58,
-    "p90": 29.64,
-    "p99": 32.369,
-    "max": 33.59
+    "mean": 2.618,
+    "median": 2.69,
+    "p90": 2.87,
+    "p99": 5.502,
+    "max": 5.9
   },
   "renderPasses": [
     {
       "pass": "world.sparks",
-      "meanMs": 21.086,
-      "shareOfRender": 0.7767
-    },
-    {
-      "pass": "world.explosions",
-      "meanMs": 3.505,
-      "shareOfRender": 0.1291
-    },
-    {
-      "pass": "world.ammo",
-      "meanMs": 1.777,
-      "shareOfRender": 0.0655
+      "meanMs": 1.468,
+      "shareOfRender": 0.5389
     },
     {
       "pass": "background",
-      "meanMs": 0.271,
-      "shareOfRender": 0.01
+      "meanMs": 0.273,
+      "shareOfRender": 0.1002
+    },
+    {
+      "pass": "world.explosions",
+      "meanMs": 0.272,
+      "shareOfRender": 0.0999
+    },
+    {
+      "pass": "world.ammo",
+      "meanMs": 0.204,
+      "shareOfRender": 0.0748
     },
     {
       "pass": "world.asteroids",
-      "meanMs": 0.141,
-      "shareOfRender": 0.0052
-    },
-    {
-      "pass": "present",
-      "meanMs": 0.115,
-      "shareOfRender": 0.0042
+      "meanMs": 0.142,
+      "shareOfRender": 0.0523
     },
     {
       "pass": "lights.collect",
-      "meanMs": 0.084,
-      "shareOfRender": 0.0031
+      "meanMs": 0.106,
+      "shareOfRender": 0.0387
+    },
+    {
+      "pass": "present",
+      "meanMs": 0.1,
+      "shareOfRender": 0.0368
     },
     {
       "pass": "hud.health",
-      "meanMs": 0.051,
-      "shareOfRender": 0.0019
+      "meanMs": 0.052,
+      "shareOfRender": 0.019
     },
     {
       "pass": "world.player",
-      "meanMs": 0.049,
-      "shareOfRender": 0.0018
-    },
-    {
-      "pass": "world.enemyShips",
-      "meanMs": 0.019,
-      "shareOfRender": 0.0007
+      "meanMs": 0.038,
+      "shareOfRender": 0.0139
     },
     {
       "pass": "world.thrusters",
-      "meanMs": 0.019,
-      "shareOfRender": 0.0007
+      "meanMs": 0.021,
+      "shareOfRender": 0.0076
     },
     {
-      "pass": "world.healSparks",
+      "pass": "world.enemyShips",
+      "meanMs": 0.018,
+      "shareOfRender": 0.0067
+    },
+    {
+      "pass": "world.turrets",
       "meanMs": 0.004,
-      "shareOfRender": 0.0002
+      "shareOfRender": 0.0015
     }
   ],
   "gc": {
     "collections": {
-      "gen0": 21,
-      "gen1": 6,
-      "gen2": 3
+      "gen0": 35,
+      "gen1": 10,
+      "gen2": 5
     },
-    "framesWithGc": 21,
+    "framesWithGc": 35,
     "allocKbPerFrame": {
-      "mean": 752.8,
-      "p99": 1097.0,
+      "mean": 754.1,
+      "p99": 1105.0,
       "max": 1730.0
     },
     "frameMsMedian": {
-      "withGc": 30.39,
-      "withoutGc": 29.185
+      "withGc": 5.3,
+      "withoutGc": 4.77
     }
   },
   "perEntityNs": {
-    "sim": 69.1,
-    "render": 1131.2
+    "sim": 92.7,
+    "render": 109.5
   },
   "entities": {
     "start": 25957,
-    "end": 16227,
-    "mean": 23876.2
+    "end": 16461,
+    "mean": 23909.9
   },
   "counts": {
     "ents": {
       "start": 25957,
-      "end": 16227,
-      "mean": 23876.2
+      "end": 16461,
+      "mean": 23909.9
     },
     "ammo": {
       "start": 4254,
       "end": 0,
-      "mean": 1511.4
+      "mean": 1528.7
     },
     "sparks": {
       "start": 18485,
-      "end": 14824,
-      "mean": 19178.6
+      "end": 15010,
+      "mean": 19198.5
     },
     "explosions": {
       "start": 3166,
-      "end": 1351,
-      "mean": 3134.2
+      "end": 1399,
+      "mean": 3130.6
     },
     "beams": {
       "start": 0,
@@ -183,6 +183,6 @@
   "budget": {
     "frameMs": 32.0,
     "pass": true,
-    "framesOverBudget": 58
+    "framesOverBudget": 0
   }
 }

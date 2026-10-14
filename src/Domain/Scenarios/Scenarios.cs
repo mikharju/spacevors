@@ -30,6 +30,9 @@ public sealed record ScenarioSpec(
     float PlayerHealthRatio,
     int MeasureTicks,
     double FrameMsBudget,
+    // Set where a scenario is knowingly slower than FrameMsBudget, so the harness reports the number
+    // without failing. Clearing this flag is how an accepted shortfall gets closed.
+    bool ExpectedOverBudget = false,
     // Effect entities to place in the impact area, already aged. Without them the first second of a
     // scenario measures particles piling up toward a steady state rather than the steady state.
     SeededEffects? Effects = null,
@@ -46,13 +49,10 @@ public static class Scenarios
     // A LoadTestWeapon volley lives 1.9 s, so a window longer than ~1.5 s drains the whole stream and
     // measures its death instead of its density. Density is held by the seeded particle counts instead.
 
-    // Loose frame budgets: they catch large regressions, not tuning drift. Refresh deliberately.
-    private const double IdleFrameMsBudget = 10.0;
-    private const double HeavyFrameMsBudget = 20.0;
-    private const double MediumFrameMsBudget = 14.0;
-
-    // The impact storm is deliberately over the play budget: it exists to be the worst case.
-    private const double StormFrameMsBudget = 32.0;
+    // One budget for every scenario: the project goal of 120 fps. They used to be per-scenario and
+    // loose (10-32ms), which caught collapses but could not fail on real drift - and a gate that
+    // cannot fail is not a gate. Raise one deliberately, with a reason, and expect it to come down.
+    private const double TargetFrameMsBudget = 1000.0 / 120.0;
 
     // The diagnostics Shadow copy carrying LoadTestWeapon (8000 pellets per volley).
     private static ShipType LoadTestShip =>
@@ -68,7 +68,7 @@ public static class Scenarios
             "Normal starting world, player idle, no seeded bullets, turrets silenced.",
             Ship: ShipType.Shadow, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
             AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 1f,
-            MeasureTicks: DefaultMeasureTicks, FrameMsBudget: IdleFrameMsBudget),
+            MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget),
 
         new("ammo-spray",
             "Seeded LoadTestWeapon volley grazing the rim of the test asteroid: dense ammo and a few " +
@@ -78,7 +78,7 @@ public static class Scenarios
             "bullets. Turrets stay silenced so no 8000-pellet volley lands inside the measured window.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
             AimDirection: TowardTestAsteroid, AimOffsetR: 1.05f, StreamLength: 0f, WeaponFires: false,
-            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: HeavyFrameMsBudget,
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
             Effects: new SeededEffects(Sparks: 6000, Explosions: 1200)),
 
         new("ammo-spray-miss",
@@ -86,7 +86,7 @@ public static class Scenarios
             "pair with ammo-spray prices broad-phase candidate testing against a rock.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
             AimDirection: IntoEmptySpace, AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false,
-            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: HeavyFrameMsBudget),
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget),
 
         new("impact-storm",
             "The same volley driven near the centre of the asteroid on purpose: ~12 impacts per tick, " +
@@ -94,14 +94,17 @@ public static class Scenarios
             "effect spawning and spark rendering (~16-20k entities). A stress case, not a representative one.",
             Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
             AimDirection: TowardTestAsteroid, AimOffsetR: 0.3f, StreamLength: 0f, WeaponFires: false,
-            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: StormFrameMsBudget,
+            // 23,876 entities and ~15k sparks: knowingly over 120 fps today, and the reason the tail
+            // investigation exists. The number is reported every run; the gate stays green on purpose.
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
+            ExpectedOverBudget: true,
             Effects: new SeededEffects(Sparks: 15000, Explosions: 2000)),
 
         new("hull-damage",
             "Player hull at 10%: damage shading, embers and smoke, no bullets in flight.",
             Ship: ShipType.Heavy, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
             AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 0.1f,
-            MeasureTicks: DefaultMeasureTicks, FrameMsBudget: MediumFrameMsBudget),
+            MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget),
     ];
 
     public static ScenarioSpec? Find(string name) =>

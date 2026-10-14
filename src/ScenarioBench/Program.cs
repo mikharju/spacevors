@@ -39,7 +39,7 @@ public static class Program
         var view = new WorldView(em);
         ScenarioWorld.Apply(em, playerEntity, spec);
 
-        Console.WriteLine($"[PERF-BEGIN] scenario={spec.Name} ticks={ticks} bullets={spec.BulletCount} budgetFrameMs={spec.FrameMsBudget:F2}");
+        Console.WriteLine($"[PERF-BEGIN] scenario={spec.Name} ticks={ticks} bullets={spec.BulletCount} budgetFrameMs={spec.FrameMsBudget:F2} expectedOverBudget={spec.ExpectedOverBudget}");
 
         _lastGc0 = GC.CollectionCount(0);
         _lastGc1 = GC.CollectionCount(1);

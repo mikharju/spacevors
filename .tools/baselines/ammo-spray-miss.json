@@ -1,110 +1,110 @@
 {
   "scenario": "ammo-spray-miss",
-  "iterations": 3,
-  "frames": 357,
+  "iterations": 5,
+  "frames": 580,
   "discarded": {
     "iterations": 1,
     "firstFramePerIteration": true
   },
   "frameMs": {
-    "mean": 6.296,
-    "median": 6.14,
-    "p90": 7.654,
-    "p99": 12.967,
-    "max": 15.45
+    "mean": 2.118,
+    "median": 1.98,
+    "p90": 2.24,
+    "p99": 8.026,
+    "max": 10.43
   },
   "fps": {
-    "mean": 166.1,
-    "median": 162.9,
-    "low1": 77.1,
-    "low10": 130.7
+    "mean": 499.6,
+    "median": 505.1,
+    "low1": 124.6,
+    "low10": 446.4
   },
   "fraction": {
-    "sim": 0.1764,
-    "render": 0.822,
-    "other": 0.0017
+    "sim": 0.5189,
+    "render": 0.4762,
+    "other": 0.0049
   },
   "simMs": {
-    "mean": 1.11,
-    "median": 1.0,
-    "p90": 1.214,
-    "p99": 3.361,
-    "max": 9.45
+    "mean": 1.099,
+    "median": 0.99,
+    "p90": 1.171,
+    "p99": 3.528,
+    "max": 9.3
   },
   "applyMs": {
-    "mean": 0.042,
+    "mean": 0.04,
     "median": 0.04,
-    "p90": 0.06,
-    "p99": 0.07,
-    "max": 0.08
+    "p90": 0.05,
+    "p99": 0.06,
+    "max": 0.09
   },
   "renderMs": {
-    "mean": 5.174,
-    "median": 5.11,
-    "p90": 6.408,
-    "p99": 7.46,
-    "max": 9.63
+    "mean": 1.008,
+    "median": 0.97,
+    "p90": 1.05,
+    "p99": 1.479,
+    "max": 4.49
   },
   "renderPasses": [
     {
       "pass": "world.ammo",
-      "meanMs": 4.567,
-      "shareOfRender": 0.8698
+      "meanMs": 0.409,
+      "shareOfRender": 0.3792
     },
     {
       "pass": "background",
-      "meanMs": 0.27,
-      "shareOfRender": 0.0515
+      "meanMs": 0.273,
+      "shareOfRender": 0.2532
     },
     {
       "pass": "world.asteroids",
-      "meanMs": 0.14,
-      "shareOfRender": 0.0266
+      "meanMs": 0.136,
+      "shareOfRender": 0.1259
     },
     {
       "pass": "present",
-      "meanMs": 0.084,
-      "shareOfRender": 0.016
-    },
-    {
-      "pass": "hud.health",
-      "meanMs": 0.05,
-      "shareOfRender": 0.0095
+      "meanMs": 0.069,
+      "shareOfRender": 0.0638
     },
     {
       "pass": "world.player",
-      "meanMs": 0.044,
-      "shareOfRender": 0.0084
+      "meanMs": 0.05,
+      "shareOfRender": 0.0463
+    },
+    {
+      "pass": "hud.health",
+      "meanMs": 0.049,
+      "shareOfRender": 0.0453
     },
     {
       "pass": "lights.collect",
-      "meanMs": 0.022,
-      "shareOfRender": 0.0042
+      "meanMs": 0.021,
+      "shareOfRender": 0.0199
     },
     {
       "pass": "world.thrusters",
       "meanMs": 0.02,
-      "shareOfRender": 0.0039
+      "shareOfRender": 0.0189
     },
     {
       "pass": "world.enemyShips",
-      "meanMs": 0.018,
-      "shareOfRender": 0.0034
+      "meanMs": 0.017,
+      "shareOfRender": 0.0157
     },
     {
       "pass": "world.turrets",
       "meanMs": 0.004,
-      "shareOfRender": 0.0008
+      "shareOfRender": 0.0036
+    },
+    {
+      "pass": "world.debugMarkers",
+      "meanMs": 0.004,
+      "shareOfRender": 0.0034
     },
     {
       "pass": "world.sparks",
       "meanMs": 0.004,
-      "shareOfRender": 0.0007
-    },
-    {
-      "pass": "world.targeting",
-      "meanMs": 0.004,
-      "shareOfRender": 0.0007
+      "shareOfRender": 0.0033
     }
   ],
   "gc": {
@@ -115,34 +115,34 @@
     },
     "framesWithGc": 0,
     "allocKbPerFrame": {
-      "mean": 18.2,
+      "mean": 17.8,
       "p99": 24.0,
-      "max": 47.0
+      "max": 45.0
     },
     "frameMsMedian": {
       "withGc": null,
-      "withoutGc": 6.14
+      "withoutGc": 1.98
     }
   },
   "perEntityNs": {
-    "sim": 271.8,
-    "render": 1266.5
+    "sim": 268.2,
+    "render": 246.1
   },
   "entities": {
     "start": 5509,
-    "end": 2679,
-    "mean": 4085.6
+    "end": 2702,
+    "mean": 4097.9
   },
   "counts": {
     "ents": {
       "start": 5509,
-      "end": 2679,
-      "mean": 4085.6
+      "end": 2702,
+      "mean": 4097.9
     },
     "ammo": {
       "start": 5457,
-      "end": 2627,
-      "mean": 4033.6
+      "end": 2650,
+      "mean": 4045.9
     },
     "sparks": {
       "start": 0,

@@ -100,7 +100,7 @@ public sealed class GameSession
             ScenarioWorld.Apply(em, playerEntity, scenario);
             _shotFrames = ParseShotFrames(scenario);
             MarkGcCounters();
-            Console.WriteLine($"[PERF-BEGIN] scenario={scenario.Name} ticks={scenario.MeasureTicks} bullets={scenario.BulletCount} budgetFrameMs={scenario.FrameMsBudget:F2}");
+            Console.WriteLine($"[PERF-BEGIN] scenario={scenario.Name} ticks={scenario.MeasureTicks} bullets={scenario.BulletCount} budgetFrameMs={scenario.FrameMsBudget:F2} expectedOverBudget={scenario.ExpectedOverBudget}");
         }
     }
 
