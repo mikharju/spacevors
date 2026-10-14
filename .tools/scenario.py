@@ -27,8 +27,13 @@ def read_frames(run: Path, logs: int) -> tuple[list[dict], float]:
         match = BEGIN.search(text)
         if match:
             budget = float(match.group(2))
-        rows = [dict(FIELD.findall(line)) for line in text.splitlines() if ROW.match(line)]
-        frames += [{k: float(v) for k, v in row.items()} for row in rows[1:]]
+        rows = [dict(FIELD.findall(line)) for line in text.splitlines() if ROW.match(line)][1:]
+        afterShot = False
+        for row in rows:
+            frame = {k: float(v) for k, v in row.items()}
+            frame["afterShot"] = afterShot
+            afterShot = frame.get("shot", 0.0) > 0
+            frames.append(frame)
     return frames, budget
 
 
@@ -170,6 +175,10 @@ def main() -> None:
     with (args.run / "frames.jsonl").open("w") as out:
         for frame in frames:
             out.write(json.dumps(frame) + "\n")
+
+    # Shot frames and the frame that pays for their PNG encode are kept in frames.jsonl for
+    # inspection but excluded from the statistics, so a 100ms screenshot cannot become a p99.
+    frames = [f for f in frames if not f.get("shot") and not f.get("afterShot")]
 
     summary = summarize(frames, args.name, args.iters, budget, read_passes(args.run, args.logs))
     (args.run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

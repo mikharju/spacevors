@@ -3,7 +3,10 @@
 # frames.jsonl + summary.json.
 #
 #   .tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold S] [--cap FPS]
-#                           [--out DIR] [--compare] [--update-baseline]
+#                           [--shots LIST] [--no-shots] [--out DIR] [--compare] [--update-baseline]
+#
+# The game writes PNGs of --shots frames (default start,mid,end) into the run dir itself, so a run
+# records what it looked like without anyone pressing F12 into a window that may not be focused.
 #
 # Default host is the real game window on whatever display this shell has. --sim runs ScenarioBench
 # instead: no window, no renderer, so the numbers are pure ECS cost.
@@ -23,9 +26,12 @@ _TOOLS="$(cd "$(dirname "$0")" && pwd)"
 
 name="${1:-}"; shift || true
 measure=""; iters=5; hold=0; cap=0; out=""; compare=0; update_baseline=0; sim=0
+shots="start,mid,end"
 while [ $# -gt 0 ]; do
     case "$1" in
         --sim) sim=1; shift ;;
+        --shots) shots="$2"; shift 2 ;;
+        --no-shots) shots=""; shift ;;
         --measure) measure="$2"; shift 2 ;;
         --iters) iters="$2"; shift 2 ;;
         --hold) hold="$2"; shift 2 ;;
@@ -68,7 +74,7 @@ run="$(cd "$run" && pwd)"
 cd "$run" || exit 1
 
 export SPACEVORS_DIAGNOSTIC=1 SPACEVORS_SCENARIO="$name"
-export SPACEVORS_SCENARIO_HOLD="$hold" SPACEVORS_SCENARIO_CAP="$cap"
+export SPACEVORS_SCENARIO_HOLD="$hold" SPACEVORS_SCENARIO_CAP="$cap" SPACEVORS_SCENARIO_SHOTS="$shots"
 if [ -n "$measure" ]; then export SPACEVORS_SCENARIO_TICKS="$measure"; fi
 
 # One extra iteration beyond the pooled ones: the first run pays cold JIT and is discarded.
@@ -107,6 +113,8 @@ if [ "$compare" = 1 ]; then
         || echo "no baseline for $name yet ($baseline)" >&2
 fi
 ln -sfn "$run" "$logs/latest"
+shots_written=$(find "$run" -maxdepth 1 -name 'scenario-*.png' | wc -l)
+[ "$shots_written" = 0 ] || echo "shots:    $(cd "$run" && ls -1 scenario-*.png | tr '\n' ' ')"
 echo "log dir:  $run"
 echo "newest:   $logs/latest  (raw rows iter-N.log, per-frame frames.jsonl, headline summary.json)"
 echo "index:    $logs/index.tsv"

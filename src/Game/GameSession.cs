@@ -61,6 +61,7 @@ public sealed class GameSession
     // Non-null in perf-scenario mode: a seeded world, one tick per frame, no pause, auto-exit.
     private readonly ScenarioSpec? _scenario;
     private int _scenarioFramesMeasured;
+    private HashSet<int> _shotFrames = [];
 
     // Last frame's stage totals, in stopwatch ticks, for the [PERF] line.
     private long _lastSimTicks;
@@ -97,6 +98,7 @@ public sealed class GameSession
         {
             _worldView.ViewportSize = viewport;
             ScenarioWorld.Apply(em, playerEntity, scenario);
+            _shotFrames = ParseShotFrames(scenario);
             MarkGcCounters();
             Console.WriteLine($"[PERF-BEGIN] scenario={scenario.Name} ticks={scenario.MeasureTicks} bullets={scenario.BulletCount} budgetFrameMs={scenario.FrameMsBudget:F2}");
         }
@@ -442,16 +444,52 @@ public sealed class GameSession
         double simMs = TicksToMs(_lastSimTicks);
         double renderMs = TicksToMs(_lastRenderTicks);
 
+        int frame = ++_scenarioFramesMeasured;
+        bool shot = _shotFrames.Contains(frame);
+
         Console.WriteLine(
-            $"[PERF] frame={++_scenarioFramesMeasured} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +
+            $"[PERF] frame={frame} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +
             $"render={renderMs:F2} other={frameMs - simMs - renderMs:F2} " +
             $"ents={Count<Position>()} ammo={Count<Ammo>()} sparks={Count<DamageSpark>()} explosions={Count<Explosion>()} " +
             $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()} " +
-            GcColumns());
+            GcColumns() + (shot ? " shot=1" : string.Empty));
 
-        if (_scenarioFramesMeasured == _scenario!.MeasureTicks)
+        if (frame == _scenario!.MeasureTicks)
             Console.WriteLine($"[PERF-END] scenario={_scenario.Name} budgetFrameMs={_scenario.FrameMsBudget:F2}");
+
+        // Captured after the row is written, so the PNG encode cannot inflate this frame; its cost
+        // lands on the next row, which is why the aggregator drops shot frames and their successors.
+        if (shot) Raylib.TakeScreenshot(ShotFileName(_scenario.Name, frame));
     }
+
+    // SPACEVORS_SCENARIO_SHOTS: frames to write as PNGs - 1-based numbers, or the words start, mid
+    // and end. The game captures its own frames because raylib's F12 path needs the window to be
+    // focused, which a headless display does not reliably provide.
+    private static HashSet<int> ParseShotFrames(ScenarioSpec spec)
+    {
+        var frames = new HashSet<int>();
+
+        foreach (string part in (Environment.GetEnvironmentVariable(ScenarioShotsEnvVar) ?? string.Empty)
+                     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            int frame = part.ToLowerInvariant() switch
+            {
+                "start" => FirstScenarioFrame,
+                "mid" => spec.MeasureTicks / 2,
+                "end" => spec.MeasureTicks,
+                _ => int.TryParse(part, out int parsed) ? parsed : 0,
+            };
+
+            if (frame >= FirstScenarioFrame && frame <= spec.MeasureTicks) frames.Add(frame);
+        }
+
+        return frames;
+    }
+
+    private static string ShotFileName(string scenario, int frame) => $"scenario-{scenario}-frame{frame:D3}.png";
+
+    const string ScenarioShotsEnvVar = "SPACEVORS_SCENARIO_SHOTS";
+    const int FirstScenarioFrame = 1;
 
     // Garbage collected since the last row, plus bytes allocated in it: the sim's p99 spikes are
     // otherwise invisible in a timing-only trace, and the scenario runner correlates them with the
