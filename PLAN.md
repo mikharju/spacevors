@@ -349,6 +349,17 @@ Shadow carries a real weapon in normal play; the load-test spray moved to a diag
 - `ShipType.DiagnosticShips`: Shadow hull, engines and graphics carrying Laser Lance, Prism Lance, Ripple Cutter, Cyclotron, Graviton Burst, Flak Curtain and LoadTestWeapon — one weapon each — appended to the select list only under `SPACEVORS_DIAGNOSTIC=1`
 - 4 new tests (Shadow's weapon, clone roster and hull identity, distinct names, every clone fires in a started world)
 
+## Sim vs render cost logging — done
+
+The diagnostic log now shows which half of the frame costs what, so performance work can be aimed at the real limiter (plans/PARALLEL_SIM.md §11).
+
+- `[SIM] tick: Xms` — one line per fixed-timestep tick: all four phases plus their command flushes
+- `[APPLY] <phase>: Xms` — the previously invisible `CommandBuffer.Apply` cost, per phase (Movement/Action/Resolution/Intent)
+- `[RENDER] frame: Xms` — the frame's draw call (`Renderer.Render` / `Renderer.RenderPaused`), covering the in-game, stats-screen and upgrade-menu paths
+- Stopwatches are reused instance fields: nothing allocated per tick/frame, and `DiagnosticLogger` no-ops when `SPACEVORS_DIAGNOSTIC` is off
+- `[RENDER]` includes raylib's `SetTargetFPS(120)` pacing wait (raylib waits inside `EndDraw`), so it floors at ~8 ms while the game is at the cap — read it against `[FRAME] dt=`
+- Verified headless (Xvfb + llvmpipe, 116 fps, ~85 entities): `[SIM] 0.15–0.33ms` vs `[RENDER] 7.95–8.17ms`; full suite green (248 passed)
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

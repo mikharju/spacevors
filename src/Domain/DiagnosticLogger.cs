@@ -50,6 +50,27 @@ public static class DiagnosticLogger
         }
     }
 
+    // Whole-tick sim cost (all four phases plus their command flushes), so the sim/render split is
+    // readable without summing [SYSTEM] lines by hand.
+    public static void LogSimTotal(long elapsedTicks) => LogTiming("SIM", "tick", elapsedTicks);
+
+    // Wall time of the frame's draw call. Includes raylib's SetTargetFPS pacing wait, which happens
+    // inside EndDraw, so this floors at ~1000/MaxFps ms whenever the game is fast enough to hit the cap.
+    public static void LogRender(long elapsedTicks) => LogTiming("RENDER", "frame", elapsedTicks);
+
+    public static void LogApply(string phase, long elapsedTicks) => LogTiming("APPLY", phase, elapsedTicks);
+
+    private static void LogTiming(string tag, string name, long elapsedTicks)
+    {
+        if (!_enabled) return;
+
+        double ms = elapsedTicks * 1000.0 / Stopwatch.Frequency;
+        lock (_lock)
+        {
+            Console.WriteLine($"[{tag}] {name}: {ms:F2}ms");
+        }
+    }
+
     public static void LogWarning(string message)
     {
         if (!_enabled) return;

@@ -226,7 +226,7 @@ src/
         SpatialGrid.cs         -- broad-phase spatial hash
         Vector2.cs             -- 2D math
         CoolDownHelper.cs      -- FireCooldown read helper
-        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, events)
+        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, per-tick sim total, render total, per-phase command-flush total, events)
 
     RenderBench/             -- headless render benchmark (lit-sprite draw cost)
 
@@ -248,6 +248,7 @@ For example: All ship related data in record structs related to ship, no ship co
 
 - ComponentStorage<T>: compact arrays + entity→slot direct-index map (O(1) lookup), swap-pop deletion for O(1) removal; entity IDs stay stable across compaction. Iteration order is not insertion order — do not rely on it.
 - Multi-component queries iterate the smallest participating storage and probe the rest with O(1) slot lookups, so iteration cost scales with the smallest set instead of N log N.
+- Frame-cost split: with `SPACEVORS_DIAGNOSTIC=1` each tick logs `[SIM] tick: Xms` (all four phases plus their command flushes), each flush logs `[APPLY] <phase>: Xms`, and each frame logs `[RENDER] frame: Xms` around the draw call. `[RENDER]` includes raylib's `SetTargetFPS` pacing wait, which happens inside `EndDraw`, so it floors at ~1000/MaxFps ms whenever the game is fast enough to hit the cap — read it against `[FRAME] dt=` to tell whether a frame is sim-bound or render-bound. Never sum `[SYSTEM]` system totals together with their sub-stage lines (`CollisionSystem` and `Collision: *` overlap).
 - Current status: Tests/PerformanceBenchmark.cs runs the full four-phase simulation at a fixed 120 fps timestep and checks an 8.3 ms frame budget per scenario. Ammo-heavy scenarios (up to ~15k live bullets) meet the budget; ship/asteroid-heavy scenarios currently exceed it — CollisionSystem is the known bottleneck (see plans/CODE_REVIEW.md, chunk 2).
 
 ## Troubleshooting

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
@@ -35,6 +36,12 @@ public sealed class GameSession
     private readonly ShipType _ship;
     private readonly bool _diagnostics;
     private readonly SimulationRunner _runner = new();
+
+    // Diagnostics timing. Reused instances: a fresh Stopwatch per tick/frame would allocate on the
+    // hot path, and DiagnosticLogger no-ops when SPACEVORS_DIAGNOSTIC is off.
+    private readonly Stopwatch _tickSw = new();
+    private readonly Stopwatch _applySw = new();
+    private readonly Stopwatch _renderSw = new();
 
     private float _accumulator;
     private bool _gameOver;
@@ -347,21 +354,28 @@ public sealed class GameSession
             _worldView.ViewportSize = new Vector2(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
             _worldView.MouseScreenPosition = new Vector2((float)Raylib.GetMouseX(), (float)Raylib.GetMouseY());
 
-            _runner.RunPhase(_worldView, _commands, _runner.MovementSystems, FixedDeltaTime, onSystemComplete);
-            _commands.Apply(_em);
-
-            _runner.RunPhase(_worldView, _commands, _runner.ActionSystems, FixedDeltaTime, onSystemComplete);
-            _commands.Apply(_em);
-
-            _runner.RunPhase(_worldView, _commands, _runner.ResolutionSystems, FixedDeltaTime, onSystemComplete);
-            _commands.Apply(_em);
-
-            _runner.RunPhase(_worldView, _commands, _runner.IntentSystems, FixedDeltaTime, onSystemComplete);
-            _commands.Apply(_em);
+            _tickSw.Restart();
+            RunPhaseAndApply(_runner.MovementSystems, "Movement", onSystemComplete);
+            RunPhaseAndApply(_runner.ActionSystems, "Action", onSystemComplete);
+            RunPhaseAndApply(_runner.ResolutionSystems, "Resolution", onSystemComplete);
+            RunPhaseAndApply(_runner.IntentSystems, "Intent", onSystemComplete);
+            _tickSw.Stop();
+            DiagnosticLogger.LogSimTotal(_tickSw.ElapsedTicks);
 
             _accumulator -= FixedDeltaTime;
             _em.AddElapsedTime(FixedDeltaTime);
         }
+    }
+
+    // Phase name is a diagnostics label only; the phase order is fixed by SimulationRunner.
+    private void RunPhaseAndApply(GameSystem[] phaseSystems, string phaseName, Action<string, long>? onSystemComplete)
+    {
+        _runner.RunPhase(_worldView, _commands, phaseSystems, FixedDeltaTime, onSystemComplete);
+
+        _applySw.Restart();
+        _commands.Apply(_em);
+        _applySw.Stop();
+        DiagnosticLogger.LogApply(phaseName, _applySw.ElapsedTicks);
     }
 
     private static void LogSystemTiming(string name, long ticks) => DiagnosticLogger.LogSystem(name, ticks);
@@ -377,7 +391,10 @@ public sealed class GameSession
     private void RenderGame()
     {
         var renderCam = _em.GetComponent<Camera>(_cameraEntity);
+        _renderSw.Restart();
         Renderer.Render(_em, renderCam.Target.X, renderCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _gameOver, _stars, _clutter, _playerEntity, _ship, _diagnostics);
+        _renderSw.Stop();
+        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 
     private void RenderStatsScreen()
@@ -385,10 +402,14 @@ public sealed class GameSession
         var statsCam = _em.GetComponent<Camera>(_cameraEntity);
         int windowWidth = Raylib.GetScreenWidth();
         int windowHeight = Raylib.GetScreenHeight();
+
+        _renderSw.Restart();
         var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards: false);
 
         Renderer.RenderPaused(_em, (float)statsCam.Target.X, (float)statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
             new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1));
+        _renderSw.Stop();
+        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 
     private void HandleUpgradeMenu()
@@ -410,8 +431,11 @@ public sealed class GameSession
         if (selectedIndex >= 0) ApplySelectedUpgrade(selectedIndex);
 
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
+        _renderSw.Restart();
         Renderer.RenderPaused(_em, (float)upgradeCam.Target.X, (float)upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
             new Renderer.StatsOverlay(screen, upgradeOptions, GetPlayerLevel(), hoveredIndex));
+        _renderSw.Stop();
+        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 
     private static int ReadChoiceSelection(int hoveredIndex)
