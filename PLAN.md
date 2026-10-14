@@ -379,9 +379,8 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 ## Render cost: shape batching — done
 
 - The baselines settled where the frame goes: ~**1.1 µs per drawn shape** (sparks, bullets, explosions — measured six times across three scenarios), i.e. the cost is per GL draw call, not per entity or pixel. `world.sparks` is 58% of `ammo-spray` render and 78% of `impact-storm`; sim is 6-11%.
-- `Game/ShapeBatch.cs` accumulates the same geometry between `Rlgl.Begin(DrawMode.Triangles)`/`Rlgl.End()` with per-vertex colour, closing every 16k vertices. The five shape passes (`ammo`, `sparks`, `healSparks`, `explosions`, `smoke`) now emit into it instead of calling `Raylib.DrawCircle`/`DrawLineEx` per entity.
-- Sandbox effect (llvmpipe): `world.ammo` 15.6 ms → 0.42 ms, `world.sparks` 1.07 ms for ~7k particles; `present` is now the largest sandbox pass.
-- Open: re-take the real-GPU baselines (`--update-baseline`) and confirm the passes on a real display — the sandbox cannot show the visual result honestly.
+- `Game/ShapeBatch.cs` batched those draws into one `Rlgl` vertex block — **reverted**: the geometry was submitted but not visible in the scenario frames, and the sandbox pass cost dropped below what drawing that many filled circles can cost. The measurement stands, the implementation did not. Redo it with start/mid/end shots as the check.
+- Scenario shots: `SPACEVORS_SCENARIO_SHOTS=start,mid,end` writes PNGs of those frames into the run dir, so a render change can be verified with one command instead of pressing F12 into an unfocused window.
 
 ## Difficulty scaling
 
