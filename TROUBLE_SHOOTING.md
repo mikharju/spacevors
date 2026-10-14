@@ -228,6 +228,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: I reasoned from the aggregator's parsed fields rather than from the raw log. `DiagnosticLogger.LogSystem` and the `onSystemComplete` hook already existed, wired up whenever diagnostics are on, and every scenario run already contained 3,600 `[SYSTEM]` lines per iteration. Only the parser was missing, and it took ~40 lines.
 - **Fix / Prevention**: Before writing a measurement, grep for the seam and look at a raw log file with the numbers you want. A missing *report* is not a missing *measurement*. The same lesson appeared earlier the same day: `[RENDER-PASS]` costs looked fine while the drawn shapes were invisible, because nobody had looked at the frames that were also already being written.
 
+## 37. Scenario names are prefixes of other scenario names
+
+- **Symptom**: A loop re-aggregating the five baselines overwrote `ammo-spray` with `ammo-spray-miss` data, and nothing complained: the numbers merely looked plausible.
+- **Cause**: Run dirs are `.tools/run/scenario-<name>-<utc>/`, so `ls -1dt .tools/run/scenario-ammo-spray-*` matches the `ammo-spray-miss` dirs too, and they were newer. Scenario names are not disjoint under glob prefixes.
+- **Fix / Prevention**: Anchor the pattern on what follows the name - `scenario-$name-[0-9]*` - or select the dir another way. When scripting over scenarios, print which run dir was picked before using it: an ambiguous glob fails silently, and in perf work a wrong number is worse than a missing one.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.
