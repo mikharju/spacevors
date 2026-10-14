@@ -23,11 +23,12 @@ public static class ScenarioWorld
             ? SpawnPlacement.Rotate(spec.AimDirection, spec.AimOffsetR * found.Radius / found.Along)
             : spec.AimDirection;
 
+        List<Vector2> impactPoints = [];
         if (spec.SeededWeapon is { } weapon)
-            SeedVolleyInFlight(em, playerPos, weapon, spec.BulletCount, aim, spec.StreamLength, em.Rng);
+            SeedVolleyInFlight(em, playerPos, weapon, spec.BulletCount, aim, spec.StreamLength, em.Rng, target, impactPoints);
 
-        if (target is { } impact && spec.Effects is { } effects)
-            SeedEffects(em, impact.Center, impact.Radius, effects, em.Rng);
+        if (spec.Effects is { } effects)
+            SeedEffects(em, impactPoints, effects, em.Rng);
 
         if (!spec.WeaponFires)
             SilencePlayerTurrets(em);
@@ -37,7 +38,8 @@ public static class ScenarioWorld
     }
 
     private static void SeedVolleyInFlight(
-        EntityManager em, Vector2 origin, WeaponType weapon, int count, Vector2 aim, float streamLength, Random rng)
+        EntityManager em, Vector2 origin, WeaponType weapon, int count, Vector2 aim, float streamLength, Random rng,
+        ImpactTarget? target, List<Vector2> impactPoints)
     {
         float fullStream = weapon.Stats.AmmoSpeed * weapon.Stats.ShotLifetime;
         float stream = streamLength > 0f ? MathF.Min(streamLength, fullStream) : fullStream;
@@ -57,8 +59,15 @@ public static class ScenarioWorld
             }
 
             var spawn = origin + dir * TurretFiringSystem.AmmoSpawnOffset;
+            Vector2 start = spawn + dir * travelled;
+
+            // Record where the bullet touches the target rock: the seeded particles sit on these
+            // points, so the pre-aged impact area matches where the stream actually lands.
+            if (target is { } rock && TryImpactPoint(start, dir, rock, out Vector2 impact))
+                impactPoints.Add(impact);
+
             var entity = em.CreateEntity();
-            em.AddComponent(entity, new Position(spawn + dir * travelled));
+            em.AddComponent(entity, new Position(start));
             em.AddComponent(entity, new Velocity(dir * speed));
             em.AddComponent(entity, new Ammo(dir * speed, weapon.AmmoRadius, (fullStream - travelled) / speed,
                 IsEnemy: false, weapon.Stats.Damage, weapon.Color));
@@ -67,6 +76,26 @@ public static class ScenarioWorld
 
     private const int ResampleAttempts = 4;
     private const float AsteroidClearance = 5f;
+
+    // First touch of a unit-direction ray with the target circle (dir is unit length, so the
+    // quadratic has unit leading coefficient).
+    private static bool TryImpactPoint(Vector2 start, Vector2 dir, ImpactTarget target, out Vector2 impact)
+    {
+        impact = Vector2.Zero;
+
+        Vector2 offset = start - target.Center;
+        float halfProjection = offset.X * dir.X + offset.Y * dir.Y;
+        float distanceSquared = offset.X * offset.X + offset.Y * offset.Y - target.Radius * target.Radius;
+        float discriminant = halfProjection * halfProjection - distanceSquared;
+
+        if (distanceSquared < 0f || discriminant < 0f) return false;
+
+        float along = -halfProjection - MathF.Sqrt(discriminant);
+        if (along <= 0f) return false;
+
+        impact = start + dir * along;
+        return true;
+    }
 
     private static bool OverlapsAsteroid(EntityManager em, Vector2 position)
     {
@@ -102,11 +131,15 @@ public static class ScenarioWorld
         return nearest;
     }
 
-    // The impact area of a scenario that hits something already holds particles when the measured
-    // window opens. Ages are uniform in [0, lifetime] so the live count is flat from the first tick
-    // instead of ramping up and then dropping off a cliff.
-    private static void SeedEffects(EntityManager em, Vector2 center, float radius, SeededEffects effects, Random rng)
+    // The impact area already holds particles when the measured window opens, aged uniformly in
+    // [0, lifetime] so the live count is flat from the first tick instead of ramping up and then
+    // dropping off a cliff. They sit on the points the volley will actually hit, because a cloud
+    // spread over the whole rock reads as collisions the stream never makes - and a stream aimed at
+    // empty space has no impact points, so nothing is seeded.
+    private static void SeedEffects(EntityManager em, List<Vector2> impactPoints, SeededEffects effects, Random rng)
     {
+        if (impactPoints.Count == 0) return;
+
         for (int i = 0; i < effects.Sparks; i++)
         {
             float angle = (float)(rng.NextDouble() * MathF.PI * 2d);
@@ -114,7 +147,7 @@ public static class ScenarioWorld
                 (float)rng.NextDouble() * (DamageEffectSystem.SparkSpeedMax - DamageEffectSystem.SparkSpeedMin);
 
             var entity = em.CreateEntity();
-            em.AddComponent(entity, new Position(center + RandomInDisc(radius, rng)));
+            em.AddComponent(entity, new Position(impactPoints[(int)(rng.NextDouble() * impactPoints.Count)]));
             em.AddComponent(entity, new Velocity(new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed));
             em.AddComponent(entity, new DamageSpark(
                 RandomAge(DamageEffectSystem.EffectLifetime, rng), DamageEffectSystem.EffectLifetime));
@@ -123,7 +156,7 @@ public static class ScenarioWorld
         for (int i = 0; i < effects.Explosions; i++)
         {
             var entity = em.CreateEntity();
-            em.AddComponent(entity, new Position(center + RandomInDisc(radius, rng)));
+            em.AddComponent(entity, new Position(impactPoints[(int)(rng.NextDouble() * impactPoints.Count)]));
             em.AddComponent(entity, new Explosion(ExplosionRadius, RandomAge(ExplosionLifetime, rng), ExplosionLifetime));
         }
     }
@@ -131,9 +164,6 @@ public static class ScenarioWorld
     // Typical mine-death blast, which is what the seeded impact area contains.
     private const float ExplosionRadius = 12f;
     private const float ExplosionLifetime = 0.5f;
-
-    private static Vector2 RandomInDisc(float radius, Random rng) =>
-        new Vector2((float)(rng.NextDouble() * 2d - 1d) * radius, (float)(rng.NextDouble() * 2d - 1d) * radius);
 
     private static float RandomAge(float lifetime, Random rng) => (float)rng.NextDouble() * lifetime;
 

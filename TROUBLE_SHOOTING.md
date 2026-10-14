@@ -198,6 +198,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: In this raylib build (6.0 via Raylib-cs 8.0.0), `SetShaderValue*` uploads to GL state immediately, but vertex data is batched and only drawn at flush time — with whatever uniform/sampler state exists *then*. So all sprites in one block get the last-set values. A texture change forces a mid-block flush (which is why different base textures partially masked it), but scalar uniforms leak unconditionally. Upstream raylib 6.0 source does not even ship its GL layer, so this could only be established empirically via `RenderBench probe`.
 - **Fix / Prevention**: Inside one shader-mode block, every draw must share identical uniform state — group draws by sprite variant (same maps) and pass per-instance data with the vertices instead. That is why `Lighting` packs the rotation angle into the vertex color's RG channels (`EncodeAngle`) rather than using an `angleRad` uniform. Verify any future batching change with `RenderBench probe`, which pixel-compares against a frozen legacy-shader oracle.
 
+## 32. A helper's name is not its contract — `RandomInDisc` sampled a square
+
+- **Symptom**: In the `ammo-spray` scenario, impact particles appeared across the whole asteroid and in its corners, where nothing could be colliding. Reported by a human watching the window, not by any measurement: entity counts, per-frame timing and the pass split were all unaffected, because the particles were the right *number*, just in the wrong *place*.
+- **Cause**: The seeder used `RandomInDisc(radius, rng)`, which was `(rand*2-1)*radius` on each axis — a square of ±radius, so its corners sit at 1.41 radius, outside the rock. Nothing in the trace revealed it: the count was flat and the cost plausible. A geometric helper written to be plausible rather than checked.
+- **Fix / Prevention**: Place seeded particles at the entry points solved from the seeded bullets' own rays, so the impact area is derived from the stream rather than assumed from the target's bounding circle. Guard the property directly (`SeededParticles_SitOnTheRockTheStreamHits`: every seeded particle must touch an asteroid). Two lessons: sample a shape by the shape, and when a rendering/scenario output looks wrong, *look at it* — cost traces cannot see placement. Also watch tolerance units: adding a pixel slack to a squared distance is 1000× too tight.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

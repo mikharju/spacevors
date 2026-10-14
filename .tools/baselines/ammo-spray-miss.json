@@ -7,69 +7,69 @@
     "firstFramePerIteration": true
   },
   "frameMs": {
-    "mean": 6.321,
-    "median": 6.29,
-    "p90": 7.7,
-    "p99": 13.131,
-    "max": 15.47
+    "mean": 6.381,
+    "median": 6.35,
+    "p90": 7.804,
+    "p99": 13.551,
+    "max": 15.51
   },
   "fps": {
-    "mean": 165.6,
-    "median": 159.0,
-    "low1": 76.2,
-    "low10": 129.9
+    "mean": 164.6,
+    "median": 157.5,
+    "low1": 73.9,
+    "low10": 128.1
   },
   "fraction": {
-    "sim": 0.1737,
-    "render": 0.8245,
-    "other": 0.0019
+    "sim": 0.1769,
+    "render": 0.8214,
+    "other": 0.0017
   },
   "simMs": {
-    "mean": 1.098,
-    "median": 0.99,
-    "p90": 1.21,
-    "p99": 3.39,
-    "max": 9.47
+    "mean": 1.129,
+    "median": 1.04,
+    "p90": 1.23,
+    "p99": 3.423,
+    "max": 9.38
   },
   "applyMs": {
-    "mean": 0.042,
+    "mean": 0.043,
     "median": 0.04,
     "p90": 0.05,
-    "p99": 0.074,
-    "max": 0.09
+    "p99": 0.07,
+    "max": 0.08
   },
   "renderMs": {
-    "mean": 5.211,
-    "median": 5.21,
-    "p90": 6.444,
-    "p99": 8.226,
-    "max": 9.85
+    "mean": 5.241,
+    "median": 5.22,
+    "p90": 6.524,
+    "p99": 8.51,
+    "max": 11.9
   },
   "renderPasses": [
     {
       "pass": "world.ammo",
-      "meanMs": 4.598,
-      "shareOfRender": 0.8687
+      "meanMs": 4.623,
+      "shareOfRender": 0.8694
     },
     {
       "pass": "background",
-      "meanMs": 0.273,
-      "shareOfRender": 0.0515
+      "meanMs": 0.278,
+      "shareOfRender": 0.0523
     },
     {
       "pass": "world.asteroids",
-      "meanMs": 0.142,
-      "shareOfRender": 0.0268
+      "meanMs": 0.14,
+      "shareOfRender": 0.0263
     },
     {
       "pass": "present",
-      "meanMs": 0.09,
-      "shareOfRender": 0.017
+      "meanMs": 0.085,
+      "shareOfRender": 0.016
     },
     {
       "pass": "hud.health",
-      "meanMs": 0.05,
-      "shareOfRender": 0.0095
+      "meanMs": 0.051,
+      "shareOfRender": 0.0096
     },
     {
       "pass": "world.player",
@@ -78,8 +78,8 @@
     },
     {
       "pass": "lights.collect",
-      "meanMs": 0.021,
-      "shareOfRender": 0.004
+      "meanMs": 0.022,
+      "shareOfRender": 0.0041
     },
     {
       "pass": "world.thrusters",
@@ -89,7 +89,7 @@
     {
       "pass": "world.enemyShips",
       "meanMs": 0.018,
-      "shareOfRender": 0.0034
+      "shareOfRender": 0.0033
     },
     {
       "pass": "world.turrets",
@@ -97,12 +97,12 @@
       "shareOfRender": 0.0008
     },
     {
-      "pass": "world.debugMarkers",
+      "pass": "world.sparks",
       "meanMs": 0.004,
       "shareOfRender": 0.0007
     },
     {
-      "pass": "world.sparks",
+      "pass": "world.debugMarkers",
       "meanMs": 0.004,
       "shareOfRender": 0.0007
     }
@@ -121,12 +121,12 @@
     },
     "frameMsMedian": {
       "withGc": null,
-      "withoutGc": 6.29
+      "withoutGc": 6.35
     }
   },
   "perEntityNs": {
-    "sim": 268.7,
-    "render": 1275.4
+    "sim": 276.3,
+    "render": 1282.7
   },
   "entities": {
     "start": 5509,
