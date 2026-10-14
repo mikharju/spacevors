@@ -176,6 +176,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: `GetFrameTime()` returns the time since the *last* call, read at the top of the update. The sim and render measured after it belong to a different interval, so subtracting them from it compares two different frames.
 - **Fix / Prevention**: When splitting a frame into stages, time the whole frame with your own `Stopwatch` around the stage calls and derive `other = frame - stages`. Use `GetFrameTime()` only for physics accumulation.
 
+## 31. A tool script that sources `.tools/env.sh` breaks the same script on a real desktop
+
+- **Symptom**: `.tools/scenario.sh <name>` printed `Segmentation fault (core dumped)` six times, opened no window, and then reported "0 frames" while still claiming `baseline updated`.
+- **Cause**: `.tools/env.sh` is the *sandbox* setup — it forces `DISPLAY=localhost:99`, `LIBGL_ALWAYS_SOFTWARE=1`, and Mesa from `.tools/root`. Sourced on a real desktop it points raylib at a display that does not exist, and raylib's failed `InitWindow` segfaults instead of reporting. The script then kept looping, and the baseline step ran on a run that produced nothing.
+- **Fix / Prevention**: Only the sandbox launcher scripts (`game.sh`, `shot.sh`, `xvfb.sh`) source env.sh; anything meant to run on both machines takes the environment as given and says so in its usage (` . .tools/env.sh && .tools/...` for the sandbox). Guard the two failure modes explicitly: check `DISPLAY`/`WAYLAND_DISPLAY` before launching a window, and treat a non-zero exit or a missing `summary.json` as fatal — never let a bookkeeping step report success after the measurement failed.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.

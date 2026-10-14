@@ -5,10 +5,15 @@
 #   .tools/scenario.sh <name> [--sim] [--measure N] [--iters N] [--hold S] [--cap FPS]
 #                           [--out DIR] [--compare] [--update-baseline]
 #
-# Default host is the real game window. --sim runs ScenarioBench instead: no window, no renderer,
-# so the numbers are pure ECS cost. Needs a display unless --sim. In the sandbox start the virtual
-# one first, as a background job:  .tools/xvfb.sh
-. "$(dirname "$0")/env.sh"
+# Default host is the real game window on whatever display this shell has. --sim runs ScenarioBench
+# instead: no window, no renderer, so the numbers are pure ECS cost.
+#
+# This script deliberately does NOT source .tools/env.sh: that is the sandbox-only X11 + software
+# Mesa setup (DISPLAY=localhost:99, LIBGL_ALWAYS_SOFTWARE=1), and on a real desktop it points the
+# game at a display that does not exist. In the sandbox, source it first:
+#   .tools/xvfb.sh                      # as a background job
+#   . .tools/env.sh && .tools/scenario.sh ammo-spray --iters 5
+_TOOLS="$(cd "$(dirname "$0")" && pwd)"
 
 name="${1:-}"; shift || true
 measure=""; iters=5; hold=0; cap=0; out=""; compare=0; update_baseline=0; sim=0
@@ -33,6 +38,11 @@ if [ "$sim" = 1 ]; then
 else
     APP="${APP:-$_TOOLS/../src/Game/bin/Release/net10.0}"
     [ -f "$APP/Game.dll" ] || { echo "build first: dotnet build src/Game/Game.csproj -c Release" >&2; exit 1; }
+    if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+        echo "no display set: this shell has neither DISPLAY nor WAYLAND_DISPLAY." >&2
+        echo "use --sim for sim-only numbers, or in the sandbox: . .tools/env.sh && $0 ..." >&2
+        exit 1
+    fi
 fi
 
 run="${out:-$_TOOLS/run/scenario-$name-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -44,22 +54,29 @@ export SPACEVORS_SCENARIO_HOLD="$hold" SPACEVORS_SCENARIO_CAP="$cap"
 if [ -n "$measure" ]; then export SPACEVORS_SCENARIO_TICKS="$measure"; fi
 
 # One extra iteration beyond the pooled ones: the first run pays cold JIT and is discarded.
+[ "$sim" = 1 ] || echo "display: ${DISPLAY:-$WAYLAND_DISPLAY}"
 for i in $(seq 1 "$((iters + 1))"); do
     if [ "$sim" = 1 ]; then
         dotnet "$APP/ScenarioBench.dll" "$name" ${measure:-} > "iter-$i.log" 2>&1
     else
         dotnet "$APP/Game.dll" > "iter-$i.log" 2>&1
     fi
-    if ! grep -q '^\[PERF-BEGIN\]' "iter-$i.log"; then
-        echo "iteration $i produced no [PERF-BEGIN]; unknown scenario or no display? See $run/iter-$i.log" >&2
+    status=$?
+    if [ "$status" != 0 ]; then
+        echo "iteration $i exited $status (raylib crashes rather than reporting a bad display). Last lines:" >&2
         tail -5 "iter-$i.log" >&2
+        exit 1
+    fi
+    if ! grep -q '^\[PERF-BEGIN\]' "iter-$i.log"; then
+        echo "iteration $i logged no [PERF-BEGIN]: unknown scenario '$name'? See $run/iter-$i.log" >&2
         exit 1
     fi
     echo "iteration $i: $(grep -c '^\[PERF\]' "iter-$i.log") frames"
 done
 
 export PYTHONPATH="$_TOOLS/pylibs${PYTHONPATH:+:}$PYTHONPATH"
-python3 "$_TOOLS/scenario.py" --run "$run" --name "$name" --iters "$iters" --logs "$((iters + 1))"
+python3 "$_TOOLS/scenario.py" --run "$run" --name "$name" --iters "$iters" --logs "$((iters + 1))" || exit 1
+[ -f "$run/summary.json" ] || { echo "no summary.json produced; baseline left untouched" >&2; exit 1; }
 
 baseline="$_TOOLS/baselines/$name.json"
 if [ "$update_baseline" = 1 ]; then
