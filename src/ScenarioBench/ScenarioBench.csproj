@@ -5,6 +5,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Mirrors Game.csproj: the harness must run the same JIT tiers as the product, or its numbers
+         describe a build the game never ships. Measurement and tradeoff recorded there. -->
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 
   <ItemGroup>

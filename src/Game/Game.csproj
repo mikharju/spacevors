@@ -1,10 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Tiered compilation was costing the frame tail: over a 120-tick scenario window the collision
+         loop never reaches tier 1, so ammo-spray measured tick median 1.83ms / p99 12.56ms / max
+         22.99ms tiered against 1.02 / 2.50 / 3.03 with tiering off, and the tick-2 and tick-9 hitches
+         disappear. Tradeoff, measured: eager JIT lands on the first tick (frame-1 dt 39ms -> 80ms)
+         while the whole 120-tick run finishes faster (wall 345ms -> 261ms). One startup hitch is a
+         better bargain than mid-combat hitches.
+         Tests.csproj deliberately omits this switch: its ms ceilings were characterized tiered, and
+         adding it there would silently retune those gates. -->
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 
   <ItemGroup>
