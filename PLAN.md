@@ -391,6 +391,9 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - `Tests/ScenarioPerformanceTest.cs` drives the scenario specs headless (median of measured ticks, warm-up discarded) against characterized ceilings, replacing `Tests/PerformanceBenchmark.cs` — a second, weaker source of truth with three `mustMeetBudget: false` phases and a stale CollisionSystem claim. The Linux CI job now runs `dotnet test`.
 - The habit is written into AGENTS.md: after a sim or render change, run `.tools/scenario.sh <name> --sim --iters 3` and report the delta as a verdict - keep, optimize, or revert.
 
+- `[SYSTEM]` lines are now aggregated (`systemMs`, `spikeFrames`) instead of sitting unread in 3,600 lines per iteration. First finding: `CollisionSystem` is 76.4% of `ammo-spray` sim mean, and the repeatable frame-9 spike is `Collision: detection` at 10.6 ms — the frame tail is broadphase detection, not GC and not destruction. Frame 2 is a different deterministic cost: `Effects: damage spark` processing the seeded particles for the first time.
+- `impact-storm` met the 120 fps budget after shape batching (4.76 ms), so its `ExpectedOverBudget` mark was removed. `hull-damage`'s per-shape canary was a false alarm (fixed pass overhead divided by a handful of sparks), so `perShapeNs` now needs ≥100 drawn shapes.
+
 ## Difficulty scaling
 
 - Add difficulty rating to enemy ships. New int stat starting at 1. Initially low hp enemies have lowest rating, while high hp have highest, say 10 for HeavyCannon enemy. Mines have ratings too.

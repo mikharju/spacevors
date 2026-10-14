@@ -222,6 +222,12 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Cause**: Absolute milliseconds are not portable. The same deterministic world measured 0.36ms inside the xunit host and 0.82ms out-of-process in `ScenarioBench`; `impact-storm` swung 0.85 → 1.94ms run to run on the same machine because xunit runs test classes in parallel and the cost is GC/scheduler dominated. A CI box, a dev desktop and a software-rendered sandbox differ by more than the budget itself.
 - **Fix / Prevention**: `Tests/ScenarioPerformanceTest.cs` asserts **characterization ceilings** - at least 2.5x the worst median observed *in the test host*, rounded up - and prints every median so drift is visible long before a ceiling trips. Keep the real budget in the scenario spec, where the `.tools/scenario.sh` harness reports against it on the machine that has a GPU. When writing any timing test: median of measured ticks with warm-up discarded, ceilings derived from the host the assertion runs in, and prove the gate is not vacuous by lowering one ceiling once.
 
+## 36. Search the existing logs before adding instrumentation
+
+- **Symptom**: I proposed adding per-system simulation timing (`[SIM-SYSTEM]` brackets, a new timings class, aggregator changes) as the next measurement step. It would have been about 100 lines of new code.
+- **Cause**: I reasoned from the aggregator's parsed fields rather than from the raw log. `DiagnosticLogger.LogSystem` and the `onSystemComplete` hook already existed, wired up whenever diagnostics are on, and every scenario run already contained 3,600 `[SYSTEM]` lines per iteration. Only the parser was missing, and it took ~40 lines.
+- **Fix / Prevention**: Before writing a measurement, grep for the seam and look at a raw log file with the numbers you want. A missing *report* is not a missing *measurement*. The same lesson appeared earlier the same day: `[RENDER-PASS]` costs looked fine while the drawn shapes were invisible, because nobody had looked at the frames that were also already being written.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.
