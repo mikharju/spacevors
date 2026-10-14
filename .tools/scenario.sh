@@ -49,17 +49,34 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$name" ] || { echo "usage: $0 <scenario> [options]" >&2; exit 2; }
 
+# The harness measures the artifact the game ships, so it publishes (ReadyToRun, per the csproj) instead
+# of running the plain build output. Measured on one host, ammo-spray, 3 fresh processes x 120 ticks:
+# first tick 81ms without ReadyToRun against 21ms with it, steady median 0.78 -> 1.09ms. The startup
+# hitch is the one players feel, so the harness pays the slightly slower steady state to stay honest.
+# Publish is incremental; the extra seconds are the price of measuring the shipped binary.
+repo="$_TOOLS/.."
 if [ "$sim" = 1 ]; then
-    APP="${APP:-$_TOOLS/../src/ScenarioBench/bin/Release/net10.0}"
-    [ -f "$APP/ScenarioBench.dll" ] || { echo "build first: dotnet build src/ScenarioBench/ScenarioBench.csproj -c Release" >&2; exit 1; }
+    app_dll="ScenarioBench.dll"
+    app_dir="$repo/src/ScenarioBench/bin/Release/net10.0/linux-x64/publish"
+    publish="dotnet publish src/ScenarioBench/ScenarioBench.csproj --configuration Release --runtime linux-x64 --self-contained false"
 else
-    APP="${APP:-$_TOOLS/../src/Game/bin/Release/net10.0}"
-    [ -f "$APP/Game.dll" ] || { echo "build first: dotnet build src/Game/Game.csproj -c Release" >&2; exit 1; }
-    if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
-        echo "no display set: this shell has neither DISPLAY nor WAYLAND_DISPLAY." >&2
-        echo "use --sim for sim-only numbers, or in the sandbox: . .tools/env.sh && $0 ..." >&2
-        exit 1
-    fi
+    app_dll="Game.dll"
+    app_dir="$repo/src/Game/bin/Release/net10.0/linux-x64/publish"
+    publish="dotnet publish src/Game/Game.csproj --configuration Release --runtime linux-x64 --self-contained false"
+fi
+
+if [ -z "${APP:-}" ]; then
+    APP="$app_dir"
+    mkdir -p "$_TOOLS/run"
+    (cd "$repo" && eval "$publish") >"$_TOOLS/run/publish.log" 2>&1 \
+        || { echo "publish failed; see $_TOOLS/run/publish.log" >&2; exit 1; }
+fi
+[ -f "$APP/$app_dll" ] || { echo "missing $APP/$app_dll - run: $publish" >&2; exit 1; }
+
+if [ "$sim" != 1 ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    echo "no display set: this shell has neither DISPLAY nor WAYLAND_DISPLAY." >&2
+    echo "use --sim for sim-only numbers, or in the sandbox: . .tools/env.sh && $0 ..." >&2
+    exit 1
 fi
 
 host=$([ "$sim" = 1 ] && echo sim || echo window)
@@ -83,6 +100,7 @@ export SPACEVORS_SCENARIO_HOLD="$hold" SPACEVORS_SCENARIO_CAP="$cap" SPACEVORS_S
 if [ -n "$measure" ]; then export SPACEVORS_SCENARIO_TICKS="$measure"; fi
 
 # One extra iteration beyond the pooled ones: the first run pays cold JIT and is discarded.
+echo "artifact: $APP/$app_dll (ReadyToRun)"
 [ "$sim" = 1 ] || echo "display: ${DISPLAY:-$WAYLAND_DISPLAY}"
 for i in $(seq 1 "$((iters + 1))"); do
     if [ "$sim" = 1 ]; then

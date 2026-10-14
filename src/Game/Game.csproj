@@ -5,15 +5,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Tiered compilation was costing the frame tail: over a 120-tick scenario window the collision
-         loop never reaches tier 1, so ammo-spray measured tick median 1.83ms / p99 12.56ms / max
-         22.99ms tiered against 1.02 / 2.50 / 3.03 with tiering off, and the tick-2 and tick-9 hitches
-         disappear. Tradeoff, measured: eager JIT lands on the first tick (frame-1 dt 39ms -> 80ms)
-         while the whole 120-tick run finishes faster (wall 345ms -> 261ms). One startup hitch is a
-         better bargain than mid-combat hitches.
-         Tests.csproj deliberately omits this switch: its ms ceilings were characterized tiered, and
-         adding it there would silently retune those gates. -->
+    <!-- ReadyToRun plus no tiering, as a pair.
+         Tiering off fixed the frame tail: over a 120-tick window the collision loop never reaches tier 1,
+         so ammo-spray measured median 1.83ms / p99 12.56ms / max 22.99ms tiered against
+         1.02 / 2.50 / 3.03 without it, and the tick-2 and tick-9 hitches disappeared with it.
+         ReadyToRun then pays for the eager JIT that turning tiering off costs on the first tick:
+         first tick 81ms -> 21ms, at the price of a slower steady tick (0.78 -> 1.09ms median). R2R with
+         tiering on starts cheaper (13ms) but ticks slower (1.32ms), so the shipped pair is R2R off-tier.
+         Tests.csproj omits both switches: its ms ceilings were characterized tiered and JIT-compiled. -->
     <TieredCompilation>false</TieredCompilation>
+    <!-- ReadyToRun is what removes the startup hitch (first tick 81ms -> 21ms; see the pair above).
+         It only affects `dotnet publish`, never `dotnet build` or `dotnet run`, so anything that runs the
+         bin/... output - `.tools/game.sh` does - is not running this build. scenario.sh publishes, and
+         prints which artifact it ran. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

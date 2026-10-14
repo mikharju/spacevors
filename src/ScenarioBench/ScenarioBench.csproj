@@ -8,6 +8,9 @@
     <!-- Mirrors Game.csproj: the harness must run the same JIT tiers as the product, or its numbers
          describe a build the game never ships. Measurement and tradeoff recorded there. -->
     <TieredCompilation>false</TieredCompilation>
+    <!-- Also ReadyToRun, so the harness measures the same pre-compiled Domain/Raylib-cs code the game
+         ships. scenario.sh publishes this project rather than running the plain build output. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
