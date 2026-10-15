@@ -7,13 +7,14 @@ public class LevelUpSystem : GameSystem
 {
     const int MilestoneLevelInterval = 5;
     const int MilestoneChoiceCount = 5;
+    // A milestone hand carries up to three new weapons, and at most one of them may be a size the
+    // ship has no free slot for — that one means replacing whatever the player already mounts.
+    const int MilestoneNewWeaponCards = 3;
+    const int MilestoneReplacementCards = 1;
     const string DiagnosticEnvVar = DiagnosticLogger.EnvVar;
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
-    // Fallback for when the WeaponSlots component is missing (always present in production).
-    const int DefaultMaxWeaponSlots = 3;
-
-    private static readonly WeaponType[] AllNewWeapons = WeaponType.AddOnWeapons;
+    private static readonly WeaponType[] AllNewWeapons = WeaponType.NewWeaponPool;
 
     // Diagnostics only: fixed upgrade sequence consumed one entry per level-up.
     private readonly UpgradableOption[]? _scriptedUpgrades;
@@ -41,12 +42,12 @@ public class LevelUpSystem : GameSystem
             bool isMilestoneLevel = newLevel % MilestoneLevelInterval == 0;
 
             // Do not consume the level-up when no choice can be offered (e.g. zero turrets).
-            if (SpawnLevelUpChoice(view, playerEntity, playerPos.Value, newLevel, isMilestoneLevel, commands))
+            if (SpawnLevelUpChoice(view, playerPos.Value, newLevel, isMilestoneLevel, commands))
                 commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
         }
     }
 
-    private bool SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
+    private bool SpawnLevelUpChoice(WorldView view, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
     {
         if (_scriptedUpgrades != null && _scriptIndex < _scriptedUpgrades.Length)
         {
@@ -70,21 +71,7 @@ public class LevelUpSystem : GameSystem
         if (isMilestoneLevel)
         {
             allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
-
-            var usedSlots = weaponNames.Count;
-            int maxSlots = GetMaxWeaponSlots(view, playerEntity);
-
-            if (usedSlots < maxSlots)
-            {
-                var availableWeapons = AllNewWeapons
-                    .Where(w => !weaponNames.Contains(w.Name))
-                    .ToList();
-
-                foreach (var weapon in availableWeapons)
-                {
-                    allOptions.Add(new UpgradableOption(weapon.Name, UpgradeOption.Damage, IsNewWeapon: true));
-                }
-            }
+            allOptions.AddRange(NewWeaponOptions(TurretMount.FreeSlots(view), weaponNames, view.Rng));
 
             foreach (var weapon in weaponNames)
             {
@@ -176,12 +163,27 @@ public class LevelUpSystem : GameSystem
         }
     }
 
-    private static int GetMaxWeaponSlots(WorldView view, Entity playerEntity)
+    // New-weapon cards for a milestone hand: mostly weapons that fit a free hull slot, and at most
+    // one of a size the ship has fully booked — that one asks the player to replace a mounted weapon.
+    private static List<UpgradableOption> NewWeaponOptions(List<TurretSlotDefinition> freeSlots, List<string> mountedNames, Random rng)
     {
-        if (view.TryGetComponent<WeaponSlots>(playerEntity, out var ws))
+        var pool = AllNewWeapons.Where(w => !mountedNames.Contains(w.Name)).ToList();
+        Shuffle(pool, rng);
+
+        var cards = new List<UpgradableOption>();
+        int replacementCards = 0;
+
+        foreach (var weapon in pool)
         {
-            return ws.Max;
+            if (cards.Count >= MilestoneNewWeaponCards) break;
+
+            bool fitsFreeSlot = freeSlots.Any(slot => TurretMount.Fits(slot, weapon));
+            if (!fitsFreeSlot && replacementCards >= MilestoneReplacementCards) continue;
+
+            cards.Add(new UpgradableOption(weapon.Name, UpgradeOption.Damage, IsNewWeapon: true));
+            if (!fitsFreeSlot) replacementCards++;
         }
-        return DefaultMaxWeaponSlots;
+
+        return cards;
     }
 }

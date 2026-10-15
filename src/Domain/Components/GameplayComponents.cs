@@ -6,6 +6,7 @@ public readonly record struct Health(int Current, int Max);
 
 public readonly record struct PendingChoice;
 
+// IsNewWeapon: the card offers the weapon itself, so the player then picks the hull slot to mount it in.
 public readonly record struct UpgradableOption(string WeaponName, UpgradeOption Stat, bool IsNewWeapon = false);
 
 public readonly record struct PendingUpgradeOptions(UpgradableOption[] Options);

@@ -91,7 +91,7 @@ public static class EnemyShipRenderer
         LitGroupRenderer.Draw(_litDraws);
 
         foreach (var (cx, cy) in _turretMarkers)
-            RenderHelpers.DrawTurretMarker(cx, cy, EnemyTurretColor);
+            RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 
         if (diagnostics)
             foreach (var (x, y, radius) in _diagnosticCircles)
@@ -111,7 +111,7 @@ public static class EnemyShipRenderer
 
             ShipSpriteRenderer.DrawFallbackShip(cx, cy, enemyShip.Radius, shipRot.Angle * 180f / MathF.PI);
 
-            RenderHelpers.DrawTurretMarker(cx, cy, EnemyTurretColor);
+            RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 
             if (diagnostics) Raylib.DrawCircle((int)cx, (int)cy, enemyShip.Radius, new Color(255, 165, 0, 60));
         }

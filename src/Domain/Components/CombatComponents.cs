@@ -10,6 +10,8 @@ public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetim
 
 public readonly record struct FireCooldown(float Timer);
 
+// A weapon a turret entity carries. ArcAngle is only read for enemy turrets, which are aimed by
+// their hull; a player turret's arc comes from the TurretSlot it is mounted in.
 public readonly record struct Turret(
     WeaponStats Weapon,
     string WeaponName,
@@ -17,6 +19,15 @@ public readonly record struct Turret(
     float Range = 360f,
     bool AutoTarget = true,
     bool IsEnemy = false);
+
+// One turret mount point on the player hull. A slot holding a weapon also carries
+// Turret, TurretAim, Position and Rotation; an empty slot carries only this.
+public readonly record struct TurretSlot(TurretSlotDefinition Definition);
+
+// A mounted player turret's aim: yaw relative to the hull, so turning the ship carries the mount
+// with it and a hull that turns faster than the weapon's TurnSpeed drags its aim off target.
+// Parked = already inside the firing tolerance, so the mount holds still instead of correcting.
+public readonly record struct TurretAim(float Yaw, bool Parked);
 
 // Player's manually selected target (enemy ship or mine), set by mouse click.
 public readonly record struct PrimaryTarget(Entity Target);
@@ -27,8 +38,6 @@ public readonly record struct AutoTargetMark(float LastTargetedAt)
     // How long after last selection the mark still counts (auto brackets, damage-graphics priority).
     public const float FreshWindow = 1f;
 }
-
-public readonly record struct WeaponSlots(int Used, int Max);
 
 // Instant hitscan beam: static segment [Start, Start + Direction * Length], Width is half-thickness.
 // CollisionSystem applies its damage exactly once (clearing DamagePending) to the first thing
@@ -50,7 +59,3 @@ public readonly record struct LaserBeam(
 
     public Vector2 End => Start + Direction * Length;
 }
-
-public readonly record struct ArcOffset(float Angle);
-
-public readonly record struct TurretOffset(Vector2 Value);

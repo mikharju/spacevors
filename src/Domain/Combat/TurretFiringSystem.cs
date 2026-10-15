@@ -19,10 +19,17 @@ public class TurretFiringSystem : GameSystem
     // A manually selected target may be engaged at this multiple of normal range, capped by ammo reach.
     private const float TargetedRangeMultiplier = 3f;
 
+    // Aim tolerances, in radians. A slewing mount keeps turning until it is within the acquire
+    // tolerance, then parks; a parked mount only resumes turning once the aim has drifted past the
+    // fire tolerance, which is also the firing gate — inside it the aim is good enough to shoot.
+    static readonly float AimAcquireTolerance = Angle.FromDeg(3f);
+    static readonly float FireAimTolerance = Angle.FromDeg(8f);
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         bool playerDead = IsPlayerDead(view);
         ClearStalePrimaryTarget(view, commands);
+        float hullRotation = PlayerRotation(view);
 
         // Commands are deferred to phase end, so the query can be iterated directly.
         foreach (var (turretEntity, turret, turretPos, turretRot) in view.GetEntitiesWithComponents<Turret, Position, Rotation>())
@@ -30,34 +37,92 @@ public class TurretFiringSystem : GameSystem
             if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
             if (!turret.IsEnemy && playerDead) continue;
 
-            // Selection is computed every tick (pure function of state) so auto-target marks stay fresh between shots.
-            var selection = FindTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle);
+            // A player turret is bolted to a hull slot and slewed inside its arc; an enemy turret is
+            // aimed by its hull, which is what its Rotation already holds.
+            MountState? mount = turret.IsEnemy ? null : ReadMount(view, turretEntity);
+
+            float arcCenterAngle = mount is { } m ? hullRotation + m.Slot.ArcCenter : turretRot.Angle;
+            var selection = FindTarget(view, turretEntity, turret, turretPos.Value, arcCenterAngle);
+
+            float aimAngle = turretRot.Angle;
+            if (mount is { } ms)
+                aimAngle = SlewMount(turretEntity, ms.Slot, ms.Aim, hullRotation, selection, turret.Weapon.TurnSpeed, deltaTime, commands);
 
             if (!turret.IsEnemy && selection.HasValue && IsMarkableTarget(view, selection.Value.Target))
                 commands.Add(new AddComponentCommand<AutoTargetMark>(selection.Value.Target, new AutoTargetMark(view.ElapsedTime)));
 
             var cooldown = CooldownHelper.GetCooldown(view, turretEntity);
 
-            if (cooldown <= 0f)
+            if (cooldown > 0f)
             {
-                if (selection.HasValue)
-                {
-                    FireAtTarget(view, turretEntity, turret, turretPos.Value, turretRot.Angle, selection.Value, commands);
-                    commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
-
-                    if (Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1")
-                    {
-                        commands.AddEntity(new Position(selection.Value.PredictedPosition), new DebugMarker(0.5f));
-                    }
-                }
+                commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(Math.Max(cooldown - deltaTime, 0f))));
+                continue;
             }
-            else
+
+            if (!selection.HasValue) continue;
+            // Being inside the arc is not enough: a mount still travelling to a solution holds its fire.
+            if (mount is not null && !AimOnTarget(aimAngle, selection.Value.AimDirection)) continue;
+
+            FireAtTarget(view, turretEntity, turret, turretPos.Value, aimAngle, selection.Value, commands);
+            commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
+
+            if (Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1")
             {
-                var newCooldown = cooldown - deltaTime;
-                commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(Math.Max(newCooldown, 0f))));
+                commands.AddEntity(new Position(selection.Value.PredictedPosition), new DebugMarker(0.5f));
             }
         }
     }
+
+    // Slew the mount toward the firing solution — or back to the middle of its arc when it has no
+    // target — at the weapon's turn speed. A mount that is already good enough holds still and
+    // issues no commands, which is the common state. Returns the mount's absolute aim.
+    private static float SlewMount(
+        Entity turretEntity,
+        TurretSlotDefinition slot,
+        TurretAim mount,
+        float hullRotation,
+        TargetSelection? selection,
+        float turnSpeed,
+        float deltaTime,
+        CommandBuffer commands)
+    {
+        float yaw = mount.Yaw;
+        float desiredYaw = selection.HasValue
+            ? Angle.ClampToArc(Angle.Normalize(Angle.Of(selection.Value.AimDirection) - hullRotation), slot.ArcCenter, slot.ArcAngle)
+            : slot.ArcCenter;
+
+        float error = Angle.Delta(yaw, desiredYaw);
+        float holdTolerance = mount.Parked ? FireAimTolerance : AimAcquireTolerance;
+
+        if (MathF.Abs(error) <= holdTolerance)
+        {
+            if (!mount.Parked)
+                commands.Add(new AddComponentCommand<TurretAim>(turretEntity, new TurretAim(yaw, Parked: true)));
+            return hullRotation + yaw;
+        }
+
+        float newYaw = Angle.Normalize(Angle.RotateToward(yaw, desiredYaw, turnSpeed * deltaTime));
+        bool arrived = MathF.Abs(Angle.Delta(newYaw, desiredYaw)) <= AimAcquireTolerance;
+        commands.Add(new AddComponentCommand<TurretAim>(turretEntity, new TurretAim(newYaw, arrived)));
+        commands.Add(new AddComponentCommand<Rotation>(turretEntity, new Rotation(hullRotation + newYaw)));
+        return hullRotation + newYaw;
+    }
+
+    // A player turret's mount state: the slot it sits in and how far it has slewed inside its arc.
+    private readonly record struct MountState(TurretSlotDefinition Slot, TurretAim Aim);
+
+    private static MountState? ReadMount(WorldView view, Entity turretEntity)
+    {
+        if (!view.TryGetComponent<TurretSlot>(turretEntity, out var slot)) return null;
+        if (!view.TryGetComponent<TurretAim>(turretEntity, out var aim)) return null;
+        return new MountState(slot.Definition, aim);
+    }
+
+    static bool AimOnTarget(float aimAngle, Vector2 aimDirection) =>
+        MathF.Abs(Angle.Delta(aimAngle, Angle.Of(aimDirection))) <= FireAimTolerance;
+
+    static float PlayerRotation(WorldView view) =>
+        view.GetEntitiesWithComponents<Player, Rotation>().TryFirst(out var player) ? player.Value2.Angle : 0f;
 
     private static bool IsPlayerDead(WorldView view)
     {
@@ -153,9 +218,11 @@ public class TurretFiringSystem : GameSystem
     private static bool IsMarkableTarget(WorldView view, Entity target) =>
         view.TryGetComponent<EnemyShip>(target, out _) || view.TryGetComponent<EnemyMine>(target, out _);
 
-    private TargetSelection? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle)
+    // Targets are chosen by the slot's arc (arcCenterAngle), not by where the mount currently points:
+    // a turret tracks what it cannot yet reach and only holds fire until its aim catches up.
+    private TargetSelection? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float arcCenterAngle)
     {
-        Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
+        Vector2 forwardDir = new Vector2((float)Math.Sin(arcCenterAngle), -(float)Math.Cos(arcCenterAngle));
 
         float cosHalfArc = (float)Math.Cos(turret.ArcAngle / 2f);
         float rangeSq = turret.Range * turret.Range;

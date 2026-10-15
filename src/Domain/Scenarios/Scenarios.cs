@@ -56,7 +56,7 @@ public static class Scenarios
 
     // The diagnostics Shadow copy carrying LoadTestWeapon (8000 pellets per volley).
     private static ShipType LoadTestShip =>
-        ShipType.DiagnosticShips.First(s => s.Weapon.Name == WeaponType.LoadTestWeapon.Name);
+        ShipType.DiagnosticShips.First(s => s.Loadout.Name == WeaponType.LoadTestWeapon.Name);
 
     // Up: the pinned test asteroid sits directly ahead of the ship. Down: empty space.
     private static readonly Vector2 TowardTestAsteroid = new(0f, -1f);

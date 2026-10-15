@@ -101,37 +101,41 @@ public class TurretFiringTest
     }
 
     [Theory]
-    [InlineData("TwinChainGun", 0f, -100f, true)]     // forward: fires
-    [InlineData("TwinChainGun", 0f, 100f, false)]     // backward: no fire
-    [InlineData("TwinChainGun", -100f, 0f, false)]    // left side: no fire
-    [InlineData("PointDefenceTurret", 0f, -100f, false)] // forward: excluded
-    [InlineData("PointDefenceTurret", 0f, 100f, true)]   // backward: fires
-    [InlineData("PointDefenceTurret", -100f, 0f, true)]  // left side: fires
-    public void TestAddOnWeaponCoversIntendedArc(string weaponName, float targetX, float targetY, bool expectedToFire)
+    [InlineData("MachineGun", TurretSlotName.MainGun, 0f, -100f, true)]   // straight ahead: inside the main gun's arc
+    [InlineData("MachineGun", TurretSlotName.MainGun, 0f, 100f, false)]   // behind: outside it
+    [InlineData("MachineGun", TurretSlotName.MainGun, -100f, 0f, false)]  // to the side: outside it
+    [InlineData("Shotgun", TurretSlotName.SmallLeft, 0f, -100f, true)]    // the left nose mount covers ahead
+    [InlineData("Shotgun", TurretSlotName.SmallLeft, -100f, 0f, false)]   // ...but not the ship's flank
+    [InlineData("Shotgun", TurretSlotName.SmallBack, 0f, 100f, true)]     // the back mount covers behind
+    public void TestMountedWeaponCoversIntendedArc(string weaponName, string slotName, float targetX, float targetY, bool expectedToFire)
     {
         var weapon = WeaponType.FromName(weaponName);
         Assert.NotNull(weapon);
-        var mount = weapon!.Value.AddOn!.Value;
 
         var em = new EntityManager();
-
         var playerEntity = em.CreateEntity();
         em.AddComponent(playerEntity, new Position(Vector2.Zero));
         em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
         em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 10, Radius: 18f, Xp: 0, Level: 1, PickupRadius: 60f, RotationSpeed: 5f));
 
-        var turretEntity = em.CreateEntity();
-        em.AddComponent(turretEntity, new Position(Vector2.Zero));
-        em.AddComponent(turretEntity, new Rotation(mount.ArcOffset)); // player angle 0 + arc offset
-        em.AddComponent(turretEntity, new Turret(Weapon: weapon.Value.Stats, WeaponName: weapon.Value.Name, ArcAngle: mount.ArcAngle, Range: mount.Range, AutoTarget: mount.AutoTarget));
+        foreach (var slot in TurretLayouts.Fighter)
+            em.AddComponent(em.CreateEntity(), new TurretSlot(slot));
+
+        var view = new WorldView(em);
+        Assert.True(TurretMount.TryFindSlot(view, slotName, out var slotEntity));
+        TurretMount.Mount(em, slotEntity, view.GetComponent<TurretSlot>(slotEntity).Definition, weapon!.Value, Vector2.Zero, 0f);
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(targetX, targetY)));
         em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 30f));
 
-        var commands = new CommandBuffer();
-        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
-        commands.Apply(em);
+        // A few ticks: enough for a mount whose target sits off the arc centre to slew onto it.
+        for (int tick = 0; tick < 10; tick++)
+        {
+            var commands = new CommandBuffer();
+            new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+            commands.Apply(em);
+        }
 
         bool fired = em.GetEntitiesWithComponents<Ammo>().Count() > 0;
         Assert.Equal(expectedToFire, fired);

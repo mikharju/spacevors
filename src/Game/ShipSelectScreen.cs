@@ -85,7 +85,7 @@ public sealed class ShipSelectScreen
             if (y + height < ListTopMargin || y > windowHeight - ListBottomMargin) continue; // off-screen
 
             var ship = ships[i];
-            string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Weapon.Turrets.Count} turret{(ship.Weapon.Turrets.Count > 1 ? "s" : "")}";
+            string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Loadout.Mounts.Count}/{ship.Slots.Count} turret mounts";
             var borderColor = i == _highlightedIndex ? new Color(255, 255, 255, 255) : new Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
             DrawShipCard(x, y, width, height, ship.Name, stats, borderColor, i < DigitKeys.Length ? $"{i + 1}" : "", i == _highlightedIndex);
 

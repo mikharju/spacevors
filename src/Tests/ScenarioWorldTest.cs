@@ -92,7 +92,7 @@ public class ScenarioWorldTest
 
         ScenarioWorld.Apply(em, player, Scenarios.Find("baseline-idle")!);
 
-        Assert.False(em.GetEntitiesWithComponents<Turret, TurretOffset>().TryFirst(out _));
+        Assert.False(em.GetEntitiesWithComponents<TurretSlot, Turret>().TryFirst(out _));
         Assert.Equal(enemyShipsBefore, Count<EnemyShip>(em));
         Assert.True(Count<Turret>(em) > 0, "enemy turrets must survive silencing");
     }

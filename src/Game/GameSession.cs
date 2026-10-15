@@ -55,6 +55,13 @@ public sealed class GameSession
     private bool _wasPaused;
     private bool _showStats;
 
+    // Which step of an upgrade choice is on screen: the cards, then picking the hull mount a chosen
+    // new weapon goes into — a free one, or one whose weapon gets replaced.
+    enum UpgradeStep { Cards, PickSlot, ReplaceSlot }
+
+    UpgradeStep _upgradeStep = UpgradeStep.Cards;
+    string _pendingMountWeapon = "";
+
     // Diagnostics: position the player is pinned to while T freeze is active.
     private Vector2? _diagnosticFreezePosition;
 
@@ -132,7 +139,7 @@ public sealed class GameSession
         // PendingChoice cannot insert unmeasured frames into the run.
         if (_scenario is not null && hasPendingChoice)
         {
-            ApplySelectedUpgrade(0);
+            ChooseUpgrade(0, autoMountInSlot: true);
             hasPendingChoice = false;
         }
 
@@ -266,20 +273,11 @@ public sealed class GameSession
 
     private void SyncTurrets(Vector2 playerPos, float angle)
     {
-        // Sync turret positions and rotations to player ship
-        float cos = (float)Math.Cos(angle);
-        float sin = (float)Math.Sin(angle);
-
-        foreach (var (turretEntity, turret, offset, arcOffset) in _em.GetEntitiesWithComponents<Turret, TurretOffset, ArcOffset>())
-        {
-            if (turret.IsEnemy) continue;
-            var rotatedOffset = new Vector2(
-                offset.Value.X * cos - offset.Value.Y * sin,
-                offset.Value.X * sin + offset.Value.Y * cos);
-
-            _em.AddComponent(turretEntity, new Position(playerPos + rotatedOffset));
-            _em.AddComponent(turretEntity, new Rotation(angle + arcOffset.Angle));
-        }
+        // Turret mounts ride with the hull: their world position is the slot offset rotated by the
+        // hull. The aim is simulation state — TurretFiringSystem slews it inside the slot's arc.
+        // Only mounted slots carry a Turret; an empty mount has no position to track.
+        foreach (var (turretEntity, _, slot) in _em.GetEntitiesWithComponents<Turret, TurretSlot>())
+            _em.AddComponent(turretEntity, new Position(slot.Definition.WorldPosition(playerPos, angle)));
     }
 
     private void HandleDiagnosticKeys(Player playerStats)
@@ -556,11 +554,21 @@ public sealed class GameSession
     private void HandleUpgradeMenu()
     {
         // Game is paused — no simulation runs. Only handle choice input.
+        int windowWidth = Raylib.GetScreenWidth();
+        int windowHeight = Raylib.GetScreenHeight();
+
+        _renderSw.Restart();
+        if (_upgradeStep == UpgradeStep.Cards) HandleCardStep(windowWidth, windowHeight);
+        else HandleSlotStep(windowWidth, windowHeight);
+        _renderSw.Stop();
+        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+    }
+
+    private void HandleCardStep(int windowWidth, int windowHeight)
+    {
         bool hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
         PendingUpgradeOptions? upgradeOptions = hasPending ? pendingTuple.Value2 : null;
 
-        int windowWidth = Raylib.GetScreenWidth();
-        int windowHeight = Raylib.GetScreenHeight();
         bool hasCards = upgradeOptions is { Options.Length: > 0 };
         var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards);
 
@@ -569,14 +577,37 @@ public sealed class GameSession
             : -1;
 
         int selectedIndex = ReadChoiceSelection(hoveredIndex);
-        if (selectedIndex >= 0) ApplySelectedUpgrade(selectedIndex);
+        if (selectedIndex >= 0) ChooseUpgrade(selectedIndex, autoMountInSlot: _scenario is not null);
 
+        RenderCardScreen(screen, upgradeOptions, hoveredIndex, windowWidth, windowHeight);
+    }
+
+    void RenderCardScreen(StatsScreenRenderer.Prepared screen, PendingUpgradeOptions? options, int hoveredIndex, int windowWidth, int windowHeight)
+    {
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
-        _renderSw.Restart();
-        Renderer.RenderPaused(_em, (float)upgradeCam.Target.X, (float)upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
-            new Renderer.StatsOverlay(screen, upgradeOptions, GetPlayerLevel(), hoveredIndex));
-        _renderSw.Stop();
-        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        Renderer.RenderPaused(_em, upgradeCam.Target.X, upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
+            new Renderer.StatsOverlay(screen, options, GetPlayerLevel(), hoveredIndex));
+    }
+
+    // The second step of a new weapon: pick the hull mount it goes into, or the weapon it replaces.
+    private void HandleSlotStep(int windowWidth, int windowHeight)
+    {
+        if (WeaponType.FromName(_pendingMountWeapon) is not { } weapon)
+        {
+            ClearPendingChoices();
+            return;
+        }
+
+        var mount = MountMenuRenderer.Prepare(_em, _ship, windowWidth, windowHeight, weapon, fillingFreeSlot: _upgradeStep == UpgradeStep.PickSlot);
+
+        int hovered = MountMenuRenderer.GetHoveredIndex(mount, Raylib.GetMouseX(), Raylib.GetMouseY());
+        int picked = ReadSlotSelection(hovered, mount.Markers);
+
+        if (picked >= 0) MountWeapon(mount.Markers[picked].SlotEntity, mount.Markers[picked].Slot, weapon);
+        else if (Raylib.IsMouseButtonPressed(MouseButton.Right)) _upgradeStep = UpgradeStep.Cards;
+
+        var mountCam = _em.GetComponent<Camera>(_cameraEntity);
+        Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mount, hovered);
     }
 
     private static int ReadChoiceSelection(int hoveredIndex)
@@ -591,20 +622,105 @@ public sealed class GameSession
         return -1;
     }
 
-    private void ApplySelectedUpgrade(int selectedIndex)
+    // Keys 1..n pick the n-numbered mount on the slot screen; ships have at most this many.
+    static readonly KeyboardKey[] SlotKeys = [KeyboardKey.One, KeyboardKey.Two, KeyboardKey.Three, KeyboardKey.Four, KeyboardKey.Five, KeyboardKey.Six, KeyboardKey.Seven, KeyboardKey.Eight];
+
+    private static int ReadSlotSelection(int hoveredIndex, MountMenuRenderer.SlotMarker[] markers)
     {
-        bool hasChoice = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple);
+        for (int key = 0; key < SlotKeys.Length; key++)
+        {
+            int marker = IndexOfNumber(markers, key + 1);
+            if (marker >= 0 && Raylib.IsKeyPressed(SlotKeys[key])) return marker;
+        }
 
-        if (hasChoice && selectedIndex < choiceTuple.Value2.Options.Length)
-            ApplyUpgrade(_em, _playerEntity, choiceTuple.Value2.Options[selectedIndex]);
+        return Raylib.IsMouseButtonPressed(MouseButton.Left) ? hoveredIndex : -1;
+    }
 
+    static int IndexOfNumber(MountMenuRenderer.SlotMarker[] markers, int number)
+    {
+        for (int i = 0; i < markers.Length; i++)
+            if (markers[i].Number == number) return i;
+        return -1;
+    }
+
+    private void ChooseUpgrade(int selectedIndex, bool autoMountInSlot)
+    {
+        if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple)) return;
+
+        var options = choiceTuple.Value2.Options;
+        if (selectedIndex >= options.Length)
+        {
+            ClearPendingChoices();
+            return;
+        }
+
+        var option = options[selectedIndex];
+
+        // A new weapon is only half a choice: it still needs a hull mount. The pending choice stays up
+        // while the player picks one, so backing out leaves the cards untouched.
+        if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage && WeaponType.FromName(option.WeaponName) is { } weapon)
+        {
+            _pendingMountWeapon = weapon.Name;
+            bool hasFreeSlot = TurretMount.FreeSlots(_worldView, weapon.Size).Count > 0;
+            DiagnosticLogger.LogEvent("UPGRADE", $"weapon {weapon.Name} needs a mount ({(hasFreeSlot ? "free slot" : "replace a mounted weapon")})");
+
+            if (autoMountInSlot)
+            {
+                MountIntoFirstFit(weapon, hasFreeSlot);
+                ClearPendingChoices();
+            }
+            else
+            {
+                _upgradeStep = hasFreeSlot ? UpgradeStep.PickSlot : UpgradeStep.ReplaceSlot;
+            }
+
+            return;
+        }
+
+        ApplyUpgrade(_em, _playerEntity, option);
         ClearPendingChoices();
+    }
+
+    private void MountWeapon(Entity slotEntity, TurretSlotDefinition slot, WeaponType weapon)
+    {
+        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
+
+        if (_upgradeStep == UpgradeStep.ReplaceSlot) TurretMount.Unmount(_em, slotEntity);
+        TurretMount.Mount(_em, slotEntity, slot, weapon, playerPos, hullRotation);
+
+        DiagnosticLogger.LogEvent("UPGRADE", $"mounted new weapon {weapon.Name} in {slot.Name}");
+        ClearPendingChoices();
+    }
+
+    // Perf scenarios never pause: take the first mount that fits — a free one, else the first
+    // mounted weapon in the way.
+    private void MountIntoFirstFit(WeaponType weapon, bool useFreeSlot)
+    {
+        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
+
+        var free = TurretMount.FreeSlots(_worldView, weapon.Size);
+        if (useFreeSlot && free.Count > 0 && TurretMount.TryFindSlot(_worldView, free[0].Name, out var freeSlot))
+        {
+            TurretMount.Mount(_em, freeSlot, free[0], weapon, playerPos, hullRotation);
+            return;
+        }
+
+        var taken = TurretMount.MountedSlots(_worldView);
+        if (taken.Count == 0) return;
+
+        TurretMount.Unmount(_em, taken[0].SlotEntity);
+        TurretMount.Mount(_em, taken[0].SlotEntity, taken[0].Slot, weapon, playerPos, hullRotation);
     }
 
     private void ClearPendingChoices()
     {
         foreach (var (entity, _) in _em.GetEntitiesWithComponents<PendingChoice>().ToList())
             _em.DestroyEntity(entity);
+
+        _upgradeStep = UpgradeStep.Cards;
+        _pendingMountWeapon = "";
     }
 
     private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)
@@ -614,15 +730,6 @@ public sealed class GameSession
         foreach (var t in em.GetEntitiesWithComponents<Turret>())
         {
             if (!t.Value1.IsEnemy) allPlayerTurrets.Add(t);
-        }
-
-        var existingWeaponNames = allPlayerTurrets.Select(t => t.Value.WeaponName).ToHashSet();
-        bool isNewWeapon = !existingWeaponNames.Contains(upgrade.WeaponName);
-
-        if (isNewWeapon && upgrade.Stat == UpgradeOption.Damage)
-        {
-            AddNewWeaponTurret(em, playerEntity, upgrade.WeaponName);
-            return;
         }
 
         var def = UpgradeDefinition.For(upgrade.Stat);
@@ -684,32 +791,5 @@ public sealed class GameSession
                 em.AddComponent(playerEntity, playerStats with { BackThrust = playerStats.BackThrust * def.Multiplier });
                 break;
         }
-    }
-
-    private static void AddNewWeaponTurret(EntityManager em, Entity playerEntity, string weaponName)
-    {
-        var slots = em.GetComponent<WeaponSlots>(playerEntity);
-        if (slots.Used >= slots.Max)
-        {
-            DiagnosticLogger.LogEvent("UPGRADE", $"new weapon {weaponName} skipped: no free weapon slots ({slots.Used}/{slots.Max})");
-            return;
-        }
-
-        var type = WeaponType.FromName(weaponName);
-        if (type is not { } weapon || weapon.AddOn is not { } mount)
-            throw new InvalidOperationException($"Unknown weapon: {weaponName}");
-
-        var playerPos = em.GetComponent<Position>(playerEntity);
-
-        var turretEntity = em.CreateEntity();
-        Vector2 worldPos = playerPos.Value;
-        em.AddComponent(turretEntity, new Position(worldPos));
-        em.AddComponent(turretEntity, new Rotation(mount.ArcOffset));
-        em.AddComponent(turretEntity, new Turret(Weapon: weapon.Stats, WeaponName: weapon.Name, ArcAngle: mount.ArcAngle, Range: mount.Range, AutoTarget: mount.AutoTarget));
-        em.AddComponent(turretEntity, new TurretOffset(mount.Offset));
-        em.AddComponent(turretEntity, new ArcOffset(mount.ArcOffset));
-
-        em.AddComponent(playerEntity, new WeaponSlots(slots.Used + 1, slots.Max));
-        DiagnosticLogger.LogEvent("UPGRADE", $"added new weapon {weaponName} (slots {slots.Used + 1}/{slots.Max})");
     }
 }

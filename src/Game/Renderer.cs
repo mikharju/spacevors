@@ -61,6 +61,24 @@ public static class Renderer
         Raylib.EndDrawing();
     }
 
+    // The hull-slot picking screen: the world behind, the hull drawn large, its mounts and arcs on top.
+    public static void RenderMount(
+        EntityManager em,
+        float camX, float camY,
+        int windowWidth, int windowHeight,
+        List<(Vector2 Position, float Size, Color Color, float Parallax)> stars,
+        List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
+        Entity playerEntity,
+        bool diagnostics,
+        MountMenuRenderer.Prepared mount,
+        int hoveredSlot)
+    {
+        Raylib.BeginDrawing();
+        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, mount.Ship, diagnostics);
+        MountMenuRenderer.Draw(mount, hoveredSlot, windowWidth, windowHeight);
+        Raylib.EndDrawing();
+    }
+
     private static void DrawScene(
         EntityManager em,
         float camX, float camY,

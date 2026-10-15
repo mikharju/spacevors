@@ -10,8 +10,6 @@ public static class WorldRenderer
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
 
-    private static readonly Color PlayerTurretColor = new(255, 180, 50, 255);
-
     // Damage smoke: grey puffs that fade out over their lifetime.
     private const int SmokeColorR = 120;
     private const int SmokeColorG = 120;
@@ -60,7 +58,7 @@ public static class WorldRenderer
         RenderTimings.Pass("world.xpPickups");
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.healthOrbs");
-        DrawTurrets(em, camX, camY, windowWidth, windowHeight);
+        DrawTurrets(em, playerEntity, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.turrets");
 
         if (diagnostics)
@@ -250,17 +248,30 @@ public static class WorldRenderer
         }
     }
 
-    private static void DrawTurrets(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    private static void DrawTurrets(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, turret, rot, pos) in em.GetEntitiesWithComponents<Turret, Rotation, Position>())
+        var hullPos = em.GetComponent<Position>(playerEntity).Value;
+        float hullRotation = em.GetComponent<Rotation>(playerEntity).Angle;
+
+        foreach (var (entity, slot) in em.GetEntitiesWithComponents<TurretSlot>())
         {
-            if (turret.IsEnemy) continue;
+            bool mounted = em.TryGetComponent<Turret>(entity, out _);
+            // A mounted turret rides with the hull via SyncTurrets; an empty mount is just its slot.
+            Vector2 world = mounted
+                ? em.GetComponent<Position>(entity).Value
+                : slot.Definition.WorldPosition(hullPos, hullRotation);
 
-            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+            var (cx, cy) = RenderHelpers.ToScreen(world, camX, camY, windowWidth, windowHeight);
+            float radius = RenderHelpers.TurretMarkerRadius(slot.Definition.Size);
+            if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
 
-            if (RenderHelpers.IsOffScreen(cx, cy, RenderHelpers.TurretMarkerSize / 2f, windowWidth, windowHeight)) continue;
+            if (!mounted)
+            {
+                Raylib.DrawCircle((int)cx, (int)cy, radius, Palette.TurretEmptySlot);
+                continue;
+            }
 
-            RenderHelpers.DrawTurretMarker(cx, cy, PlayerTurretColor);
+            RenderHelpers.DrawTurretMarker(cx, cy, radius * 1.6f, Angle.ToDeg(em.GetComponent<Rotation>(entity).Angle), Palette.TurretMounted);
         }
     }
 

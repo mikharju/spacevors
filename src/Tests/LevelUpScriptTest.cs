@@ -62,9 +62,9 @@ public class LevelUpScriptTest
     }
 
     [Fact]
-    public void MilestoneOffersNewWeaponWhenDistinctWeaponsBelowMaxSlots()
+    public void MilestoneOffersNewWeaponsWhenMountsAreFree()
     {
-        // Heavy-like loadout: three turrets but only two distinct weapon types, max three slots.
+        // Heavy hull: three of its seven mounts filled, two distinct weapon types.
         var (em, player) = CreateHeavyLikePlayer(xp: 45, level: 4);
 
         RunLevelUp(new LevelUpSystem(), em);
@@ -151,13 +151,23 @@ public class LevelUpScriptTest
         em.AddComponent(player, new Position(Vector2.Zero));
         em.AddComponent(player, new Velocity(Vector2.Zero));
         em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 20, Radius: 84f, Xp: xp, Level: level, PickupRadius: 230f, RotationSpeed: 0.67f));
-        em.AddComponent(player, new WeaponSlots(2, 3));
 
-        AddTurret(em, "MachineGun");
-        AddTurret(em, "Shotgun");
-        AddTurret(em, "Shotgun");
+        foreach (var slot in TurretLayouts.Heavy)
+            em.AddComponent(em.CreateEntity(), new TurretSlot(slot));
+
+        MountOnHull(em, TurretSlotName.MainGun, WeaponType.MachineGun);
+        MountOnHull(em, TurretSlotName.SmallLeft, WeaponType.Shotgun);
+        MountOnHull(em, TurretSlotName.SmallRight, WeaponType.Shotgun);
 
         return (em, player);
+    }
+
+    // Mount a weapon where the hull says it goes, the way level-up does it.
+    private static void MountOnHull(EntityManager em, string slotName, WeaponType weapon)
+    {
+        var view = new WorldView(em);
+        Assert.True(TurretMount.TryFindSlot(view, slotName, out var slotEntity));
+        TurretMount.Mount(em, slotEntity, view.GetComponent<TurretSlot>(slotEntity).Definition, weapon, Vector2.Zero, 0f);
     }
 
     private static void AddTurret(EntityManager em, string weaponName)

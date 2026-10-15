@@ -25,7 +25,6 @@ public static class StatsScreenRenderer
     const int SectionGap = 10;
     const int CountColumnWidth = 48;
 
-    static readonly Color DimColor = new(15, 15, 25, 215);
     static readonly Color RowTint = new(255, 255, 255, 6);
     static readonly Color CountUpgraded = new(120, 255, 140, 255);
     static readonly Color CountNone = new(110, 110, 130, 255);
@@ -46,7 +45,7 @@ public static class StatsScreenRenderer
 
     public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex)
     {
-        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, DimColor);
+        Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, Palette.ScreenDim);
 
         bool hasCards = options is { Options.Length: > 0 };
 
@@ -75,9 +74,13 @@ public static class StatsScreenRenderer
         return -1;
     }
 
+    // UI scale from the window width, before the vertical shrink-to-fit. Shared with the slot-picking
+    // screen so both paused screens size their text the same way.
+    public static float UiScale(int windowWidth) => Math.Clamp(windowWidth / (float)BaseDesignWidth, 1f, MaxTextScale);
+
     static float ComputeScale(int windowWidth, int windowHeight, StatsLayout layout, bool hasCards)
     {
-        float scale = Math.Clamp(windowWidth / (float)BaseDesignWidth, 1f, MaxTextScale);
+        float scale = UiScale(windowWidth);
 
         // Shrink to fit vertically if the content would overflow a short window.
         float baseUnits = MeasureTopPanelsHeight(layout, 1f) + 2f * OuterMargin
@@ -195,24 +198,58 @@ public static class StatsScreenRenderer
             new("Pickup radius", FormatInt(player.PickupRadius), CountOf(em, playerEntity, UpgradeOption.PickupRadius)),
         };
 
-        if (em.TryGetComponent<WeaponSlots>(playerEntity, out var slots))
-            shipRows.Add(new("Weapons", $"{slots.Used}/{slots.Max}", -1));
+        var mounts = CountMounts(em);
+        if (mounts.SmallTotal > 0) shipRows.Add(new("Small mounts", $"{mounts.SmallUsed}/{mounts.SmallTotal}", -1));
+        if (mounts.LargeTotal > 0) shipRows.Add(new("Large mounts", $"{mounts.LargeUsed}/{mounts.LargeTotal}", -1));
 
         var weaponSections = new List<StatsSection>();
         foreach (var weaponName in GetPlayerWeaponNames(em))
         {
             var turret = FirstTurretOfWeapon(em, weaponName);
+            var mount = MountOf(em, weaponName);
             var rows = new List<StatRow>
             {
                 new("Damage", FormatInt(turret.Weapon.Damage), CountOf(em, playerEntity, UpgradeOption.Damage, weaponName)),
                 new("Fire rate", $"{FormatRate(turret.Weapon.FireRate)}/s{PelletSuffix(turret.Weapon.PelletCount)}", CountOf(em, playerEntity, UpgradeOption.FireRate, weaponName)),
                 new("Projectile speed", FormatInt(turret.Weapon.AmmoSpeed), CountOf(em, playerEntity, UpgradeOption.ProjectileSpeed, weaponName)),
                 new("Range / bullet life", $"{FormatInt(turret.Range)} px · {turret.Weapon.ShotLifetime:0.0}s", CountOf(em, playerEntity, UpgradeOption.Range, weaponName)),
+                // The arc belongs to the hull mount, the slew rate to the weapon: together they say
+                // whether this gun keeps its target while the ship turns.
+                new("Mount / firing arc", mount is { } m ? $"{m.Name} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "—", -1),
+                new("Turret turn speed", $"{(int)MathF.Round(Angle.ToDeg(turret.Weapon.TurnSpeed))}°/s", -1),
             };
             weaponSections.Add(new StatsSection(weaponName.ToUpper(), [.. rows]));
         }
 
         return new StatsLayout([.. shipRows], [.. weaponSections]);
+    }
+
+    static (int SmallUsed, int SmallTotal, int LargeUsed, int LargeTotal) CountMounts(EntityManager em)
+    {
+        int smallUsed = 0, smallTotal = 0, largeUsed = 0, largeTotal = 0;
+        foreach (var (entity, slot) in em.GetEntitiesWithComponents<TurretSlot>())
+        {
+            bool occupied = em.HasComponent<Turret>(entity);
+            if (slot.Definition.Size == TurretSize.Large)
+            {
+                largeTotal++;
+                if (occupied) largeUsed++;
+            }
+            else
+            {
+                smallTotal++;
+                if (occupied) smallUsed++;
+            }
+        }
+
+        return (smallUsed, smallTotal, largeUsed, largeTotal);
+    }
+
+    static TurretSlotDefinition? MountOf(EntityManager em, string weaponName)
+    {
+        foreach (var (_, turret, slot) in em.GetEntitiesWithComponents<Turret, TurretSlot>())
+            if (turret.WeaponName == weaponName) return slot.Definition;
+        return null;
     }
 
     static List<string> GetPlayerWeaponNames(EntityManager em)

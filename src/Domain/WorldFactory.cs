@@ -28,9 +28,12 @@ public static class WorldFactory
         em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerShipStats.Boost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth, shipType.MaxHealth));
 
-        // A slot is one distinct weapon type (matches LevelUpSystem and AddNewWeaponTurret).
-        int usedSlots = shipType.Weapon.Turrets.Select(t => t.Weapon.Name).Distinct().Count();
-        em.AddComponent(playerEntity, new WeaponSlots(usedSlots, shipType.MaxWeaponSlots));
+        // A slot is one hull mount; the starting loadout fills some of them by slot name.
+        foreach (var mount in shipType.Loadout.Mounts)
+        {
+            if (!shipType.Slots.Any(s => s.Name == mount.SlotName))
+                throw new InvalidOperationException($"{shipType.Name} has no turret slot '{mount.SlotName}' for {mount.Weapon.Name}");
+        }
 
         bool pinnedAsteroid = testAsteroid || Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
 
@@ -95,15 +98,14 @@ public static class WorldFactory
             EnemyShipFactory.AddComponents(em, ship, spawnPos, initialVel, SpawnPlacement.AngleFromTo(spawnPos, Vector2.Zero), 0f, enemyShipType);
         }
 
-        // Create turret entities from the ship's weapons
-        foreach (var def in shipType.Weapon.Turrets)
+        // One entity per turret mount on the hull; the ones the loadout fills also carry the weapon.
+        var mountsBySlot = shipType.Loadout.Mounts.ToDictionary(m => m.SlotName);
+        foreach (var slot in shipType.Slots)
         {
-            var turretEntity = em.CreateEntity();
-            em.AddComponent(turretEntity, new Position(new Vector2(0f, 0f)));
-            em.AddComponent(turretEntity, new Rotation(def.ArcOffset));
-            em.AddComponent(turretEntity, new Turret(Weapon: def.Weapon.Stats, WeaponName: def.Weapon.Name, ArcAngle: def.ArcAngle, Range: def.Range));
-            em.AddComponent(turretEntity, new TurretOffset(def.Offset));
-            em.AddComponent(turretEntity, new ArcOffset(def.ArcOffset));
+            var slotEntity = em.CreateEntity();
+            em.AddComponent(slotEntity, new TurretSlot(slot));
+            if (mountsBySlot.TryGetValue(slot.Name, out var mount))
+                TurretMount.Mount(em, slotEntity, slot, mount.Weapon, hullPosition: Vector2.Zero, hullRotation: 0f);
         }
 
         return (em, playerEntity, cameraEntity);

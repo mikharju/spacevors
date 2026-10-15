@@ -167,11 +167,11 @@ public static class ScenarioWorld
 
     private static float RandomAge(float lifetime, Random rng) => (float)rng.NextDouble() * lifetime;
 
-    // Player turrets are the ones carrying a TurretOffset; enemy ship turrets are not.
+    // Player turrets are the ones mounted in a hull slot; enemy ship turrets are not.
     private static void SilencePlayerTurrets(EntityManager em)
     {
-        foreach (var (entity, _, _) in em.GetEntitiesWithComponents<Turret, TurretOffset>().ToList())
-            em.RemoveComponent<Turret>(entity);
+        foreach (var (entity, _, _) in em.GetEntitiesWithComponents<TurretSlot, Turret>().ToList())
+            TurretMount.Unmount(em, entity);
     }
 
     private static void SetPlayerHealth(EntityManager em, Entity playerEntity, float ratio)

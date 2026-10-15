@@ -11,7 +11,7 @@ public class ShipRosterTest
     [Fact]
     public void Shadow_CarriesARealWeaponNotTheLoadTestSpray()
     {
-        Assert.Equal(WeaponType.GravitonBurst.Name, Assert.Single(ShipType.Shadow.Weapon.Turrets).Weapon.Name);
+        Assert.Equal(WeaponType.GravitonBurst.Name, Assert.Single(ShipType.Shadow.Loadout.Mounts).Weapon.Name);
     }
 
     [Fact]
@@ -24,7 +24,7 @@ public class ShipRosterTest
             WeaponType.LoadTestWeapon.Name,
         ];
 
-        Assert.Equal(expectedWeapons, ShipType.DiagnosticShips.Select(s => Assert.Single(s.Weapon.Turrets).Weapon.Name));
+        Assert.Equal(expectedWeapons, ShipType.DiagnosticShips.Select(s => Assert.Single(s.Loadout.Mounts).Weapon.Name));
 
         foreach (var ship in ShipType.DiagnosticShips)
         {
@@ -44,6 +44,25 @@ public class ShipRosterTest
 
         Assert.Equal(names.Length, names.Distinct().Count());
         Assert.All(names, name => Assert.StartsWith("Shadow ", name));
+    }
+
+    [Fact]
+    public void EveryLoadoutFitsTheShipsOwnSlots()
+    {
+        foreach (var ship in ShipType.All)
+            foreach (var mount in ship.Loadout.Mounts)
+            {
+                var slot = Assert.Single(ship.Slots, s => s.Name == mount.SlotName);
+                Assert.True(TurretMount.Fits(slot, mount.Weapon), $"{ship.Name}: {mount.Weapon.Name} does not fit {slot.Name}");
+            }
+    }
+
+    [Fact]
+    public void EveryShipHasAtLeastOneFreeMountForANewWeapon()
+    {
+        // Progression promises a free slot for most new weapons, so no hull may start fully booked.
+        foreach (var ship in ShipType.All)
+            Assert.True(ship.Slots.Count > ship.Loadout.Mounts.Count, $"{ship.Name} starts with every mount filled");
     }
 
     [Fact]

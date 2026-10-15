@@ -21,6 +21,16 @@ internal static class Palette
     public static readonly Color Shadow = new(0, 0, 0, 90);
     public static readonly Color TrackDark = new(10, 12, 20, 140);
 
+    // The dim wash behind the paused screens (stats, upgrades, slot picking).
+    public static readonly Color ScreenDim = new(15, 15, 25, 215);
+
+    // Turret mounts: an empty one is a greyish-blue circle, a mounted gun a greyish-red triangle
+    // pointing where it aims, and its firing arc a green sector around the mount.
+    public static readonly Color TurretEmptySlot = new(95, 125, 155, 210);
+    public static readonly Color TurretMounted = new(190, 95, 95, 255);
+    public static readonly Color TurretArc = new(70, 190, 110, 40);
+    public static readonly Color TurretArcHover = new(70, 190, 110, 95);
+
     // Green → amber → red health gradient shared by the HUD and target hp bars.
     public static Color HealthColor(float ratio) => ratio < 0.5f
         ? Lerp(HealthLow, HealthMid, ratio * 2f)
