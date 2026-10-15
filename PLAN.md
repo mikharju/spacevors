@@ -49,7 +49,8 @@ Goal:
 - Shift: boost (forward only, 2.5x)
 - Mouse: aim — the ship rotates toward the cursor (primary rotation)
 - Left click: lock the clicked enemy ship or mine as primary target (red corner brackets); all weapons then prioritize it at extended range. Clicking empty space clears the target
-- Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
+- Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded, how many hull mounts of each size are filled, and per weapon its hull mount with firing arc and turret turn speed. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
+- Upgrade choice: 1-5 or click a card. Choosing a new weapon opens the turret-mount screen — the hull drawn large, every mount shown as a circle with its firing arc; click a mount or press its number to fit the weapon, right-click to go back to the cards. If every mount of that size is taken, the screen asks which mounted weapon to replace
 - R: restart from game over (back to ship selection)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
@@ -418,6 +419,40 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - Ship can have one or two small or large damage effects at any one time
 - If ship restores hp above threshold, damage effect associated with that tier gets fixed
 - Show damage effects on ship status screen with red text
+
+## Turret layouts — done
+
+Ships have a turret layout: Multiple turret slots with following properties:
+- size (large, small)
+- arc of fire (degrees) how far can the turret turn
+- direction (degrees) which way the weapon points if centered in the middle of it's firing arc
+- Location on hull (Vector from ship center)
+- name (eg. main_gun, small_left,, small_right, small_back)
+
+Weapons get:
+- Size (large, small)
+- Turning speed (degrees / s)
+
+Ships may get new weapons to put into their turret slots on the 5 level new weapon cards.
+- User chooses which slot the weapon goes into.
+- Large weapon may not be mounted on small slot
+
+During upgrade when user is choosing where to new weapon: 
+- render large ship graphic with empty turrets shown as greyish blue circles
+- render the arc of fire as green section of circle originating from center of turret showing which directions the turret may fire in
+
+Graphics: 
+- Render a greyish blue circle where the turret location is, different size for large and small
+- Render triangle greyish red triangle in turret circle when turret is mounted
+- Triangle turns to point where the turret is pointing
+
+Ships get the same starting weapons as currently, but they are now in their turret slots
+- Add one more turret slot to each ship (small ships end up with two empty slots and large ship with three)
+- If ship has free turret slots, most weapons offered must be of type fitting the free slot. 
+- Minority of offered new weapons may be of size whose slots are all full, then user will need to replace an existing weapon.
+
+- Implemented: one entity per hull mount (`TurretSlot`), created by `WorldFactory` from `TurretLayouts` (Scout 3, Fighter 4, Shadow 3, Heavy 7 — two free on the small ships, three on Heavy). A filled mount also carries `Turret`/`TurretAim`/`Position`/`Rotation`; the arc, offset and size belong to the slot, the size/range/turn speed to the weapon (`WeaponType.Size`, `WeaponStats.TurnSpeed`). Slew is hull-relative, so absolute rate = hull rate + turn rating and a hull turning faster than a gun drags its aim off target — intended. `AimAcquireTolerance` 3° stops the correction, `FireAimTolerance` 8° restarts it and is also the firing gate, so a sweeping mount fires as it crosses a target and a spinning hull silences guns rated below its turn rate. With no valid target a mount walks back to the middle of its arc and parks. `TwinChainGun` is gone (it needed a slot of its own); every other weapon fits a slot. Mount screen: `MountMenuRenderer` (hull unrotated, empty mounts as greyish-blue circles sized by slot, arcs as green sectors, mounted guns as greyish-red triangles, number badges + right-click back); in-game markers use the same shapes. Perf: `ammo-spray` sim median 1.25 ms vs 1.26 ms on `HEAD`, `impact-storm` 2.06 vs 2.09 ms — no measurable cost (scenarios silence player turrets, so the slew path is not in these numbers).
+
 
 ## Future
 

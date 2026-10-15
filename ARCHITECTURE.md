@@ -85,7 +85,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo LaserBeam FireCooldown Turret WeaponSlots TurretOffset ArcOffset PrimaryTarget AutoTargetMark
+Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim PrimaryTarget AutoTargetMark
 Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
@@ -102,8 +102,8 @@ Three ways systems write components, plus direct app-layer writes:
 3. Local accumulation + single flush: CollisionSystem accumulates per-entity velocity/position-correction/angular-velocity/health deltas in per-frame dictionaries and emits one command per entity at the end of Update — otherwise last-write-wins would drop all but the final hit on an entity struck several times in one frame.
 
 Direct writes (app layer): GameSession writes straight to the EntityManager before the simulation step or while paused, never mid-phase:
-- Pre-phase (form the tick's initial state; systems read them normally): Acceleration/AngularVelocity from input, turret Position/Rotation from SyncTurrets, diagnostic-key writes.
-- While paused: upgrade application (Player/Turret/Health/WeaponSlots + new weapon turrets), pending-choice cleanup, thruster removal on pause entry.
+- Pre-phase (form the tick's initial state; systems read them normally): Acceleration/AngularVelocity from input, turret mount Position from SyncTurrets (a mount's aim — Rotation + TurretAim — is simulation state, command-written by TurretFiringSystem), diagnostic-key writes.
+- While paused: upgrade application (Player/Turret/Health, and mounting a new weapon into a hull slot), pending-choice cleanup, thruster removal on pause entry.
 
 Rules:
 - Systems default to CommandBuffer; the direct ref mutations above are the only exceptions and must stay single-component in-place edits with no structural changes during iteration. Any new direct-write path requires updating this section first.
@@ -229,7 +229,7 @@ src/
         Vector2.cs             -- 2D math
         CoolDownHelper.cs      -- FireCooldown read helper
         DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, per-tick sim total, render total, per-phase command-flush total, events); EnvVar is the single source for the gate
-        WorldFactory.cs        -- starting world: player, camera, turrets, asteroids, mines, enemy ships (seeded, no Raylib)
+        WorldFactory.cs        -- starting world: player, camera, hull turret mounts, asteroids, mines, enemy ships (seeded, no Raylib)
         Scenarios/             -- ScenarioSpec + the named perf scenarios + ScenarioWorld (seeded start states)
 
     RenderBench/             -- headless render benchmark (lit-sprite draw cost)
