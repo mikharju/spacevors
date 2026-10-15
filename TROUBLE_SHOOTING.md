@@ -182,6 +182,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: `.tools/env.sh` is the *sandbox* setup — it forces `DISPLAY=localhost:99`, `LIBGL_ALWAYS_SOFTWARE=1`, and Mesa from `.tools/root`. Sourced on a real desktop it points raylib at a display that does not exist, and raylib's failed `InitWindow` segfaults instead of reporting. The script then kept looping, and the baseline step ran on a run that produced nothing.
 - **Fix / Prevention**: Only the sandbox launcher scripts (`game.sh`, `shot.sh`, `xvfb.sh`) source env.sh; anything meant to run on both machines takes the environment as given and says so in its usage (` . .tools/env.sh && .tools/...` for the sandbox). Guard the two failure modes explicitly: check `DISPLAY`/`WAYLAND_DISPLAY` before launching a window, and treat a non-zero exit or a missing `summary.json` as fatal — never let a bookkeeping step report success after the measurement failed.
 
+## 43. `dotnet build` fails in the agent sandbox on a read-only home
+
+- **Symptom**: `dotnet build src/Domain/Domain.csproj` died with `System.IO.IOException: Read-only file system : '/home/agent/.dotnet'`, or with `The user's home directory could not be determined. Set the 'DOTNET_CLI_HOME' environment variable`.
+- **Cause**: the agent shell has no writable home directory, and each command runs in a fresh sandbox, so anything dotnet wants to cache there (or in `$HOME`) fails on the first MSBuild/nuget write.
+- **Fix / Prevention**: point both variables at a scratch dir on every dotnet command: `HOME=/tmp/dh DOTNET_CLI_HOME=/tmp/dh DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet build …`. `/tmp` is writable but does not survive between commands (entry 26), so the first-use setup runs again per command — a couple of seconds, not worth caching. The same applies to `.tools/scenario.sh`, which shells out to dotnet.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.
