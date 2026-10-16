@@ -4,10 +4,11 @@ Plan for fixing the inverted difficulty curve (2026-09-12).
 
 ## Status: P1–P5 implemented (commits `difficulty P4` … `difficulty P5`)
 
-**Round 2 planned (2026-10-16), nothing implemented:** see "Round 2" at the end of this file — the
-knobs beyond hp/damage/fire rate (stand-off range, ammo speed, small-ship speed, composition,
-tracking, pellets, concurrency, mines, reward side), with the numbers and the rules they must obey.
-P6 (type unlock) and P7 (surges) from below are still unimplemented and are folded into that plan.
+**Round 2 planned 2026-10-16, its individual-stat knobs implemented the same day:** see "Round 2" at
+the end of this file — the knobs beyond hp/damage/fire rate (stand-off range, ammo speed, small-ship
+speed, composition, tracking, pellets, concurrency, mines, reward side), with the numbers and the rules
+they must obey. P6 (type unlock) and P7 (surges) from above are still unimplemented and are folded into
+that plan.
 
 Deviations from the proposed values, and why:
 
@@ -121,6 +122,19 @@ If linear scaling feels flat after P1–P6 are measured: discrete threat tiers w
 
 **Status: plan only (2026-10-16). No code changed.** Asked for: longer attack range, a tiny bit of
 projectile speed, small enemies a bit faster, and other knobs worth having.
+
+**Round 2 implemented the same day (2026-10-16), direction chosen by the user: deadlier individuals,
+not a busier world.** Done: R2.8 (the `[THREAT]` readout — `ThreatMeter.Measure`, one row a second,
+logged in every run and drawn on the bottom edge with diagnostics on), R2.3 (per-type `FiringRange`
+drift with the D1 ceiling), R2.4 (ammo speed +1%/tier with the D3 ceiling; scatter left alone, as the
+plan said: one, not both), R2.5 (Interceptor 90→120, Default 65→85, HeavyCannon flat;
+`PlayerSpeedFactor` left at 0.75 pending playtest), and the tracking drift from R2.6 item 5
+(+0.03 rad/s per tier). Not done: R2.6 items 1-4 and 6-11 (composition/P6, pellets, concurrency,
+mines, reward side, elites, spawn geometry, behaviour, difficulty selection), the D5 assertion
+("one hit ≤ 1/3 of a typical late hull") — there is no data quantity for a *typical late* hull, so the
+test asserts D6 (the TTK ceiling) instead and the flat `DamageAdd` instead — and the R2.10 order
+shifted: the readout and the individual-knobs landed, composition (their pacing baseline) has not.
+`MaxTier` became public so the ceilings can be stated at the cap.
 
 ## R2.1 What already scales, and what is frozen (read off the code today)
 

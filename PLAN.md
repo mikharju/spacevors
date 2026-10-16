@@ -487,12 +487,22 @@ Raw DPS (fire rate × pellets × damage). Tier 1: Cyclotron 8 (1600 px, 4200 px/
 - Measured: `ammo-spray` sim median **1.29 ms** / p99 2.08 against 1.33 / 2.37, `impact-storm` **2.09 ms** / 4.35 against 2.14 / 4.96 — this costs ~0%, keep. The added work is one component lookup per rock hit; the per-tick health bookkeeping only runs for small rocks, and the killing hit now spawns fewer effects than the hits before it.
 - Open knob: clearing a rock pays nothing — no XP, no loot — so it is pure DPS spent on cover. Whether rocks should drop something, or whether the reward is simply the shot lane you opened, is a playtest call.
 
+## Difficulty: deadlier individuals, and a threat readout — done
+
+- **A one-second threat row, logged in every run.** `ThreatMeter.Measure` is a read-only aggregate over the world: ships alive, ships standing inside their own gun range plus the player's hull radius (the ones that can hit the hull right now), live enemy rounds, their summed fire rate × pellets × damage (`in`), the same sum for the guns on the player's own hull (`out`), hp, level, mines, small rocks. `GameSession` takes it once a second of game time. The `[THREAT]` line is the one log line not behind the diagnostics gate — it is the tuning record for the difficulty knobs — and the same row is drawn along the bottom edge when `SPACEVORS_DIAGNOSTIC=1` (`hud.threat` render pass). First read of an unattended Scout run: `t=18s tier=0 ships=8 ring=2 rounds=2 in=1.4/s out=17.0/s hp=1/8 lvl=1 mines=2 rocks=13`. The `out` column lands exactly on the 17 DPS the weapon pass priced for the Scout, and the hp walk says the early threat is drifting mines, not guns (`mines` 9→2 while the hull sits in a field).
+- **The ladder now drifts reach, closing speed and tracking, not only hp / damage / fire rate.** Applied at spawn, tier = minute, capped at 10. Reach: Interceptor 700→550 (it trades reach for the close), Default 700→800, HeavyCannon 700→950 — the slow 160 px/s gun becomes the long firing line. Closing speed: Interceptor 90→120, Default 65→85, HeavyCannon unchanged. Ammo speed +1%/tier only (200→220, 160→176). Tracking +0.03 rad/s per tier (1.0→1.30): they hold a guns-on-you arc through a strafe without becoming faster or harder-hitting. The hull and its turret are built with the same grown range, because the chase AI brakes the hull at `FiringRange` and the gun fires at it.
+- **Ceilings, asserted by `EnemyDifficultyTest` in the `WeaponBalanceTest` style.** The firing ring — widest grown `FiringRange` plus the widest hull radius (84) — stays inside the player's 1350 px mid band, so mid and long guns still trade favourably at minute 10. Enemy ammo stays under 250 px/s and under the player's slowest round (400), so the fight stays readable and the growth in `in` comes from range and tracking rather than faster bullets. A tier-10 HeavyCannon still dies inside ~7 s of a starter Scout's sustained fire. Per-shot damage is deliberately *not* one of these knobs: it stays on `DamageAdd`, 6 against a base-8 Scout.
+- Direction chosen: **deadlier individuals rather than a busier world** — no new entities, so no sim cost, but harsher on the low-hp hulls, which is exactly what the ring ceiling and the flat damage pay for.
+- Tests: 4 in `ThreatMeterTest` (the ring gate, a wreck not counting, rounds/mounts/mines/rocks, no player) and 5 in `EnemyDifficultyTest` (the three ceilings, drift by role not by fleet, hull and gun agreeing on range). 318 passing.
+- Measured: `ammo-spray` sim median **1.28 ms** / p99 2.58 against 1.29 / 2.08, `impact-storm` **2.07** / 4.08 against 2.09 / 4.35 — this costs ~0%, keep. The scenarios run at tier 0, where the new drifts are zero, so they prove no regression rather than the tier-10 cost; the readout itself is 1 Hz in the window path only.
+- Still open (plans/DIFFICULTY_SCALING.md R2): composition unlocks and weight drift (P6), pellet volleys and concurrency, mines getting scarcer rather than weaker, the reward side (heal-orb chance), elites, spawn surges, and the fairness purchase of a weapons-hot delay on spawn.
+
 ## Near future
 
 - Missiles
 - New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)
 - New mines (Turns into missile, fires a delayed beam)
-- Difficulty scaling: enemies start shooting at longer range and get longer range weapons (maybe also a tiny bit of extra projectile speed, but not much)
+- Difficulty scaling: which enemy types appear when and how their spawn weights drift (P6); pellet volleys and concurrency; mines and the reward side
 
 ## Future
 
