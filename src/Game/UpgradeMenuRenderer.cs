@@ -215,10 +215,21 @@ public static class UpgradeMenuRenderer
 
     // For a new weapon the prominent line carries the mount size, which is the thing the player has
     // to know before picking a hull mount.
-    private static string GetUpgradeValue(UpgradableOption option) =>
-        option.IsNewWeapon && WeaponType.FromName(option.WeaponName) is { } weapon
-            ? (weapon.Size == TurretSize.Large ? "large" : "small")
-            : UpgradeDefinition.For(option.Stat).DisplayValue;
+    private static string GetUpgradeValue(UpgradableOption option)
+    {
+        if (WeaponType.FromName(option.WeaponName) is not { } weapon)
+            return UpgradeDefinition.For(option.Stat).DisplayValue;
+
+        if (option.IsNewWeapon)
+            return weapon.Size == TurretSize.Large ? "large" : "small";
+
+        // ApplyUpgrade hands a multi-pellet gun another pellet instead of speeding it up, so the card
+        // must not promise the +15% a single-pellet gun gets.
+        if (option.Stat == UpgradeOption.FireRate && weapon.Stats.PelletCount > 1)
+            return "+1 shot";
+
+        return UpgradeDefinition.For(option.Stat).DisplayValue;
+    }
 
     // Base numbers of a new weapon — nothing has upgraded it yet, so these are honest starting values.
     private static string[]? NewWeaponSpecs(UpgradableOption option)

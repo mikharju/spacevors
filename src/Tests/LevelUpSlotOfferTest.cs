@@ -91,6 +91,27 @@ public class LevelUpSlotOfferTest
             o => o.WeaponName == WeaponType.RailGun.Name);
     }
 
+    // A hitscan gun fires instant beams: a projectile-speed card would multiply AmmoSpeed 0 by 1.3,
+    // so it must never be dealt.
+    [Fact]
+    public void HitscanGun_IsNeverOfferedAProjectileSpeedCard()
+    {
+        WeaponMount[] hitscanOnly = [new(TurretSlotName.MainGun, WeaponType.LaserLance)];
+        var (em, _) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1, hitscanOnly);
+
+        for (int levelUp = 0; levelUp < 10; levelUp++)
+        {
+            RunLevelUp(em);
+
+            foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
+            {
+                Assert.DoesNotContain(options.Options,
+                    o => o.Stat == UpgradeOption.ProjectileSpeed && o.WeaponName == WeaponType.LaserLance.Name);
+                em.DestroyEntity(entity);
+            }
+        }
+    }
+
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null)
     {
         var em = new EntityManager();

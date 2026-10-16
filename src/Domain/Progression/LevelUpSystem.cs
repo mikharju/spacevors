@@ -99,7 +99,12 @@ public class LevelUpSystem : GameSystem
             foreach (var weapon in weaponNames)
             {
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
-                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
+
+                // A hitscan beam has no travelling projectile: the card would multiply AmmoSpeed 0
+                // by 1.3 and be a dead choice.
+                if (WeaponType.FromName(weapon)?.Stats.Hitscan != true)
+                    allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
+
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
             }
 
