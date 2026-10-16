@@ -4,7 +4,9 @@ using Spacevors.Domain.Stats;
 namespace Spacevors.Domain.Systems;
 
 // One turret's current target selection: the entity plus the aim data for firing at it.
-public readonly record struct TargetSelection(Entity Target, Vector2 AimDirection, Vector2 PredictedPosition, float Radius);
+// `Led` marks an aim that is an intercept solution rather than the target's current position: a round
+// leaves at a rolled speed, so the shot is solved again for the speed it actually has.
+public readonly record struct TargetSelection(Entity Target, Vector2 AimDirection, Vector2 PredictedPosition, float Radius, bool Led);
 
 public class TurretFiringSystem : GameSystem
 {
@@ -177,11 +179,7 @@ public class TurretFiringSystem : GameSystem
         if (distSq > rangeSq || distSq < Epsilon) return null;
 
         Vector2 relVel = vel.Value - playerVelocity;
-        float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
-        float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
-        float c = -distSq;
-
-        float travelTime = SolveQuadratic(a, b, c);
+        float travelTime = InterceptTime(relPos, relVel, ammoSpeed);
         if (travelTime <= 0f) return null;
 
         Vector2 predictedPos = pos.Value + vel.Value * travelTime;
@@ -193,7 +191,7 @@ public class TurretFiringSystem : GameSystem
         Vector2 aimDir = (toPredicted - playerVelocity * travelTime) / (ammoSpeed * travelTime);
         if (Vector2.Dot(forwardDir, aimDir) < cosHalfArc) return null;
 
-        return new TargetSelection(targetEntity, aimDir, predictedPos, radius);
+        return new TargetSelection(targetEntity, aimDir, predictedPos, radius, Led: true);
     }
 
     // Hitscan (instant) aim: target's current position must be in arc and within range — no lead.
@@ -209,7 +207,7 @@ public class TurretFiringSystem : GameSystem
         Vector2 aimDir = relPos / (float)Math.Sqrt(distSq);
         if (Vector2.Dot(forwardDir, aimDir) < cosHalfArc) return null;
 
-        return new TargetSelection(targetEntity, aimDir, pos.Value, GetTargetRadius(view, targetEntity));
+        return new TargetSelection(targetEntity, aimDir, pos.Value, GetTargetRadius(view, targetEntity), Led: false);
     }
 
     private static float GetTargetRadius(WorldView view, Entity targetEntity) =>
@@ -308,11 +306,7 @@ public class TurretFiringSystem : GameSystem
 
                     Vector2 relVel = playerVel.Value - enemyVelocity;
                     float ammoSpeed = es.TurretAmmoSpeed;
-                    float a = ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y;
-                    float b = -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y);
-                    float c = -distSq;
-
-                    float travelTime = SolveQuadratic(a, b, c);
+                    float travelTime = InterceptTime(relPos, relVel, ammoSpeed);
                     if (travelTime <= 0f) continue;
 
                     Vector2 predictedPos = playerPos.Value + playerVel.Value * travelTime;
@@ -322,7 +316,7 @@ public class TurretFiringSystem : GameSystem
                     if (distToPredictedSq > reachSq) continue;
 
                     Vector2 aimDir = (toPredicted - enemyVelocity * travelTime) / (ammoSpeed * travelTime);
-                    nearestTarget = new TargetSelection(playerEntity, aimDir, predictedPos, player.Radius);
+                    nearestTarget = new TargetSelection(playerEntity, aimDir, predictedPos, player.Radius, Led: true);
                     nearestDistSq = distSq;
                 }
             }
@@ -363,25 +357,9 @@ public class TurretFiringSystem : GameSystem
             }
         }
 
-        foreach (var (enemyShipEntity, enemyShip, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
-        {
-            var toTarget = shipPos.Value - turretPos;
-            float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
-
-            if (distSq > rangeSq || distSq < Epsilon) continue;
-
-            float dist = (float)Math.Sqrt(distSq);
-            var toTargetDir = toTarget / dist;
-
-            float dot = Vector2.Dot(forwardDir, toTargetDir);
-            if (dot < cosHalfArc) continue;
-
-            if (distSq < nearestDistSq)
-            {
-                nearestTarget = new TargetSelection(enemyShipEntity, toTargetDir, shipPos.Value, enemyShip.Radius);
-                nearestDistSq = distSq;
-            }
-        }
+        // Deliberately no second pass that aims at the ship's current position: a shot fired without
+        // the lead solution is off by exactly (ship velocity x flight time), so a mount whose lead
+        // falls outside its arc holds fire instead of throwing shots that cannot land.
     }
 
     private static void FindTargetWithoutPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, ref TargetSelection? nearestTarget, ref float nearestDistSq)
@@ -400,7 +378,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = new TargetSelection(mineEntity, aimDir, minePos.Value, mine.Radius);
+                nearestTarget = new TargetSelection(mineEntity, aimDir, minePos.Value, mine.Radius, Led: false);
                 nearestDistSq = distSq;
             }
         }
@@ -419,26 +397,7 @@ public class TurretFiringSystem : GameSystem
 
             if (distSq < nearestDistSq)
             {
-                nearestTarget = new TargetSelection(enemyShipEntity, aimDir, shipPos.Value, enemyShip.Radius);
-                nearestDistSq = distSq;
-            }
-        }
-
-        foreach (var (enemyShipEntity, enemyShip, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
-        {
-            Vector2 toTarget = shipPos.Value - turretPos;
-            float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
-
-            if (distSq > rangeSq || distSq < Epsilon) continue;
-
-            float dist = (float)Math.Sqrt(distSq);
-            var aimDir = toTarget / dist;
-            float dot = Vector2.Dot(forwardDir, aimDir);
-            if (dot < cosHalfArc) continue;
-
-            if (distSq < nearestDistSq)
-            {
-                nearestTarget = new TargetSelection(enemyShipEntity, aimDir, shipPos.Value, enemyShip.Radius);
+                nearestTarget = new TargetSelection(enemyShipEntity, aimDir, shipPos.Value, enemyShip.Radius, Led: false);
                 nearestDistSq = distSq;
             }
         }
@@ -451,18 +410,40 @@ public class TurretFiringSystem : GameSystem
         int pelletCount = turret.Weapon.PelletCount;
         float scatterAngle = turret.Weapon.Scatter;
 
+        // A round is fired at a rolled speed and leaves from the muzzle, not from the turret, so a led
+        // target is solved again per round at the speed that round actually has and from where the round
+        // starts. Solving once at the nominal speed leaves the roll itself tilting a slow round several
+        // degrees off the solution the mount slewed to.
+        Vector2 carriedVelocity = InheritedVelocity(view, turretEntity, turret);
+        bool leads = false;
+        Vector2 relPos = Vector2.Zero, relVel = Vector2.Zero;
+        if (target.Led && view.TryGetComponent<Position>(target.Target, out var targetPos) && view.TryGetComponent<Velocity>(target.Target, out var targetVel))
+        {
+            leads = true;
+            relPos = targetPos.Value - (turretPos + ammoDir * AmmoSpawnOffset);
+            relVel = targetVel.Value - carriedVelocity;
+        }
+
         for (int i = 0; i < pelletCount; i++)
         {
             float angleOffset = ScatterOffset(view.Rng, scatterAngle, i, pelletCount);
+            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * AmmoSpeedVariation;
+            float ammoSpeed = turret.Weapon.AmmoSpeed * speedVariation;
+
+            Vector2 aimDir = ammoDir;
+            if (leads)
+            {
+                float travelTime = InterceptTime(relPos, relVel, ammoSpeed);
+                if (travelTime > 0f) aimDir = (relPos + relVel * travelTime) / (ammoSpeed * travelTime);
+            }
+
             float cosOff = (float)Math.Cos(angleOffset);
             float sinOff = (float)Math.Sin(angleOffset);
 
             Vector2 pelletDir = new Vector2(
-                ammoDir.X * cosOff - ammoDir.Y * sinOff,
-                ammoDir.X * sinOff + ammoDir.Y * cosOff
+                aimDir.X * cosOff - aimDir.Y * sinOff,
+                aimDir.X * sinOff + aimDir.Y * cosOff
             );
-
-            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * AmmoSpeedVariation;
 
             Vector2 spawnOffset = pelletDir * AmmoSpawnOffset;
             if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))
@@ -473,20 +454,7 @@ public class TurretFiringSystem : GameSystem
             }
 
             var spawnPos = turretPos + spawnOffset;
-            Vector2 ammoVel = pelletDir * turret.Weapon.AmmoSpeed * speedVariation;
-
-            if (!turret.IsEnemy)
-            {
-                foreach (var (_, _, vel) in view.GetEntitiesWithComponents<Player, Velocity>())
-                {
-                    ammoVel += vel.Value;
-                    break;
-                }
-            }
-            else if (view.TryGetComponent<Velocity>(turretEntity, out var shipVel))
-            {
-                ammoVel += shipVel.Value;
-            }
+            Vector2 ammoVel = pelletDir * ammoSpeed + carriedVelocity;
 
             float ammoRadius = GetAmmoRadius(turret);
             int damage = turret.Weapon.Damage;
@@ -562,6 +530,24 @@ public class TurretFiringSystem : GameSystem
 
         var type = WeaponType.FromName(turret.WeaponName);
         return type?.Color ?? AmmoColor.Yellow;
+    }
+
+    // Flight time at which a round of this speed, fired at the target from here, meets it;
+    // <= 0 when it never can — the target outpaces the round, or is receding.
+    private static float InterceptTime(Vector2 relPos, Vector2 relVel, float ammoSpeed) =>
+        SolveQuadratic(
+            ammoSpeed * ammoSpeed - relVel.X * relVel.X - relVel.Y * relVel.Y,
+            -2f * (relPos.X * relVel.X + relPos.Y * relVel.Y),
+            -(relPos.X * relPos.X + relPos.Y * relPos.Y));
+
+    // The velocity a round carries from whoever fired it: the player's hull for a player turret, the
+    // firing ship for an enemy one.
+    private static Vector2 InheritedVelocity(WorldView view, Entity turretEntity, Turret turret)
+    {
+        if (turret.IsEnemy)
+            return view.TryGetComponent<Velocity>(turretEntity, out var shipVel) ? shipVel.Value : Vector2.Zero;
+
+        return view.GetEntitiesWithComponents<Player, Velocity>().TryFirst(out var player) ? player.Value2.Value : Vector2.Zero;
     }
 
     private static float SolveQuadratic(float a, float b, float c)

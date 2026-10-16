@@ -219,14 +219,17 @@ public class TurretFiringTest
         Assert.True(ammoEntity.Value >= 0, "Expected enemy ammo to be spawned");
         var vel = ammo.Velocity;
 
-        Assert.InRange(vel.X, 150f, 215f);
-        Assert.InRange(vel.Y, -25f, 25f);
-
         var relativeVel = vel - new Vector2(0f, 80f); // strip inherited ship velocity
-        float speed = relativeVel.Magnitude;
-        Assert.InRange(speed, 170f, 230f); // 200 px/s +/- 15% spawn variation
+        Assert.InRange(relativeVel.Magnitude, 170f, 230f); // 200 px/s +/- 15% spawn variation
 
-        var expectedDir = new Vector2(0.9165f, -0.4f); // lead direction for this geometry
-        Assert.True(Vector2.Dot(relativeVel / speed, expectedDir) > 0.999f, $"Aim {relativeVel} not along expected lead direction");
+        // The lead is solved for the speed this round actually leaves at, and from the muzzle it leaves
+        // from, so the round's world line runs onto the player wherever its speed landed: at the nominal
+        // speed alone, the 80 px/s drift would put it ~150 px off at this range.
+        var spawn = em.GetComponent<Position>(ammoEntity).Value;
+        var toPlayer = new Vector2(500f, 0f) - spawn;
+        var lineDir = vel / vel.Magnitude;
+        float along = toPlayer.X * lineDir.X + toPlayer.Y * lineDir.Y;
+        float offLine = (toPlayer - lineDir * along).Magnitude;
+        Assert.True(offLine <= 1f, $"Round runs {offLine} px past the player it was aimed at");
     }
 }
