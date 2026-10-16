@@ -459,6 +459,33 @@ Ships get the same starting weapons as currently, but they are now in their turr
 - Fitting-screen and card follow-up: every hull mount carries its number all the time (a mount's key no longer depends on what else is on screen), the mounts that accept the weapon in hand are drawn with a green ring (`Palette.TurretFits`, doubled when hovered), and a new-weapon card names its mount size in the accent line and lists the gun's base range / damage / attack speed / projectile speed below it — honest numbers because a new weapon has no upgrades yet. The stat block is skipped rather than squeezed on cards narrower than 150 px.
 - Marker shape follow-up: a bare triangle read as ambiguous about which way the gun points, so a mounted mount is drawn as the same circle an empty mount has, plus a triangle whose base corners sit inside the circle (0.93 radius, hidden by the opaque disc) and whose tip reaches 1.9 radius. One helper, `RenderHelpers.DrawTurretMarker`, draws both shapes for the world and the mount screen. Measured on the sandbox's software-GL host (`ammo-spray`, window mode, iters 1): median 15.62 ms against 15.55 ms before — the extra draw call per mount is noise; the `world.turrets` pass stays at 0.014 ms mean over 240 frames. Bug found while drawing them: the marker heading (`Rotation`) was only written on ticks where a mount slewed, so a mount holding still kept an old heading while the ship turned and then snapped to the right one the instant it started firing — which read as turrets teleporting onto a target. A mount's `Rotation` is now derived every frame from the hull plus `TurretAim` (`TurretMount.SyncWorldTransforms`), the same way its position already was; the simulation writes only `TurretAim`.
 
+## Weapon balance pass — done
+
+Plan: plans/WEAPON_BALANCE.md. Every gun now owns one cell of (range band, delivery class, fire rate, pellets per shot, mount size), and the DPS ladder prices delivery: a hitscan beam can never miss on the way, so it buys the least damage.
+
+Range ladder, base auto-target range in px: **aura 600 → close 900 → mid 1350 → long 1600–1700**, with RailGun the one sniper whose click reach (3× base, capped by its own ammo at 5000 px) really flies 4500 px. The 600 px floor is not taste: enemy guns open fire at `700 + your hull radius`, so a shorter gun cannot answer what is shooting it — the old 220 and 260 px guns sat inside that ring.
+
+Rules the data obeys, each asserted in `WeaponBalanceTest`: the range on a card is crossable by the slowest round that gun fires (`AmmoSpeed × 0.85 × ShotLifetime ≥ Range`); ≤ 12 rounds a second from one mount; a beam stays under 0.8× the slowest projectile gun of its band; a large gun out-DPSes the best small gun of its tier and class by ≥ 25%; tier 2 is ≤ 1.4× tier 1 of its size and must beat it in DPS **or** in reach; at most two guns slew slower than a Balanced hull turns; one gun per identity cell; starter firepower follows hull size (Scout 17 < Fighter 22.5 ≈ Shadow 24 < Heavy 45 raw DPS — a 168 px hull dodges worse than a 92 px one and gets engaged from 784 px instead of 746, so the big ship is allowed to start ahead).
+
+Raw DPS (fire rate × pellets × damage). Tier 1: Cyclotron 8 (1600 px, 4200 px/s), RippleCutter 8, InterceptorTurret 9, Shotgun 10.5, MachineGun 12, FlakCurtain 12. Tier 2 (`UnlockLevel: 5`): PrismLance 8.4, LaserLance 9.6 at 1650 px instant, RailGun 14 (1500 / 4500 px), GravitonBurst 16.5, AcidBubbleSpray 12 (900 px cone).
+
+- `Scatter` is now the half-angle of the cone a shot pattern covers: several pellets spread evenly across it, a lone pellet rolls randomly inside it (`view.Rng`, seeded). Before that the offset for `PelletCount == 1` was always 0, so Flak Curtain's 0.5 and Acid Bubble's 0.4 did nothing at all.
+- New-weapon cards come from `WeaponType.NewWeaponPoolFor(level)`: tier-1 guns only until the first milestone hand, then the five tier-2 guns as well. `SPACEVORS_DIAG_UPGRADES` ignores tiers — a script is a bench — and so does `ShipType.DiagnosticShips`, which now carries one Shadow copy per gun.
+- Dead and misleading cards fixed: `ProjectileSpeed` is never offered to a hitscan gun (it multiplied `AmmoSpeed 0` by 1.3), and a `FireRate` card on a multi-pellet gun says "+1 shot", which is what `ApplyUpgrade` does, instead of the "+15%" it promised.
+- `PointDefenceTurret` became **InterceptorTurret**: a twin 2-pellet snap at 900 px on the fastest mount in the game (360°/s). "Point defence" promised anti-projectile fire the sim does not have, and the gun was dominated by two others.
+- Starter loadouts: Scout = Cyclotron + InterceptorTurret, Fighter = MachineGun + Shotgun, Shadow = a Ripple Cutter in each of its three mounts, Heavy unchanged (machine gun, two side shotguns, flak disc). Shadow is the only hull that starts fully booked — cargo makes that a free swap, not a dead end — guarded by `AtMostOneHullStartsFullyBooked`.
+- Naming trap found while writing the rules: `AutoTarget: false` (RailGun) turns off **lead prediction**, it does not make a gun manual-only. AcidBubbleSpray's flag is gone, so its bubbles lead their target again.
+- Perf: the scenarios pin `LoadTestWeapon` and silence player turrets, so a balance pass cannot move them — measured anyway: `ammo-spray` sim median 1.33 ms against 1.31/1.33/1.36 on the previous commit, `impact-storm` 2.14 ms against 2.14–2.19. Free. What the scenarios do not see is live round count in real play: the Heavy's starter set goes from ~52 to ~93 live rounds (rate × lifetime) — still two orders under the 10k-object goal, and the number to watch when the next gun is added.
+
+## Near future
+
+- Remove asteroid targeting (or maybe allow if clicked, but no autotargeting)
+- Allow destruction of smaller asteroids
+- Missiles
+- New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)
+- New mines (Turns into missile, fires a delayed beam)
+- Difficulty scaling: enemies start shooting at longer range and get longer range weapons (maybe also a tiny bit of extra projectile speed, but not much)
+
 ## Future
 
 - bosses
@@ -468,6 +495,7 @@ Ships get the same starting weapons as currently, but they are now in their turr
 - save/load
 - replays
 - mod-friendly data definitions
+- non circle collisions and ship shapes (is this expensive)
 
 ## Done criteria
 

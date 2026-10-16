@@ -214,7 +214,7 @@ src/
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
         Combat/                -- firing (incl. click-target priority, hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass), impact damage rule, effects, damage emission, death explosions, asteroid factory
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
-        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull)
+        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; plans/WEAPON_BALANCE.md states why.
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)

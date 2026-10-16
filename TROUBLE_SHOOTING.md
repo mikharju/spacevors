@@ -188,6 +188,18 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: the agent shell has no writable home directory, and each command runs in a fresh sandbox, so anything dotnet wants to cache there (or in `$HOME`) fails on the first MSBuild/nuget write.
 - **Fix / Prevention**: point both variables at a scratch dir on every dotnet command: `HOME=/tmp/dh DOTNET_CLI_HOME=/tmp/dh DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet build …`. `/tmp` is writable but does not survive between commands (entry 26), so the first-use setup runs again per command — a couple of seconds, not worth caching. The same applies to `.tools/scenario.sh`, which shells out to dotnet.
 
+## 44. `ComponentQuery<…>` is not a LINQ source, so `Select`/`Where` fail in a new test
+
+- **Symptom**: A freshly written test failed to build with `'ComponentQuery<Ammo>' does not contain a definition for 'Select'`, while `.Count()` and `.ToList()` on the very same query compiled fine.
+- **Cause**: `ComponentQuery<T…>` is a `readonly struct` with a pattern-based `GetEnumerator` and hand-written `ToList`/`Count`/`Any`/`TryFirst`. It does not implement `IEnumerable<T>`, so LINQ extension methods never bind on it.
+- **Fix / Prevention**: in a test, `em.GetEntitiesWithComponents<T…>().ToList()` first and then use LINQ on the list, or `foreach` directly. The tuple element names follow the arity: one component yields `(Entity, Value1)`, two `(Entity, Value1, Value2)`.
+
+## 45. A stat field's name is not its behaviour
+
+- **Symptom**: A balance rule written as "guns with big per-shot damage are manual-target-only, so overkill is the player's choice" was simply false: `AutoTarget: false` on `WeaponType` only selects `FindTargetWithoutPrediction` in `TurretFiringSystem` — the gun still acquires targets on its own, it just does not lead them.
+- **Cause**: the rule was written from the field's name instead of from its read sites. Names like `AutoTarget`, `PointDefenceTurret` and `BeamSpacing` each imply a mechanic; only some of them exist.
+- **Fix / Prevention**: before stating a rule, a comment or a plan line about a stat field, grep the field and read every site that reads it. Where the name lies, fix the name in the same change (`PointDefenceTurret` → `InterceptorTurret`) rather than carrying the lie forward.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.
