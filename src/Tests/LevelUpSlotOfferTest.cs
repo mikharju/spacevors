@@ -6,12 +6,12 @@ using Xunit;
 
 namespace Tests;
 
-// A milestone hand offers new weapons the hull can actually take: mostly weapons that fit a free
-// mount, and at most one that means replacing something already mounted.
+// What a level-up hand may contain once cargo exists: new weapons the ship does not already own,
+// whether or not a mount is free for them, and stat upgrades only for the guns actually on the hull.
 public class LevelUpSlotOfferTest
 {
     [Fact]
-    public void MilestoneHand_OffersNewWeaponsThatFitFreeMounts()
+    public void MilestoneHand_OffersAtMostThreeNewWeapons()
     {
         var (em, player) = CreateHull(ShipType.Fighter, xp: 45, level: 4);
 
@@ -22,14 +22,10 @@ public class LevelUpSlotOfferTest
         var offered = NewWeaponCards(em);
         Assert.NotEmpty(offered);
         Assert.True(offered.Count <= 3, $"a milestone hand offers at most three new weapons, got {offered.Count}");
-
-        var freeSlots = TurretMount.FreeSlots(new WorldView(em));
-        int needsReplacement = offered.Count(name => !freeSlots.Any(slot => TurretMount.Fits(slot, WeaponType.FromName(name)!.Value)));
-        Assert.True(needsReplacement <= 1, $"only one offered weapon may need a replacement, got {needsReplacement}");
     }
 
     [Fact]
-    public void FullyBookedHull_OfferAtMostOneReplacement()
+    public void FullyBookedHull_StillOfferedNewWeapons()
     {
         WeaponMount[] everyMount =
         [
@@ -42,15 +38,20 @@ public class LevelUpSlotOfferTest
             new(TurretSlotName.SmallNose, WeaponType.PointDefenceTurret),
         ];
 
-        var (em, _) = CreateHull(ShipType.Heavy, xp: 45, level: 4, everyMount);
+        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, everyMount);
 
         Assert.Empty(TurretMount.FreeSlots(new WorldView(em)));
 
-        RunLevelUp(em);
+        // An unowned weapon is always worth offering: it can wait in cargo until the player makes
+        // room. A hand may shuffle its new-weapon cards out entirely, so look across several.
+        var offered = new List<string>();
+        for (int levelUp = 0; levelUp < 12; levelUp++)
+        {
+            RunLevelUp(em);
+            offered.AddRange(TakeNewWeaponCards(em));
+        }
 
-        // With every mount booked, a hull may be offered at most one weapon — and that one asks the
-        // player to pull something out.
-        Assert.True(NewWeaponCards(em).Count <= 1, "a full hull should not be offered a shelf of weapons it cannot fit");
+        Assert.NotEmpty(offered);
     }
 
     [Fact]
@@ -62,6 +63,32 @@ public class LevelUpSlotOfferTest
         RunLevelUp(em);
 
         Assert.DoesNotContain(NewWeaponCards(em), name => mounted.Contains(name));
+    }
+
+    [Fact]
+    public void CargoWeaponsAreNeverOfferedAgain()
+    {
+        var (em, player) = CreateHull(ShipType.Fighter, xp: 45, level: 4);
+        em.AddComponent(player, WeaponCargo.Empty.With(TurretMount.CarriedTurret(WeaponType.RailGun)));
+
+        RunLevelUp(em);
+
+        Assert.DoesNotContain(NewWeaponCards(em), name => name == WeaponType.RailGun.Name);
+    }
+
+    // Cargo weapons are inactive: they are not upgraded either, so no card may name one.
+    [Fact]
+    public void CargoWeaponsGetNoStatUpgradeCards()
+    {
+        var (em, player) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1);
+        em.AddComponent(player, WeaponCargo.Empty.With(TurretMount.CarriedTurret(WeaponType.RailGun)));
+
+        RunLevelUp(em);
+
+        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
+        Assert.Single(choices);
+        Assert.DoesNotContain(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options,
+            o => o.WeaponName == WeaponType.RailGun.Name);
     }
 
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null)
@@ -102,5 +129,19 @@ public class LevelUpSlotOfferTest
         return [.. em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options
             .Where(o => o.IsNewWeapon)
             .Select(o => o.WeaponName)];
+    }
+
+    // Read the hand and clear it, so the next level-up can offer another one.
+    static List<string> TakeNewWeaponCards(EntityManager em)
+    {
+        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
+        if (choices.Count == 0) return new List<string>();
+
+        List<string> names = [.. em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options
+            .Where(o => o.IsNewWeapon)
+            .Select(o => o.WeaponName)];
+
+        foreach (var (entity, _) in choices) em.DestroyEntity(entity);
+        return names;
     }
 }

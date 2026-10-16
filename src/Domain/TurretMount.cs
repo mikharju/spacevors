@@ -52,14 +52,22 @@ public static class TurretMount
 
     // Put a weapon in a slot: the turret plus its aim state, parked at the middle of the slot's arc
     // so a freshly mounted gun is ready and inside its own firing rules.
-    public static void Mount(EntityManager em, Entity slotEntity, TurretSlotDefinition slot, WeaponType weapon, Vector2 hullPosition, float hullRotation)
+    public static void Mount(EntityManager em, Entity slotEntity, TurretSlotDefinition slot, WeaponType weapon, Vector2 hullPosition, float hullRotation) =>
+        MountTurret(em, slotEntity, slot, CarriedTurret(weapon) with { ArcAngle = slot.ArcAngle }, hullPosition, hullRotation);
+
+    // The turret a weapon becomes when it is not on the hull — in cargo. The arc is irrelevant there:
+    // whatever mount it later sits in supplies it.
+    public static Turret CarriedTurret(WeaponType weapon) =>
+        new(weapon.Stats, weapon.Name, 0f, weapon.Range, weapon.AutoTarget);
+
+    // Mount a turret that was carried in cargo: its upgraded stats come back with it, only the arc
+    // changes because that belongs to the mount it now sits in.
+    public static void Mount(EntityManager em, Entity slotEntity, TurretSlotDefinition slot, Turret carried, Vector2 hullPosition, float hullRotation) =>
+        MountTurret(em, slotEntity, slot, carried with { ArcAngle = slot.ArcAngle, IsEnemy = false }, hullPosition, hullRotation);
+
+    static void MountTurret(EntityManager em, Entity slotEntity, TurretSlotDefinition slot, Turret turret, Vector2 hullPosition, float hullRotation)
     {
-        em.AddComponent(slotEntity, new Turret(
-            Weapon: weapon.Stats,
-            WeaponName: weapon.Name,
-            ArcAngle: slot.ArcAngle,
-            Range: weapon.Range,
-            AutoTarget: weapon.AutoTarget));
+        em.AddComponent(slotEntity, turret);
         em.AddComponent(slotEntity, new TurretAim(slot.ArcCenter, Parked: true));
         em.AddComponent(slotEntity, new Position(slot.WorldPosition(hullPosition, hullRotation)));
         em.AddComponent(slotEntity, new Rotation(hullRotation + slot.ArcCenter));

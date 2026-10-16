@@ -7,10 +7,9 @@ public class LevelUpSystem : GameSystem
 {
     const int MilestoneLevelInterval = 5;
     const int MilestoneChoiceCount = 5;
-    // A milestone hand carries up to three new weapons, and at most one of them may be a size the
-    // ship has no free slot for — that one means replacing whatever the player already mounts.
+    // A milestone hand carries up to three new weapons. Whether they fit a free hull mount is the
+    // player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
     const int MilestoneNewWeaponCards = 3;
-    const int MilestoneReplacementCards = 1;
     const string DiagnosticEnvVar = DiagnosticLogger.EnvVar;
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
@@ -42,12 +41,12 @@ public class LevelUpSystem : GameSystem
             bool isMilestoneLevel = newLevel % MilestoneLevelInterval == 0;
 
             // Do not consume the level-up when no choice can be offered (e.g. zero turrets).
-            if (SpawnLevelUpChoice(view, playerPos.Value, newLevel, isMilestoneLevel, commands))
+            if (SpawnLevelUpChoice(view, playerEntity, playerPos.Value, newLevel, isMilestoneLevel, commands))
                 commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
         }
     }
 
-    private bool SpawnLevelUpChoice(WorldView view, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
+    private bool SpawnLevelUpChoice(WorldView view, Entity playerEntity, Vector2 position, int newLevel, bool isMilestoneLevel, CommandBuffer commands)
     {
         if (_scriptedUpgrades != null && _scriptIndex < _scriptedUpgrades.Length)
         {
@@ -66,12 +65,19 @@ public class LevelUpSystem : GameSystem
         if (turrets.Count == 0) return false;
 
         var weaponNames = turrets.Select(t => t.WeaponName).Distinct().ToList();
+
+        // Cargo weapons are owned but inactive: they are not offered stat upgrades (those come from
+        // the turrets on the hull above) and they are not offered back as new weapons.
+        var ownedNames = new List<string>(weaponNames);
+        if (view.TryGetComponent<WeaponCargo>(playerEntity, out var cargo))
+            ownedNames.AddRange(cargo.Weapons.Select(w => w.WeaponName));
+
         var allOptions = new List<UpgradableOption>();
 
         if (isMilestoneLevel)
         {
             allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
-            allOptions.AddRange(NewWeaponOptions(TurretMount.FreeSlots(view), weaponNames, view.Rng));
+            allOptions.AddRange(NewWeaponOptions(ownedNames, view.Rng));
 
             foreach (var weapon in weaponNames)
             {
@@ -163,25 +169,17 @@ public class LevelUpSystem : GameSystem
         }
     }
 
-    // New-weapon cards for a milestone hand: mostly weapons that fit a free hull slot, and at most
-    // one of a size the ship has fully booked — that one asks the player to replace a mounted weapon.
-    private static List<UpgradableOption> NewWeaponOptions(List<TurretSlotDefinition> freeSlots, List<string> mountedNames, Random rng)
+    // New-weapon cards for a milestone hand: anything the ship does not already own, mounted or in cargo.
+    private static List<UpgradableOption> NewWeaponOptions(List<string> ownedNames, Random rng)
     {
-        var pool = AllNewWeapons.Where(w => !mountedNames.Contains(w.Name)).ToList();
+        var pool = AllNewWeapons.Where(w => !ownedNames.Contains(w.Name)).ToList();
         Shuffle(pool, rng);
 
         var cards = new List<UpgradableOption>();
-        int replacementCards = 0;
-
         foreach (var weapon in pool)
         {
             if (cards.Count >= MilestoneNewWeaponCards) break;
-
-            bool fitsFreeSlot = freeSlots.Any(slot => TurretMount.Fits(slot, weapon));
-            if (!fitsFreeSlot && replacementCards >= MilestoneReplacementCards) continue;
-
             cards.Add(new UpgradableOption(weapon.Name, UpgradeOption.Damage, IsNewWeapon: true));
-            if (!fitsFreeSlot) replacementCards++;
         }
 
         return cards;
