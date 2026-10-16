@@ -40,9 +40,9 @@ public readonly record struct ShipType(
     public static ShipType Scout { get; } = new(
         Name: "Scout",
         TextureKey: "scout",
-        Description: "Balanced engines, rapid particle stream",
+        Description: "Balanced engines, particle stream and a flank repeater",
         Engine: EngineLayout.Balanced,
-        Loadout: WeaponLoadout.Cyclotron,
+        Loadout: WeaponLoadout.CyclotronRepeater,
         Slots: TurretLayouts.Scout,
         MaxHealth: 8,
         Radius: 46f,
@@ -54,9 +54,9 @@ public readonly record struct ShipType(
     public static ShipType Fighter { get; } = new(
         Name: "Fighter",
         TextureKey: "fighter",
-        Description: "Pursuit engines, laser lance + cyclotron",
+        Description: "Pursuit engines, machine gun and a side shotgun",
         Engine: EngineLayout.Pursuit,
-        Loadout: WeaponLoadout.LaserLanceCyclotron,
+        Loadout: WeaponLoadout.MachineGunShotgun,
         Slots: TurretLayouts.Fighter,
         MaxHealth: 10,
         Radius: 58f,
@@ -82,9 +82,9 @@ public readonly record struct ShipType(
     public static ShipType Shadow { get; } = new(
         Name: "Shadow",
         TextureKey: "shadow",
-        Description: "Balanced engines, graviton burst",
+        Description: "Balanced engines, a ripple cutter in every mount",
         Engine: EngineLayout.Balanced,
-        Loadout: WeaponLoadout.InMainGun(WeaponType.GravitonBurst),
+        Loadout: WeaponLoadout.RippleCutterTrio,
         Slots: TurretLayouts.Shadow,
         MaxHealth: 10,
         Radius: 58f,
@@ -97,7 +97,8 @@ public readonly record struct ShipType(
 
     // Extra ships on the select screen in diagnostics mode (SPACEVORS_DIAGNOSTIC=1): the Shadow
     // hull, engines and graphics with one weapon each, so any weapon can be play-tested from a
-    // fresh start. LoadTestWeapon lives here now that Shadow carries a real weapon.
+    // fresh start — tiers are a card-pool rule, not a restriction on the bench. LoadTestWeapon lives
+    // here now that Shadow carries a real weapon.
     public static ShipType[] DiagnosticShips { get; } =
     [
         ShadowCarrying(WeaponType.LaserLance),
@@ -106,6 +107,11 @@ public readonly record struct ShipType(
         ShadowCarrying(WeaponType.Cyclotron),
         ShadowCarrying(WeaponType.GravitonBurst),
         ShadowCarrying(WeaponType.FlakCurtain),
+        ShadowCarrying(WeaponType.MachineGun),
+        ShadowCarrying(WeaponType.Shotgun),
+        ShadowCarrying(WeaponType.RailGun),
+        ShadowCarrying(WeaponType.AcidBubbleSpray),
+        ShadowCarrying(WeaponType.InterceptorTurret),
         // LoadTestWeapon's arc is the perf scenario's, so it keeps its own layout.
         ShadowCarrying(WeaponType.LoadTestWeapon, WeaponLoadout.LoadTestWeapon),
     ];

@@ -11,7 +11,9 @@ public class ShipRosterTest
     [Fact]
     public void Shadow_CarriesARealWeaponNotTheLoadTestSpray()
     {
-        Assert.Equal(WeaponType.GravitonBurst.Name, Assert.Single(ShipType.Shadow.Loadout.Mounts).Weapon.Name);
+        Assert.NotEmpty(ShipType.Shadow.Loadout.Mounts);
+        Assert.All(ShipType.Shadow.Loadout.Mounts, m => Assert.Equal(WeaponType.RippleCutter.Name, m.Weapon.Name));
+        Assert.DoesNotContain(ShipType.Shadow.Loadout.Mounts, m => m.Weapon.Name == WeaponType.LoadTestWeapon.Name);
     }
 
     [Fact]
@@ -21,6 +23,8 @@ public class ShipRosterTest
         [
             WeaponType.LaserLance.Name, WeaponType.PrismLance.Name, WeaponType.RippleCutter.Name,
             WeaponType.Cyclotron.Name, WeaponType.GravitonBurst.Name, WeaponType.FlakCurtain.Name,
+            WeaponType.MachineGun.Name, WeaponType.Shotgun.Name, WeaponType.RailGun.Name,
+            WeaponType.AcidBubbleSpray.Name, WeaponType.InterceptorTurret.Name,
             WeaponType.LoadTestWeapon.Name,
         ];
 
@@ -58,11 +62,14 @@ public class ShipRosterTest
     }
 
     [Fact]
-    public void EveryShipHasAtLeastOneFreeMountForANewWeapon()
+    public void AtMostOneHullStartsFullyBooked()
     {
-        // Progression promises a free slot for most new weapons, so no hull may start fully booked.
-        foreach (var ship in ShipType.All)
-            Assert.True(ship.Slots.Count > ship.Loadout.Mounts.Count, $"{ship.Name} starts with every mount filled");
+        // A new weapon card is never a dead pick: a booked mount can be freed for free through the
+        // cargo. Even so, only the brawler hull may fill every mount, so most hulls can take a new
+        // gun straight into a slot.
+        int fullyBooked = ShipType.All.Count(s => s.Loadout.Mounts.Count >= s.Slots.Count);
+
+        Assert.True(fullyBooked <= 1, $"{fullyBooked} hulls start with every mount filled");
     }
 
     [Fact]

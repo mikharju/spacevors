@@ -35,7 +35,7 @@ public class LevelUpSlotOfferTest
             new(TurretSlotName.SmallLeft, WeaponType.Shotgun),
             new(TurretSlotName.SmallRight, WeaponType.AcidBubbleSpray),
             new(TurretSlotName.SmallBack, WeaponType.FlakCurtain),
-            new(TurretSlotName.SmallNose, WeaponType.PointDefenceTurret),
+            new(TurretSlotName.SmallNose, WeaponType.InterceptorTurret),
         ];
 
         var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, everyMount);

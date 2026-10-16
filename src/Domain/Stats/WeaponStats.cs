@@ -55,13 +55,15 @@ public readonly record struct WeaponType(
 
     // Heavy gun: a slow mount punishes a spinning hull. RailGun is the one gun whose ammo can fly the
     // 3x reach a clicked target grants (2500 px/s × 2 s), which is what makes it the sniper — not its
-    // base range. Its 14 damage is wasted on a 2 HP mine, hence the manual targeting.
+    // base range. AutoTarget off here means no lead prediction: it aims where the target is.
     public static WeaponType RailGun { get; } = new("RailGun", new(1f, 2500f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 14, TurnSpeed: TurnDeg(55f)), TurretSize.Large, 1500f, AmmoRadius: 3.75f, Color: AmmoColor.Blue, AutoTarget: false, UnlockLevel: 5);
 
     // Corrosive spray: slow bubbles in a wide cone, covering an area instead of a target. The lifetime
     // is what makes the 900 px on its card reachable at 400 px/s.
     public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 400f, 4f, 1, Scatter: 0.45f, ShotLifetime: 3f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 900f, AmmoRadius: 5f, Color: AmmoColor.Green, UnlockLevel: 5);
-    public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1, TurnSpeed: TurnDeg(220f)), TurretSize.Small, 680f);
+    // Twin close-range snap: the fastest mount in the game, so it keeps its aim on a ship that is
+    // circling the hull instead of the one it locked at the start.
+    public static WeaponType InterceptorTurret { get; } = new("InterceptorTurret", new(4.5f, 1200f, 2f, 2, Scatter: 0.2f, Damage: 1, TurnSpeed: TurnDeg(360f)), TurretSize.Small, 900f);
 
     // Lasers (hitscan): instant beams out to turret range, damaging the first thing hit only. Instant
     // delivery is the cheapest delivery in the game, so beams buy the least damage per volley.
@@ -84,7 +86,7 @@ public readonly record struct WeaponType(
     // Perf scenarios only: it must aim instantly so seeded volleys keep looking like fired ones.
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1), TurretSize.Large, 580f);
 
-    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, PointDefenceTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, LoadTestWeapon];
+    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, LoadTestWeapon];
 
     // Weapons a level-up new-weapon card may offer at `level`: never the load-test spray, and never
     // a gun whose tier has not unlocked yet.
@@ -105,12 +107,21 @@ public readonly record struct WeaponLoadout(string Name, IReadOnlyList<WeaponMou
     // A single weapon in the main gun slot: what a diagnostics ship carries.
     public static WeaponLoadout InMainGun(WeaponType weapon) => new(weapon.Name, [new WeaponMount(TurretSlotName.MainGun, weapon)]);
 
-    public static WeaponLoadout Cyclotron { get; } = new("Cyclotron stream", [
-        new(TurretSlotName.MainGun, WeaponType.Cyclotron)]);
+    // Scout: the longest-reach gun it can carry plus the fast-mount twin covering one flank.
+    public static WeaponLoadout CyclotronRepeater { get; } = new("CyclotronRepeater", [
+        new(TurretSlotName.MainGun, WeaponType.Cyclotron),
+        new(TurretSlotName.SmallLeft, WeaponType.InterceptorTurret)]);
 
-    public static WeaponLoadout LaserLanceCyclotron { get; } = new("LaserLanceCyclotron", [
-        new(TurretSlotName.MainGun, WeaponType.LaserLance),
-        new(TurretSlotName.SmallLeft, WeaponType.Cyclotron)]);
+    // Fighter: a heavy chewer ahead and a cone of slugs covering the other forward arc.
+    public static WeaponLoadout MachineGunShotgun { get; } = new("MachineGunShotgun", [
+        new(TurretSlotName.MainGun, WeaponType.MachineGun),
+        new(TurretSlotName.SmallLeft, WeaponType.Shotgun)]);
+
+    // Shadow: every mount holds a 600 px blade, so the hull has to fly into the fight to be armed.
+    public static WeaponLoadout RippleCutterTrio { get; } = new("RippleCutterTrio", [
+        new(TurretSlotName.MainGun, WeaponType.RippleCutter),
+        new(TurretSlotName.SmallLeft, WeaponType.RippleCutter),
+        new(TurretSlotName.SmallRight, WeaponType.RippleCutter)]);
 
     // Four mounts, three distinct weapons: machinegun + twin side shotguns + close-in flak disc.
     public static WeaponLoadout HeavyFlak { get; } = new("HeavyFlak", [
