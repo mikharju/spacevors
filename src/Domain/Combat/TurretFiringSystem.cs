@@ -472,7 +472,7 @@ public class TurretFiringSystem : GameSystem
 
         for (int i = 0; i < pelletCount; i++)
         {
-            float angleOffset = (i - (pelletCount - 1) / 2f) * scatterAngle;
+            float angleOffset = ScatterOffset(view.Rng, scatterAngle, i, pelletCount);
             float cosOff = (float)Math.Cos(angleOffset);
             float sinOff = (float)Math.Sin(angleOffset);
 
@@ -544,6 +544,15 @@ public class TurretFiringSystem : GameSystem
                 }
             }
         }
+    }
+
+    // Scatter is the half-angle of the cone a shot pattern covers. Several pellets spread evenly
+    // across it; a lone pellet has nothing to spread against, so it rolls a random angle inside the
+    // cone — without that roll Scatter would do nothing at all for a spray weapon.
+    private static float ScatterOffset(Random rng, float scatter, int pellet, int pelletCount)
+    {
+        if (pelletCount > 1) return (pellet - (pelletCount - 1) / 2f) * scatter;
+        return scatter == 0f ? 0f : (rng.NextSingle() * 2f - 1f) * scatter;
     }
 
     // Fallback ammo radius when the weapon name is not a known player WeaponType.

@@ -14,6 +14,8 @@ public readonly record struct WeaponStats(
     float AmmoSpeed,
     float KickbackForce,
     int PelletCount,
+    // Half-angle (rad) of the cone a shot pattern covers: several pellets spread evenly across it,
+    // a lone pellet rolls randomly inside it.
     float Scatter,
     float ShotLifetime = 3f,
     int Damage = 1,
