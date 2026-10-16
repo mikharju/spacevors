@@ -31,6 +31,7 @@ public class CollisionSystem : GameSystem
     private readonly Dictionary<Entity, float> _angularVelocityAccumulator = new();
     private readonly Dictionary<Entity, int> _frameRemainingHealth = new();
     private readonly HashSet<Entity> _hitMines = new();
+    private readonly HashSet<Entity> _hitAsteroids = new();
     private readonly Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)> _shipDeathData = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
@@ -50,6 +51,7 @@ public class CollisionSystem : GameSystem
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
         _hitMines.Clear();
+        _hitAsteroids.Clear();
         _shipDeathData.Clear();
         bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -272,7 +274,8 @@ public class CollisionSystem : GameSystem
             {
                 var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
                 ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidContact, commands);
-                _effectsToSpawn.Add((asteroidContact, MineType.Small));
+                if (DamageAsteroid(view, earliestAsteroidHit.Value, ammo.Damage))
+                    _effectsToSpawn.Add((asteroidContact, MineType.Small));
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
@@ -400,8 +403,11 @@ public class CollisionSystem : GameSystem
                     switch (firstKind)
                     {
                         case SpatialGrid.CollisionKind.Asteroid:
-                            // Asteroids have no health: the beam just stops with an impact flash.
-                            _effectsToSpawn.Add((firstContact, MineType.Small));
+                            // The beam stops at the rock with an impact flash. A small rock also takes
+                            // the hit; a big one is scenery with no Health to lose. A rock that is
+                            // coming apart flashes nothing: its end is smoke, not fire.
+                            if (DamageAsteroid(view, firstHit.Value, beam.Damage))
+                                _effectsToSpawn.Add((firstContact, MineType.Small));
                             break;
 
                         case SpatialGrid.CollisionKind.EnemyMine:
@@ -503,6 +509,25 @@ public class CollisionSystem : GameSystem
                 var mineHealth = view.GetComponent<Health>(mineEntity);
                 commands.Add(new AddComponentCommand<Health>(mineEntity, new Health(remaining, mineHealth.Max)));
             }
+        }
+
+        foreach (var asteroidEntity in _hitAsteroids)
+        {
+            var remaining = _frameRemainingHealth[asteroidEntity];
+            if (remaining > 0)
+            {
+                var asteroidHealth = view.GetComponent<Health>(asteroidEntity);
+                commands.Add(new AddComponentCommand<Health>(asteroidEntity, new Health(remaining, asteroidHealth.Max)));
+                continue;
+            }
+
+            // A rock that is gone leaves a cloud of grey puffs and nothing else: no fireball, no
+            // staged explosion, no loot. Only the bullets that killed it paid for it.
+            var pos = view.GetComponent<Position>(asteroidEntity);
+            var rock = view.GetComponent<Asteroid>(asteroidEntity);
+            view.TryGetComponent<Velocity>(asteroidEntity, out var drift);
+            AsteroidFactory.SpawnBreakupSmoke(commands, pos.Value, drift.Value, rock.Radius, view.Rng);
+            commands.Add(new DestroyEntityCommand(asteroidEntity));
         }
 
         foreach (var (_, shipEntity, hitPoint, shipPos, _, shipRadius, graphicsId) in _ammoToShipHits)
@@ -821,14 +846,15 @@ public class CollisionSystem : GameSystem
                 SpawnSpark(commands, contactPoint, view.Rng);
     }
 
-    // Asteroids (no Health) and mines (their own contact rule in ResolveMineVsPlayer)
-    // never take impact damage; ships register death data like bullet hits do, so the
-    // death pass writes back damaged health for survivors and runs the full death flow
-    // for kills.
+    // Asteroids and mines (mines have their own contact rule in ResolveMineVsPlayer) never take
+    // impact damage: a rock is broken by gunfire only, so the field cannot grind itself away as
+    // ships and rocks collide. Ships register death data like bullet hits do, so the death pass
+    // writes back damaged health for survivors and runs the full death flow for kills.
     private void AccumulateImpactHealth(WorldView view, Entity entity, int damage, Vector2 hitPoint)
     {
         if (damage == 0) return;
         if (view.HasComponent<EnemyMine>(entity)) return;
+        if (view.HasComponent<Asteroid>(entity)) return;
         if (!view.TryGetComponent<Health>(entity, out var health)) return;
 
         var remaining = (_frameRemainingHealth.TryGetValue(entity, out var r) ? r : health.Current) - damage;
@@ -840,6 +866,21 @@ public class CollisionSystem : GameSystem
         {
             _shipDeathData[entity] = (hitPoint, pos.Value, enemyShip.Radius, enemyShip.GraphicsId);
         }
+    }
+
+    // A hit on a small rock chips its Health and returns whether the rock is still there afterwards;
+    // the big scenery has no Health, so the hit stays an obstacle hit and no bookkeeping follows.
+    // Whether a rock dies is decided once per tick in the resolution pass, so several bullets landing
+    // in the same tick cannot each blow it up.
+    private bool DamageAsteroid(WorldView view, Entity asteroidEntity, int damage)
+    {
+        if (damage <= 0) return true;
+        if (!view.TryGetComponent<Health>(asteroidEntity, out var health)) return true;
+
+        var remaining = (_frameRemainingHealth.TryGetValue(asteroidEntity, out var r) ? r : health.Current) - damage;
+        _frameRemainingHealth[asteroidEntity] = remaining;
+        _hitAsteroids.Add(asteroidEntity);
+        return remaining > 0;
     }
 
     private void ResolveAmmoVsAsteroid(

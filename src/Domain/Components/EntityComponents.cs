@@ -37,6 +37,10 @@ public readonly record struct Asteroid(bool IsSmall, float Radius, byte Variant 
 {
     public const int SmallVariantCount = 3;
     public const int LargeVariantCount = 3;
+
+    // Only the small rocks can be shot to pieces: enough hits that clearing one costs real ammo,
+    // few enough that holding a gun on it for a couple of seconds does it. The large ones are scenery.
+    public const int SmallHealth = 50;
 }
 
 // Target is the camera center; Drift is the eased mouse-driven offset from the player.
