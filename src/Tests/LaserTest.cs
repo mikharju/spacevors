@@ -47,10 +47,11 @@ public class LaserTest
             ArcAngle: MathF.PI / 4f,
             Range: 1200f));
 
-        // Asteroid straight ahead (turret rotation 0 points down, -Y).
+        // Asteroid straight ahead (turret rotation 0 points down, -Y), clicked as the primary target.
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, -500f)));
         em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 30f));
+        em.AddComponent(player, new PrimaryTarget(asteroid));
 
         var view = new WorldView(em);
         var commands = new CommandBuffer();

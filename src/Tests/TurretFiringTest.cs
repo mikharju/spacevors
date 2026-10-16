@@ -35,6 +35,7 @@ public class TurretFiringTest
         em.AddComponent(asteroidEntity, new Position(new Vector2(0f, -100f)));
         em.AddComponent(asteroidEntity, new Velocity(Vector2.Zero));
         em.AddComponent(asteroidEntity, new Asteroid(IsSmall: false, Radius: 30f));
+        em.AddComponent(playerEntity, new PrimaryTarget(asteroidEntity));
 
         // Create view and run system
         var view = new WorldView(em);
@@ -91,6 +92,7 @@ public class TurretFiringTest
         em.AddComponent(asteroidEntity, new Position(new Vector2(0f, -100f)));
         em.AddComponent(asteroidEntity, new Velocity(Vector2.Zero));
         em.AddComponent(asteroidEntity, new Asteroid(IsSmall: false, Radius: 30f));
+        em.AddComponent(playerEntity, new PrimaryTarget(asteroidEntity));
 
         var commands = new CommandBuffer();
         new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
@@ -127,7 +129,9 @@ public class TurretFiringTest
 
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(targetX, targetY)));
+        em.AddComponent(asteroid, new Velocity(Vector2.Zero));
         em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 30f));
+        em.AddComponent(playerEntity, new PrimaryTarget(asteroid));
 
         // A few ticks: enough for a mount whose target sits off the arc centre to slew onto it.
         for (int tick = 0; tick < 10; tick++)

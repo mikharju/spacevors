@@ -3,7 +3,8 @@ using Spacevors.Domain.Stats;
 
 namespace Spacevors.Domain.Systems;
 
-// Picks the enemy ship or mine under a world-space click point.
+// Picks the target under a world-space click point: an enemy ship, a mine or an asteroid. A rock is
+// shot at only when it is clicked, which is what makes it a target instead of scenery.
 // Click zones are forgiving: small targets get larger multipliers so they stay clickable.
 public static class PrimaryTargetPicker
 {
@@ -34,6 +35,14 @@ public static class PrimaryTargetPicker
             var pos = em.GetComponent<Position>(entity);
             float zone = mine.Radius * (mine.Size == MineSize.Small ? SmallMineClickMultiplier : LargeMineClickMultiplier);
             Consider(entity, pos.Value, point, zone, ref best, ref bestDistSq);
+        }
+
+        foreach (var (entity, asteroid) in em.GetEntitiesWithComponents<Asteroid>())
+        {
+            // A rock is already big, so its own radius is a forgiving enough zone — and a zone wider
+            // than the hull would steal clicks meant for the space beside it.
+            var pos = em.GetComponent<Position>(entity);
+            Consider(entity, pos.Value, point, asteroid.Radius, ref best, ref bestDistSq);
         }
 
         return best;

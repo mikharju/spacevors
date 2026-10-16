@@ -144,7 +144,8 @@ public class TurretSlewTest
         return (em, player, slotEntity, slot);
     }
 
-    // A stationary asteroid at `worldAngle` (0 = straight up, which is forward for an unturned hull).
+    // A stationary asteroid at `worldAngle` (0 = straight up, which is forward for an unturned hull),
+    // clicked as the primary target: a rock the player has not clicked is never worth firing at.
     static void AddTargetAt(EntityManager em, float worldAngle, float distance)
     {
         var target = em.CreateEntity();
@@ -152,6 +153,9 @@ public class TurretSlewTest
         em.AddComponent(target, new Position(direction * distance));
         em.AddComponent(target, new Velocity(Vector2.Zero));
         em.AddComponent(target, new Asteroid(IsSmall: false, Radius: 30f));
+
+        if (em.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple))
+            em.AddComponent(playerTuple.Entity, new PrimaryTarget(target));
     }
 
     // Turn the hull and step the firing system tick by tick; returns how many shots went off.

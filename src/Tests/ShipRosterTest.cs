@@ -77,13 +77,15 @@ public class ShipRosterTest
     {
         foreach (var ship in ShipType.DiagnosticShips)
         {
-            var (em, _, _, _, _) = GameInitializer.Initialize(ship, new Vector2(1920f, 1024f));
+            var (em, playerEntity, _, _, _) = GameInitializer.Initialize(ship, new Vector2(1920f, 1024f));
 
-            // One target straight ahead: inside every weapon's arc and range.
+            // One rock straight ahead, clicked: inside every weapon's arc and range, and a rock is
+            // only ever a target once the player picks it.
             var target = em.CreateEntity();
             em.AddComponent(target, new Position(new Vector2(0f, -100f)));
             em.AddComponent(target, new Velocity(Vector2.Zero));
             em.AddComponent(target, new Asteroid(IsSmall: false, Radius: 30f));
+            em.AddComponent(playerEntity, new PrimaryTarget(target));
 
             var commands = new CommandBuffer();
             new TurretFiringSystem().Update(new WorldView(em), 1f / 120f, commands);

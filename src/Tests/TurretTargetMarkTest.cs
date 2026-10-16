@@ -57,16 +57,21 @@ public class TurretTargetMarkTest
     }
 
     [Fact]
-    public void AsteroidSelectedAsLastResortIsNeverMarked()
+    public void ClickedAsteroidIsFiredAtButNeverMarked()
     {
-        var (em, _, _) = TargetingTest.CreatePlayerWorld(range: 300f, ammoSpeed: 500f, shotLifetime: 3f);
+        var (em, player, _) = TargetingTest.CreatePlayerWorld(range: 300f, ammoSpeed: 500f, shotLifetime: 3f);
         var asteroid = em.CreateEntity();
         em.AddComponent(asteroid, new Position(new Vector2(0f, -150f)));
+        em.AddComponent(asteroid, new Velocity(Vector2.Zero));
         em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 20f));
 
+        // With no click the rock is scenery: nothing shoots back, so nothing is worth firing at.
+        Assert.False(em.GetEntitiesWithComponents<Ammo>().Any(), "An unclicked asteroid must not draw fire");
+
+        em.AddComponent(player, new PrimaryTarget(asteroid));
         RunTick(em);
 
-        Assert.True(em.GetEntitiesWithComponents<Ammo>().Any(), "Turret should fire at the asteroid as last resort");
+        Assert.True(em.GetEntitiesWithComponents<Ammo>().Any(), "A clicked asteroid must be fired at");
         Assert.False(em.HasComponent<AutoTargetMark>(asteroid), "Asteroids must never be marked");
     }
 

@@ -69,6 +69,7 @@ public class ScatterConeTest
         em.AddComponent(asteroidEntity, new Position(new Vector2(0f, -100f)));
         em.AddComponent(asteroidEntity, new Velocity(Vector2.Zero));
         em.AddComponent(asteroidEntity, new Asteroid(IsSmall: false, Radius: 30f));
+        em.AddComponent(playerEntity, new PrimaryTarget(asteroidEntity));
 
         var commands = new CommandBuffer();
         new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);

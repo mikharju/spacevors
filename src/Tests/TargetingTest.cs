@@ -166,6 +166,65 @@ public class TargetingTest
     }
 
     [Fact]
+    public void TestRockIsNeverAutoTargeted()
+    {
+        var (em, player, _) = CreatePlayerWorld(range: 300f, ammoSpeed: 500f, shotLifetime: 3f);
+        AddRock(em, new Vector2(0f, -150f)); // dead ahead, well inside range
+
+        Assert.True(RunFiringPass(em) == 0, "A rock alone must not draw fire");
+
+        em.AddComponent(player, new PrimaryTarget(AddRock(em, new Vector2(0f, -800f)))); // clicked, beyond base range
+        Assert.True(RunFiringPass(em) > 0, "A clicked rock is a target like any other");
+    }
+
+    [Fact]
+    public void TestRockLosesPriorityWhenSmashed()
+    {
+        // The firing system drops a target whose components are gone, which is how a destroyed rock
+        // is noticed: there is nothing left to read.
+        var (em, player, _) = CreatePlayerWorld(range: 300f, ammoSpeed: 500f, shotLifetime: 3f);
+        var rock = AddRock(em, new Vector2(0f, -800f));
+        em.AddComponent(player, new PrimaryTarget(rock));
+
+        em.DestroyEntity(rock);
+        var commands = new CommandBuffer();
+        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+
+        Assert.True(commands.Commands.OfType<RemoveComponentCommand<PrimaryTarget>>().Any(),
+            "Expected PrimaryTarget removal once the clicked rock is gone");
+    }
+
+    [Fact]
+    public void TestPickerClicksRock()
+    {
+        var em = new EntityManager();
+        var rock = AddRock(em, Vector2.Zero); // radius 40, zone = its own radius
+
+        Assert.Equal(rock, PrimaryTargetPicker.Pick(em, new Vector2(38f, 0f)));
+        Assert.Null(PrimaryTargetPicker.Pick(em, new Vector2(60f, 0f)));
+    }
+
+    [Fact]
+    public void TestPickerPrefersTheShipClickedOverTheRockBehindIt()
+    {
+        var em = new EntityManager();
+        var rock = AddRock(em, Vector2.Zero);
+        var ship = AddEnemyShip(em, new Vector2(30f, 0f)); // radius 20 -> zone 30
+
+        Assert.Equal(ship, PrimaryTargetPicker.Pick(em, new Vector2(30f, 0f)));
+        Assert.Equal(rock, PrimaryTargetPicker.Pick(em, new Vector2(-30f, 0f)));
+    }
+
+    private static Entity AddRock(EntityManager em, Vector2 pos, float radius = 40f)
+    {
+        var entity = em.CreateEntity();
+        em.AddComponent(entity, new Position(pos));
+        em.AddComponent(entity, new Velocity(Vector2.Zero));
+        em.AddComponent(entity, new Asteroid(IsSmall: false, Radius: radius));
+        return entity;
+    }
+
+    [Fact]
     public void TestPickerSmallShipForgivingZone()
     {
         var em = new EntityManager();

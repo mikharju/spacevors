@@ -155,8 +155,10 @@ public class TurretFiringSystem : GameSystem
         }
 
         target = primary.Target;
-        bool isEnemy = view.TryGetComponent<EnemyShip>(target, out _) || view.TryGetComponent<EnemyMine>(target, out _);
-        if (!isEnemy) return false;
+        bool targetable = view.TryGetComponent<EnemyShip>(target, out _)
+            || view.TryGetComponent<EnemyMine>(target, out _)
+            || view.TryGetComponent<Asteroid>(target, out _);
+        if (!targetable) return false;
         return !view.TryGetComponent<Dead>(target, out _);
     }
 
@@ -213,6 +215,7 @@ public class TurretFiringSystem : GameSystem
     private static float GetTargetRadius(WorldView view, Entity targetEntity) =>
         view.TryGetComponent<EnemyShip>(targetEntity, out var ship) ? ship.Radius
         : view.TryGetComponent<EnemyMine>(targetEntity, out var mine) ? mine.Radius
+        : view.TryGetComponent<Asteroid>(targetEntity, out var rock) ? rock.Radius
         : 0f;
 
     // Only enemy ships and mines get auto brackets; asteroid selections are never marked.
@@ -242,7 +245,8 @@ public class TurretFiringSystem : GameSystem
 
             float ammoSpeed = turret.Weapon.AmmoSpeed;
 
-            // A manually selected target takes priority at an extended range (capped by what the ammo can physically reach).
+            // A clicked target — a ship, a mine or a rock — takes priority at an extended range (capped
+            // by what the ammo can physically reach).
             if (TryGetLivePrimaryTarget(view, out var primaryTarget))
             {
                 TargetSelection? aimed;
@@ -259,6 +263,8 @@ public class TurretFiringSystem : GameSystem
                 if (aimed.HasValue) return aimed;
             }
 
+            // Auto-targeting sees only what shoots back: enemy ships and mines. A rock is scenery
+            // until the player clicks one, which is the path above.
             if (turret.AutoTarget && !turret.Weapon.Hitscan)
             {
                 FindTargetWithPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed, ref nearestTarget, ref nearestDistSq);
@@ -267,8 +273,6 @@ public class TurretFiringSystem : GameSystem
             {
                 FindTargetWithoutPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, ref nearestTarget, ref nearestDistSq);
             }
-
-            CheckTargets(view.GetEntitiesWithComponents<Asteroid>(), a => a.Radius, rangeSq);
         }
         else
         {
@@ -325,29 +329,6 @@ public class TurretFiringSystem : GameSystem
         }
 
         return nearestTarget;
-
-        void CheckTargets<T>(ComponentQuery<T> candidates, Func<T, float> getRadius, float checkRangeSq)
-            where T : notnull
-        {
-            foreach (var (candidateEntity, value) in candidates)
-            {
-                var pos = view.GetComponent<Position>(candidateEntity);
-                var diff = pos.Value - turretPos;
-                float distSq = diff.X * diff.X + diff.Y * diff.Y;
-
-                if (distSq > checkRangeSq || distSq < Epsilon) continue;
-
-                float dist = (float)Math.Sqrt(distSq);
-                var dir = diff / dist;
-                if (Vector2.Dot(forwardDir, dir) < cosHalfArc) continue;
-
-                if (distSq < nearestDistSq)
-                {
-                    nearestTarget = new TargetSelection(candidateEntity, dir, pos.Value, getRadius(value));
-                    nearestDistSq = distSq;
-                }
-            }
-        }
     }
 
     private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref TargetSelection? nearestTarget, ref float nearestDistSq)
