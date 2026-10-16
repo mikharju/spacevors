@@ -90,6 +90,8 @@ Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff 
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
+Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an entity damageable, so the large asteroids that are pure scenery have none and a hit on them stays an obstacle hit.
+
 ## Write patterns
 
 Three ways systems write components, plus direct app-layer writes:
@@ -212,7 +214,7 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority, hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass), impact damage rule, effects, damage emission, death explosions, asteroid factory
+        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball)
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
         Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types, spawn weights, tier curves, enemy weapon), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; plans/WEAPON_BALANCE.md states why.
         Physics/               -- force integration + position integration
