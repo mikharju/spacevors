@@ -44,6 +44,34 @@ public class TurretMountTest
         Assert.Equal(2, TurretMount.MountedSlots(view).Count);
     }
 
+    // The marker heading a frame shows is derived, not remembered: a hull turn carries every mount's
+    // aim with it, even one that is holding still. Without this the drawn heading goes stale and then
+    // snaps when the gun next slews.
+    [Fact]
+    public void MountWorldRotationFollowsTheHullPlusTheStoredYaw()
+    {
+        var (em, _, _) = WorldFactory.Create(ShipType.Fighter, WorldView.DefaultViewportSize, seed: 7);
+        var view = new WorldView(em);
+        Assert.True(TurretMount.TryFindSlot(view, TurretSlotName.SmallLeft, out var left));
+        Assert.True(TurretMount.TryFindSlot(view, TurretSlotName.MainGun, out var mainGun));
+
+        // Park the left mount 20° off its arc centre; the main gun stays where it was mounted.
+        em.AddComponent(left, new TurretAim(Angle.FromDeg(20f), Parked: true));
+
+        TurretMount.SyncWorldTransforms(em, new Vector2(100f, -50f), hullRotation: Angle.FromDeg(50f));
+
+        Assert.Equal(Angle.FromDeg(70f), em.GetComponent<Rotation>(left).Angle, 3);
+        // The main gun has not slewed from its arc centre (0°), so it rides the hull exactly.
+        Assert.Equal(Angle.FromDeg(50f), em.GetComponent<Rotation>(mainGun).Angle, 3);
+        Assert.Equal(Angle.FromDeg(20f), em.GetComponent<TurretAim>(left).Yaw, 3);
+
+        var hullSlot = view.GetComponent<TurretSlot>(left).Definition;
+        var expectedPosition = hullSlot.WorldPosition(new Vector2(100f, -50f), Angle.FromDeg(50f));
+        var position = em.GetComponent<Position>(left).Value;
+        Assert.Equal(expectedPosition.X, position.X, 2);
+        Assert.Equal(expectedPosition.Y, position.Y, 2);
+    }
+
     [Fact]
     public void MountedSlotCarriesAimAndPosition_EmptySlotCarriesNeither()
     {

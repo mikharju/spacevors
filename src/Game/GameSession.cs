@@ -271,14 +271,7 @@ public sealed class GameSession
         return thrustAccel;
     }
 
-    private void SyncTurrets(Vector2 playerPos, float angle)
-    {
-        // Turret mounts ride with the hull: their world position is the slot offset rotated by the
-        // hull. The aim is simulation state — TurretFiringSystem slews it inside the slot's arc.
-        // Only mounted slots carry a Turret; an empty mount has no position to track.
-        foreach (var (turretEntity, _, slot) in _em.GetEntitiesWithComponents<Turret, TurretSlot>())
-            _em.AddComponent(turretEntity, new Position(slot.Definition.WorldPosition(playerPos, angle)));
-    }
+    private void SyncTurrets(Vector2 playerPos, float angle) => TurretMount.SyncWorldTransforms(_em, playerPos, angle);
 
     private void HandleDiagnosticKeys(Player playerStats)
     {

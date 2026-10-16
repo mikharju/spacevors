@@ -102,7 +102,7 @@ Three ways systems write components, plus direct app-layer writes:
 3. Local accumulation + single flush: CollisionSystem accumulates per-entity velocity/position-correction/angular-velocity/health deltas in per-frame dictionaries and emits one command per entity at the end of Update — otherwise last-write-wins would drop all but the final hit on an entity struck several times in one frame.
 
 Direct writes (app layer): GameSession writes straight to the EntityManager before the simulation step or while paused, never mid-phase:
-- Pre-phase (form the tick's initial state; systems read them normally): Acceleration/AngularVelocity from input, turret mount Position from SyncTurrets (a mount's aim — Rotation + TurretAim — is simulation state, command-written by TurretFiringSystem), diagnostic-key writes.
+- Pre-phase (form the tick's initial state; systems read them normally): Acceleration/AngularVelocity from input, turret mount Position and Rotation from `TurretMount.SyncWorldTransforms` — both are derived from the hull plus the slot offset and the `TurretAim` yaw, so a turning hull carries every mount with it; the aim itself (`TurretAim`) is simulation state, command-written by TurretFiringSystem, diagnostic-key writes.
 - While paused: upgrade application (Player/Turret/Health, and mounting a new weapon into a hull slot), pending-choice cleanup, thruster removal on pause entry.
 
 Rules:

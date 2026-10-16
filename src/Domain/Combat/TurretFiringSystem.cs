@@ -76,6 +76,8 @@ public class TurretFiringSystem : GameSystem
     // Slew the mount toward the firing solution — or back to the middle of its arc when it has no
     // target — at the weapon's turn speed. A mount that is already good enough holds still and
     // issues no commands, which is the common state. Returns the mount's absolute aim.
+    // Only TurretAim (the hull-relative yaw) is written here: the mount's world Rotation is derived
+    // from it every frame by the app layer, so a turning hull carries the aim with it for free.
     private static float SlewMount(
         Entity turretEntity,
         TurretSlotDefinition slot,
@@ -104,7 +106,6 @@ public class TurretFiringSystem : GameSystem
         float newYaw = Angle.Normalize(Angle.RotateToward(yaw, desiredYaw, turnSpeed * deltaTime));
         bool arrived = MathF.Abs(Angle.Delta(newYaw, desiredYaw)) <= AimAcquireTolerance;
         commands.Add(new AddComponentCommand<TurretAim>(turretEntity, new TurretAim(newYaw, arrived)));
-        commands.Add(new AddComponentCommand<Rotation>(turretEntity, new Rotation(hullRotation + newYaw)));
         return hullRotation + newYaw;
     }
 

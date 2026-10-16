@@ -92,7 +92,6 @@ public class TurretSlewTest
         var aim = em.GetComponent<TurretAim>(turret);
         Assert.True(MathF.Abs(aim.Yaw) <= Angle.FromDeg(3f), $"mount should settle near mid-arc, was {Angle.ToDeg(aim.Yaw):0.0}°");
         Assert.True(aim.Parked);
-        Assert.True(MathF.Abs(em.GetComponent<Rotation>(turret).Angle) <= Angle.FromDeg(3f));
     }
 
     [Fact]

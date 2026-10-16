@@ -65,6 +65,20 @@ public static class TurretMount
         em.AddComponent(slotEntity, new Rotation(hullRotation + slot.ArcCenter));
     }
 
+    // A mounted turret's world transform is derived state, refreshed once per frame before the
+    // simulation runs: position from the slot offset on the hull, rotation from the hull angle plus
+    // the aim yaw the simulation keeps in TurretAim. Deriving the rotation here — rather than
+    // writing it only when a mount slews — is what stops a marker holding an old heading while the
+    // ship turns and then snapping to the right one the moment the gun starts moving.
+    public static void SyncWorldTransforms(EntityManager em, Vector2 hullPosition, float hullRotation)
+    {
+        foreach (var (entity, _, slot, aim) in em.GetEntitiesWithComponents<Turret, TurretSlot, TurretAim>())
+        {
+            em.AddComponent(entity, new Position(slot.Definition.WorldPosition(hullPosition, hullRotation)));
+            em.AddComponent(entity, new Rotation(hullRotation + aim.Yaw));
+        }
+    }
+
     // Take the weapon out, leaving the empty mount behind.
     public static void Unmount(EntityManager em, Entity slotEntity)
     {
