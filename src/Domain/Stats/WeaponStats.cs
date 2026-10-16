@@ -70,10 +70,10 @@ public readonly record struct WeaponType(
     public static WeaponType LaserLance { get; } = new("LaserLance", new(FireRate: 2.4f, AmmoSpeed: 0f, KickbackForce: 12f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(90f), Hitscan: true), TurretSize.Large, 1650f, AmmoRadius: 3f, Color: AmmoColor.Blue, UnlockLevel: 5);
 
     // Three beams 70 px apart: the gun that hits a formation instead of one hull.
-    public static WeaponType PrismLance { get; } = new("PrismLance", new(FireRate: 0.75f, AmmoSpeed: 0f, KickbackForce: 12f, PelletCount: 3, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(70f), Hitscan: true, BeamSpacing: 70f), TurretSize.Large, 1350f, AmmoRadius: 2.5f, Color: AmmoColor.Violet, UnlockLevel: 5);
+    public static WeaponType PrismLance { get; } = new("PrismLance", new(FireRate: 0.7f, AmmoSpeed: 0f, KickbackForce: 12f, PelletCount: 3, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(70f), Hitscan: true, BeamSpacing: 70f), TurretSize.Large, 1350f, AmmoRadius: 2.5f, Color: AmmoColor.Violet, UnlockLevel: 5);
 
     // Point-blank blade: 32 px wide, reaching into the enemy's firing ring, and never needing lead.
-    public static WeaponType RippleCutter { get; } = new("RippleCutter", new(FireRate: 2.25f, AmmoSpeed: 0f, KickbackForce: 10f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(200f), Hitscan: true), TurretSize.Small, 600f, AmmoRadius: 16f, Color: AmmoColor.Violet);
+    public static WeaponType RippleCutter { get; } = new("RippleCutter", new(FireRate: 2f, AmmoSpeed: 0f, KickbackForce: 10f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(200f), Hitscan: true), TurretSize.Small, 600f, AmmoRadius: 16f, Color: AmmoColor.Violet);
 
     // Particle accelerators: bullets fast enough to draw streaks; swept collision keeps them honest.
     // Cyclotron has the most forgiving delivery and the longest auto reach, so it pays the least DPS.
