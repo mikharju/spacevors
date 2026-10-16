@@ -62,6 +62,11 @@ public sealed class GameSession
     UpgradeStep _upgradeStep = UpgradeStep.Cards;
     string _pendingMountWeapon = "";
 
+    // raylib closes the window on its exit key (Escape by default); key 0 is no key at all, which
+    // is how the mount step gets Escape back for "back to the cards".
+    const KeyboardKey DefaultExitKey = KeyboardKey.Escape;
+    const KeyboardKey NoExitKey = (KeyboardKey)0;
+
     // Diagnostics: position the player is pinned to while T freeze is active.
     private Vector2? _diagnosticFreezePosition;
 
@@ -132,7 +137,7 @@ public sealed class GameSession
         if (_gameOver) _showStats = false;
 
         // Tab toggles the stats screen (also while picking an upgrade).
-        // Escape is not used: raylib's default exit key would close the window.
+        // Escape still closes the window, except on the mount step — see HandleUpgradeMenu.
         if (!_gameOver && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
 
         // Scenario mode never pauses: a level-up applies its first option immediately, so a
@@ -550,6 +555,10 @@ public sealed class GameSession
         int windowWidth = Raylib.GetScreenWidth();
         int windowHeight = Raylib.GetScreenHeight();
 
+        // Escape is raylib's exit key, so it closes the window from any screen. The mount step
+        // reclaims it for "back to the cards", which means the exit key has to be off there.
+        Raylib.SetExitKey(_upgradeStep == UpgradeStep.Cards ? DefaultExitKey : NoExitKey);
+
         _renderSw.Restart();
         if (_upgradeStep == UpgradeStep.Cards) HandleCardStep(windowWidth, windowHeight);
         else HandleSlotStep(windowWidth, windowHeight);
@@ -597,7 +606,7 @@ public sealed class GameSession
         int picked = ReadSlotSelection(hovered, mount.Markers);
 
         if (picked >= 0) MountWeapon(mount.Markers[picked].SlotEntity, mount.Markers[picked].Slot, weapon);
-        else if (Raylib.IsMouseButtonPressed(MouseButton.Right)) _upgradeStep = UpgradeStep.Cards;
+        else if (Raylib.IsKeyPressed(KeyboardKey.Escape) || Raylib.IsMouseButtonPressed(MouseButton.Right)) _upgradeStep = UpgradeStep.Cards;
 
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mount, hovered);

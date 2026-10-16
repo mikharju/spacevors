@@ -68,8 +68,8 @@ public static class MountMenuRenderer
         }
 
         string hint = fillingFreeSlot
-            ? $"Click a free mount, or press its number, to fit {pendingWeapon.Name} — right-click to go back"
-            : $"No free mount fits {pendingWeapon.Name}: click a mounted weapon to replace it — right-click to go back";
+            ? $"Click a free mount, or press its number, to fit {pendingWeapon.Name} — Esc or right-click to go back"
+            : $"No free mount fits {pendingWeapon.Name}: click a mounted weapon to replace it — Esc or right-click to go back";
 
         return new Prepared(ship, shipX, shipY, diameter, scale, [.. markers], hint);
     }

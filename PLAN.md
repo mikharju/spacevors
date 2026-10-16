@@ -50,7 +50,7 @@ Goal:
 - Mouse: aim — the ship rotates toward the cursor (primary rotation)
 - Left click: lock the clicked enemy ship or mine as primary target (red corner brackets); all weapons then prioritize it at extended range. Clicking empty space clears the target
 - Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded, how many hull mounts of each size are filled, and per weapon its hull mount with firing arc and turret turn speed. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
-- Upgrade choice: 1-5 or click a card. Choosing a new weapon opens the turret-mount screen — the hull drawn large, every mount shown as a circle with its firing arc; click a mount or press its number to fit the weapon, right-click to go back to the cards. If every mount of that size is taken, the screen asks which mounted weapon to replace
+- Upgrade choice: 1-5 or click a card. Choosing a new weapon opens the turret-mount screen — the hull drawn large, every mount shown as a circle with its firing arc; click a mount or press its number to fit the weapon, Esc or right-click to go back to the cards, which are still the same ones. If every mount of that size is taken, the screen asks which mounted weapon to replace
 - R: restart from game over (back to ship selection)
 - L: force level-up (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 - M: spawn a test explosion at the fixed asteroid (0,-300) (only when SPACEVORS_DIAGNOSTIC=1, for testing)
