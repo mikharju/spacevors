@@ -36,6 +36,12 @@ public sealed class GameSession
     private readonly List<(Vector2 Position, float Width, float Height, Color Color)> _clutter;
     private readonly ShipType _ship;
     private readonly bool _diagnostics;
+
+    // One threat read a second: the `[THREAT]` line goes to the log always, and rides into the
+    // diagnostics overlay (plans/DIFFICULTY_SCALING.md R2.8).
+    private const float ThreatReadoutInterval = 1f;
+    private float _threatNextAt;
+    private string _threatLine = string.Empty;
     private readonly SimulationRunner _runner = new();
 
     // Diagnostics timing. Reused instances: a fresh Stopwatch per tick/frame would allocate on the
@@ -185,6 +191,8 @@ public sealed class GameSession
 
         StepSimulation();
 
+        UpdateThreatReadout();
+
         // Death animation: keep simulating (smoke, sparks, embers, hull shading) for a
         // moment after the fatal hit, then freeze into game over.
         if (!_gameOver && playerDead)
@@ -201,6 +209,21 @@ public sealed class GameSession
         // value describes the *previous* frame, which makes `other` land on the wrong row and can
         // even go negative.
         if (_scenario is not null) ReportScenarioFrame(TicksToMs(_frameSw.ElapsedTicks));
+    }
+
+    // The threat readout: one row a second saying what the fleet can currently throw at the hull and
+    // what the hull can answer with. It prints in every run — it is the tuning record behind the
+    // difficulty knobs — and the same row shows on screen when diagnostics mode is on.
+    private void UpdateThreatReadout()
+    {
+        if (_gameOver || _em.ElapsedTime < _threatNextAt) return;
+        _threatNextAt = _em.ElapsedTime + ThreatReadoutInterval;
+
+        var s = ThreatMeter.Measure(_worldView);
+        _threatLine = $"[THREAT] t={s.Elapsed:F0}s tier={s.Tier} ships={s.Ships} ring={s.ShipsInRing} " +
+                      $"rounds={s.EnemyRounds} in={s.IncomingDps:F1}/s out={s.PlayerDps:F1}/s " +
+                      $"hp={s.Health}/{s.MaxHealth} lvl={s.Level} mines={s.Mines} rocks={s.SmallRocks}";
+        DiagnosticLogger.LogThreat(_threatLine);
     }
 
     private void ReadPlayerInput()
@@ -541,7 +564,8 @@ public sealed class GameSession
     {
         var renderCam = _em.GetComponent<Camera>(_cameraEntity);
         _renderSw.Restart();
-        Renderer.Render(_em, renderCam.Target.X, renderCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _gameOver, _stars, _clutter, _playerEntity, _ship, _diagnostics);
+        Renderer.Render(_em, renderCam.Target.X, renderCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _gameOver, _stars, _clutter, _playerEntity, _ship, _diagnostics,
+            _diagnostics ? _threatLine : string.Empty);
         _renderSw.Stop();
         _lastRenderTicks = _renderSw.ElapsedTicks;
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);

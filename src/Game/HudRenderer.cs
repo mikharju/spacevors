@@ -62,6 +62,16 @@ public static class HudRenderer
         Raylib.DrawText(level, windowWidth - Raylib.MeasureText(level, Font) - 10, 6, Font, Palette.TextMuted);
     }
 
+    // The threat readout along the bottom edge: the same row the game logs once a second (ThreatMeter),
+    // drawn only when diagnostics mode is on.
+    public static void DrawThreatReadout(string line, int windowWidth, int windowHeight)
+    {
+        const int Font = 14;
+        int paddingX = (int)(windowWidth * 0.015f);
+        int paddingY = (int)(windowHeight * 0.02f);
+        Raylib.DrawText(line, paddingX, windowHeight - paddingY - Font, Font, Palette.TextMuted);
+    }
+
     // Fades a dark overlay in over the scene, then the title, accent rule and restart hint.
     public static void DrawGameOverText(int windowWidth, int windowHeight)
     {

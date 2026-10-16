@@ -68,6 +68,17 @@ public static class DiagnosticLogger
     // being a single [RENDER] total.
     public static void LogRenderPass(string pass, long elapsedTicks) => LogTiming("RENDER-PASS", pass, elapsedTicks);
 
+    // The threat readout is the tuning record for the difficulty knobs, so unlike every other line it
+    // prints whenever a game runs, not only under the diagnostics gate. GameSession paces it to one
+    // line a second, which is cheap enough to leave on and grep for after any run.
+    public static void LogThreat(string line)
+    {
+        lock (_lock)
+        {
+            Console.WriteLine(line);
+        }
+    }
+
     private static void LogTiming(string tag, string name, long elapsedTicks)
     {
         if (!_enabled) return;

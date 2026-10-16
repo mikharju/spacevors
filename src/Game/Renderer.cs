@@ -16,11 +16,12 @@ public static class Renderer
         List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
         Entity playerEntity,
         ShipType shipType,
-        bool diagnostics)
+        bool diagnostics,
+        string threatLine)
     {
         Raylib.BeginDrawing();
         RenderTimings.BeginFrame();
-        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
+        DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics, threatLine);
 
         if (gameOver)
         {
@@ -90,7 +91,8 @@ public static class Renderer
         List<(Vector2 Position, float Width, float Height, Color Color)> clutter,
         Entity playerEntity,
         ShipType shipType,
-        bool diagnostics)
+        bool diagnostics,
+        string threatLine = "")
     {
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
         RenderTimings.Pass("clear");
@@ -111,6 +113,13 @@ public static class Renderer
         RenderTimings.Pass("hud.health");
         HudRenderer.DrawXpBar(em, playerEntity, windowWidth, windowHeight);
         RenderTimings.Pass("hud.xp");
+
+        // Empty when diagnostics mode is off: the caller owns the gate.
+        if (threatLine.Length > 0)
+        {
+            HudRenderer.DrawThreatReadout(threatLine, windowWidth, windowHeight);
+            RenderTimings.Pass("hud.threat");
+        }
     }
 
 }
