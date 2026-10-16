@@ -46,7 +46,7 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 
 - **Symptom**: `xdotool click 1` did not register as a selection in the game, while keys and wheel worked fine.
 - **Cause**: The press+release can land between two input polls (frame ~8 ms at 120 fps); per-frame `IsMouseButtonPressed` then never sees the transition.
-- **Fix / Prevention**: Send explicit slow clicks: `xdotool mousemove X Y mousedown 1; sleep 0.3; xdotool mouseup 1`.
+- **Fix / Prevention**: Send explicit slow clicks: `xdotool mousemove X Y mousedown 1; sleep 0.3; xdotool mouseup 1`. And take the coordinates from the rendered frame, not from layout constants: the stats screen shrinks its content to fit, so a hand-computed button position can be off by tens of pixels and the click lands harmlessly on nothing.
 
 ## 7. Stale binary after a failed rebuild (silent)
 

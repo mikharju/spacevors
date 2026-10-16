@@ -85,7 +85,7 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim PrimaryTarget AutoTargetMark
+Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim WeaponCargo PrimaryTarget AutoTargetMark
 Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
