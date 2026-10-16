@@ -13,8 +13,6 @@ public class LevelUpSystem : GameSystem
     const string DiagnosticEnvVar = DiagnosticLogger.EnvVar;
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
-    private static readonly WeaponType[] AllNewWeapons = WeaponType.NewWeaponPool;
-
     // Diagnostics only: fixed upgrade sequence consumed one entry per level-up.
     private readonly UpgradableOption[]? _scriptedUpgrades;
     private int _scriptIndex;
@@ -77,7 +75,7 @@ public class LevelUpSystem : GameSystem
         if (isMilestoneLevel)
         {
             allOptions.Add(new UpgradableOption("", UpgradeOption.Hp));
-            allOptions.AddRange(NewWeaponOptions(ownedNames, view.Rng));
+            allOptions.AddRange(NewWeaponOptions(ownedNames, newLevel, view.Rng));
 
             foreach (var weapon in weaponNames)
             {
@@ -145,7 +143,8 @@ public class LevelUpSystem : GameSystem
 
     private static UpgradableOption? ParseEntry(string entry)
     {
-        if (AllNewWeapons.Any(w => w.Name == entry))
+        // A script names a gun directly and ignores its unlock level: the script is a test bench.
+        if (entry != WeaponType.LoadTestWeapon.Name && WeaponType.FromName(entry) is not null)
             return new UpgradableOption(entry, UpgradeOption.Damage, IsNewWeapon: true);
 
         var parts = entry.Split(':');
@@ -174,10 +173,11 @@ public class LevelUpSystem : GameSystem
         }
     }
 
-    // New-weapon cards for a milestone hand: anything the ship does not already own, mounted or in cargo.
-    private static List<UpgradableOption> NewWeaponOptions(List<string> ownedNames, Random rng)
+    // New-weapon cards for a milestone hand: anything the ship does not already own, mounted or in
+    // cargo, drawn from the pool that this level has unlocked.
+    private static List<UpgradableOption> NewWeaponOptions(List<string> ownedNames, int newLevel, Random rng)
     {
-        var pool = AllNewWeapons.Where(w => !ownedNames.Contains(w.Name)).ToList();
+        var pool = WeaponType.NewWeaponPoolFor(newLevel).Where(w => !ownedNames.Contains(w.Name)).ToList();
         Shuffle(pool, rng);
 
         var cards = new List<UpgradableOption>();

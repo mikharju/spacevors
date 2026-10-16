@@ -40,25 +40,29 @@ public readonly record struct WeaponType(
     float Range,
     float AmmoRadius = 2.5f,
     AmmoColor Color = AmmoColor.Yellow,
-    bool AutoTarget = true)
+    bool AutoTarget = true,
+    // The first level a new-weapon card may offer this gun at. Starter hulls carry tier-1 guns only;
+    // the stronger guns arrive with the first milestone hand.
+    int UnlockLevel = 1)
 {
+    // Tier 1: the guns a ship can start with.
     public static WeaponType MachineGun { get; } = new("MachineGun", new(8f, 420f, 10f, 1, Scatter: 0.033f, Damage: 1, TurnSpeed: TurnDeg(180f)), TurretSize.Large, 1260f);
     public static WeaponType Shotgun { get; } = new("Shotgun", new(2f, 350f, 2.5f, 3, Scatter: 0.04f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 860f);
 
     // Heavy guns: slow mounts, so they punish a spinning hull. RailGun range sits between the old
     // starting-ship 2000 px and the old level-up-mount 500 px now that one weapon has one range.
-    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 2500f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 15, TurnSpeed: TurnDeg(55f)), TurretSize.Large, 1200f, AmmoRadius: 3.75f, Color: AmmoColor.Blue, AutoTarget: false);
-    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 650f, AmmoRadius: 5f, Color: AmmoColor.Green, AutoTarget: false);
+    public static WeaponType RailGun { get; } = new("RailGun", new(0.667f, 2500f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 15, TurnSpeed: TurnDeg(55f)), TurretSize.Large, 1200f, AmmoRadius: 3.75f, Color: AmmoColor.Blue, AutoTarget: false, UnlockLevel: 5);
+    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 200f, 8f, 1, Scatter: 0.4f, ShotLifetime: 1.2f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 650f, AmmoRadius: 5f, Color: AmmoColor.Green, AutoTarget: false, UnlockLevel: 5);
     public static WeaponType PointDefenceTurret { get; } = new("PointDefenceTurret", new(5f, 300f, 5f, 1, Scatter: 0.05f, Damage: 1, TurnSpeed: TurnDeg(220f)), TurretSize.Small, 680f);
 
     // Lasers (hitscan): instant beams out to turret range, damage the first thing hit only.
-    public static WeaponType LaserLance { get; } = new("LaserLance", new(FireRate: 0.8f, AmmoSpeed: 0f, KickbackForce: 25f, PelletCount: 1, Scatter: 0f, Damage: 12, TurnSpeed: TurnDeg(90f), Hitscan: true), TurretSize.Large, 1400f, AmmoRadius: 3f, Color: AmmoColor.Blue);
-    public static WeaponType PrismLance { get; } = new("PrismLance", new(FireRate: 0.6f, AmmoSpeed: 0f, KickbackForce: 30f, PelletCount: 3, Scatter: 0f, Damage: 5, TurnSpeed: TurnDeg(70f), Hitscan: true, BeamSpacing: 14f), TurretSize.Large, 1200f, AmmoRadius: 2.5f, Color: AmmoColor.Violet);
+    public static WeaponType LaserLance { get; } = new("LaserLance", new(FireRate: 0.8f, AmmoSpeed: 0f, KickbackForce: 25f, PelletCount: 1, Scatter: 0f, Damage: 12, TurnSpeed: TurnDeg(90f), Hitscan: true), TurretSize.Large, 1400f, AmmoRadius: 3f, Color: AmmoColor.Blue, UnlockLevel: 5);
+    public static WeaponType PrismLance { get; } = new("PrismLance", new(FireRate: 0.6f, AmmoSpeed: 0f, KickbackForce: 30f, PelletCount: 3, Scatter: 0f, Damage: 5, TurnSpeed: TurnDeg(70f), Hitscan: true, BeamSpacing: 14f), TurretSize.Large, 1200f, AmmoRadius: 2.5f, Color: AmmoColor.Violet, UnlockLevel: 5);
     public static WeaponType RippleCutter { get; } = new("RippleCutter", new(FireRate: 1.5f, AmmoSpeed: 0f, KickbackForce: 10f, PelletCount: 1, Scatter: 0f, Damage: 6, TurnSpeed: TurnDeg(200f), Hitscan: true), TurretSize.Small, 260f, AmmoRadius: 16f, Color: AmmoColor.Violet);
 
     // Particle accelerators: bullets fast enough to draw streaks; swept collision keeps them honest.
     public static WeaponType Cyclotron { get; } = new("Cyclotron", new(FireRate: 12f, AmmoSpeed: 4200f, KickbackForce: 2f, PelletCount: 1, Scatter: 0.015f, ShotLifetime: 0.6f, Damage: 1, TurnSpeed: TurnDeg(300f)), TurretSize.Small, 1360f, AmmoRadius: 1.5f, Color: AmmoColor.Cyan);
-    public static WeaponType GravitonBurst { get; } = new("GravitonBurst", new(FireRate: 1.2f, AmmoSpeed: 3000f, KickbackForce: 15f, PelletCount: 5, Scatter: 0f, ShotLifetime: 0.8f, Damage: 3, TurnSpeed: TurnDeg(80f)), TurretSize.Large, 1600f, AmmoRadius: 4f, Color: AmmoColor.Cyan);
+    public static WeaponType GravitonBurst { get; } = new("GravitonBurst", new(FireRate: 1.2f, AmmoSpeed: 3000f, KickbackForce: 15f, PelletCount: 5, Scatter: 0f, ShotLifetime: 0.8f, Damage: 3, TurnSpeed: TurnDeg(80f)), TurretSize.Large, 1600f, AmmoRadius: 4f, Color: AmmoColor.Cyan, UnlockLevel: 5);
 
     // Wide slow flak disc: the grazing width does the aiming at close range.
     public static WeaponType FlakCurtain { get; } = new("FlakCurtain", new(FireRate: 10f, AmmoSpeed: 220f, KickbackForce: 0f, PelletCount: 1, Scatter: 0.5f, ShotLifetime: 1f, Damage: 1, TurnSpeed: TurnDeg(300f)), TurretSize.Small, 220f, AmmoRadius: 9f, Color: AmmoColor.Green);
@@ -68,8 +72,10 @@ public readonly record struct WeaponType(
 
     public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, PointDefenceTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, LoadTestWeapon];
 
-    // Weapons a level-up new-weapon card may offer.
-    public static readonly WeaponType[] NewWeaponPool = [.. All.Where(w => w.Name != LoadTestWeapon.Name)];
+    // Weapons a level-up new-weapon card may offer at `level`: never the load-test spray, and never
+    // a gun whose tier has not unlocked yet.
+    public static WeaponType[] NewWeaponPoolFor(int level) =>
+        [.. All.Where(w => w.Name != LoadTestWeapon.Name && w.UnlockLevel <= level)];
 
     public static WeaponType? FromName(string name) => All.FirstOrDefault(w => w.Name == name);
 

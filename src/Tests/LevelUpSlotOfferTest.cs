@@ -112,6 +112,22 @@ public class LevelUpSlotOfferTest
         }
     }
 
+    // Tier gating: the pool is what new-weapon cards are drawn from, so unlocking a gun is a matter
+    // of which level its UnlockLevel reaches. Tier 2 opens with the first milestone hand (level 5).
+    [Fact]
+    public void TierTwoGuns_UnlockWithTheFirstMilestone()
+    {
+        string[] advanced = ["RailGun", "LaserLance", "PrismLance", "GravitonBurst", "AcidBubbleSpray"];
+
+        foreach (string name in advanced)
+        {
+            Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(1), w => w.Name == name);
+            Assert.Contains(WeaponType.NewWeaponPoolFor(5), w => w.Name == name);
+        }
+
+        Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(5), w => w.Name == WeaponType.LoadTestWeapon.Name);
+    }
+
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null)
     {
         var em = new EntityManager();
