@@ -55,15 +55,25 @@ public sealed class GameSession
     private bool _wasPaused;
     private bool _showStats;
 
-    // Which step of an upgrade choice is on screen: the cards, then picking the hull mount a chosen
-    // new weapon goes into — a free one, or one whose weapon gets replaced.
-    enum UpgradeStep { Cards, PickSlot, ReplaceSlot }
+    // Which menu is on screen while the game is paused: the upgrade cards, then the mount/cargo screen
+    // where a weapon gets placed on the hull or left in cargo.
+    enum UpgradeStep { Cards, Mounts }
 
     UpgradeStep _upgradeStep = UpgradeStep.Cards;
-    string _pendingMountWeapon = "";
 
-    // raylib closes the window on its exit key (Escape by default); key 0 is no key at all, which
-    // is how the mount step gets Escape back for "back to the cards".
+    // The weapon in hand on the mount screen: a new weapon from a card, or one taken down from the
+    // hull (then it is already in cargo). "" means nothing is in hand.
+    string _heldWeapon = "";
+    // The held weapon is the card's, so it is not the player's yet: backing out hands the card back.
+    bool _heldIsCardWeapon;
+    // The card's weapon has been mounted or stored, so the level-up is spent even while a displaced
+    // gun is still in hand.
+    bool _cardResolved;
+    // The mount screen was opened from the stats screen instead of from a card.
+    bool _mountsFromStats;
+
+    // raylib closes the window on its exit key (Escape by default); key 0 is no key at all, which is
+    // how the mount screen gets Escape back for "back".
     const KeyboardKey DefaultExitKey = KeyboardKey.Escape;
     const KeyboardKey NoExitKey = (KeyboardKey)0;
 
@@ -136,9 +146,10 @@ public sealed class GameSession
 
         if (_gameOver) _showStats = false;
 
-        // Tab toggles the stats screen (also while picking an upgrade).
-        // Escape still closes the window, except on the mount step — see HandleUpgradeMenu.
-        if (!_gameOver && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
+        // Tab toggles the stats screen (also while picking an upgrade). It does nothing on the mount
+        // screen, which has its own way out (Escape).
+        bool onMountsScreen = _upgradeStep == UpgradeStep.Mounts;
+        if (!_gameOver && !onMountsScreen && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
 
         // Scenario mode never pauses: a level-up applies its first option immediately, so a
         // PendingChoice cannot insert unmeasured frames into the run.
@@ -148,14 +159,16 @@ public sealed class GameSession
             hasPendingChoice = false;
         }
 
-        bool paused = hasPendingChoice || _showStats;
+        bool paused = hasPendingChoice || _showStats || onMountsScreen;
+        Raylib.SetExitKey(onMountsScreen ? NoExitKey : DefaultExitKey);
 
         // Entering pause: stop the ship's thrusters so flames/lights don't burn behind the menu.
         if (paused && !_wasPaused) StopThrusters();
         _wasPaused = paused;
 
         if (!paused) UpdateRunning(frameTime);
-        else if (_showStats) RenderStatsScreen();
+        else if (onMountsScreen) HandleMountsScreen();
+        else if (_showStats) HandleStatsScreen();
         else HandleUpgradeMenu();
 
         return false;
@@ -534,17 +547,27 @@ public sealed class GameSession
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 
-    private void RenderStatsScreen()
+    // The stats screen: read-only stats plus the way into mount and cargo management.
+    private void HandleStatsScreen()
     {
-        var statsCam = _em.GetComponent<Camera>(_cameraEntity);
         int windowWidth = Raylib.GetScreenWidth();
         int windowHeight = Raylib.GetScreenHeight();
+        bool canManageMounts = !_em.GetEntitiesWithComponents<PendingChoice>().Any();
 
         _renderSw.Restart();
         var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards: false);
 
-        Renderer.RenderPaused(_em, (float)statsCam.Target.X, (float)statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
-            new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1));
+        var (buttonX, buttonY, buttonW, buttonH) = StatsScreenRenderer.ManageMountsButtonRect(windowWidth, windowHeight, screen.Scale);
+        int mouseX = Raylib.GetMouseX();
+        int mouseY = Raylib.GetMouseY();
+        bool buttonHovered = canManageMounts
+            && mouseX >= buttonX && mouseX <= buttonX + buttonW && mouseY >= buttonY && mouseY <= buttonY + buttonH;
+
+        if (buttonHovered && Raylib.IsMouseButtonPressed(MouseButton.Left)) OpenMountsFromStats();
+
+        var statsCam = _em.GetComponent<Camera>(_cameraEntity);
+        Renderer.RenderPaused(_em, statsCam.Target.X, statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
+            new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1, canManageMounts, buttonHovered));
         _renderSw.Stop();
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
@@ -555,13 +578,8 @@ public sealed class GameSession
         int windowWidth = Raylib.GetScreenWidth();
         int windowHeight = Raylib.GetScreenHeight();
 
-        // Escape is raylib's exit key, so it closes the window from any screen. The mount step
-        // reclaims it for "back to the cards", which means the exit key has to be off there.
-        Raylib.SetExitKey(_upgradeStep == UpgradeStep.Cards ? DefaultExitKey : NoExitKey);
-
         _renderSw.Restart();
-        if (_upgradeStep == UpgradeStep.Cards) HandleCardStep(windowWidth, windowHeight);
-        else HandleSlotStep(windowWidth, windowHeight);
+        HandleCardStep(windowWidth, windowHeight);
         _renderSw.Stop();
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
@@ -588,29 +606,169 @@ public sealed class GameSession
     {
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderPaused(_em, upgradeCam.Target.X, upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
-            new Renderer.StatsOverlay(screen, options, GetPlayerLevel(), hoveredIndex));
+            new Renderer.StatsOverlay(screen, options, GetPlayerLevel(), hoveredIndex, false, false));
     }
 
-    // The second step of a new weapon: pick the hull mount it goes into, or the weapon it replaces.
-    private void HandleSlotStep(int windowWidth, int windowHeight)
+    // The mount/cargo screen: put what is in hand into a mount, take a gun down into cargo, or leave
+    // a weapon inactive in cargo. Reached from a new-weapon card or from the stats screen.
+    private void HandleMountsScreen()
     {
-        if (WeaponType.FromName(_pendingMountWeapon) is not { } weapon)
+        int windowWidth = Raylib.GetScreenWidth();
+        int windowHeight = Raylib.GetScreenHeight();
+        var cargo = ReadCargo();
+
+        int mouseX = Raylib.GetMouseX();
+        int mouseY = Raylib.GetMouseY();
+        var cargoNames = new List<string>();
+        foreach (var carried in cargo.Weapons) cargoNames.Add(carried.WeaponName);
+
+        var mounts = MountMenuRenderer.Prepare(_em, _ship, windowWidth, windowHeight, _heldWeapon, cargoNames, MountsHint(cargo));
+        int hoveredMount = MountMenuRenderer.GetHoveredMountIndex(mounts, mouseX, mouseY);
+        int hoveredCargo = MountMenuRenderer.GetHoveredCargoIndex(mounts, mouseX, mouseY);
+
+        int picked = ReadMountSelection(hoveredMount, mounts.Markers);
+        if (picked >= 0) ApplyMountClick(mounts.Markers[picked]);
+        else if (hoveredCargo >= 0 && Raylib.IsMouseButtonPressed(MouseButton.Left)) _heldWeapon = mounts.Cargo[hoveredCargo].WeaponName;
+        else if (Raylib.IsMouseButtonPressed(MouseButton.Right)) DropHold();
+        else if (Raylib.IsKeyPressed(KeyboardKey.Escape)) LeaveMountsScreen();
+        else if (Raylib.IsKeyPressed(KeyboardKey.C)) StoreHeldInCargo();
+
+        // The card has been paid for and nothing is left in hand: the choice is done.
+        if (!_mountsFromStats && _cardResolved && _heldWeapon.Length == 0)
         {
             ClearPendingChoices();
             return;
         }
 
-        var mount = MountMenuRenderer.Prepare(_em, _ship, windowWidth, windowHeight, weapon, fillingFreeSlot: _upgradeStep == UpgradeStep.PickSlot);
-
-        int hovered = MountMenuRenderer.GetHoveredIndex(mount, Raylib.GetMouseX(), Raylib.GetMouseY());
-        int picked = ReadSlotSelection(hovered, mount.Markers);
-
-        if (picked >= 0) MountWeapon(mount.Markers[picked].SlotEntity, mount.Markers[picked].Slot, weapon);
-        else if (Raylib.IsKeyPressed(KeyboardKey.Escape) || Raylib.IsMouseButtonPressed(MouseButton.Right)) _upgradeStep = UpgradeStep.Cards;
-
+        _renderSw.Restart();
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
-        Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mount, hovered);
+        Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mounts, hoveredMount, hoveredCargo);
+        _renderSw.Stop();
+        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
+
+    private string MountsHint(WeaponCargo cargo)
+    {
+        if (_heldWeapon.Length == 0)
+            return "Click a mounted turret, or press its number, to take it down into cargo — Esc to go back";
+
+        string exit = _cardResolved ? "Esc to finish" : _mountsFromStats ? "Esc to go back" : "Esc back to the cards";
+
+        if (_heldIsCardWeapon || !cargo.Holds(_heldWeapon))
+            return $"Click a mount, or press its number, to fit {_heldWeapon} — C stores it in cargo — {exit}";
+
+        return $"{_heldWeapon} is in hand: click a mount to fit it, a filled mount swaps it into cargo — {exit}";
+    }
+
+    // A mount click. With a weapon in hand it goes into that mount, and any gun already there comes
+    // off into cargo and becomes what the player holds next. With nothing in hand, the mounted gun
+    // comes down into cargo and is picked up — this is how a turret is taken out of the fight.
+    private void ApplyMountClick(MountMenuRenderer.SlotMarker marker)
+    {
+        string placingName = _heldWeapon;
+        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
+
+        // Nothing in hand: the mounted gun comes down, upgraded stats and all, and is what is held now.
+        if (_heldWeapon.Length == 0)
+        {
+            if (!_em.TryGetComponent<Turret>(marker.SlotEntity, out var taken)) return;
+
+            WriteCargo(ReadCargo().With(taken));
+            TurretMount.Unmount(_em, marker.SlotEntity);
+            _heldWeapon = taken.WeaponName;
+            _heldIsCardWeapon = false;
+            DiagnosticLogger.LogEvent("MOUNT", $"{taken.WeaponName} taken off {marker.Slot.Name} into cargo");
+            return;
+        }
+
+        // Something in hand: the gun in the way is displaced into cargo and becomes the new hold.
+        if (_em.TryGetComponent<Turret>(marker.SlotEntity, out var displaced))
+        {
+            WriteCargo(ReadCargo().With(displaced));
+            _heldWeapon = displaced.WeaponName;
+            _heldIsCardWeapon = false;
+            DiagnosticLogger.LogEvent("MOUNT", $"{displaced.WeaponName} displaced from {marker.Slot.Name} into cargo");
+        }
+        else
+        {
+            _heldWeapon = "";
+            _heldIsCardWeapon = false;
+        }
+
+        if (ReadCargo().TryFind(placingName, out var carried))
+        {
+            WriteCargo(ReadCargo().Without(carried.WeaponName));
+            TurretMount.Mount(_em, marker.SlotEntity, marker.Slot, carried, playerPos, hullRotation);
+            DiagnosticLogger.LogEvent("MOUNT", $"{carried.WeaponName} mounted out of cargo in {marker.Slot.Name}");
+        }
+        else if (WeaponType.FromName(placingName) is { } fresh)
+        {
+            TurretMount.Mount(_em, marker.SlotEntity, marker.Slot, fresh, playerPos, hullRotation);
+            DiagnosticLogger.LogEvent("MOUNT", $"new weapon {fresh.Name} mounted in {marker.Slot.Name}");
+        }
+
+        if (!_mountsFromStats) _cardResolved = true;
+    }
+
+    // Right-click puts the held weapon down. A card weapon that was never placed goes back to the card.
+    private void DropHold()
+    {
+        if (_heldIsCardWeapon && !_cardResolved)
+        {
+            LeaveMountsScreen();
+            return;
+        }
+
+        _heldWeapon = "";
+    }
+
+    private void StoreHeldInCargo()
+    {
+        if (_heldWeapon.Length == 0) return;
+
+        string stored = _heldWeapon;
+        var cargo = ReadCargo();
+
+        // A weapon from a card has never been on the hull, so it enters cargo as a fresh turret; one
+        // taken off the hull is already there with its upgrades.
+        if (!cargo.Holds(stored) && WeaponType.FromName(stored) is { } fresh)
+            WriteCargo(cargo.With(TurretMount.CarriedTurret(fresh)));
+
+        _heldIsCardWeapon = false;
+        _heldWeapon = "";
+        if (!_mountsFromStats) _cardResolved = true;
+        DiagnosticLogger.LogEvent("MOUNT", $"{stored} stored in cargo");
+    }
+
+    private void LeaveMountsScreen()
+    {
+        if (!_mountsFromStats && _cardResolved)
+        {
+            ClearPendingChoices();
+            return;
+        }
+
+        _upgradeStep = UpgradeStep.Cards;
+        _heldWeapon = "";
+        _heldIsCardWeapon = false;
+        _cardResolved = false;
+        _mountsFromStats = false;
+    }
+
+    private void OpenMountsFromStats()
+    {
+        _upgradeStep = UpgradeStep.Mounts;
+        _mountsFromStats = true;
+        _heldWeapon = "";
+        _heldIsCardWeapon = false;
+        _cardResolved = false;
+    }
+
+    private WeaponCargo ReadCargo() =>
+        _em.TryGetComponent<WeaponCargo>(_playerEntity, out var cargo) ? cargo : WeaponCargo.Empty;
+
+    private void WriteCargo(WeaponCargo cargo) => _em.AddComponent(_playerEntity, cargo);
 
     private static int ReadChoiceSelection(int hoveredIndex)
     {
@@ -627,7 +785,7 @@ public sealed class GameSession
     // Keys 1..n pick the n-numbered mount on the slot screen; ships have at most this many.
     static readonly KeyboardKey[] SlotKeys = [KeyboardKey.One, KeyboardKey.Two, KeyboardKey.Three, KeyboardKey.Four, KeyboardKey.Five, KeyboardKey.Six, KeyboardKey.Seven, KeyboardKey.Eight];
 
-    private static int ReadSlotSelection(int hoveredIndex, MountMenuRenderer.SlotMarker[] markers)
+    private static int ReadMountSelection(int hoveredMount, MountMenuRenderer.SlotMarker[] markers)
     {
         for (int key = 0; key < SlotKeys.Length; key++)
         {
@@ -635,7 +793,7 @@ public sealed class GameSession
             if (marker >= 0 && Raylib.IsKeyPressed(SlotKeys[key])) return marker;
         }
 
-        return Raylib.IsMouseButtonPressed(MouseButton.Left) ? hoveredIndex : -1;
+        return Raylib.IsMouseButtonPressed(MouseButton.Left) ? hoveredMount : -1;
     }
 
     static int IndexOfNumber(MountMenuRenderer.SlotMarker[] markers, int number)
@@ -658,22 +816,25 @@ public sealed class GameSession
 
         var option = options[selectedIndex];
 
-        // A new weapon is only half a choice: it still needs a hull mount. The pending choice stays up
-        // while the player picks one, so backing out leaves the cards untouched.
+        // A new weapon is only half a choice: it goes into hand and the player puts it on the hull or
+        // leaves it in cargo. The pending choice stays up until that is settled, so backing out of the
+        // mount screen hands the cards straight back.
         if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage && WeaponType.FromName(option.WeaponName) is { } weapon)
         {
-            _pendingMountWeapon = weapon.Name;
-            bool hasFreeSlot = TurretMount.FreeSlots(_worldView, weapon.Size).Count > 0;
-            DiagnosticLogger.LogEvent("UPGRADE", $"weapon {weapon.Name} needs a mount ({(hasFreeSlot ? "free slot" : "replace a mounted weapon")})");
+            _heldWeapon = weapon.Name;
+            _heldIsCardWeapon = true;
+            _cardResolved = false;
+            _mountsFromStats = false;
+            DiagnosticLogger.LogEvent("UPGRADE", $"weapon {weapon.Name} in hand: mount it or store it in cargo");
 
             if (autoMountInSlot)
             {
-                MountIntoFirstFit(weapon, hasFreeSlot);
+                MountIntoFirstFit(weapon);
                 ClearPendingChoices();
             }
             else
             {
-                _upgradeStep = hasFreeSlot ? UpgradeStep.PickSlot : UpgradeStep.ReplaceSlot;
+                _upgradeStep = UpgradeStep.Mounts;
             }
 
             return;
@@ -683,37 +844,21 @@ public sealed class GameSession
         ClearPendingChoices();
     }
 
-    private void MountWeapon(Entity slotEntity, TurretSlotDefinition slot, WeaponType weapon)
-    {
-        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
-        float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
-
-        if (_upgradeStep == UpgradeStep.ReplaceSlot) TurretMount.Unmount(_em, slotEntity);
-        TurretMount.Mount(_em, slotEntity, slot, weapon, playerPos, hullRotation);
-
-        DiagnosticLogger.LogEvent("UPGRADE", $"mounted new weapon {weapon.Name} in {slot.Name}");
-        ClearPendingChoices();
-    }
-
-    // Perf scenarios never pause: take the first mount that fits — a free one, else the first
-    // mounted weapon in the way.
-    private void MountIntoFirstFit(WeaponType weapon, bool useFreeSlot)
+    // Perf scenarios never pause: fit the weapon into the first mount that is free, and if the hull is
+    // full let it ride in cargo until the player makes room.
+    private void MountIntoFirstFit(WeaponType weapon)
     {
         var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
         float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
 
         var free = TurretMount.FreeSlots(_worldView, weapon.Size);
-        if (useFreeSlot && free.Count > 0 && TurretMount.TryFindSlot(_worldView, free[0].Name, out var freeSlot))
+        if (free.Count > 0 && TurretMount.TryFindSlot(_worldView, free[0].Name, out var freeSlot))
         {
             TurretMount.Mount(_em, freeSlot, free[0], weapon, playerPos, hullRotation);
             return;
         }
 
-        var taken = TurretMount.MountedSlots(_worldView);
-        if (taken.Count == 0) return;
-
-        TurretMount.Unmount(_em, taken[0].SlotEntity);
-        TurretMount.Mount(_em, taken[0].SlotEntity, taken[0].Slot, weapon, playerPos, hullRotation);
+        WriteCargo(ReadCargo().With(TurretMount.CarriedTurret(weapon)));
     }
 
     private void ClearPendingChoices()
@@ -722,7 +867,10 @@ public sealed class GameSession
             _em.DestroyEntity(entity);
 
         _upgradeStep = UpgradeStep.Cards;
-        _pendingMountWeapon = "";
+        _heldWeapon = "";
+        _heldIsCardWeapon = false;
+        _cardResolved = false;
+        _mountsFromStats = false;
     }
 
     private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)

@@ -18,6 +18,7 @@ internal static class Palette
     public static readonly Color TextMuted = new(150, 160, 175, 255);
     public static readonly Color PanelFill = new(10, 12, 20, 200);
     public static readonly Color PanelEdge = new(255, 255, 255, 30);
+    public static readonly Color PanelFillHover = new(22, 26, 40, 225);
     public static readonly Color Shadow = new(0, 0, 0, 90);
     public static readonly Color TrackDark = new(10, 12, 20, 140);
 
@@ -26,6 +27,8 @@ internal static class Palette
 
     // Turret mounts: an empty one is a greyish-blue circle, a mounted gun a greyish-red triangle
     // pointing where it aims, and its firing arc a green sector around the mount.
+    public static readonly Color RowHover = new(255, 255, 255, 18);
+
     public static readonly Color TurretEmptySlot = new(95, 125, 155, 210);
     public static readonly Color TurretMounted = new(190, 95, 95, 255);
     public static readonly Color TurretArc = new(70, 190, 110, 40);

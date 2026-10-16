@@ -42,7 +42,9 @@ public static class Renderer
         StatsScreenRenderer.Prepared Screen,
         PendingUpgradeOptions? Options,
         int PlayerLevel,
-        int HoveredIndex);
+        int HoveredIndex,
+        bool CanManageMounts,
+        bool HoveredManage);
 
     public static void RenderPaused(
         EntityManager em,
@@ -57,7 +59,7 @@ public static class Renderer
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
-        StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex);
+        StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex, stats.CanManageMounts, stats.HoveredManage);
         Raylib.EndDrawing();
     }
 
@@ -71,11 +73,12 @@ public static class Renderer
         Entity playerEntity,
         bool diagnostics,
         MountMenuRenderer.Prepared mount,
-        int hoveredSlot)
+        int hoveredSlot,
+        int hoveredCargo)
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, mount.Ship, diagnostics);
-        MountMenuRenderer.Draw(mount, hoveredSlot, windowWidth, windowHeight);
+        MountMenuRenderer.Draw(mount, hoveredSlot, hoveredCargo, windowWidth, windowHeight);
         Raylib.EndDrawing();
     }
 

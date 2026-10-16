@@ -24,6 +24,8 @@ public static class StatsScreenRenderer
     const int RowPitch = 24;
     const int SectionGap = 10;
     const int CountColumnWidth = 48;
+    const int HintGap = 10;
+    const string ManageMountsLabel = "Manage mounts and cargo";
 
     static readonly Color RowTint = new(255, 255, 255, 6);
     static readonly Color CountUpgraded = new(120, 255, 140, 255);
@@ -43,7 +45,7 @@ public static class StatsScreenRenderer
         return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards));
     }
 
-    public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex)
+    public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex, bool canManageMounts, bool hoveredManage)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, Palette.ScreenDim);
 
@@ -52,12 +54,37 @@ public static class StatsScreenRenderer
         DrawTopPanels(prepared.Layout, shipName, level, windowWidth, prepared.Scale);
 
         if (hasCards)
-            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale);
-        else
         {
-            UpgradeMenuRenderer.ResetFade();
-            DrawHint("Tab to close", windowWidth, windowHeight, prepared.Scale);
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale);
+            return;
         }
+
+        UpgradeMenuRenderer.ResetFade();
+
+        if (canManageMounts)
+        {
+            var (x, y, w, h) = ManageMountsButtonRect(windowWidth, windowHeight, prepared.Scale);
+            Ui.DrawPanel(x, y, w, h, (int)(6 * prepared.Scale), hoveredManage ? Palette.PanelFillHover : Palette.PanelFill,
+                hoveredManage ? Palette.Accent : Palette.PanelEdge);
+            int font = (int)(RowFontSize * prepared.Scale);
+            Raylib.DrawText(ManageMountsLabel, x + (w - Raylib.MeasureText(ManageMountsLabel, font)) / 2, y + (h - font) / 2, font,
+                hoveredManage ? Palette.TextBright : Palette.TextMuted);
+            DrawHint("Tab to close — the button rearranges turrets and cargo", windowWidth, windowHeight, prepared.Scale);
+        }
+        else
+            DrawHint("Tab to close", windowWidth, windowHeight, prepared.Scale);
+    }
+
+    // The button that opens the mount/cargo screen. Shared with the caller's hit test, so the box the
+    // player clicks is exactly the box that was drawn.
+    public static (int X, int Y, int Width, int Height) ManageMountsButtonRect(int windowWidth, int windowHeight, float scale)
+    {
+        int font = (int)(RowFontSize * scale);
+        int width = Raylib.MeasureText(ManageMountsLabel, font) + (int)(48 * scale);
+        int height = (int)(RowPitch * scale);
+        int x = windowWidth / 2 - width / 2;
+        int y = UpgradeMenuRenderer.GetHintY(windowHeight, scale) - height - (int)(HintGap * scale);
+        return (x, y, width, height);
     }
 
     public static int GetHoveredCardIndex(Prepared prepared, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
@@ -201,6 +228,10 @@ public static class StatsScreenRenderer
         var mounts = CountMounts(em);
         if (mounts.SmallTotal > 0) shipRows.Add(new("Small mounts", $"{mounts.SmallUsed}/{mounts.SmallTotal}", -1));
         if (mounts.LargeTotal > 0) shipRows.Add(new("Large mounts", $"{mounts.LargeUsed}/{mounts.LargeTotal}", -1));
+
+        // Cargo weapons are inactive, so they are absent from the weapon sections below; say so here.
+        int carried = em.TryGetComponent<WeaponCargo>(playerEntity, out var cargo) ? cargo.Weapons.Count : 0;
+        shipRows.Add(new("In cargo (inactive)", $"{carried}", -1));
 
         var weaponSections = new List<StatsSection>();
         foreach (var weaponName in GetPlayerWeaponNames(em))
