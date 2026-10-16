@@ -263,7 +263,7 @@ public static class WorldRenderer
 
             var (cx, cy) = RenderHelpers.ToScreen(world, camX, camY, windowWidth, windowHeight);
             float radius = RenderHelpers.TurretMarkerRadius(slot.Definition.Size);
-            if (RenderHelpers.IsOffScreen(cx, cy, radius, windowWidth, windowHeight)) continue;
+            if (RenderHelpers.IsOffScreen(cx, cy, RenderHelpers.TurretMarkerExtent(slot.Definition.Size), windowWidth, windowHeight)) continue;
 
             if (!mounted)
             {
@@ -271,7 +271,7 @@ public static class WorldRenderer
                 continue;
             }
 
-            RenderHelpers.DrawTurretMarker(cx, cy, radius * 1.6f, Angle.ToDeg(em.GetComponent<Rotation>(entity).Angle), Palette.TurretMounted);
+            RenderHelpers.DrawTurretMarker(cx, cy, radius, Angle.ToDeg(em.GetComponent<Rotation>(entity).Angle), Palette.TurretMounted);
         }
     }
 

@@ -129,7 +129,7 @@ public static class MountMenuRenderer
             fill);
     }
 
-    // Empty mounts are circles, mounted ones a triangle pointing where the gun currently aims.
+    // Empty mounts are circles; a mounted one is the same circle with a point toward where the gun aims.
     static void DrawMarker(SlotMarker marker, bool hovered)
     {
         var center = new System.Numerics.Vector2(marker.ScreenX, marker.ScreenY);
@@ -142,7 +142,7 @@ public static class MountMenuRenderer
         }
 
         float aimDeg = Angle.ToDeg(marker.AimAngle);
-        RenderHelpers.DrawTurretMarker(center.X, center.Y, marker.MarkerRadius * 1.6f, aimDeg, hovered ? Palette.Accent : Palette.TurretMounted);
+        RenderHelpers.DrawTurretMarker(center.X, center.Y, marker.MarkerRadius, aimDeg, hovered ? Palette.Accent : Palette.TurretMounted);
     }
 
     static void DrawNumberBadge(SlotMarker marker, float scale)

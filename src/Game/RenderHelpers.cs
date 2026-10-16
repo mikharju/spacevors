@@ -36,20 +36,28 @@ internal static class RenderHelpers
     // Turret marker: how big a hull mount reads in world pixels.
     public static float TurretMarkerRadius(TurretSize size) => size == TurretSize.Large ? 9f : 6f;
 
-    // A turret marker: a triangle whose tip points where the mount aims.
+    // How far a mounted marker reaches from its centre, for off-screen culling.
+    public static float TurretMarkerExtent(TurretSize size) => TurretMarkerRadius(size) * MarkerApexReach;
+
+    // A mounted turret: the mount circle with a point sticking out of it toward where the gun aims.
+    // The triangle's base corners sit at 0.93 radius — inside the opaque circle, which is a disc, so
+    // the whole base is hidden and only the tip at 1.9 radius shows.
     // Vertex order must be clockwise in screen space; counter-clockwise triangles are culled.
     public static void DrawTurretMarker(float cx, float cy, float radius, float angleDeg, Color color)
     {
+        Raylib.DrawCircle((int)cx, (int)cy, radius, color);
+
         float angle = angleDeg * MathF.PI / 180f;
         Raylib.DrawTriangle(
-            Rotated(cx, cy, 0f, -radius, angle),
-            Rotated(cx, cy, -radius * TailHalfWidth, radius * TailDepth, angle),
-            Rotated(cx, cy, radius * TailHalfWidth, radius * TailDepth, angle),
+            Rotated(cx, cy, 0f, -radius * MarkerApexReach, angle),
+            Rotated(cx, cy, -radius * MarkerTailHalfWidth, radius * MarkerTailInset, angle),
+            Rotated(cx, cy, radius * MarkerTailHalfWidth, radius * MarkerTailInset, angle),
             color);
     }
 
-    const float TailHalfWidth = 0.75f;
-    const float TailDepth = 0.6f;
+    const float MarkerApexReach = 1.9f;
+    const float MarkerTailHalfWidth = 0.9f;
+    const float MarkerTailInset = 0.25f;
 
     static System.Numerics.Vector2 Rotated(float cx, float cy, float x, float y, float angle)
         => new(cx + x * MathF.Cos(angle) - y * MathF.Sin(angle),
