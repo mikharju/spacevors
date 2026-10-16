@@ -200,6 +200,12 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: the rule was written from the field's name instead of from its read sites. Names like `AutoTarget`, `PointDefenceTurret` and `BeamSpacing` each imply a mechanic; only some of them exist.
 - **Fix / Prevention**: before stating a rule, a comment or a plan line about a stat field, grep the field and read every site that reads it. Where the name lies, fix the name in the same change (`PointDefenceTurret` → `InterceptorTurret`) rather than carrying the lie forward.
 
+## 46. `scenario.sh --sim` cannot see anything that lives in `GameSession`
+
+- **Symptom**: I added a once-a-second `[THREAT]` line in `GameSession`, ran `scenario.sh ammo-spray --sim`, grepped the log for it and got zero hits — as if the feature did nothing.
+- **Cause**: `--sim` runs `ScenarioBench`, which drives `WorldFactory` + `ScenarioWorld` + `SimulationRunner.RunTick` with **no `GameSession` at all**. Everything in the window path — HUD lines, the threat readout, key handling, `[FRAME]`/`[RENDER]`/`[SIM]` rows — is absent from that artifact. The `[PERF]` rows in a `--sim` log come from the bench, so their presence proves nothing about the game loop.
+- **Fix / Prevention**: to verify window-path work, run the game and capture its stdout: `.tools/game.sh > .tools/run/app.log 2>&1` as a background job (plain `game.sh` writes only to its own stdout, which no file keeps), then `.tools/input.sh key 1` — the digit keys start a run directly from ship select — wait, then grep. A 14 px HUD line needs a native-scale crop, since a 1920×1024 shot is downscaled when read: `PYTHONPATH=.tools/pylibs python3 -c "from PIL import Image; Image.open(shot).crop((0, h-70, 980, h)).save(crop)"`. And `.tools/xvfb.sh` exiting 1 with "server already running" is not a failure — display :99 is up and the game connects.
+
 ## Maybe remove
 
 Borderline entries: they document project code/library issues rather than LLM-workflow problems. Keep only if the knowledge is still needed for future feature work; otherwise delete.
