@@ -28,7 +28,7 @@ public static class EnemyShipFactory
         em.AddComponent(entity, new Velocity(velocity));
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
-        em.AddComponent(entity, BuildEnemyShip(type));
+        em.AddComponent(entity, BuildEnemyShip(type, tier));
         em.AddComponent(entity, BuildTurret(type, tier));
         int health = TieredHealth(type, tier);
         em.AddComponent(entity, new Health(health, health));
@@ -44,7 +44,7 @@ public static class EnemyShipFactory
             new InitialComponent<Velocity>(new Velocity(velocity)),
             new InitialComponent<Rotation>(new Rotation(rotation)),
             new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
-            new InitialComponent<EnemyShip>(BuildEnemyShip(type)),
+            new InitialComponent<EnemyShip>(BuildEnemyShip(type, tier)),
             new InitialComponent<Turret>(BuildTurret(type, tier)),
             new InitialComponent<Health>(new Health(health, health))
         };
@@ -53,9 +53,11 @@ public static class EnemyShipFactory
     private static int TieredHealth(EnemyShipType type, int tier) =>
         (int)MathF.Round(type.Health * EnemyShipStats.HpMultiplier(tier), MidpointRounding.AwayFromZero);
 
-    private static EnemyShip BuildEnemyShip(EnemyShipType type) =>
-        new(type.Radius, type.Speed, type.TurnRate, type.FiringRange, type.TurretFireRate, type.TurretAmmoSpeed, type.Acceleration, type.GraphicsId);
+    // The hull and its gun must carry the same grown range: the chase system brakes the hull at
+    // FiringRange and the turret fires at it, so a drift on one alone would split the two.
+    private static EnemyShip BuildEnemyShip(EnemyShipType type, int tier) =>
+        new(type.Radius, EnemyShipStats.SpeedFor(type, tier), EnemyShipStats.TurnRateFor(type, tier), EnemyShipStats.FiringRangeFor(type, tier), type.TurretFireRate, EnemyShipStats.AmmoSpeedFor(type, tier), type.Acceleration, type.GraphicsId);
 
     private static Turret BuildTurret(EnemyShipType type, int tier) =>
-        new(Weapon: new WeaponStats(type.TurretFireRate * EnemyShipStats.FireRateMultiplier(tier), type.TurretAmmoSpeed, KickbackForce: EnemyShipStats.WeaponKickbackForce, PelletCount: EnemyShipStats.WeaponPelletCount, Scatter: EnemyShipStats.WeaponScatter, Damage: EnemyShipStats.BaseDamage + EnemyShipStats.DamageAdd(tier)), WeaponName: EnemyShipStats.WeaponName, ArcAngle: EnemyShipStats.WeaponArcAngle, Range: type.FiringRange, IsEnemy: true);
+        new(Weapon: new WeaponStats(type.TurretFireRate * EnemyShipStats.FireRateMultiplier(tier), EnemyShipStats.AmmoSpeedFor(type, tier), KickbackForce: EnemyShipStats.WeaponKickbackForce, PelletCount: EnemyShipStats.WeaponPelletCount, Scatter: EnemyShipStats.WeaponScatter, Damage: EnemyShipStats.BaseDamage + EnemyShipStats.DamageAdd(tier)), WeaponName: EnemyShipStats.WeaponName, ArcAngle: EnemyShipStats.WeaponArcAngle, Range: EnemyShipStats.FiringRangeFor(type, tier), IsEnemy: true);
 }

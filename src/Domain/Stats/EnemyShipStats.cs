@@ -11,12 +11,21 @@ public readonly record struct EnemyShipType(
     float TurretAmmoSpeed,
     float Acceleration,
     int Health,
+    // What the tier ladder drifts each minute, applied at spawn (EnemyShipStats.FiringRangeFor,
+    // SpeedFor, AmmoSpeedFor). Negative is a deliberate trade: the Interceptor gives up reach to buy
+    // closing speed.
+    float RangePerTier = 0f,
+    float SpeedPerTier = 0f,
+    float AmmoSpeedPerTier = 0f,
     // Relative share of enemy spawns (EnemyShipFactory.PickRandomType); equal weights give an even split.
     float SpawnWeight = 1f)
 {
-    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 15);
-    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 7);
-    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 30);
+    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 15,
+        RangePerTier: 10f, SpeedPerTier: 2f, AmmoSpeedPerTier: 2f);
+    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 7,
+        RangePerTier: -15f, SpeedPerTier: 3f, AmmoSpeedPerTier: 2f);
+    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 30,
+        RangePerTier: 25f, AmmoSpeedPerTier: 1.6f);
 
     public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon];
 
@@ -40,7 +49,7 @@ public static class EnemyShipStats
     // Tiers are applied at spawn time only, so existing entities are never mutated mid-run.
     // Multipliers are capped by MaxTier — stats stop growing after 10 minutes instead of compounding forever against the player's upgrades.
     public const float TierDuration = 60f;
-    private const int MaxTier = 10;
+    public const int MaxTier = 10;
 
     public static int TierFor(float elapsedTime) => Math.Clamp((int)(elapsedTime / TierDuration), 0, MaxTier);
 
@@ -49,4 +58,24 @@ public static class EnemyShipStats
     public static int DamageAdd(int tier) => tier / 2;
 
     public static float FireRateMultiplier(int tier) => 1f + 0.1f * tier;
+
+    // Deadlier individuals rather than a busier world (plans/DIFFICULTY_SCALING.md R2.3-R2.5): reach,
+    // closing speed, tracking and a touch of ammo speed climb with the tier, while per-shot damage
+    // stays on DamageAdd alone. The ceilings keep that inside the player's weapon ladder: an enemy
+    // engages at `FiringRange + the player's hull radius`, and the ring must stay under the player's
+    // mid-range band (1350) so mid and long guns keep trading favourably. Ammo stays dodgeable — the
+    // genre's readability budget is reaction time, and enemy guns already lead their shots.
+    public const float MaxFiringRange = 1000f;
+    public const float MaxAmmoSpeed = 250f;
+    public const float TurnRatePerTier = 0.03f;
+
+    public static float FiringRangeFor(EnemyShipType type, int tier) =>
+        Math.Min(type.FiringRange + type.RangePerTier * tier, MaxFiringRange);
+
+    public static float AmmoSpeedFor(EnemyShipType type, int tier) =>
+        Math.Min(type.TurretAmmoSpeed + type.AmmoSpeedPerTier * tier, MaxAmmoSpeed);
+
+    public static float SpeedFor(EnemyShipType type, int tier) => type.Speed + type.SpeedPerTier * tier;
+
+    public static float TurnRateFor(EnemyShipType type, int tier) => type.TurnRate + TurnRatePerTier * tier;
 }
