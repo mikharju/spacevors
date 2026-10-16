@@ -15,6 +15,10 @@ public static class UpgradeMenuRenderer
     const int UpgradeCardLabelFontSize = 20;
     const int UpgradeCardValueFontSize = 36;
     const int MaxUpgradeLabelLines = 3;
+    // A new-weapon card lists what the gun does at its base level; the block is skipped rather than
+    // squeezed when the window is too narrow for it.
+    const int UpgradeCardStatFontSize = 15;
+    const int MinCardWidthForStats = 150;
 
     public const int HintFontSize = 16;
     public const int HintGap = 28; // gap between card bottom and hint text top
@@ -44,7 +48,7 @@ public static class UpgradeMenuRenderer
         {
             var opt = options.Options[i];
             var (topLeft, w, h) = GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, scale);
-            DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt.Stat), (i + 1).ToString(), i == hoveredIndex, fade, scale);
+            DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt), NewWeaponSpecs(opt), (i + 1).ToString(), i == hoveredIndex, fade, scale);
         }
 
         string hint = "Click a card or press keys";
@@ -75,11 +79,13 @@ public static class UpgradeMenuRenderer
     }
 
     // Soft-depth card: rounded translucent panel with shadow; hover lifts it 4px,
-    // brightens the border to the accent; value in accent, label muted.
-    private static void DrawCard(int x, int y, int width, int height, string label, string statValue, string key, bool hovered, float fade, float scale)
+    // brightens the border to the accent; value in accent, label muted. A new-weapon card puts the
+    // mount size where the value goes and lists the gun's base numbers underneath.
+    private static void DrawCard(int x, int y, int width, int height, string label, string statValue, string[]? weaponStats, string key, bool hovered, float fade, float scale)
     {
         int labelFont = (int)(UpgradeCardLabelFontSize * scale);
         int valueFont = (int)(UpgradeCardValueFontSize * scale);
+        int statFont = (int)(UpgradeCardStatFontSize * scale);
         int radius = (int)(6 * scale);
 
         Color background = hovered ? new Color(50, 50, 68, 230) : new Color(28, 30, 40, 230);
@@ -92,10 +98,15 @@ public static class UpgradeMenuRenderer
 
         string[] labelLines = WrapText(label, width - (int)(24 * scale), labelFont);
         int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
-        int labelValueGap = (int)(28 * scale);
+        int labelValueGap = (int)(24 * scale);
         int linePitch = labelFont + (int)(4 * scale);
         int labelHeight = numLines * linePitch - (int)(4 * scale);
-        int contentY = y + (height - labelHeight - labelValueGap - valueFont) / 2;
+        int statsGap = (int)(10 * scale);
+        int statPitch = statFont + (int)(3 * scale);
+        bool showStats = weaponStats is { Length: > 0 } && width >= (int)(MinCardWidthForStats * scale);
+        int statsHeight = showStats ? weaponStats!.Length * statPitch - (int)(3 * scale) : 0;
+
+        int contentY = y + (height - labelHeight - labelValueGap - valueFont - (showStats ? statsGap + statsHeight : 0)) / 2;
 
         for (int i = 0; i < numLines; i++)
         {
@@ -104,9 +115,16 @@ public static class UpgradeMenuRenderer
                 Ui.WithAlpha(Palette.TextMuted, fade));
         }
 
+        int valueY = contentY + labelHeight + labelValueGap;
         int valueWidth = Raylib.MeasureText(statValue, valueFont);
-        Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, contentY + labelHeight + labelValueGap, valueFont,
+        Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, valueY, valueFont,
             Ui.WithAlpha(Palette.Accent, fade));
+
+        if (!showStats) return;
+
+        for (int i = 0; i < weaponStats!.Length; i++)
+            Raylib.DrawText(weaponStats[i], x + (int)(16 * scale), valueY + valueFont + statsGap + i * statPitch, statFont,
+                Ui.WithAlpha(Palette.TextMuted, fade));
     }
 
     private static void DrawKeyBadge(int x, int y, string key, float fade, float scale)
@@ -195,5 +213,27 @@ public static class UpgradeMenuRenderer
         };
     }
 
-    private static string GetUpgradeValue(UpgradeOption option) => UpgradeDefinition.For(option).DisplayValue;
+    // For a new weapon the prominent line carries the mount size, which is the thing the player has
+    // to know before picking a hull mount.
+    private static string GetUpgradeValue(UpgradableOption option) =>
+        option.IsNewWeapon && WeaponType.FromName(option.WeaponName) is { } weapon
+            ? (weapon.Size == TurretSize.Large ? "large" : "small")
+            : UpgradeDefinition.For(option.Stat).DisplayValue;
+
+    // Base numbers of a new weapon — nothing has upgraded it yet, so these are honest starting values.
+    private static string[]? NewWeaponSpecs(UpgradableOption option)
+    {
+        if (!option.IsNewWeapon || WeaponType.FromName(option.WeaponName) is not { } weapon) return null;
+
+        string speed = weapon.Stats.Hitscan ? "beam instant" : $"projectile speed {Format(weapon.Stats.AmmoSpeed)}";
+        return
+        [
+            $"range {Format(weapon.Range)}",
+            $"damage {weapon.Stats.Damage}{(weapon.Stats.PelletCount > 1 ? $" x{weapon.Stats.PelletCount}" : "")}",
+            $"attack speed {Format(weapon.Stats.FireRate)}/s",
+            speed,
+        ];
+    }
+
+    private static string Format(float value) => value < 10f ? $"{value:0.0}" : $"{(int)MathF.Round(value)}";
 }

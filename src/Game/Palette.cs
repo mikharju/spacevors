@@ -31,6 +31,8 @@ internal static class Palette
 
     public static readonly Color TurretEmptySlot = new(95, 125, 155, 210);
     public static readonly Color TurretMounted = new(190, 95, 95, 255);
+    public static readonly Color TurretFits = new(90, 215, 130, 235);
+
     public static readonly Color TurretArc = new(70, 190, 110, 40);
     public static readonly Color TurretArcHover = new(70, 190, 110, 95);
 

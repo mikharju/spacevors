@@ -655,7 +655,7 @@ public sealed class GameSession
         string exit = _cardResolved ? "Esc to finish" : _mountsFromStats ? "Esc to go back" : "Esc back to the cards";
 
         if (_heldIsCardWeapon || !cargo.Holds(_heldWeapon))
-            return $"Click a mount, or press its number, to fit {_heldWeapon} — C stores it in cargo — {exit}";
+            return $"Green ring = the mount fits {_heldWeapon}: click one, or press its number — C stores it in cargo — {exit}";
 
         return $"{_heldWeapon} is in hand: click a mount to fit it, a filled mount swaps it into cargo — {exit}";
     }
@@ -790,7 +790,7 @@ public sealed class GameSession
         for (int key = 0; key < SlotKeys.Length; key++)
         {
             int marker = IndexOfNumber(markers, key + 1);
-            if (marker >= 0 && Raylib.IsKeyPressed(SlotKeys[key])) return marker;
+            if (marker >= 0 && markers[marker].Selectable && Raylib.IsKeyPressed(SlotKeys[key])) return marker;
         }
 
         return Raylib.IsMouseButtonPressed(MouseButton.Left) ? hoveredMount : -1;

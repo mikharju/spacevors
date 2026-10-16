@@ -41,7 +41,11 @@ public static class MountMenuRenderer
         float ScreenY,
         float MarkerRadius,
         bool Selectable,
-        int Number); // 1-based key/hint number, 0 when not selectable
+        // The mount can take the weapon in hand: it gets a green ring, so the player sees at a glance
+        // which mounts are candidates rather than hunting with the mouse.
+        bool AcceptsHeld,
+        // 1-based key/hint number; every slot is numbered, so the key for a mount never changes.
+        int Number);
 
     // One cargo weapon, drawn as a clickable row.
     public readonly record struct CargoItem(
@@ -83,8 +87,9 @@ public static class MountMenuRenderer
         foreach (var (slotEntity, slot) in em.GetEntitiesWithComponents<TurretSlot>())
         {
             bool occupied = em.HasComponent<Turret>(slotEntity);
-            bool selectable = held is { } weapon ? TurretMount.Fits(slot.Definition, weapon) : occupied;
-            if (selectable) number++;
+            bool acceptsHeld = held is { } weapon && TurretMount.Fits(slot.Definition, weapon);
+            bool selectable = acceptsHeld || (held is null && occupied);
+            number++;
 
             markers.Add(new SlotMarker(
                 slotEntity,
@@ -96,7 +101,8 @@ public static class MountMenuRenderer
                 shipY + slot.Definition.Offset.Y * zoom,
                 RenderHelpers.TurretMarkerRadius(slot.Definition.Size) * zoom,
                 selectable,
-                selectable ? number : 0));
+                acceptsHeld,
+                number));
         }
 
         var cargo = new List<CargoItem>();
@@ -158,8 +164,9 @@ public static class MountMenuRenderer
         {
             bool hovered = marker.Selectable && marker.SlotEntity == hoveredSlot;
             DrawArc(marker, hovered);
+            if (marker.AcceptsHeld) DrawFitRing(marker, hovered, prepared.Scale);
             DrawMarker(marker, hovered);
-            if (marker.Number > 0) DrawNumberBadge(marker, prepared.Scale);
+            DrawNumberBadge(marker, prepared.Scale);
         }
 
         DrawCargo(prepared, hoveredCargo);
@@ -196,6 +203,15 @@ public static class MountMenuRenderer
             Color text = item.Held ? Palette.Accent : i == hoveredCargo ? Palette.TextBright : Palette.TextMuted;
             Raylib.DrawText(item.WeaponName, (int)(item.ScreenX + CargoRowPaddingX * prepared.Scale), (int)item.ScreenY, headerFont, text);
         }
+    }
+
+    // Green ring around a mount that can take the weapon in hand. Hovering doubles the ring, so the
+    // hovered candidate still stands out from the rest.
+    static void DrawFitRing(SlotMarker marker, bool hovered, float scale)
+    {
+        float reach = marker.MarkerRadius + ClickSlack * 0.6f;
+        Raylib.DrawCircleLines((int)marker.ScreenX, (int)marker.ScreenY, reach, Palette.TurretFits);
+        if (hovered) Raylib.DrawCircleLines((int)marker.ScreenX, (int)marker.ScreenY, reach + 3f * scale, Palette.TurretFits);
     }
 
     // Firing arc: a green sector around the mount's centre direction. Screen degrees put 0 to the
