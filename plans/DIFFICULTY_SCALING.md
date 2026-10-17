@@ -371,5 +371,6 @@ fuse run out.
 
 **Cost of the whole thing**: no new hull, art, AI branch or spawn rule. Two components on the hull
 (`MissileWeapon`, `MissileCooldown`), one Action-phase system, and the composition draw. The pinned
-scenarios run unarmed, so they can only prove no regression — they did (ammo-spray 1.31 ms,
-impact-storm 2.11 ms medians).
+scenarios run unarmed, so they can only prove no regression — they did (ammo-spray 1.30 ms,
+impact-storm 2.16 ms medians, against 1.33 / 2.12 before any missile code; the p99 band on this host is
+±0.3 ms).

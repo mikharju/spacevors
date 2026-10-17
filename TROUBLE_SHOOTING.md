@@ -321,6 +321,15 @@ frames and the `[THREAT]` line stuck at the same `t=`: `LevelUpSystem` spawns a 
 app pauses while the upgrade menu is open. Nothing is broken — the run is waiting for a card. Send
 `key 1` on a loop (or watch for the menu) and the clock starts again.
 
+## 51. A headless run's game clock runs slower than the wall clock
+
+Waiting real minutes for a time-based feature (the armament ladder opens at 3 minutes of *game* time) does
+not work under llvmpipe: `UpdateRunning` clamps the accumulated frame time per step, so a frame that took
+250 ms only advances the simulation by the clamp. Observed: ~200 s of wall time bought ~100 s of
+`[THREAT] t=`, i.e. roughly half speed at ~4-8 fps. Budget wall time at 2x the game clock, or spawn the
+content directly — the `SPACEVORS_DIAGNOSTIC=1` bench keys exist for exactly that (`U` spawns a rack-armed
+hull, `H` makes the hull unkillable for a long session).
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

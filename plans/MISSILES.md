@@ -21,9 +21,19 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   turn radius and the fuse reach, so a jittered round would be a different missile than the one the player
   just read. `AmmoSpawnOffset`, hull clearance, inherited velocity and the arc gate (`FiringArc`) are
   shared with the gun pass instead of copied.
+- **How it was verified in the real game** (headless, `SPACEVORS_DIAGNOSTIC=1`, one ~5 minute run):
+  8 `Enemy rack: launch` events, every one of them at `t ≥ 192 s` — never before composition tier 3;
+  the `[THREAT]` row printed `missiles=0/0` for the 169 samples before tier 3 and `missiles=1/3` after;
+  `Missiles: guidance` reported entities on ticks with a round in the air; `world.missiles` rendered every
+  frame at 0.00-0.02 ms. The dart *sprite* itself was pixel-verified on the player's Orange missile (the
+  same draw path, 61-69 exact-body pixels per frame); a frame containing an enemy Red dart was not caught,
+  because the game clock runs at roughly half wall speed under llvmpipe (TROUBLE_SHOOTING 51).
+- **Bench key added for that verification:** `U` spawns a rack-armed Interceptor (unkillable test hp) at
+  the player, so a red dart can be watched on demand instead of waiting three minutes for the ladder.
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
-  prove no regression (ammo-spray sim median 1.31 ms, impact-storm 2.11 ms) and nothing about the cost of
-  live missiles. That is the open measurement.
+  prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
+  missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is
+  the open measurement.
 - **Accepted edge from §11 still open:** `AmmoSpawnOffset = 20` means a missile launched beside an adjacent
   hull detonates on its first sweep. An arming distance is the fix if it ever reads as unfair.
 

@@ -61,7 +61,7 @@ Goal:
 - K: halve hp of the locked target or nearest enemy ship to reach damage smoke tiers quickly (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
 ### Diagnostics env vars (testing only)
-- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin, K key halve target hp
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin, K key halve target hp, J key halve player hp, U key rack-armed test hull (enemy missiles)
 - SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
 
 ## MVP
@@ -529,8 +529,8 @@ plans/DIFFICULTY_SCALING.md R2.12).
 - A rack launches from 1.4× the hull's own gun ring (capped at 1450 px) while the hull still brakes at its
   old range, and its rounds stay at 165-250 px/s: far, slow and shootable is the whole design.
 - Sim cost: the pinned scenarios run unarmed, so they prove no regression only — `ammo-spray` sim median
-  **1.31 ms**, `impact-storm` **2.11 ms**, against 1.31 / 2.07 before. A missile-carrying scenario is the
-  missing measurement.
+  **1.30 ms** and `impact-storm` **2.16 ms**, against 1.33 / 2.12 before any missile code (this host's p99
+  band is ±0.3 ms, so both sit inside noise). A missile-carrying scenario is the missing measurement.
 
 ## Near future
 
