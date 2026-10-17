@@ -82,9 +82,11 @@ static class ShapeSprites
     const int BodyHeight = TipHeight + ShaftHeight;
     const int ExhaustWidth = 8, ExhaustHeight = 12;
 
-    // How far the plume's nozzle edge reaches into the body's tail, as a fraction of the plume's own
-    // length: 0 butts the two shapes together, 0.5 buries half of the plume inside the hull.
-    const float ExhaustBurialInsideTail = 0.5f;
+    // How much of the plume's own length stays inside the body's tail: 0 butts the two shapes together,
+    // 1 hides the whole plume inside the hull. The plume is anchored on the **tail**, not part-way between
+    // the body's centre and its tail: anchored part-way, a lengthening plume slid forward along the body
+    // and out past the nose, which is what made the flame look detached from a turning missile.
+    const float ExhaustBurialInsideTail = 0.25f;
 
     static Texture2D _missileBody, _missileExhaust;
 
@@ -136,11 +138,12 @@ static class ShapeSprites
 
         if (exhaustLength > 0f)
         {
-            // The plume's nozzle edge sits a little *inside* the body's tail: two shapes that only
-            // touch edge to edge read as two objects flying in formation, however carefully the
-            // arithmetic looks on paper.
+            // The plume hangs off the tail with a quarter of its own length buried inside it: two shapes
+            // that only touch edge to edge read as two objects flying in formation, however carefully the
+            // arithmetic looks on paper. Anchoring on the tail rather than on a fixed distance from the
+            // centre is what keeps the plume aft as it grows with boost and turn.
             Vector2 aft = new Vector2(cx, cy) - new Vector2(MathF.Sin(angleRad), -MathF.Cos(angleRad))
-                * (bodyLength * 0.5f - exhaustLength * ExhaustBurialInsideTail);
+                * (bodyLength * 0.5f + exhaustLength * (0.5f - ExhaustBurialInsideTail));
             Raylib.DrawTexturePro(MissileExhaust, new Rectangle(0, 0, ExhaustWidth, ExhaustHeight),
                 new Rectangle(aft.X - exhaustWidth * 0.5f, aft.Y - exhaustLength * 0.5f, exhaustWidth, exhaustLength),
                 new Vector2(exhaustWidth * 0.5f, exhaustLength * 0.5f), degrees, exhaustColor);

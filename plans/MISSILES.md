@@ -45,7 +45,10 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   before, which is what "reads as a bright dot" was really about. Both bodies are then painted the same
   **light grey**, and the flame takes over the colour channel: Orange for the player's racks, Red for an
   enemy's, at full saturation while cruising and washing toward white only in a hard turn (the grey body
-  means the plume no longer has to hold the identity on its own).
+  means the plume no longer has to hold the identity on its own). The plume is anchored on the body's tail
+  with a quarter of its own length buried inside it: anchored part-way between the centre and the tail, a
+  lengthening plume — which is exactly what boost and a hard turn do — slid forward and out past the nose,
+  and the flame read as a separate object trailing a turning missile.
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
   prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
   missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is

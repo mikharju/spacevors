@@ -206,7 +206,9 @@ Rendering: `world.missiles` is its own pass (`WorldRenderer.DrawMissiles`), draw
 from two generated sprites. The body is drawn `MissileBodyStretch` (7.5) times the collision radius long with
 a fixed-size nose: at 2.5 a round drew a 10 px dart and read as a bright dot at the ranges missiles are
 fired across. The plume answers two numbers — the rudder (`Steering`) and the throttle (how far the round is
-still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The
+still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The plume
+is anchored on the body's **tail**, not part-way between the centre and the tail, so it stays aft as it grows
+with boost and turn. The
 player's guided rounds are Orange (the guided colour) and the enemy's stay
 Red, because colour is the threat channel and the shape is what says "guided". Both bodies are painted the
 same light grey (`MissileBodyColor`) — a missile is a piece of hardware, not a faction badge — so the
