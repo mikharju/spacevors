@@ -68,4 +68,80 @@ static class ShapeSprites
         Raylib.DrawTexturePro(Disc, FullSource, dest,
             new Vector2(0f, thickness * 0.5f), MathF.Atan2(axis.Y, axis.X) * 180f / MathF.PI, color);
     }
+
+    // Missile: a nose-up body (triangle tip over a square shaft) and a separate aft triangle for the
+    // exhaust, authored white and tinted per draw like the disc. The exhaust is its own image so it
+    // can stretch and brighten without moving the body, and it always has a floor: a guided round that
+    // goes invisible mid-flight is a round the player cannot dodge.
+    const int BodyWidth = 8, BodyHeight = 14;
+    const int ExhaustWidth = 8, ExhaustHeight = 12;
+
+    // How far the plume's nozzle edge reaches into the body's tail, as a fraction of the plume's own
+    // length: 0 butts the two shapes together, 0.5 buries half of the plume inside the hull.
+    const float ExhaustBurialInsideTail = 0.5f;
+
+    static Texture2D _missileBody, _missileExhaust;
+
+    static Texture2D MissileBody
+    {
+        get
+        {
+            if (_missileBody.Id != 0) return _missileBody;
+
+            Image image = Raylib.GenImageColor(BodyWidth, BodyHeight, Transparent);
+            Raylib.ImageDrawTriangle(ref image,
+                new Vector2(BodyWidth / 2f, 0f),
+                new Vector2(0f, BodyHeight * 0.4f),
+                new Vector2(BodyWidth, BodyHeight * 0.4f), Opaque);
+            Raylib.ImageDrawRectangleRec(ref image, new Rectangle(0f, BodyHeight * 0.4f, BodyWidth, BodyHeight * 0.6f), Opaque);
+
+            _missileBody = Raylib.LoadTextureFromImage(image);
+            Raylib.UnloadImage(image);
+            return _missileBody;
+        }
+    }
+
+    static Texture2D MissileExhaust
+    {
+        get
+        {
+            if (_missileExhaust.Id != 0) return _missileExhaust;
+
+            // Full width at the nozzle, apex aft: the plume leaves the mount as wide as the hull that
+            // threw it and tapers away, so where it meets the body the two shapes are continuous.
+            Image image = Raylib.GenImageColor(ExhaustWidth, ExhaustHeight, Transparent);
+            Raylib.ImageDrawTriangle(ref image,
+                new Vector2(0f, 0f),
+                new Vector2(ExhaustWidth / 2f, ExhaustHeight),
+                new Vector2(ExhaustWidth, 0f), Opaque);
+
+            _missileExhaust = Raylib.LoadTextureFromImage(image);
+            Raylib.UnloadImage(image);
+            return _missileExhaust;
+        }
+    }
+
+    // `angleRad` follows the world's angle convention (0 faces up on screen), the same one the hull
+    // sprites are drawn with. The flame hangs off the aft end along that heading.
+    public static void DrawMissile(float cx, float cy, float angleRad, float bodyLength, float bodyWidth,
+        float exhaustLength, float exhaustWidth, Color bodyColor, Color exhaustColor)
+    {
+        float degrees = angleRad * 180f / MathF.PI;
+
+        if (exhaustLength > 0f)
+        {
+            // The plume's nozzle edge sits a little *inside* the body's tail: two shapes that only
+            // touch edge to edge read as two objects flying in formation, however carefully the
+            // arithmetic looks on paper.
+            Vector2 aft = new Vector2(cx, cy) - new Vector2(MathF.Sin(angleRad), -MathF.Cos(angleRad))
+                * (bodyLength * 0.5f - exhaustLength * ExhaustBurialInsideTail);
+            Raylib.DrawTexturePro(MissileExhaust, new Rectangle(0, 0, ExhaustWidth, ExhaustHeight),
+                new Rectangle(aft.X - exhaustWidth * 0.5f, aft.Y - exhaustLength * 0.5f, exhaustWidth, exhaustLength),
+                new Vector2(exhaustWidth * 0.5f, exhaustLength * 0.5f), degrees, exhaustColor);
+        }
+
+        Raylib.DrawTexturePro(MissileBody, new Rectangle(0, 0, BodyWidth, BodyHeight),
+            new Rectangle(cx - bodyWidth * 0.5f, cy - bodyLength * 0.5f, bodyWidth, bodyLength),
+            new Vector2(bodyWidth * 0.5f, bodyLength * 0.5f), degrees, bodyColor);
+    }
 }

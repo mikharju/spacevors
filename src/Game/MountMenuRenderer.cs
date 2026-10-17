@@ -243,6 +243,14 @@ public static class MountMenuRenderer
             return;
         }
 
+        // A guided mount is a rack: a square in the hull frame (the menu draws the hull unrotated), not
+        // a point that tracks where the gun happens to be looking.
+        if (WeaponType.FromName(marker.WeaponName)?.Stats.Homing == true)
+        {
+            RenderHelpers.DrawRackMarker(center.X, center.Y, marker.MarkerRadius, 0f, hovered ? Palette.Accent : Palette.TurretMounted);
+            return;
+        }
+
         float aimDeg = Angle.ToDeg(marker.AimAngle);
         RenderHelpers.DrawTurretMarker(center.X, center.Y, marker.MarkerRadius, aimDeg, hovered ? Palette.Accent : Palette.TurretMounted);
     }

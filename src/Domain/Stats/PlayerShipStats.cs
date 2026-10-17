@@ -112,6 +112,9 @@ public readonly record struct ShipType(
         ShadowCarrying(WeaponType.RailGun),
         ShadowCarrying(WeaponType.AcidBubbleSpray),
         ShadowCarrying(WeaponType.InterceptorTurret),
+        ShadowCarrying(WeaponType.SeekerPod),
+        ShadowCarrying(WeaponType.Swarmlet),
+        ShadowCarrying(WeaponType.HavocTorpedo),
         // LoadTestWeapon's arc is the perf scenario's, so it keeps its own layout.
         ShadowCarrying(WeaponType.LoadTestWeapon, WeaponLoadout.LoadTestWeapon),
     ];

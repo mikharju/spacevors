@@ -25,6 +25,7 @@ public class ShipRosterTest
             WeaponType.Cyclotron.Name, WeaponType.GravitonBurst.Name, WeaponType.FlakCurtain.Name,
             WeaponType.MachineGun.Name, WeaponType.Shotgun.Name, WeaponType.RailGun.Name,
             WeaponType.AcidBubbleSpray.Name, WeaponType.InterceptorTurret.Name,
+            WeaponType.SeekerPod.Name, WeaponType.Swarmlet.Name, WeaponType.HavocTorpedo.Name,
             WeaponType.LoadTestWeapon.Name,
         ];
 
@@ -94,6 +95,21 @@ public class ShipRosterTest
             bool fired = em.GetEntitiesWithComponents<Ammo>().Count() > 0
                 || em.GetEntitiesWithComponents<LaserBeam>().Count() > 0;
             Assert.True(fired, $"{ship.Name} started a game but fired nothing");
+
+            // A guided gun's rounds leave with their lock on the rock the bench clicked: that lock is
+            // the whole of its guidance, so a missile fired without one is a dumb round in a fancy skin.
+            var gun = Assert.Single(ship.Loadout.Mounts).Weapon;
+            if (gun.Stats.Homing)
+            {
+                int lockedOnTarget = 0;
+                foreach (var (missileEntity, missile) in em.GetEntitiesWithComponents<Missile>())
+                {
+                    Assert.Equal(target, missile.LockedTarget);
+                    lockedOnTarget++;
+                }
+
+                Assert.Equal(gun.Stats.PelletCount, lockedOnTarget);
+            }
         }
     }
 }

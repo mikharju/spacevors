@@ -34,6 +34,8 @@ public static class WorldRenderer
         RenderTimings.Pass("world.asteroids");
         DrawAmmo(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.ammo");
+        DrawMissiles(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.missiles");
         DrawLaserBeams(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.beams");
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
@@ -134,6 +136,10 @@ public static class WorldRenderer
     {
         foreach (var (entity, ammo, pos) in em.GetEntitiesWithComponents<Ammo, Position>())
         {
+            // A guided round is drawn as a body and an exhaust flame in its own pass: which way it is
+            // pointed is the information the player has to read, and a streak cannot carry that.
+            if (em.HasComponent<Missile>(entity)) continue;
+
             // Same segment the collision system swept: fast bullets draw as streaks.
             Vector2 from = pos.Value - ammo.Velocity * GameSession.FixedDeltaTime;
             var (fromX, fromY) = RenderHelpers.ToScreen(from, camX, camY, windowWidth, windowHeight);
@@ -158,6 +164,51 @@ public static class WorldRenderer
                     color);
         }
     }
+
+    // A guided round: body, then the exhaust flame hanging off its aft end. The flame is drawn first so
+    // the body sits on top of it, and both have floors — a missile the player cannot see is a missile
+    // the player cannot dodge.
+    private static void DrawMissiles(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (_, missile, ammo, pos) in em.GetEntitiesWithComponents<Missile, Ammo, Position>())
+        {
+            // Body length scales with the collision radius, so the 4 px pod round and the 6 px torpedo
+            // read as the different objects their stats say they are.
+            float bodyLength = ammo.Radius * MissileBodyStretch;
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+            if (RenderHelpers.IsOffScreen(cx, cy, bodyLength * (1f + MissileExhaustHardTurn), windowWidth, windowHeight)) continue;
+
+            float steering = Math.Clamp(missile.Steering, 0f, 1f);
+            float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * steering);
+
+            Color body = AmmoColorOf(ammo.Color);
+            // The turn the guidance actually applied makes the flame longer, whiter and brighter: the
+            // player reads "this round is committed that way" off the same number the sim computed.
+            Color flame = MixTowardWhite(body, ExhaustWhiteMix + ExhaustHardTurnMix * steering);
+            flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * steering);
+
+            ShapeSprites.DrawMissile(cx, cy, Angle.Of(ammo.Velocity),
+                bodyLength, ammo.Radius,
+                exhaustLength, ammo.Radius * ExhaustWidthScale,
+                body, flame);
+        }
+    }
+
+    const float MissileBodyStretch = 2.5f;
+    const float MissileExhaustCruise = 0.45f, MissileExhaustHardTurn = 1f;
+    const float ExhaustWidthScale = 1.5f;
+    // The flame stays the body's colour when cruising and only washes out toward white when the round
+    // is swinging hard, so the plume never turns grey.
+    const float ExhaustWhiteMix = 0.25f, ExhaustHardTurnMix = 0.45f;
+    // Cruise alpha stays high: a guided round the player cannot see is a guided round the player
+    // cannot dodge, so the flame dims with the turn but never goes faint.
+    const byte ExhaustCruiseAlpha = 210;
+
+    static Color MixTowardWhite(Color color, float amount) => new(
+        (byte)(color.R + (255 - color.R) * amount),
+        (byte)(color.G + (255 - color.G) * amount),
+        (byte)(color.B + (255 - color.B) * amount),
+        color.A);
 
     public static Color AmmoColorOf(AmmoColor color) => color switch
     {
@@ -257,7 +308,7 @@ public static class WorldRenderer
 
         foreach (var (entity, slot) in em.GetEntitiesWithComponents<TurretSlot>())
         {
-            bool mounted = em.TryGetComponent<Turret>(entity, out _);
+            bool mounted = em.TryGetComponent<Turret>(entity, out var turret);
             // A mounted turret rides with the hull via SyncTurrets; an empty mount is just its slot.
             Vector2 world = mounted
                 ? em.GetComponent<Position>(entity).Value
@@ -273,7 +324,12 @@ public static class WorldRenderer
                 continue;
             }
 
-            RenderHelpers.DrawTurretMarker(cx, cy, radius, Angle.ToDeg(em.GetComponent<Rotation>(entity).Angle), Palette.TurretMounted);
+            // A guided mount is a rack: it never swings to face anything, so its marker is a square in
+            // the hull frame instead of the aim-following point.
+            if (turret.Weapon.Homing)
+                RenderHelpers.DrawRackMarker(cx, cy, radius, Angle.ToDeg(hullRotation), Palette.TurretMounted);
+            else
+                RenderHelpers.DrawTurretMarker(cx, cy, radius, Angle.ToDeg(em.GetComponent<Rotation>(entity).Angle), Palette.TurretMounted);
         }
     }
 

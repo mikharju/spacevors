@@ -59,6 +59,22 @@ internal static class RenderHelpers
     const float MarkerTailHalfWidth = 0.9f;
     const float MarkerTailInset = 0.25f;
 
+    // A missile rack: a square riding in the hull frame instead of a point toward the target. A guided
+    // round picks its own bearing once it is away from the mount, so a marker that swung to aim would
+    // claim the mount is steering something it does not. The arc sector is still drawn underneath:
+    // what the rack may cover is still a property of the mount.
+    public static void DrawRackMarker(float cx, float cy, float radius, float hullAngleDeg, Color color)
+    {
+        float half = radius * RackMarkerHalfSide;
+        Raylib.DrawRectanglePro(
+            new Rectangle(cx - half, cy - half, half * 2f, half * 2f),
+            new System.Numerics.Vector2(half, half),
+            hullAngleDeg,
+            color);
+    }
+
+    const float RackMarkerHalfSide = 0.8f;
+
     static System.Numerics.Vector2 Rotated(float cx, float cy, float x, float y, float angle)
         => new(cx + x * MathF.Cos(angle) - y * MathF.Sin(angle),
                cy + x * MathF.Sin(angle) + y * MathF.Cos(angle));
