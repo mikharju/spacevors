@@ -9,12 +9,19 @@ namespace Spacevors.Domain.Systems;
 public readonly record struct ThreatSnapshot(
     float Elapsed,
     int Tier,
+    // Which rung of the armament ladder the clock has reached (EnemyShipStats.CompositionTierFor):
+    // the stat tier above says how hard individuals are, this says what appears.
+    int CompositionTier,
     int Ships,
     // Ships standing within their own gun range of the hull: the ones that can hit it right now.
     int ShipsInRing,
     // Their summed fire rate × pellets × damage per second, before any of it misses.
     float IncomingDps,
     int EnemyRounds,
+    // Guided rounds the enemy has in the air, against what the ladder allows (plans/MISSILES.md R22):
+    // the pair says whether late pressure is arriving as mixing or as volume.
+    int EnemyMissiles,
+    int MissileCap,
     // The same sum for the guns mounted on the player's hull.
     float PlayerDps,
     int Health,
@@ -34,7 +41,7 @@ public static class ThreatMeter
         var playerPos = playerTuple.Value2.Value;
         var health = playerTuple.Value3;
 
-        int ships = 0, shipsInRing = 0, enemyRounds = 0, mines = 0, smallRocks = 0;
+        int ships = 0, shipsInRing = 0, enemyRounds = 0, enemyMissiles = 0, mines = 0, smallRocks = 0;
         float incomingDps = 0f, playerDps = 0f;
 
         foreach (var (entity, ship, pos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
@@ -61,6 +68,9 @@ public static class ThreatMeter
         foreach (var (_, ammo) in view.GetEntitiesWithComponents<Ammo>())
             if (ammo.IsEnemy) enemyRounds++;
 
+        foreach (var (_, _, ammo) in view.GetEntitiesWithComponents<Missile, Ammo>())
+            if (ammo.IsEnemy) enemyMissiles++;
+
         // A player turret lives on a hull slot, so requiring the slot filters out the enemy guns.
         foreach (var (_, turret, _) in view.GetEntitiesWithComponents<Turret, TurretSlot>())
             if (!turret.IsEnemy)
@@ -75,13 +85,18 @@ public static class ThreatMeter
         foreach (var (_, asteroid) in view.GetEntitiesWithComponents<Asteroid>())
             if (asteroid.IsSmall) smallRocks++;
 
+        int compositionTier = EnemyShipStats.CompositionTierFor(view.ElapsedTime);
+
         return new ThreatSnapshot(
             view.ElapsedTime,
             EnemyShipStats.TierFor(view.ElapsedTime),
+            compositionTier,
             ships,
             shipsInRing,
             incomingDps,
             enemyRounds,
+            enemyMissiles,
+            EnemyShipStats.MissileCapFor(compositionTier),
             playerDps,
             health.Current,
             health.Max,

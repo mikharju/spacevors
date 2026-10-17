@@ -220,8 +220,11 @@ public sealed class GameSession
         _threatNextAt = _em.ElapsedTime + ThreatReadoutInterval;
 
         var s = ThreatMeter.Measure(_worldView);
-        _threatLine = $"[THREAT] t={s.Elapsed:F0}s tier={s.Tier} ships={s.Ships} ring={s.ShipsInRing} " +
-                      $"rounds={s.EnemyRounds} in={s.IncomingDps:F1}/s out={s.PlayerDps:F1}/s " +
+        // `tier=` is the stat tier and the armament rung it has reached; `missiles=` is the enemy's guided
+        // rounds in the air over what the ladder allows, which is the number the missile knobs are tuned
+        // against.
+        _threatLine = $"[THREAT] t={s.Elapsed:F0}s tier={s.Tier}/{s.CompositionTier} ships={s.Ships} ring={s.ShipsInRing} " +
+                      $"rounds={s.EnemyRounds} missiles={s.EnemyMissiles}/{s.MissileCap} in={s.IncomingDps:F1}/s out={s.PlayerDps:F1}/s " +
                       $"hp={s.Health}/{s.MaxHealth} lvl={s.Level} mines={s.Mines} rocks={s.SmallRocks}";
         DiagnosticLogger.LogThreat(_threatLine);
     }
