@@ -2,13 +2,13 @@
 
 Plan for fixing the inverted difficulty curve (2026-09-12).
 
-## Status: P1–P5 implemented (commits `difficulty P4` … `difficulty P5`)
+## Status: P1–P6 implemented (P6 as the armament ladder — see R2.12)
 
 **Round 2 planned 2026-10-16, its individual-stat knobs implemented the same day:** see "Round 2" at
 the end of this file — the knobs beyond hp/damage/fire rate (stand-off range, ammo speed, small-ship
 speed, composition, tracking, pellets, concurrency, mines, reward side), with the numbers and the rules
-they must obey. P6 (type unlock) and P7 (surges) from above are still unimplemented and are folded into
-that plan.
+they must obey. P7 (surges) from above is still unimplemented; P6 landed with missiles as the armament
+ladder (R2.12).
 
 Deviations from the proposed values, and why:
 
@@ -16,7 +16,11 @@ Deviations from the proposed values, and why:
 - **P4**: kept 6 initial ships and took the plan's primary option (widen band) at 2400–5000 instead of 2400–6000, to keep the cull distance sane; mines 15 → 9 (mid-range); ship `InitialDelay` 5 → 9 s (mid-range).
 - **P3**: plan gave no values — chose `ReferenceSpeed = 100 px/s`, `MaxFactor = 3`. The interval is *divided* by the factor (the stated effect — constant density per unit distance — requires faster spawning at higher speed).
 - **P5**: "capped multipliers" had no value — capped via `MaxTier = 10` (stats stop growing after 10 minutes). Damage scales on `Turret.Weapon.Damage` (base 1), the only enemy damage that actually hits the player; the dead `EnemyShip.Damage` field was removed.
-- **P6/P7**: not implemented (out of scope for this work).
+- **P6**: landed as the **armament ladder** rather than a type-unlock schedule: the three hulls keep
+  rolling from t=0 and what escalates is what they carry (plans/MISSILES.md §9, and "R2.12 The armament
+  ladder" at the end of this file). `EnemyShipStats.PickComposition` is one weighted draw over
+  hull × unlocked armament, so the composition unlock and the weight drift are the same mechanism — which
+  is also the composition drift round 2 was holding back. P7 (surges) is still unimplemented.
 
 Verification: unit tests per item (`EnemyShipCullTest`, `EnemySpeedScalingTest`, `SpawnIntervalScalingTest`, `EnemyTierStatsTest`) plus existing `WorldRngTest` (determinism) and `PerformanceBenchmark`. The headless "enemies within 1000 px" diagnostic log from the verification section was not added — no Xvfb in this environment to observe it; add if a manual threat-curve check is wanted.
 
@@ -129,8 +133,9 @@ logged in every run and drawn on the bottom edge with diagnostics on), R2.3 (per
 drift with the D1 ceiling), R2.4 (ammo speed +1%/tier with the D3 ceiling; scatter left alone, as the
 plan said: one, not both), R2.5 (Interceptor 90→120, Default 65→85, HeavyCannon flat;
 `PlayerSpeedFactor` left at 0.75 pending playtest), and the tracking drift from R2.6 item 5
-(+0.03 rad/s per tier). Not done: R2.6 items 1-4 and 6-11 (composition/P6, pellets, concurrency,
-mines, reward side, elites, spawn geometry, behaviour, difficulty selection), the D5 assertion
+(+0.03 rad/s per tier). Not done: R2.6 items 1-4 and 6-11 (pellets, concurrency, mines, reward side,
+elites, spawn geometry, behaviour, difficulty selection) — item 4's composition drift landed later, as
+the armament ladder in R2.9 — the D5 assertion
 ("one hit ≤ 1/3 of a typical late hull") — there is no data quantity for a *typical late* hull, so the
 test asserts D6 (the TTK ceiling) instead and the flat `DamageAdd` instead — and the R2.10 order
 shifted: the readout and the individual-knobs landed, composition (their pacing baseline) has not.
@@ -308,3 +313,63 @@ the rim clear, and no single hit over D5. Every knob in R2.6 becomes readable in
   the TTK rule re-checked?
 - Do you want the reward-side knob in the same pass, or is difficulty only about enemies?
 - Should the Interceptor stop shooting entirely and become a pure rammer once its range drops to 550?
+
+## R2.12 The armament ladder (implemented with missiles, plans/MISSILES.md)
+
+Round 2 asked whether the late game should escalate as a **busier world** or as **deadlier
+individuals**, and whether `MaxTier = 10` should be kept while composition grows. Missiles answer both:
+the stat ladder stays frozen at tier 10 — hp, damage and fire rate must stop compounding against the
+player's upgrades — and a second axis takes over what the player *sees*.
+
+**Two tier axes, deliberately separate** (`EnemyShipStats`):
+
+| | `TierFor` | `CompositionTierFor` |
+|---|---|---|
+| drives | hp, damage, fire rate, range, speed, ammo speed, turn rate | which armaments roll, how many guided rounds may be in the air |
+| cap | `MaxTier = 10` (10 minutes) | `MaxCompositionTier = 20` (20 minutes) |
+
+**The ladder.** A hull keeps its hull — radius, speed, hp, chase AI, firing ring — and gains an armament
+`Guns` / `Missiles` / `GunsAndMissiles`, drawn from rows of `(armament, min composition tier, weight)`
+written on the hull itself:
+
+| Comp. tier | Clock | `enemy-1` (r 20) | `interceptor` (r 45) | `heavy-cannon` (r 78) | Rounds in air |
+|---|---|---|---|---|---|
+| 0-2 | 0:00-3:00 | guns | guns | guns | 0 |
+| 3-4 | 3:00-5:00 | guns | guns / missiles ~30 % | guns | 3 |
+| 5-7 | 5:00-8:00 | guns | even mix | guns | 3 |
+| 8-9 | 8:00-10:00 | guns | even mix | guns / guns+missiles 50 % | 4 |
+| 10-13 | 10:00-14:00 | guns | even mix | guns+missiles ~80 % | 5 |
+| 14-19 | 14:00-20:00 | guns | even mix | guns+missiles | 6 |
+| 20+ | capped | guns | even mix | guns+missiles | 7 |
+
+Why that shape: the middle hull is the first carrier (it already stands off, and 7 hp means it can die
+before it launches, so a fuse-armed body reads as a duellist rather than a lottery); the large hull gets
+the rack last, because a missile on the slow long firing line reads as the execution of a role the
+player already knows; the swarmer never carries one, because with up to 100 live hulls it is the one
+armament no weight table tames.
+
+**Reach honesty (R21).** A rack launches from `FiringRange × 1.4` — Interceptor 770-980 px, HeavyCannon
+980-1330 px — capped by `MaxMissileFiringRange = 1450`, which is under the player's longest gun (1700).
+The chase AI still brakes the hull at its own `FiringRange` whatever it carries, so arming a hull changes
+nothing about how it flies: reach is bought by the weapon, never by a new hull behaviour. That is also
+why enemy rounds stay at 165-250 px/s — a fuse thrown from 1330 px is a long, visible window.
+
+**The cap (R22)** is world-wide and counted live (`Ammo` + `Missile` + `IsEnemy`), because nothing has to
+desync when a round is shot down, finds its target or runs out of fuse. Per-hull reload (~1 round / 3 s)
+is the soft knob under it. `missiles=in-flight/cap` is printed in the `[THREAT]` row so the ladder is
+tuned against a number instead of a feeling.
+
+**Damage honesty.** A rack's damage is `BaseDamage + tier/3` (+1 for the large hull's role) against the
+bullet's `tier/2`: a steering round is the most certain delivery the enemy ever gets, and certainty is
+paid for in damage, exactly as R1/R9 price it for the player. The rule is asserted only over the
+composition tiers at which the armament can actually roll, which is the honest version of the claim.
+
+**What the player has for an answer** — the reason the ceilings are affordable: outrun it (165-250 px/s
+can never catch a hull flying faster), out-turn it, **shoot it down** (1-3 hp, and every gun and beam on
+the hull is point defence — `FlakCurtain`'s 9 px disc is the cheapest), kill the launcher, or let the
+fuse run out.
+
+**Cost of the whole thing**: no new hull, art, AI branch or spawn rule. Two components on the hull
+(`MissileWeapon`, `MissileCooldown`), one Action-phase system, and the composition draw. The pinned
+scenarios run unarmed, so they can only prove no regression — they did (ammo-spray 1.31 ms,
+impact-storm 2.11 ms medians).

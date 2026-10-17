@@ -2,6 +2,31 @@
 
 Plan only: no code changed here. This is the first item under PLAN.md "Near future".
 
+## Status: implemented (2026-10-17), 8 commits, 22 new tests
+
+Everything below shipped as planned, in the commit order of §13. Where the code ended up different:
+
+- **The rule numbers moved.** This plan drafted its rules as R9-R16, which collided with the slew-rate,
+  hull-size, identity and colour rules already numbered R9-R14 in `plans/WEAPON_BALANCE.md`. They are now
+  **R15-R22** (15 certainty, 16 turn radius, 17 round budget, 18 volley privilege, 19 damageable round,
+  20 monotone ladder, 21 honest reach, 22 cap ladder) and this file has been renumbered to match. The
+  tests live in `WeaponBalanceTest`, `MissileCollisionTest`, `EnemyMissileFiringTest` and
+  `EnemyMissileLadderTest`.
+- **`+1 missile` growth uses a named budget**, `WeaponStats.HomingRoundBudget = 4`, rather than restating
+  R17's number at three call sites, and the card is withdrawn at the ceiling by the same mechanism that
+  killed the `ProjectileSpeed`-on-a-beam card.
+- **The large hull's top rung is ~80 %, not "~100 %"** of its spawns (4:1 over gun-only heavies at
+  composition tier 10), so a bare heavy stays a rare sight instead of disappearing from the roster.
+- **Enemy rack launches skip the gun pass's ±15 % speed jitter.** On a guided round the speed *is* the
+  turn radius and the fuse reach, so a jittered round would be a different missile than the one the player
+  just read. `AmmoSpawnOffset`, hull clearance, inherited velocity and the arc gate (`FiringArc`) are
+  shared with the gun pass instead of copied.
+- **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
+  prove no regression (ammo-spray sim median 1.31 ms, impact-storm 2.11 ms) and nothing about the cost of
+  live missiles. That is the open measurement.
+- **Accepted edge from §11 still open:** `AmmoSpawnOffset = 20` means a missile launched beside an adjacent
+  hull detonates on its first sweep. An arming distance is the fix if it ever reads as unfair.
+
 Decisions already fixed (by the request):
 - **Same mounts as turrets.** A missile gun is just a `WeaponType` with a `Size`, mounted into an existing hull slot through `TurretMount`. No new mount concept, no new slot kind.
 - **Enemy missiles arrive as a difficulty ladder on the existing hulls**: gun-only first, then a few missile-only variants, then an even mix, and later the large hull carries guns *and* missiles. Slow enemy missiles only; fast missiles stay player-only, enforced by ceilings.
@@ -147,7 +172,7 @@ One accepted edge: the muzzle sits 20 px out (`AmmoSpawnOffset`), so a missile f
 - New `UpgradeOption.MissileHealth`, `Additive: 1`, per weapon like `Damage`; stored as `WeaponStats.MissileHealth` and stamped on every launched round as `Health(max, max)`, so a card paid for mid-flight never has to touch a round already in the air.
 - Offered only for homing weapons — the same exclusion that keeps `ProjectileSpeed` off hitscan guns, so no dead cards enter the hand.
 
-This is the half of the design that makes the pricing honest: a guided round nobody can shoot down is a *guaranteed* hit, and R9 would have to price it at its ceiling. With shoot-down, the player gets a second thing to do when a lock lands — spend gun DPS on the round instead of the hull — and `FlakCurtain`'s 9 px disc at 600 px finally has a job it is uniquely good at (Q12).
+This is the half of the design that makes the pricing honest: a guided round nobody can shoot down is a *guaranteed* hit, and R15 would have to price it at its ceiling. With shoot-down, the player gets a second thing to do when a lock lands — spend gun DPS on the round instead of the hull — and `FlakCurtain`'s 9 px disc at 600 px finally has a job it is uniquely good at (Q12).
 
 ## 6. What variants are possible — the catalogue
 
@@ -158,7 +183,7 @@ Axes, with the code each one costs:
 | **Seeker** | lock-on at fire (v1) · retarget to nearest when the lock dies · "seek nearest" with no lock at all · dumb-fire ballistic (no seeker) | retarget ≈ 3 lines in guidance; seek-nearest = a grid query per round (adds hot-path cost); dumb-fire = zero new code, it is just a slow bullet |
 | **Steering law** | pure pursuit (v1) · proportional navigation · dive-from-the-side (fly a bearing, then turn in) | PN ≈ 10 lines and buys real intercepts on fast cross-courses; the dive pattern is a two-phase heading in guidance |
 | **Warhead** | single hull hit (v1) · proximity fuse (detonate within N px) · splash/AoE on impact · cluster (splits into bullets at the fuse or on hit) | proximity ≈ 5 lines in guidance + a damage hand-off; splash/AoE = a new grid-circle damage pass in `CollisionSystem` (the real new machinery); cluster = spawn-on-expire hook in `AmmoLifetimeSystem` |
-| **Salvo** | 1 · 2 · 3–4 per volley (=`PelletCount`) · and whether a `FireRate` card grows it | the growth choice is one `SalvoGrows` flag per weapon; the ceiling is the existing R11 budget (§7) |
+| **Salvo** | 1 · 2 · 3–4 per volley (=`PelletCount`) · and whether a `FireRate` card grows it | the growth choice is one `SalvoGrows` flag per weapon; the ceiling is the existing R17 budget (§7) |
 | **Counterplay** | shoot it down (v1: bullets and beams, cross-faction only) · outrun it · out-turn it · kill the launcher · break the lock | shoot-down is one grid kind + one branch (§5); the other four are already free |
 | **Speed profile** | constant (v1) · boost then cruise | a 2-line `speed(t)` in guidance; the exhaust already visualises it (§10) |
 | **Supply** | unlimited (v1) · magazine + reload | new component + new UI, and it is a *resource* mechanic the rest of the game has none of — out of scope |
@@ -184,7 +209,7 @@ Why these three identities:
 - **HavocTorpedo** is the anti-heavy gun: a big round (10 damage, **3 hp** so a swarm of interceptor fire does not brush it aside) that punishes the slow, straight-flying `HeavyCannon`, and that a fast `Interceptor` simply outruns or out-turns (255 px turn radius vs the Interceptor's ~92 px). Poor `TurnSpeed` on the mount (slow slew) so the big slot costs twice.
 - **Swarmlet** is the one that swarms: three cheap 1 hp rounds at aura range, and the **only** missile whose volley grows with cards. That is where the request's warning bites — see the growth rule below.
 
-All three pass the existing table rules: R6 reach (`300 × 0.85 × 4.0 = 1020 ≥ 900`, `200 × 0.85 × 8.0 = 1360 ≥ 1350`, `350 × 0.85 × 2.5 = 744 ≥ 600`), R7 round budget (1.2 / 0.7 / 2.4 rounds/s per mount, against today's 12), R5 per-shot damage (3, 2, and the torpedo as the second "big round" exception alongside `RailGun`), and the new R9–R11 below.
+All three pass the existing table rules: R6 reach (`300 × 0.85 × 4.0 = 1020 ≥ 900`, `200 × 0.85 × 8.0 = 1360 ≥ 1350`, `350 × 0.85 × 2.5 = 744 ≥ 600`), R7 round budget (1.2 / 0.7 / 2.4 rounds/s per mount, against today's 12), R5 per-shot damage (3, 2, and the torpedo as the second "big round" exception alongside `RailGun`), and the new R15–R17 below.
 
 ### How each missile grows (the request's warning)
 
@@ -192,22 +217,22 @@ Today `ApplyUpgrade` treats a `FireRate` card as "+1 shot" for **any** gun that 
 
 - `WeaponStats.SalvoGrows` makes the choice **per weapon**, defaulting to today's behaviour. **SeekerPod and HavocTorpedo set it false** — their `FireRate` card is a real rate increase (×1.15), which is also what makes them feel like a gun being tuned rather than a spell being stacked.
 - **Swarmlet keeps `SalvoGrows: true`**: +1 missile per card is its whole upgrade fantasy, and the card text already says "+1 shot".
-- The growth **ceiling is an existing rule, not a new number**: a salvo may not grow past what R11 allows (`FireRate × PelletCount ≤ 4`), so Swarmlet stops at 5 per volley. `LevelUpSystem` then stops offering the card at the ceiling — the same shape as the hitscan exclusion that killed the `ProjectileSpeed`-on-a-beam dead card, so a full hand never fills with cards that do nothing.
+- The growth **ceiling is an existing rule, not a new number**: a salvo may not grow past what R17 allows (`FireRate × PelletCount ≤ 4`), so Swarmlet stops at 5 per volley. `LevelUpSystem` then stops offering the card at the ceiling — the same shape as the hitscan exclusion that killed the `ProjectileSpeed`-on-a-beam dead card, so a full hand never fills with cards that do nothing.
 - `Range` still multiplies the fuse (which is what makes a long-range missile physically reach), and `Damage`/`ProjectileSpeed` do what they say. None of them touch the salvo.
 
 ## 8. Balance rules to add (extend `plans/WEAPON_BALANCE.md` + `WeaponBalanceTest`)
 
-- **R9 — certainty is the most expensive delivery.** A homing gun's raw DPS must be **≤ the weakest non-homing gun in its reach band (±15 %)**. Today: 600 band → RippleCutter 8 (Swarmlet 4.8 ✓); 900 band → InterceptorTurret 9 (SeekerPod 3.6 ✓); 1350 band → PrismLance 8.4 (HavocTorpedo 7.0 ✓). Homing is the *other* side of R1: a beam cannot miss on travel, a missile cannot miss on aim. Cross-fire (R14) is what keeps that ceiling from having to be lower still.
-- **R10 — a missile must not be a guaranteed hit.** Its turn radius `AmmoSpeed / HomingTurnRate` must be **larger** than the turn radius of the fastest thing it hunts (a tier-10 Interceptor turns at ~92 px), so a target that flies well can still break the lock geometry. 114 px, 255 px and 118 px clear it.
-- **R11 — missile salvo budget.** `FireRate × PelletCount ≤ 4` rounds/s for a homing gun (stricter than R7's 12), because a missile's fuse is 2.5–8 s and live rounds = rate × fuse. This is also the ceiling the salvo-growth rule borrows (§7).
-- **R13 — salvo growth is a per-weapon privilege.** A `FireRate` card grows a volley only where `SalvoGrows` is true, and never past R11. The failure this guards against is silent: four cards on a 1-missile gun would otherwise make it the swarm gun, changing its identity and multiplying live entities.
-- **R14 — a missile is damageable, and only by the other side.** It carries `Health` (1 hp small … 3 hp large at base), it is hit only by opposing-faction rounds and beams, a hit consumes the probing round and costs its own damage, and no bullet-vs-bullet or same-faction pass exists. Its hp may grow only through the `MissileHealth` card.
+- **R15 — certainty is the most expensive delivery.** A homing gun's raw DPS must be **≤ the weakest non-homing gun in its reach band (±15 %)**. Today: 600 band → RippleCutter 8 (Swarmlet 4.8 ✓); 900 band → InterceptorTurret 9 (SeekerPod 3.6 ✓); 1350 band → PrismLance 8.4 (HavocTorpedo 7.0 ✓). Homing is the *other* side of R1: a beam cannot miss on travel, a missile cannot miss on aim. Cross-fire (R19) is what keeps that ceiling from having to be lower still.
+- **R16 — a missile must not be a guaranteed hit.** Its turn radius `AmmoSpeed / HomingTurnRate` must be **larger** than the turn radius of the fastest thing it hunts (a tier-10 Interceptor turns at ~92 px), so a target that flies well can still break the lock geometry. 114 px, 255 px and 118 px clear it.
+- **R17 — missile salvo budget.** `FireRate × PelletCount ≤ 4` rounds/s for a homing gun (stricter than R7's 12), because a missile's fuse is 2.5–8 s and live rounds = rate × fuse. This is also the ceiling the salvo-growth rule borrows (§7).
+- **R18 — salvo growth is a per-weapon privilege.** A `FireRate` card grows a volley only where `SalvoGrows` is true, and never past R17. The failure this guards against is silent: four cards on a 1-missile gun would otherwise make it the swarm gun, changing its identity and multiplying live entities.
+- **R19 — a missile is damageable, and only by the other side.** It carries `Health` (1 hp small … 3 hp large at base), it is hit only by opposing-faction rounds and beams, a hit consumes the probing round and costs its own damage, and no bullet-vs-bullet or same-faction pass exists. Its hp may grow only through the `MissileHealth` card.
 
 Recorded with the difficulty rules in `plans/DIFFICULTY_SCALING.md` and asserted in `EnemyDifficultyTest` (§9):
 
-- **R12 — the escalation ladder is monotone.** Gun-only precedes missile-only, which precedes guns+missiles, on any one hull; a hull's missile share may only rise with tier; and an enemy missile never exceeds the player's slowest round in speed nor `MaxMissileTurnRate` in steering. These are the lines that keep the request's rule — *"a few missile-only variants … later an even mix … later both"* — from drifting into a missile storm during a later tuning pass.
-- **R15 — an enemy missile can physically cross the ring it launches from.** `launch speed × fuse ≥ launch ring` at every tier (the enemy twin of the player's R6), with `MaxMissileFiringRange = 1450` as the outer bound.
-- **R16 — the in-flight enemy missile cap is a slow, monotone ladder** tied to the composition tier, not to the stat ladder: 0 until tier 3, 3 through tier 7, **5 at tier 10**, **7 from tier 20**. It is a ceiling, not a floor: point defence and killing launchers are what keep the real number below it.
+- **R20 — the escalation ladder is monotone.** Gun-only precedes missile-only, which precedes guns+missiles, on any one hull; a hull's missile share may only rise with tier; and an enemy missile never exceeds the player's slowest round in speed nor `MaxMissileTurnRate` in steering. These are the lines that keep the request's rule — *"a few missile-only variants … later an even mix … later both"* — from drifting into a missile storm during a later tuning pass.
+- **R21 — an enemy missile can physically cross the ring it launches from.** `launch speed × fuse ≥ launch ring` at every tier (the enemy twin of the player's R6), with `MaxMissileFiringRange = 1450` as the outer bound.
+- **R22 — the in-flight enemy missile cap is a slow, monotone ladder** tied to the composition tier, not to the stat ladder: 0 until tier 3, 3 through tier 7, **5 at tier 10**, **7 from tier 20**. It is a ceiling, not a floor: point defence and killing launchers are what keep the real number below it.
 
 ## 9. Enemy missiles: an armament ladder, not a new monster
 
@@ -260,13 +285,13 @@ public readonly record struct EnemyArmamentRow(EnemyArmament Armament, int MinTi
 | Interceptor, `Missiles` | 165 px/s (+4/tier, cap 250) | 70°/s | 6 s | 770–980 px | 2 | `BaseDamage + tier/3` | 1 |
 | HeavyCannon, `GunsAndMissiles` | 200 px/s (+5/tier, cap 250) | 50°/s | 6 s | 980–1330 px | 3 | `BaseDamage + tier/3 + 1` | 1 |
 
-R15 holds at both ends: at tier 0 the Interceptor crosses `165 × 6 = 990 ≥ 770`, at tier 10 the HeavyCannon crosses `250 × 6 = 1500 ≥ 1330`. The 1.4 multiplier is what makes the launch ring reachable at all, and it is the number to touch first if the fuse ever needs shortening.
+R21 holds at both ends: at tier 0 the Interceptor crosses `165 × 6 = 990 ≥ 770`, at tier 10 the HeavyCannon crosses `250 × 6 = 1500 ≥ 1330`. The 1.4 multiplier is what makes the launch ring reachable at all, and it is the number to touch first if the fuse ever needs shortening.
 
 ### Ceilings, asserted in `EnemyDifficultyTest`
 
 - **speed ≤ `MaxAmmoSpeed` (250)** — the existing readability ceiling now covers missiles too, and 165–250 sits inside it.
 - **turn rate ≤ a new `MaxMissileTurnRate = 90°/s`**, fuse **≤ 6 s**, and **launch ring ≤ `MaxMissileFiringRange = 1450`** — under the player's longest auto-target band (1700), so nothing shoots at the player from a distance no player gun can answer. Fast player missiles stay the player's because these lines make "enemy missile" and "fast missile" mutually exclusive by construction.
-- **missile damage ≤ bullet damage at the same stat tier.** Missiles get their own, slower ladder — `MissileDamageAdd = tier / 3` against the bullet's `tier / 2` — because a steering round is the most certain delivery the enemy ever gets, and certainty is paid for in damage, exactly as R1/R9 price it for the player. The HeavyCannon's `+1` hull-role premium keeps that inequality true only because the guns+missiles armament cannot appear before composition tier 8: at tier 8 the missile lands 4 against the bullet's 5. The test asserts the rule over the tiers where each armament can actually roll, which is the honest version of the claim.
+- **missile damage ≤ bullet damage at the same stat tier.** Missiles get their own, slower ladder — `MissileDamageAdd = tier / 3` against the bullet's `tier / 2` — because a steering round is the most certain delivery the enemy ever gets, and certainty is paid for in damage, exactly as R1/R15 price it for the player. The HeavyCannon's `+1` hull-role premium keeps that inequality true only because the guns+missiles armament cannot appear before composition tier 8: at tier 8 the missile lands 4 against the bullet's 5. The test asserts the rule over the tiers where each armament can actually roll, which is the honest version of the claim.
 - **the in-flight cap ladder above** — counted live (`Ammo` + `Missile` + `IsEnemy`, a handful of entities to walk). Per-hull reload (~1 missile / 3 s) is the soft knob; the world-wide cap is the hard one.
 
 What the player does about it — five answers, which is what all these ceilings are buying: **outrun** it (165–250 px/s can never catch a hull flying faster), **out-turn** it (at ~200 px/s the player's turn radius is ~150 px against a 135 px Interceptor missile and a 233 px torpedo), **shoot it down** (1–3 hp, and every gun and beam on the hull is a point-defence answer: `FlakCurtain`'s 9 px disc is the cheapest), **kill the launcher**, or **let the fuse run out**.
@@ -313,13 +338,13 @@ Render cost: two batched quads per missile at ~0.1 µs per shape after batching,
   - *friendly*: a player missile overlapping the player hull deals nothing; two player missiles pass each other; an enemy missile passes an enemy hull; a bullet passes a same-faction missile.
   - *cross-fire*: an enemy bullet destroys a 1 hp player missile and is itself consumed; a player bullet does the same to an enemy missile; a 3 hp torpedo survives two 1-damage hits and dies to one 14-damage slug; a beam cuts a missile; two opposing missiles on a head-on course kill each other; a bullet never damages a bullet; **a missile destroyed mid-flight never damages the player** (Q1).
 - `MissileHealthUpgradeTest`: the card raises the hp of that gun's *next* rounds only; it is offered for homing weapons only; no card appears for a non-homing gun.
-- `SalvoGrowthTest` (R13): a `FireRate` card on SeekerPod multiplies the rate and leaves the volley at 1; on Swarmlet it adds a missile; the card stops being offered once the volley would break R11.
+- `SalvoGrowthTest` (R18): a `FireRate` card on SeekerPod multiplies the rate and leaves the volley at 1; on Swarmlet it adds a missile; the card stops being offered once the volley would break R17.
 - `TurretFiringTest` addition: a homing gun locks the nearest in-arc target, its round carries that lock plus `Health`, and the round is not lead-solved.
-- `WeaponBalanceTest`: R9 (certainty pricing, all three bands), R10 (turn radius), R11 (salvo budget), R13 (growth privilege), R14 (base hp within 1–3) for the new rows; existing rules keep covering them automatically.
-- `EnemyArmamentLadderTest` (R12): no hull in the initial world or at composition tier 0 carries a missile; the Interceptor's missile row unlocks at tier 3 and the HeavyCannon's guns+missiles row at tier 8; a hull's missile weight never falls as the tier rises; a tier-2 draw returns zero missile hulls over many draws; **raising the composition cap to 20 does not move the stat cap at 10**.
+- `WeaponBalanceTest`: R15 (certainty pricing, all three bands), R16 (turn radius), R17 (salvo budget), R18 (growth privilege), R19 (base hp within 1–3) for the new rows; existing rules keep covering them automatically.
+- `EnemyArmamentLadderTest` (R20): no hull in the initial world or at composition tier 0 carries a missile; the Interceptor's missile row unlocks at tier 3 and the HeavyCannon's guns+missiles row at tier 8; a hull's missile weight never falls as the tier rises; a tier-2 draw returns zero missile hulls over many draws; **raising the composition cap to 20 does not move the stat cap at 10**.
 - `EnemyMissileFiringTest`: launches at a player inside its reach and not outside it; honours the arc gate and the hull-radius margin; the round inherits the hull's velocity and the same ±30 % speed roll; a `Missiles` hull has no `Turret` component and fires once per reload; a `GunsAndMissiles` hull fires both weapons on independent cooldowns; **the hull still brakes at its own `FiringRange`** whatever it carries.
-- `EnemyMissileCapTest` (R16): the cap follows the ladder — 3 at tier 3, 4 at tier 8, **5 at tier 10**, 6 at tier 14, **7 at tier 20** — and a crowded world never exceeds it, checked after 200 ticks with 40 hulls alive.
-- `EnemyMissileReachTest` (R15): `launch speed × fuse ≥ launch ring` for every hull at every tier, and the ring stays under `MaxMissileFiringRange`.
+- `EnemyMissileCapTest` (R22): the cap follows the ladder — 3 at tier 3, 4 at tier 8, **5 at tier 10**, 6 at tier 14, **7 at tier 20** — and a crowded world never exceeds it, checked after 200 ticks with 40 hulls alive.
+- `EnemyMissileReachTest` (R21): `launch speed × fuse ≥ launch ring` for every hull at every tier, and the ring stays under `MaxMissileFiringRange`.
 - `EnemyDifficultyTest`: the ceilings (speed, turn rate, fuse, ring, missile damage ≤ bullet damage at the same tier); the TTK check generalises from "HeavyCannon" to "every hull", which a missile variant does not change since armament never moves hull hp.
 - `ThreatMeterTest`: the new `missiles=` column counts live enemy missiles and ignores live player ones.
 - `WorldRngTest` unchanged (the armament draw goes through `view.Rng`, one extra draw per spawn once tier 3 arrives); `SPACEVORS_DIAG_UPGRADES` scripts keep working (they name guns directly and ignore the pool).
@@ -327,9 +352,9 @@ Render cost: two batched quads per missile at ~0.1 µs per shape after batching,
 ## 13. Commit split (small, each leaves the tree green)
 
 1. `missiles: Missile component + guidance system` — component, system, Intent-phase wiring in `SimulationRunner`, the firing hook, `MissileGuidanceTest`. Ships nothing playable yet.
-2. `missiles: SeekerPod, HavocTorpedo, Swarmlet + R9–R11, R13` — weapon table rows, the `SalvoGrows` split in `ApplyUpgrade`, the card-withdrawal rule in `LevelUpSystem`, balance-test rules, card lines, bench ships.
+2. `missiles: SeekerPod, HavocTorpedo, Swarmlet + R15–R17, R18` — weapon table rows, the `SalvoGrows` split in `ApplyUpgrade`, the card-withdrawal rule in `LevelUpSystem`, balance-test rules, card lines, bench ships.
 3. `missiles: missile graphics` — generated body/exhaust images, `world.missiles` pass, `Steering`-driven exhaust with its floors, `AmmoColor.Orange`, the square rack marker in the mount screen and on the hull, stats-screen rows.
-4. `missiles: missiles are damageable` — `SpatialGrid.CollisionKind.Missile`, the cross-faction branch in the ammo sweep and the beam pass, `Health` on launch, the `MissileHealth` card, `MissileCollisionTest` + `MissileHealthUpgradeTest` (R14).
+4. `missiles: missiles are damageable` — `SpatialGrid.CollisionKind.Missile`, the cross-faction branch in the ammo sweep and the beam pass, `Health` on launch, the `MissileHealth` card, `MissileCollisionTest` + `MissileHealthUpgradeTest` (R19).
 5. `missiles: enemy missile firing` — `MissileWeapon` + `MissileCooldown`, `EnemyMissileFiringSystem`, the shared arc/launch helper, the cap ladder, `CompositionTierFor`, ceilings in `EnemyDifficultyTest`. Nothing is armed yet, so the commit is behaviour-free by construction.
 6. `missiles: the armament ladder` — `EnemyArmament` rows per hull (tier gates + weights), the weighted hull×armament pick, the ladder / firing / reach / cap tests.
 7. `missiles: threat readout` — the `missiles=` column in `ThreatMeter` and the hud row.
@@ -341,8 +366,8 @@ Order matters twice: the damageable-missile commit (4) lands **before** the enem
 
 - `ARCHITECTURE.md`: `Missile`, `MissileWeapon`, `MissileCooldown` in the component list, and `Health` noted as also riding a missile; `MissileGuidanceSystem` first in the Intent phase and `EnemyMissileFiringSystem` after `TurretFiringSystem` in the Action phase; the new `SpatialGrid.CollisionKind.Missile` in the broad-phase description; a line in Write patterns about the dual `Velocity`/`Ammo` command pair.
 - `PLAN.md`: move "Missiles" out of *Near future* into a done section with the numbers; add the `MissileHealth` card to the upgrade list and the armament ladder to the difficulty paragraph.
-- `plans/WEAPON_BALANCE.md`: R9–R11, R13 and R14, with the three missile rows.
-- `plans/DIFFICULTY_SCALING.md`: **P6 (which enemies appear when, and how their weights drift) becomes real** as the armament ladder; record the new **composition tier (cap 20) beside the stat tier (cap 10)** and why they are split; add R12, R15 and R16 to the ceiling list. Record what is still open there (weight drift beyond missiles, elites, surges).
+- `plans/WEAPON_BALANCE.md`: R15–R17, R18 and R19, with the three missile rows.
+- `plans/DIFFICULTY_SCALING.md`: **P6 (which enemies appear when, and how their weights drift) becomes real** as the armament ladder; record the new **composition tier (cap 20) beside the stat tier (cap 10)** and why they are split; add R20, R21 and R22 to the ceiling list. Record what is still open there (weight drift beyond missiles, elites, surges).
 - `TROUBLE_SHOOTING.md`: only if implementation hits a *workflow* problem worth recording (e.g. a headless-verification trap), not for game-logic findings.
 
 ## 15. Open questions (all with a recommendation)
@@ -365,7 +390,7 @@ Order matters twice: the damageable-missile commit (4) lands **before** the enem
 16. **Should a damaged missile look damaged?** → **Yes, cheaply** — flicker the exhaust while `Health < Max`. A missile that shrugs off three hits and looks untouched teaches the wrong thing about the player's own aim.
 17. **Should the enemy missile's longer launch ring (up to 1450 px, past the 1350 px bullet ring) be shown to the player?** → **No hint.** The launch itself is the tell, and the fuse plus the speed are the answer; a diagnostics-only ring circle is enough for tuning.
 18. **Should `ProjectileSpeed` cards apply to missiles?** → **Yes, no cap** — it works today (guidance keeps the launch speed) and it makes the card range honest. Watch `[THREAT]`: a heavily upgraded missile is both harder to dodge *and* harder to shoot down, which is the one combination these ceilings exist to catch.
-19. **A "homing turn rate" upgrade card?** → **No for v1.** Rate and salvo growth already cover the class; a turn-rate card is a new `UpgradeOption` plus screen plumbing for the stat that R10's guard rail is built on.
+19. **A "homing turn rate" upgrade card?** → **No for v1.** Rate and salvo growth already cover the class; a turn-rate card is a new `UpgradeOption` plus screen plumbing for the stat that R16's guard rail is built on.
 20. **Magazine / reload / missile supply?** → **No.** It is a resource mechanic nothing else in the game has.
 21. **A hunter-killer missile that seeks enemy rounds?** → **Not now.** The cross-fire pass gives point defence without it; a seeker would need a per-round target search — the same cost that made the balance pass rename `PointDefenceTurret` away.
 22. **Do player missiles lock mines and clicked rocks?** → **Yes** (free via the existing target paths). A torpedo wasting 10 damage on a 2 hp mine is a real tradeoff for bad target priority.

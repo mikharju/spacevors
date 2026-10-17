@@ -508,12 +508,36 @@ Raw DPS (fire rate × pellets × damage). Tier 1: Cyclotron 8 (1600 px, 4200 px/
 - **Open knob — the lead has to fit inside the arc, because the barrel is what carries the round.** The largest cross-line drift a mount can lead is `ammoSpeed × sin(halfArc)`: for a 400 px/s round (`Shotgun`, `AcidBubbleSpray`) in a 45° arc that is 153 px/s, against a hull with 400 px/s² of thrust and no drag. `MachineGun` 230, `InterceptorTurret` 459, `Cyclotron` 1608. The Fighter's side mounts are the only 45° small mounts in the game — Scout, Shadow and Heavy give small mounts 120°, which lifts a shotgun to 346 px/s. Options for a playtest call: widen the Fighter's side arcs to match the other hulls, lift the slow guns' ammo speed (the DPS ladder prices delivery, so faster rounds buy less damage), or accept that a mount goes quiet when it cannot point at the solution.
 
 
+## Missiles — done
+
+Guided rounds on both sides (plans/MISSILES.md; the rules are R15-R22 in plans/WEAPON_BALANCE.md and
+plans/DIFFICULTY_SCALING.md R2.12).
+
+- A missile is a round with a lock, not a hull: `Ammo` plus `Missile` plus `Health`, spawned like a
+  bullet and steered by `MissileGuidanceSystem` (first in the Intent phase). Its turn radius is
+  `Speed / TurnRate`, which is what keeps a lock dodgeable.
+- Three player guns, one per size and tier rung: SeekerPod (small, quick, unlock 5), Swarmlet (small,
+  three-round volley, unlock 5), HavocTorpedo (large, slow, unlock 10). Orange is the guided colour, and a
+  rack on the hull is drawn as a square that does not turn.
+- A guided round carries 1-3 hp and only the **other side's** fire can hit it: point defence is free,
+  because every gun and beam already on the hull is the answer. `MissileHealth` is the one card that buys
+  tougher rounds, and it is withdrawn at the ceiling rather than offered as a lie.
+- Enemy missiles are an **armament ladder over the three existing hulls**, not a fourth species: the
+  Interceptor starts carrying a few at 3 minutes and an even mix at 5, the HeavyCannon adds guns+missiles
+  at 8 and mostly carries them from 10. Guided rounds allowed in the air: 0 → 3 → 4 → 5 → 6 → 7 at
+  composition tiers 3 / 8 / 10 / 14 / 20, printed in the `[THREAT]` row as `missiles=n/cap`.
+- A rack launches from 1.4× the hull's own gun ring (capped at 1450 px) while the hull still brakes at its
+  old range, and its rounds stay at 165-250 px/s: far, slow and shootable is the whole design.
+- Sim cost: the pinned scenarios run unarmed, so they prove no regression only — `ammo-spray` sim median
+  **1.31 ms**, `impact-storm` **2.11 ms**, against 1.31 / 2.07 before. A missile-carrying scenario is the
+  missing measurement.
+
 ## Near future
 
-- Missiles
 - New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)
 - New mines (Turns into missile, fires a delayed beam)
-- Difficulty scaling: which enemy types appear when and how their spawn weights drift (P6); pellet volleys and concurrency; mines and the reward side
+- Difficulty scaling: pellet volleys and concurrency; mines and the reward side (the type/composition
+  drift landed as the armament ladder)
 
 ## Future
 

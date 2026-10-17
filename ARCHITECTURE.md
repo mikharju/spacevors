@@ -116,11 +116,13 @@ Rules:
 One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffer is applied after each phase, so later phases read earlier phases' writes within the same tick:
 
 1. Movement: PhysicsSystem → PositionIntegrationSystem → AmmoLifetimeSystem
-2. Action: TurretFiringSystem → EnemyShipSpawnSystem
+2. Action: TurretFiringSystem → EnemyMissileFiringSystem → EnemyShipSpawnSystem
 3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
-4. Intent: MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem
+4. Intent: MissileGuidanceSystem → MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
+
+`MissileGuidanceSystem` is deliberately **first** in Intent: it turns a guided round's heading and rewrites both `Velocity` (what Movement integrates) and the round's own `Ammo.Velocity` (what the swept collision reads and the renderer draws the streak from), so the round's position next tick, its collision segment and its drawn direction all agree on the heading guidance just chose. It never gives a round `Acceleration`: a guided round's speed is constant by design, and its turn radius is `Speed / TurnRate`.
 
 ## Main loop
 
@@ -163,12 +165,42 @@ Components:
 
 Movement uses forces instead of directly setting velocity.
 
+## Guided rounds
+
+A missile is a round, not a hull: it is spawned exactly like a bullet (`Position` + `Velocity` + `Ammo`)
+with three components added, and it is destroyed exactly like one.
+
+Components:
+- `Missile(LockedTarget, Speed, TurnRate, Steering)` — the lock taken at launch, the flight numbers, and
+  how hard the round turned last tick (0..1), which is the number the exhaust is drawn from. Self-contained:
+  nothing downstream looks back up at the gun that fired it.
+- `Health` — a guided round is a body with 1-3 hp, so the other side can shoot it down. Dumb ammo has none.
+- On the launcher only: `MissileWeapon(Weapon, Range)` (a rack's own stats and its own, wider launch ring)
+  and `MissileCooldown(Timer)`. A hull may carry guns, a rack, or both, each on its own cooldown; a
+  missile-only hull has no `Turret` component at all.
+
+Two passes produce them — `TurretFiringSystem` for the player's homing guns, which lock instead of
+computing lead, and `EnemyMissileFiringSystem` for enemy racks — and one pass steers them. The enemy rack
+is a second gun on the same hull rather than a new enemy kind: the escalation is an armament ladder over
+the existing hulls (plans/DIFFICULTY_SCALING.md R2.12).
+
+Faction rule: a missile sits in the collision grid (`CollisionKind.Missile`) and the cross-fire pass
+counts only hits from the **opposing** side. Same-side rounds and beams pass through it, which is what
+keeps a player's missiles from eating their own DPS and what makes a round never collide with itself. A
+missile shot down breaks up in smoke; its warhead never detonates.
+
+Rendering: `world.missiles` is its own pass (`WorldRenderer.DrawMissiles`), drawing tip + shaft + plume
+from two generated sprites. The player's guided rounds are Orange (the guided colour) and the enemy's stay
+Red, because colour is the threat channel and the shape is what says "guided". A rack's mount marker is a
+square that does not turn, against the round empty mounts and the aiming triangles of gun mounts.
+
 ## Cross-system signaling
 
 No event queues. Systems signal each other through components, written via the CommandBuffer (see Write patterns). A later system in a same or next phase reacts to the component it finds.
 
 Examples:
 - CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions
+- TurretFiringSystem / EnemyMissileFiringSystem put `Missile` + `Health` on a round at launch; MissileGuidanceSystem steers it each tick; CollisionSystem reads the same round's `Ammo` to shoot it down
 - PickupMagnetSystem raises Player.Xp (direct ref write, see Write patterns); LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
 - GameSession reads PendingChoice to pause and show the upgrade menu
 

@@ -103,6 +103,38 @@ DPS premium that short-range guns used to need shrinks with it (§3 R2).
   (reach band, delivery, burst/stream, slot) plus one signature stat.
 - **R14 — colour is an identity channel.** Yellow = kinetic, Blue = precision energy, Violet =
   laser, Green = chemical, Cyan = particle. A player should read a loadout from the tracers alone.
+  Orange is the guided channel (plans/MISSILES.md): an orange round is steering at something.
+
+### The guided-gun rules (added with missiles, plans/MISSILES.md)
+
+- **R15 — certainty is paid for in damage.** A guided gun's DPS stays at or below 0.8× the cheapest
+  non-guided peer in its reach band. A lock spends the shot, so the compensation the rest of the ladder
+  gets — spread, lead, dodge — does not apply to it. (`GuidedGunDpsStaysUnderItsOwnBand`)
+- **R16 — a guided round must be out-turnable by what it hunts.** Its turn radius (`AmmoSpeed /
+  HomingTurnRate`) stays wider than the turn radius of the tightest enemy hull at its max tier. Under
+  that line a lock is a sentence rather than a weapon. (`GuidedRoundTurnsWiderThanAnythingItHunts`)
+- **R17 — the guided-round budget.** One mount may put at most `WeaponStats.HomingRoundBudget` (4)
+  guided rounds in flight per second (`FireRate × PelletCount ≤ 4`). Guided rounds live for seconds and
+  cannot be dodged by luck, so they get a budget of their own instead of R7's 12 rounds/s.
+  (`GuidedGunStaysInsideTheGuidedRoundBudget`)
+- **R18 — volley growth is a privilege, not a default.** A `FireRate` card adds a shot only where the gun
+  can honour it: ordinary volley guns always grow; a growing guided volley stops at the R17 budget and
+  the card is withdrawn rather than relabelled; a gun with `SalvoGrows` off takes the card as a rate.
+  (`OnlySomeGunsMayGrowTheirVolley`, `GuidedVolleyAtItsCeiling_IsNotOfferedAnotherShot`)
+- **R19 — a guided round is a body, and a shootable one.** It carries 1-3 hp; one `MissileHealth` card
+  buys the whole mount +1 hp on the rounds it fires next, and the card is withdrawn at the ceiling. Only
+  the other side's fire can hit it, so a missile never eats its own side's DPS and never collides with
+  itself. (`MissileCollisionTests`, `WeaponStats.CanToughenRound`)
+- **R20 — the enemy armament ladder only adds.** A hull never loses an armament as the composition tier
+  climbs, its rack share never falls, and the small swarmer never carries a rack at all.
+  (`EveryRungOfTheLadderAddsToTheOneBelowIt`, `TheSwarmerNeverCarriesARack`)
+- **R21 — an enemy rack's reach stays honest.** It launches from farther than the hull's guns fire
+  (× 1.4), but no farther than 1450 px — under the player's longest gun (1700) — and its fuse must cross
+  its own launch ring at that tier. (`ARackOutreachesItsOwnGunsButNotThePlayersLongestGun`,
+  `ARoundsFuseCrossesItsOwnLaunchRing`)
+- **R22 — enemy guided rounds in the air are a ladder, not a flow.** 0 → 3 → 4 → 5 → 6 → 7 at
+  composition tiers 3 / 8 / 10 / 14 / 20: one round at a time, never two rungs within two minutes, and
+  none at all before three minutes of guns. (`TheRoundsAllowedInTheAirClimbOneStepAtATime`)
 
 ## 4. Identity matrix
 
@@ -224,6 +256,10 @@ Shadow loses the game's strongest gun and becomes a high-skill short-range hull 
   R13 (no duplicate identity cell). A test that reads the rules is what stops the next weapon from
   quietly breaking them. `LoadTestWeapon` is exempt from every rule (it is the perf scenario's
   8000-pellet spray, not a gun).
+- Guided guns: `WeaponBalanceTest` also asserts R15 (certainty priced in damage), R16 (turn radius),
+  R17 (guided-round budget) and R18 (volley growth), and `MissileGuidanceTest` covers what a lock
+  actually does — turns onto it, holds its speed, straightens out when the lock dies. The enemy side of
+  R19-R22 is asserted in `MissileCollisionTest`, `EnemyMissileFiringTest` and `EnemyMissileLadderTest`.
 - Cone-scatter gets its own small test: one shot, seeded RNG, direction stays inside ±Scatter, and
   multi-pellet offsets are unchanged.
 - Existing tests to update: `ShipRosterTest` (Shadow's gun, diagnostic roster after the rename),
@@ -282,3 +318,12 @@ Shadow loses the game's strongest gun and becomes a high-skill short-range hull 
   did not — `ammo-spray` sim median 1.33 ms against 1.31/1.33/1.36 on the previous commit,
   `impact-storm` 2.14 ms against 2.14–2.19. Live rounds in real play do move: the Heavy's starter set
   goes from ~52 to ~93 (rate × lifetime), which is the number R7 guards.
+- **Missiles landed with three deviations from plans/MISSILES.md.** (a) The plan drafted its rules as
+  R9-R16, which collided with the slew-rate, hull-size and identity rules already numbered here, so the
+  guided rules are **R15-R22**; the plan file was renumbered to match. (b) The large hull's
+  `GunsAndMissiles` rung reaches ~80 % of its spawns at composition tier 10 rather than the plan's
+  "~100 %", so a bare heavy stays a rare sight instead of vanishing. (c) A rack launch skips the gun
+  pass's ±15 % speed jitter, because on a guided round the speed *is* the turn radius and the fuse
+  reach — jittering it would launch a different missile than the one the player just read. The rest of
+  the launch plumbing (`AmmoSpawnOffset`, hull clearance, inherited velocity, `FiringArc`) is shared
+  with the gun pass rather than copied.
