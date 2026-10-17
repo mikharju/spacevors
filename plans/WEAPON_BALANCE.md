@@ -110,9 +110,11 @@ DPS premium that short-range guns used to need shrinks with it (§3 R2).
 - **R15 — certainty is paid for in damage.** A guided gun's DPS stays at or below 0.8× the cheapest
   non-guided peer in its reach band. A lock spends the shot, so the compensation the rest of the ladder
   gets — spread, lead, dodge — does not apply to it. (`GuidedGunDpsStaysUnderItsOwnBand`)
-- **R16 — a guided round must be out-turnable by what it hunts.** Its turn radius (`AmmoSpeed /
-  HomingTurnRate`) stays wider than the turn radius of the tightest enemy hull at its max tier. Under
-  that line a lock is a sentence rather than a weapon. (`GuidedRoundTurnsWiderThanAnythingItHunts`)
+- **R16 — a guided round must be out-turnable by what it hunts.** Its turn radius stays wider than the turn
+  radius of the tightest enemy hull at its max tier — measured at the speed it **launches** at
+  (`AmmoSpeed × MissileLaunchFraction / HomingTurnRate`), the tight end of a flight that ramps up to
+  `AmmoSpeed` and widens as it builds. Under that line a lock is a sentence rather than a weapon.
+  (`GuidedRoundTurnsWiderThanAnythingItHunts`)
 - **R17 — the guided-round budget.** One mount may put at most `WeaponStats.HomingRoundBudget` (4)
   guided rounds in flight per second (`FireRate × PelletCount ≤ 4`). Guided rounds live for seconds and
   cannot be dodged by luck, so they get a budget of their own instead of R7's 12 rounds/s.
@@ -256,9 +258,11 @@ Shadow loses the game's strongest gun and becomes a high-skill short-range hull 
   R13 (no duplicate identity cell). A test that reads the rules is what stops the next weapon from
   quietly breaking them. `LoadTestWeapon` is exempt from every rule (it is the perf scenario's
   8000-pellet spray, not a gun).
-- Guided guns: `WeaponBalanceTest` also asserts R15 (certainty priced in damage), R16 (turn radius),
-  R17 (guided-round budget) and R18 (volley growth), and `MissileGuidanceTest` covers what a lock
-  actually does — turns onto it, holds its speed, straightens out when the lock dies. The enemy side of
+- Guided guns: `WeaponBalanceTest` also asserts R15 (certainty priced in damage), R16 (turn radius, measured
+  at the launch end), R17 (guided-round budget) and R18 (volley growth), and `MissileGuidanceTest` covers
+  what a lock actually does — turns onto it, builds to its top speed and stops there, straightens out when
+  the lock dies, and leaves along the hull's nose at a target the slot's arc would have excluded. The enemy
+  side of
   R19-R22 is asserted in `MissileCollisionTest`, `EnemyMissileFiringTest` and `EnemyMissileLadderTest`.
 - Cone-scatter gets its own small test: one shot, seeded RNG, direction stays inside ±Scatter, and
   multi-pellet offsets are unchanged.
@@ -327,3 +331,22 @@ Shadow loses the game's strongest gun and becomes a high-skill short-range hull 
   reach — jittering it would launch a different missile than the one the player just read. The rest of
   the launch plumbing (`AmmoSpawnOffset`, hull clearance, inherited velocity, `FiringArc`) is shared
   with the gun pass rather than copied.
+- **Missiles got a throttle, an arc exemption and a longer body (2026-10-17).** A guided round now leaves at
+  `MissileLaunchFraction` (0.7) of its card speed and builds to it at `MissileLaunchAcceleration`
+  (200 px/s²) — so `AmmoSpeed` means the **top** speed, and the turn radius is tightest the moment the round
+  leaves the rack, which is the end R16 measures at. The card speeds rose with it: SeekerPod 300 → **420**,
+  Swarmlet 350 → **490**, HavocTorpedo 200 → **280** px/s, so a round that used to fly flat now finishes
+  faster than it started. Launch radii 112 / 116 / 250 px and cruise radii 160 / 165 / 357 px all stay
+  outside the ~92 px a tier-10 Interceptor turns at, and the guided round's speed is no longer rolled at all
+  (the ±15 % variation is dumb ammo only), so those radii are facts rather than ranges.
+  Guided mounts are gated by **range only** and do not slew: the round leaves along the hull's nose and
+  guidance picks the lock up from there, which is what a rack graphic already said. The enemy rack keeps its
+  cone and its aim, because a round launched backwards from a 980-1330 px ring cannot cross that ring inside
+  a 6 s fuse — reach honesty (R21) is why the exemption is one-sided. Enemy rounds ramp too (launch = 0.7 ×
+  the tier ladder, ceiling still D3's 250 px/s), and `EnemyShipStats.MissileReachFor` is the ramp-aware
+  distance a fuse actually buys, which is what R21's test asserts. On screen the body draws 7.5 × the
+  collision radius long with a fixed 5 px nose over a 25 px shaft: a torpedo dart measures ~45 px and ~240
+  exact-colour pixels in a live frame, against ~15 px and ~65 before — the round read as a bright dot at the
+  ranges missiles are fired across. Measured: `ammo-spray` 1.31-1.34 ms and `impact-storm` 2.19 ms against
+  1.30 / 2.16 before the change; both scenarios are unarmed, so that spread is this host's noise band and the
+  sim path for them is unchanged.

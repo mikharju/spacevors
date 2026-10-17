@@ -330,6 +330,15 @@ not work under llvmpipe: `UpdateRunning` clamps the accumulated frame time per s
 content directly — the `SPACEVORS_DIAGNOSTIC=1` bench keys exist for exactly that (`U` spawns a rack-armed
 hull, `H` makes the hull unkillable for a long session).
 
+## 52. An instant key tap is dropped when the frame rate collapses
+
+`.tools/shot.sh` pressed F12 with `xdotool key` (press+release in one go) and then waited. In a heavy
+scene — 15 ships, torpedoes crossing the map — llvmpipe drops this game to ~1 fps, and raylib only sees a
+key that is still down when the next frame is polled, so every retry tapped between two polls: three
+attempts, no screenshot, and the misleading "is the game drawing?" while the log showed a full render pass
+row every frame. `shot.sh` now **holds** F12 for `SHOT_HOLD` (default 1.5 s) like `input.sh` holds keys.
+Same rule for anything else driven by hand: `xdotool keydown K; sleep 2; xdotool keyup K`.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

@@ -30,6 +30,19 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   because the game clock runs at roughly half wall speed under llvmpipe (TROUBLE_SHOOTING 51).
 - **Bench key added for that verification:** `U` spawns a rack-armed Interceptor (unkillable test hp) at
   the player, so a red dart can be watched on demand instead of waiting three minutes for the ladder.
+- **Revision 2 (same day): the speed-profile knob was taken, plus an arc exemption and a longer dart.**
+  A guided round now leaves at `WeaponStats.MissileLaunchFraction` (0.7) of its card speed and builds to it
+  at `MissileLaunchAcceleration` (200 px/s²) — "boost then cruise" from the variants table, not "constant".
+  `AmmoSpeed` therefore means the **top** speed, and the card speeds rose with it: SeekerPod 300 → 420,
+  Swarmlet 350 → 490, HavocTorpedo 200 → 280 px/s. The turn radius is tightest at launch,
+  so R16 is measured there (launch 112 / 116 / 250 px, cruise 160 / 165 / 357 px, against the ~92 px a
+  tier-10 Interceptor turns at). A guided round's speed is no longer rolled at launch.
+  A **player** guided mount is gated by range only and does not slew — the round leaves along the hull's nose
+  and steers, which is what the non-turning rack square always implied. The **enemy** rack keeps its cone
+  and its aim: a round launched backwards from a 980-1330 px ring cannot cross that ring inside a 6 s fuse
+  (R21), so the exemption is deliberately one-sided. On screen the body is drawn 7.5 × the collision radius
+  with a fixed 5 px nose over a 25 px shaft — a torpedo dart measures ~45 px long in a frame against ~15 px
+  before, which is what "reads as a bright dot" was really about.
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
   prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
   missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is

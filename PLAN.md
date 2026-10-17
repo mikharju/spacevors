@@ -528,9 +528,23 @@ plans/DIFFICULTY_SCALING.md R2.12).
   composition tiers 3 / 8 / 10 / 14 / 20, printed in the `[THREAT]` row as `missiles=n/cap`.
 - A rack launches from 1.4× the hull's own gun ring (capped at 1450 px) while the hull still brakes at its
   old range, and its rounds stay at 165-250 px/s: far, slow and shootable is the whole design.
+- **A guided round builds to its speed.** It leaves at 0.7 × its card speed (`MissileLaunchFraction`) and
+  accelerates at 200 px/s² to that speed, so the card speed is a ceiling: SeekerPod 294 → 420, Swarmlet
+  343 → 490, HavocTorpedo 196 → 280 px/s, and an enemy rack's round 116 → 165 at tier 0 up to 175 → 250 at
+  tier 10 (still capped by the enemy ammo-speed ceiling). A guided round's speed is never rolled, so its turn
+  radius is a fact rather than a range: tightest just after launch (112 / 116 / 250 px for the player's three
+  guns) and widest at cruise, which is why R16 is measured at the launch end.
+- **A player rack is gated by range alone and does not aim:** its round leaves along the hull's nose and
+  steers onto the lock, so a forward mount covers what is behind the hull, and the price is the whole way
+  round at a slow launch. The enemy rack keeps its cone and keeps aiming, because a round launched backwards
+  from a 980-1330 px ring could not cross that ring inside its fuse.
+- **The dart is drawn 7.5 × the collision radius** — a fixed 5 px nose over a 3× longer shaft, ~45 px for the
+  torpedo and ~30 px for the pod rounds. At 2.5 it drew ~15 px and read as a bright dot. The plume answers
+  both the turn and the throttle still running, with floors on length and brightness.
 - Sim cost: the pinned scenarios run unarmed, so they prove no regression only — `ammo-spray` sim median
-  **1.30 ms** and `impact-storm` **2.16 ms**, against 1.33 / 2.12 before any missile code (this host's p99
-  band is ±0.3 ms, so both sit inside noise). A missile-carrying scenario is the missing measurement.
+  **1.30-1.34 ms** and `impact-storm` **2.16-2.19 ms**, against 1.33 / 2.12 before any missile code (this
+  host's p99 band is ±0.3 ms, so all of it sits inside noise). A missile-carrying scenario is the missing
+  measurement.
 
 ## Near future
 

@@ -122,7 +122,7 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
 
-`MissileGuidanceSystem` is deliberately **first** in Intent: it turns a guided round's heading and rewrites both `Velocity` (what Movement integrates) and the round's own `Ammo.Velocity` (what the swept collision reads and the renderer draws the streak from), so the round's position next tick, its collision segment and its drawn direction all agree on the heading guidance just chose. It never gives a round `Acceleration`: a guided round's speed is constant by design, and its turn radius is `Speed / TurnRate`.
+`MissileGuidanceSystem` is deliberately **first** in Intent: it turns a guided round's heading, builds its speed toward `MaxSpeed`, and rewrites both `Velocity` (what Movement integrates) and the round's own `Ammo.Velocity` (what the swept collision reads and the renderer draws the streak from), so the round's position next tick, its collision segment and its drawn direction all agree on the heading guidance just chose. It never gives a round an `Acceleration` component: the speed is rewritten at the tick boundary as it climbs, so the collision pass still reads one constant velocity between ticks and the turn radius stays `Speed / TurnRate`.
 
 ## Main loop
 
@@ -171,18 +171,31 @@ A missile is a round, not a hull: it is spawned exactly like a bullet (`Position
 with three components added, and it is destroyed exactly like one.
 
 Components:
-- `Missile(LockedTarget, Speed, TurnRate, Steering)` — the lock taken at launch, the flight numbers, and
-  how hard the round turned last tick (0..1), which is the number the exhaust is drawn from. Self-contained:
-  nothing downstream looks back up at the gun that fired it.
+- `Missile(LockedTarget, Speed, MaxSpeed, Acceleration, TurnRate, Steering)` — the lock taken at launch, the
+  flight numbers, and how hard the round turned last tick (0..1), which is one of the two numbers the exhaust
+  is drawn from. Self-contained: nothing downstream looks back up at the gun that fired it.
+  `Speed` is the round's own flight speed and `MissileGuidanceSystem` is its only writer: it climbs by
+  `Acceleration` toward `MaxSpeed`, so a round leaves its rack at `WeaponStats.MissileLaunchFraction` of its
+  card speed and builds to that speed. The turn radius is `Speed / TurnRate`, which makes it tightest just
+  after launch and widest at cruise — the balance rules are measured at the launch end for that reason.
 - `Health` — a guided round is a body with 1-3 hp, so the other side can shoot it down. Dumb ammo has none.
 - On the launcher only: `MissileWeapon(Weapon, Range)` (a rack's own stats and its own, wider launch ring)
   and `MissileCooldown(Timer)`. A hull may carry guns, a rack, or both, each on its own cooldown; a
   missile-only hull has no `Turret` component at all.
 
+Who may launch: **range only**. A guided mount is not gated by its slot's arc and does not slew — a rack is a
+square that does not turn — so its round leaves along the hull's nose and guidance picks the lock up from
+there, which lets a forward rack cover what is behind the hull. The price is geometry, not a rule: the round
+has to fly all the way around, from a slow launch, at the target's speed. The enemy rack keeps its firing
+cone, because an enemy round that launched backwards could not cross its own launch ring inside its fuse
+(R21 reach honesty in plans/WEAPON_BALANCE.md), while the player chose the weapon and pays for the long way.
+
 Two passes produce them — `TurretFiringSystem` for the player's homing guns, which lock instead of
 computing lead, and `EnemyMissileFiringSystem` for enemy racks — and one pass steers them. The enemy rack
 is a second gun on the same hull rather than a new enemy kind: the escalation is an armament ladder over
-the existing hulls (plans/DIFFICULTY_SCALING.md R2.12).
+the existing hulls (plans/DIFFICULTY_SCALING.md R2.12). A guided round's speed is never rolled: the gun's
+±15 % speed variation applies to dumb ammo only, because on a guided round the speed *is* the turn radius and
+the fuse reach.
 
 Faction rule: a missile sits in the collision grid (`CollisionKind.Missile`) and the cross-fire pass
 counts only hits from the **opposing** side. Same-side rounds and beams pass through it, which is what
@@ -190,7 +203,11 @@ keeps a player's missiles from eating their own DPS and what makes a round never
 missile shot down breaks up in smoke; its warhead never detonates.
 
 Rendering: `world.missiles` is its own pass (`WorldRenderer.DrawMissiles`), drawing tip + shaft + plume
-from two generated sprites. The player's guided rounds are Orange (the guided colour) and the enemy's stay
+from two generated sprites. The body is drawn `MissileBodyStretch` (7.5) times the collision radius long with
+a fixed-size nose: at 2.5 a round drew a 10 px dart and read as a bright dot at the ranges missiles are
+fired across. The plume answers two numbers — the rudder (`Steering`) and the throttle (how far the round is
+still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The
+player's guided rounds are Orange (the guided colour) and the enemy's stay
 Red, because colour is the threat channel and the shape is what says "guided". A rack's mount marker is a
 square that does not turn, against the round empty mounts and the aiming triangles of gun mounts.
 
