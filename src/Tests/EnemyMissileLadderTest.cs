@@ -92,10 +92,10 @@ public class EnemyMissileLadderTests
 
             for (int tier = 0; tier <= EnemyShipStats.MaxTier; tier++)
             {
-                float speed = EnemyShipStats.MissileSpeedFor(spec, tier);
+                float reach = EnemyShipStats.MissileReachFor(spec, tier);
                 float ring = EnemyShipStats.MissileRangeFor(type, tier);
-                Assert.True(speed * spec.Fuse >= ring,
-                    $"{type.TextureKey} at tier {tier}: a {spec.Fuse} s fuse at {speed} px/s cannot cross {ring} px");
+                Assert.True(reach >= ring,
+                    $"{type.TextureKey} at tier {tier}: its round crosses {reach:0} px on a {spec.Fuse} s fuse counting the launch ramp, short of its own {ring:0} px ring");
             }
         }
     }

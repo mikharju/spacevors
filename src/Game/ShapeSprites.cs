@@ -69,11 +69,17 @@ static class ShapeSprites
             new Vector2(0f, thickness * 0.5f), MathF.Atan2(axis.Y, axis.X) * 180f / MathF.PI, color);
     }
 
-    // Missile: a nose-up body (triangle tip over a square shaft) and a separate aft triangle for the
+    // Missile: a nose-up body (triangle tip over a long shaft) and a separate aft triangle for the
     // exhaust, authored white and tinted per draw like the disc. The exhaust is its own image so it
     // can stretch and brighten without moving the body, and it always has a floor: a guided round that
     // goes invisible mid-flight is a round the player cannot dodge.
-    const int BodyWidth = 8, BodyHeight = 14;
+    const int BodyWidth = 8;
+
+    // The nose is a fixed triangle — it is the point of the thing, it does not stretch with the airframe —
+    // and the shaft under it is what carries the read. The shaft used to be 8 px tall, and at the length a
+    // round is actually drawn on screen the whole missile read as a bright dot.
+    const int TipHeight = 5, ShaftHeight = 25;
+    const int BodyHeight = TipHeight + ShaftHeight;
     const int ExhaustWidth = 8, ExhaustHeight = 12;
 
     // How far the plume's nozzle edge reaches into the body's tail, as a fraction of the plume's own
@@ -91,9 +97,9 @@ static class ShapeSprites
             Image image = Raylib.GenImageColor(BodyWidth, BodyHeight, Transparent);
             Raylib.ImageDrawTriangle(ref image,
                 new Vector2(BodyWidth / 2f, 0f),
-                new Vector2(0f, BodyHeight * 0.4f),
-                new Vector2(BodyWidth, BodyHeight * 0.4f), Opaque);
-            Raylib.ImageDrawRectangleRec(ref image, new Rectangle(0f, BodyHeight * 0.4f, BodyWidth, BodyHeight * 0.6f), Opaque);
+                new Vector2(0f, TipHeight),
+                new Vector2(BodyWidth, TipHeight), Opaque);
+            Raylib.ImageDrawRectangleRec(ref image, new Rectangle(0f, TipHeight, BodyWidth, ShaftHeight), Opaque);
 
             _missileBody = Raylib.LoadTextureFromImage(image);
             Raylib.UnloadImage(image);

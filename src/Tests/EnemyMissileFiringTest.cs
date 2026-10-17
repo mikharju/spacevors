@@ -103,7 +103,7 @@ public class EnemyMissileFiringTests
             var round = em.CreateEntity();
             em.AddComponent(round, new Position(new Vector2(100f * i, 400f)));
             em.AddComponent(round, new Ammo(new Vector2(0f, -100f), Radius: 4f, Lifetime: 6f, IsEnemy: true, Damage: 2));
-            em.AddComponent(round, new Missile(otherHull, Speed: 100f, TurnRate: 1f, Steering: 0f));
+            em.AddComponent(round, new Missile(otherHull, Speed: 100f, MaxSpeed: 100f, Acceleration: WeaponStats.MissileLaunchAcceleration, TurnRate: 1f, Steering: 0f));
         }
 
         Tick(em, view);

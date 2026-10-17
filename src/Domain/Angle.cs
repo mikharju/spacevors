@@ -12,6 +12,9 @@ public static class Angle
     // The angle a direction vector points at — the inverse of (sin a, -cos a).
     public static float Of(Vector2 direction) => MathF.Atan2(direction.X, -direction.Y);
 
+    // The unit vector an angle points at — the other half of the same convention.
+    public static Vector2 Direction(float radians) => new(MathF.Sin(radians), -MathF.Cos(radians));
+
     // Wrap into (-π, π] so a stored angle cannot drift unbounded.
     public static float Normalize(float radians)
     {

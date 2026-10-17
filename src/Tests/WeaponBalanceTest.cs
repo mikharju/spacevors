@@ -86,7 +86,9 @@ public class WeaponBalanceTest
     }
 
     // R16: a guided round's turn radius is what makes it dodgeable. Tighter than the turn radius of
-    // what it hunts and a lock is a death sentence rather than a challenge.
+    // what it hunts and a lock is a death sentence rather than a challenge. It is measured at the **launch**
+    // speed: a round builds to its top speed, so its radius is tightest the moment it leaves the rack, and
+    // that is the end of the flight the guarantee has to hold at.
     [Fact]
     public void GuidedRoundTurnsWiderThanAnythingItHunts()
     {
@@ -99,9 +101,11 @@ public class WeaponBalanceTest
 
         foreach (var w in Guns.Where(w => w.Stats.Homing))
         {
-            float turnRadius = w.Stats.AmmoSpeed / w.Stats.HomingTurnRate;
-            Assert.True(turnRadius > tightest,
-                $"{w.Name} turns inside {turnRadius:0} px, tighter than the {tightest:0} px a tier-{EnemyShipStats.MaxTier} hull can out-turn");
+            float launchRadius = w.Stats.AmmoSpeed * WeaponStats.MissileLaunchFraction / w.Stats.HomingTurnRate;
+            float topRadius = w.Stats.AmmoSpeed / w.Stats.HomingTurnRate;
+            Assert.True(launchRadius > tightest,
+                $"{w.Name} turns inside {launchRadius:0} px just after launch, tighter than the {tightest:0} px a tier-{EnemyShipStats.MaxTier} hull can out-turn");
+            Assert.True(topRadius > launchRadius, $"{w.Name}'s turn radius must widen as its speed builds");
         }
     }
 

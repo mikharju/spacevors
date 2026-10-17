@@ -179,13 +179,17 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, bodyLength * (1f + MissileExhaustHardTurn), windowWidth, windowHeight)) continue;
 
             float steering = Math.Clamp(missile.Steering, 0f, 1f);
-            float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * steering);
+            // A round still building to its card speed is burning for it, so the plume answers the throttle
+            // as well as the rudder: full length just after launch, and again when the round swings hard.
+            float boost = missile.MaxSpeed > 0f ? 1f - Math.Clamp(ammo.Velocity.Magnitude / missile.MaxSpeed, 0f, 1f) : 0f;
+            float effort = MathF.Max(steering, boost);
+            float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * effort);
 
             Color body = AmmoColorOf(ammo.Color);
-            // The turn the guidance actually applied makes the flame longer, whiter and brighter: the
-            // player reads "this round is committed that way" off the same number the sim computed.
-            Color flame = MixTowardWhite(body, ExhaustWhiteMix + ExhaustHardTurnMix * steering);
-            flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * steering);
+            // The work the round is doing makes the flame longer, whiter and brighter: the player reads
+            // "this round is committed that way" off the same numbers the sim computed.
+            Color flame = MixTowardWhite(body, ExhaustWhiteMix + ExhaustHardTurnMix * effort);
+            flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * effort);
 
             ShapeSprites.DrawMissile(cx, cy, Angle.Of(ammo.Velocity),
                 bodyLength, ammo.Radius,
@@ -194,7 +198,10 @@ public static class WorldRenderer
         }
     }
 
-    const float MissileBodyStretch = 2.5f;
+    // Drawn body length per px of collision radius. Three times what it was: at 2.5 a 4 px round drew a
+    // 10 px dart, which at the ranges a missile is fired across read as a bright dot rather than an object
+    // with a nose and a tail.
+    const float MissileBodyStretch = 7.5f;
     const float MissileExhaustCruise = 0.45f, MissileExhaustHardTurn = 1f;
     const float ExhaustWidthScale = 1.5f;
     // The flame stays the body's colour when cruising and only washes out toward white when the round

@@ -10,11 +10,19 @@ public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetim
 
 public readonly record struct FireCooldown(float Timer);
 
-// A guided round: the entity it is locked onto, the speed it was launched at, how hard it may turn
-// (rad/s), and how hard it turned last tick (0..1) — the renderer draws the exhaust from that.
-// Self-contained: the round carries its own flight numbers, so guidance never looks upstream.
-// The turn limit is what makes a missile dodgeable — its turn radius is Speed / TurnRate.
-public readonly record struct Missile(Entity LockedTarget, float Speed, float TurnRate, float Steering);
+// A guided round: the entity it is locked onto, the flight numbers it was launched with, and how hard it
+// turned last tick (0..1) — the renderer draws the exhaust from that. Self-contained: the round carries
+// its own numbers, so guidance never looks upstream.
+// `Speed` is the round's own flight speed and guidance is the only writer: it climbs by `Acceleration`
+// toward `MaxSpeed` and stops there. The turn radius is therefore `Speed / TurnRate` — a round is tightest
+// just after launch and hardest to shake once it has its speed up.
+public readonly record struct Missile(
+    Entity LockedTarget,
+    float Speed,
+    float MaxSpeed,
+    float Acceleration,
+    float TurnRate,
+    float Steering);
 
 // The missile rack an enemy hull carries: its own gun stats and its own launch ring, separate from the
 // hull's `Turret` so a hull can carry guns, a rack, or both, each on its own cooldown. The ring is

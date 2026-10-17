@@ -29,6 +29,9 @@ public readonly record struct WeaponStats(
     // Homing weapons fire guided Missiles instead of dumb Ammo: the round locks on whatever the gun
     // acquired at launch and steers toward it, so it needs no lead solution and no clear line — only
     // a fuse long enough to cross the distance and a turn limit good enough to catch what it hunts.
+    // For a homing gun `AmmoSpeed` is the speed the round builds **to**, not the speed it leaves at:
+    // see MissileLaunchFraction. The turn radius rule below therefore reads against the top speed,
+    // which is the least forgiving end of the flight.
     bool Homing = false,
     // Steering limit of a homing round, rad/s. Its turn radius is AmmoSpeed / HomingTurnRate: below a
     // target's own turn radius the missile cannot catch it, which is what keeps a lock dodgeable.
@@ -49,6 +52,17 @@ public readonly record struct WeaponStats(
     // dumb ammo (R7). It is also the ceiling on a homing gun's growing volley (R18): a FireRate card
     // stops offering "+1 shot" once the next shot would break it.
     public const float HomingRoundBudget = 4f;
+
+    // A guided round leaves its mount at this fraction of its card speed and builds up to that speed
+    // under MissileLaunchAcceleration below. The slow start is what the growing exhaust shows, and it is
+    // what makes firing along the hull's own nose honest: a round that has to turn is a round the target
+    // can see leaving.
+    public const float MissileLaunchFraction = 0.7f;
+
+    // px/s² of that build-up. It is deliberately not an `Acceleration` component: guidance rewrites the
+    // round's speed at the tick boundary, so the collision pass still reads a constant velocity between
+    // ticks, and the round's speed stays a single number that the turn radius is computed from.
+    public const float MissileLaunchAcceleration = 200f;
 
     // R19: how tough one guided round can be made. A round that eats four hits of ordinary fire stops
     // being a body worth shooting at and becomes a second magazine, so three is the ceiling.
@@ -122,19 +136,20 @@ public readonly record struct WeaponType(
     // buys the *least* damage of its reach band (R15), and its turn radius — AmmoSpeed / HomingTurnRate
     // — has to stay wider than what it hunts, or a lock becomes a death sentence (R16). They are all
     // slow-firing: R17 caps a mount at 4 guided rounds in flight per second.
-    // SeekerPod: the small hull's first missile. 115 px turn radius catches anything but a turning
-    // Interceptor, and its FireRate card fires it more often rather than more at once.
-    public static WeaponType SeekerPod { get; } = new("SeekerPod", new(FireRate: 1.2f, AmmoSpeed: 300f, KickbackForce: 4f, PelletCount: 1, Scatter: 0f, ShotLifetime: 4f, Damage: 3, TurnSpeed: TurnDeg(180f), Homing: true, HomingTurnRate: TurnDeg(150f), SalvoGrows: false), TurretSize.Small, 900f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+    // SeekerPod: the small hull's first missile. It leaves at 294 px/s and builds to 420 px/s in 0.6 s, so
+    // its turn radius runs from 112 px at launch to 160 px at speed — wider than anything it hunts at both
+    // ends of the flight (R16). Its FireRate card fires it more often rather than more at once.
+    public static WeaponType SeekerPod { get; } = new("SeekerPod", new(FireRate: 1.2f, AmmoSpeed: 420f, KickbackForce: 4f, PelletCount: 1, Scatter: 0f, ShotLifetime: 4f, Damage: 3, TurnSpeed: TurnDeg(180f), Homing: true, HomingTurnRate: TurnDeg(150f), SalvoGrows: false), TurretSize.Small, 900f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
 
     // Swarmlet: the swarm missile, and the only homing gun allowed to grow its volley. Three cheap
     // locked rounds at once is the point; the growth stops at the R17 ceiling.
-    public static WeaponType Swarmlet { get; } = new("Swarmlet", new(FireRate: 0.8f, AmmoSpeed: 350f, KickbackForce: 3f, PelletCount: 3, Scatter: 0.25f, ShotLifetime: 2.5f, Damage: 2, TurnSpeed: TurnDeg(200f), Homing: true, HomingTurnRate: TurnDeg(170f)), TurretSize.Small, 600f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+    public static WeaponType Swarmlet { get; } = new("Swarmlet", new(FireRate: 0.8f, AmmoSpeed: 490f, KickbackForce: 3f, PelletCount: 3, Scatter: 0.25f, ShotLifetime: 2.5f, Damage: 2, TurnSpeed: TurnDeg(200f), Homing: true, HomingTurnRate: TurnDeg(170f)), TurretSize.Small, 600f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
 
     // HavocTorpedo: the big slow hull-killer. 10 damage per shot breaks R5's per-shot cap the way
     // RailGun does — at 0.6/s nothing else in the game can carry a round that big — and it pays for
-    // the licence with the least DPS in its band (R15). A 255 px turn radius means it can only ever
-    // lock on hulls that cannot out-turn it.
-    public static WeaponType HavocTorpedo { get; } = new("HavocTorpedo", new(FireRate: 0.6f, AmmoSpeed: 200f, KickbackForce: 15f, PelletCount: 1, Scatter: 0f, ShotLifetime: 8f, Damage: 10, TurnSpeed: TurnDeg(90f), Homing: true, HomingTurnRate: TurnDeg(45f), SalvoGrows: false), TurretSize.Large, 1350f, AmmoRadius: 6f, Color: AmmoColor.Orange, UnlockLevel: 10);
+    // the licence with the least DPS in its band (R15). Its turn radius never drops below 250 px, so it
+    // can only ever lock on hulls that cannot out-turn it.
+    public static WeaponType HavocTorpedo { get; } = new("HavocTorpedo", new(FireRate: 0.6f, AmmoSpeed: 280f, KickbackForce: 15f, PelletCount: 1, Scatter: 0f, ShotLifetime: 8f, Damage: 10, TurnSpeed: TurnDeg(90f), Homing: true, HomingTurnRate: TurnDeg(45f), SalvoGrows: false), TurretSize.Large, 1350f, AmmoRadius: 6f, Color: AmmoColor.Orange, UnlockLevel: 10);
 
     // Perf scenarios only: it must aim instantly so seeded volleys keep looking like fired ones.
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1), TurretSize.Large, 580f);

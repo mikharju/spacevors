@@ -23,7 +23,7 @@ public class MissileCollisionTests
         em.AddComponent(missile, new Position(position));
         em.AddComponent(missile, new Velocity(velocity));
         em.AddComponent(missile, new Ammo(velocity, Radius: 4f, Lifetime: 10f, IsEnemy: isEnemy, Damage: 3));
-        em.AddComponent(missile, new Missile(target, Speed: velocity.Magnitude, TurnRate: 3f, Steering: 0f));
+        em.AddComponent(missile, new Missile(target, Speed: velocity.Magnitude, MaxSpeed: velocity.Magnitude, Acceleration: WeaponStats.MissileLaunchAcceleration, TurnRate: 3f, Steering: 0f));
         em.AddComponent(missile, new Health(health, health));
         return missile;
     }

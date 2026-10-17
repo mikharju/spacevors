@@ -37,7 +37,7 @@ public class EnemyMissileFiringSystem : GameSystem
                 continue;
             }
 
-            Vector2 hullForward = new Vector2((float)Math.Sin(rotation.Angle), -(float)Math.Cos(rotation.Angle));
+            Vector2 hullForward = Angle.Direction(rotation.Angle);
             if (!TryAim(rack, pos.Value, hullForward, player.Radius, playerPos.Value, out Vector2 aimDir))
             {
                 // Outside the ring or the cone: hold the round loaded and fire as soon as the player is
@@ -78,22 +78,25 @@ public class EnemyMissileFiringSystem : GameSystem
 
     // The same launch plumbing as the gun pass — spawn offset, clear of the hull, the hull's inherited
     // velocity — and the same Red the enemy's bullets are, because the colour is the threat channel and
-    // the shape of the round is what says "guided". The one thing deliberately not shared is the gun
-    // pass's speed jitter: on a guided round the speed *is* the turn radius and the fuse reach, so a
-    // jittered round would be a different missile than the one the player just read.
+    // the shape of the round is what says "guided". The two things deliberately not shared are the gun
+    // pass's speed jitter (on a guided round the speed *is* the turn radius and the fuse reach, so a
+    // jittered round would be a different missile than the one the player just read) and its full launch
+    // speed: a rack throws its round at MissileLaunchFraction of the card speed and the round builds to
+    // that speed in flight, which is why the plume is long just after a launch.
     private static void LaunchRound(CommandBuffer commands, Vector2 hullPos, Vector2 aimDir, Vector2 hullForward,
         float hullRadius, Vector2 hullVelocity, MissileWeapon rack, Entity playerEntity)
     {
         var weapon = rack.Weapon;
-        float speed = weapon.AmmoSpeed;
+        float topSpeed = weapon.AmmoSpeed;
+        float launchSpeed = topSpeed * WeaponStats.MissileLaunchFraction;
         Vector2 spawnPos = TurretFiringSystem.EnemySpawnPosition(hullPos, aimDir, hullForward, hullRadius);
-        Vector2 roundVelocity = aimDir * speed + hullVelocity;
+        Vector2 roundVelocity = aimDir * launchSpeed + hullVelocity;
 
         commands.AddEntity(
             new Position(spawnPos),
             new Velocity(roundVelocity),
             new Ammo(roundVelocity, EnemyShipStats.MissileAmmoRadius, weapon.ShotLifetime, IsEnemy: true, weapon.Damage, AmmoColor.Red),
-            new Missile(playerEntity, speed, weapon.HomingTurnRate, Steering: 0f),
+            new Missile(playerEntity, launchSpeed, topSpeed, WeaponStats.MissileLaunchAcceleration, weapon.HomingTurnRate, Steering: 0f),
             new Health(weapon.MissileHealth, weapon.MissileHealth));
     }
 

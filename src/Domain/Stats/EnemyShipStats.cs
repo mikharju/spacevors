@@ -13,10 +13,12 @@ public readonly record struct EnemyArmamentRow(EnemyArmament Armament, int MinCo
 // One hull's missile rack. Damage is not here: it follows the shared enemy damage ladder, so a missile
 // can never out-damage the bullet its hull fires at the same tier.
 public readonly record struct EnemyMissileSpec(
-    float LaunchSpeed,
-    float LaunchSpeedPerTier,
-    // Steering limit of the launched round, rad/s. Its turn radius is LaunchSpeed / TurnRate, and that
-    // is what keeps an enemy missile dodgeable by out-turning it.
+    // The speed the round builds **to** (a rack throws it at WeaponStats.MissileLaunchFraction of this and
+    // guidance ramps it up). Capped by MaxAmmoSpeed, so the readability ceiling is the top speed's ceiling.
+    float CruiseSpeed,
+    float CruiseSpeedPerTier,
+    // Steering limit of the launched round, rad/s. Its turn radius is Speed / TurnRate — tightest just
+    // after launch, widest at cruise — and that is what keeps an enemy missile dodgeable by out-turning it.
     float TurnRate,
     float Fuse,
     int RoundHealth,
@@ -209,8 +211,19 @@ public static class EnemyShipStats
     // ever gets, and certainty is paid for in damage (R1/R9 price it the same way for the player).
     public static int MissileDamageAdd(int tier) => tier / 3;
 
+    // The speed a rack's round builds to — not the speed it leaves at, which is a fraction of this.
     public static float MissileSpeedFor(EnemyMissileSpec spec, int tier) =>
-        Math.Min(spec.LaunchSpeed + spec.LaunchSpeedPerTier * tier, MaxAmmoSpeed);
+        Math.Min(spec.CruiseSpeed + spec.CruiseSpeedPerTier * tier, MaxAmmoSpeed);
+
+    // What that round can physically cross before its fuse ends: the ramp's trapezoid, then the cruise
+    // that follows it (the enemy twin of the player's R6 reach rule, R21).
+    public static float MissileReachFor(EnemyMissileSpec spec, int tier)
+    {
+        float top = MissileSpeedFor(spec, tier);
+        float launch = top * WeaponStats.MissileLaunchFraction;
+        float rampTime = Math.Min((top - launch) / WeaponStats.MissileLaunchAcceleration, spec.Fuse);
+        return rampTime * (launch + top) / 2f + (spec.Fuse - rampTime) * top;
+    }
 
     // The hull still brakes at its own gun range whatever it carries, so the rack's ring is the grown
     // gun range × 1.4: missiles launch from outside the gun line without the hull behaving differently.

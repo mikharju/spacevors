@@ -34,6 +34,10 @@ public class TurretFiringSystem : GameSystem
     static readonly float AimAcquireTolerance = Angle.FromDeg(3f);
     static readonly float FireAimTolerance = Angle.FromDeg(8f);
 
+    // A dot test against -1 admits every bearing. A guided round needs no clear line and no facing mount:
+    // it turns after launch, so only its range gates the shot.
+    private const float AnyBearingCosine = -1f;
+
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         bool playerDead = IsPlayerDead(view);
@@ -47,8 +51,9 @@ public class TurretFiringSystem : GameSystem
             if (!turret.IsEnemy && playerDead) continue;
 
             // A player turret is bolted to a hull slot and slewed inside its arc; an enemy turret is
-            // aimed by its hull, which is what its Rotation already holds.
-            MountState? mount = turret.IsEnemy ? null : ReadMount(view, turretEntity);
+            // aimed by its hull, which is what its Rotation already holds. A player rack slews nothing at
+            // all: a rack is a square that does not turn, and its round leaves along the hull's nose.
+            MountState? mount = turret.IsEnemy || turret.Weapon.Homing ? null : ReadMount(view, turretEntity);
 
             float arcCenterAngle = mount is { } m ? hullRotation + m.Slot.ArcCenter : turretRot.Angle;
             var selection = FindTarget(view, turretEntity, turret, turretPos.Value, arcCenterAngle);
@@ -72,7 +77,14 @@ public class TurretFiringSystem : GameSystem
             // Being inside the arc is not enough: a mount still travelling to a solution holds its fire.
             if (mount is not null && !AimOnTarget(aimAngle, selection.Value.AimDirection)) continue;
 
-            FireAtTarget(view, turretEntity, turret, turretPos.Value, aimAngle, selection.Value, commands);
+            // A rack does not aim, so its round leaves along the hull's nose and guidance turns it onto the
+            // lock from there. That is what lets a stern rack cover what is ahead — and a bow rack what is
+            // behind — while the round still has to fly the whole way around.
+            var shot = turret.Weapon.Homing
+                ? selection.Value with { AimDirection = Angle.Direction(hullRotation) }
+                : selection.Value;
+
+            FireAtTarget(view, turretEntity, turret, turretPos.Value, aimAngle, shot, commands);
             commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
 
             if (Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1")
@@ -231,9 +243,11 @@ public class TurretFiringSystem : GameSystem
     // a turret tracks what it cannot yet reach and only holds fire until its aim catches up.
     private TargetSelection? FindTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float arcCenterAngle)
     {
-        Vector2 forwardDir = new Vector2((float)Math.Sin(arcCenterAngle), -(float)Math.Cos(arcCenterAngle));
+        Vector2 forwardDir = Angle.Direction(arcCenterAngle);
 
-        float cosHalfArc = (float)Math.Cos(turret.ArcAngle / 2f);
+        // A guided round is gated by its range alone: it turns onto its lock after launch, so a mount that
+        // cannot point at the target — and a rack that points at nothing — still engages.
+        float cosHalfArc = turret.Weapon.Homing ? AnyBearingCosine : (float)Math.Cos(turret.ArcAngle / 2f);
         float rangeSq = turret.Range * turret.Range;
 
         TargetSelection? nearestTarget = null;
@@ -418,6 +432,7 @@ public class TurretFiringSystem : GameSystem
     private void FireAtTarget(WorldView view, Entity turretEntity, Turret turret, Vector2 turretPos, float turretAngle, TargetSelection target, CommandBuffer commands)
     {
         Vector2 ammoDir = target.AimDirection;
+        bool guided = turret.Weapon.Homing;
 
         int pelletCount = turret.Weapon.PelletCount;
         float scatterAngle = turret.Weapon.Scatter;
@@ -439,8 +454,15 @@ public class TurretFiringSystem : GameSystem
         for (int i = 0; i < pelletCount; i++)
         {
             float angleOffset = ScatterOffset(view.Rng, scatterAngle, i, pelletCount);
-            float speedVariation = 1f + (view.Rng.NextSingle() - 0.5f) * AmmoSpeedVariation;
-            float ammoSpeed = turret.Weapon.AmmoSpeed * speedVariation;
+            // A guided round's speed is the number its turn radius and fuse reach are computed from, so it
+            // is not rolled: a jittered round would be a different missile than the one the player read off
+            // the card. Dumb ammo keeps its roll, which is what makes a shotgun spray a spray.
+            float ammoSpeed = guided
+                ? turret.Weapon.AmmoSpeed
+                : turret.Weapon.AmmoSpeed * (1f + (view.Rng.NextSingle() - 0.5f) * AmmoSpeedVariation);
+            // The speed it actually leaves at: a guided round is launched slow and guidance builds it to
+            // `ammoSpeed`, which is its card speed and its ceiling.
+            float flightSpeed = guided ? ammoSpeed * WeaponStats.MissileLaunchFraction : ammoSpeed;
 
             Vector2 aimDir = ammoDir;
             if (leads)
@@ -459,12 +481,9 @@ public class TurretFiringSystem : GameSystem
 
             Vector2 spawnPos = turretPos + pelletDir * AmmoSpawnOffset;
             if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))
-            {
-                Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
-                spawnPos = EnemySpawnPosition(turretPos, pelletDir, forwardDir, ship.Radius);
-            }
+                spawnPos = EnemySpawnPosition(turretPos, pelletDir, Angle.Direction(turretAngle), ship.Radius);
 
-            Vector2 ammoVel = pelletDir * ammoSpeed + carriedVelocity;
+            Vector2 ammoVel = pelletDir * flightSpeed + carriedVelocity;
 
             float ammoRadius = GetAmmoRadius(turret);
             int damage = turret.Weapon.Damage;
@@ -501,7 +520,7 @@ public class TurretFiringSystem : GameSystem
                     new Position(spawnPos),
                     new Velocity(ammoVel),
                     ammo,
-                    new Missile(target.Target, ammoSpeed, turret.Weapon.HomingTurnRate, Steering: 0f),
+                    new Missile(target.Target, flightSpeed, ammoSpeed, WeaponStats.MissileLaunchAcceleration, turret.Weapon.HomingTurnRate, Steering: 0f),
                     new Health(missileHealth, missileHealth));
             }
             else
