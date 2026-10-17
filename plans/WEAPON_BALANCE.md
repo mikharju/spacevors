@@ -103,7 +103,9 @@ DPS premium that short-range guns used to need shrinks with it (§3 R2).
   (reach band, delivery, burst/stream, slot) plus one signature stat.
 - **R14 — colour is an identity channel.** Yellow = kinetic, Blue = precision energy, Violet =
   laser, Green = chemical, Cyan = particle. A player should read a loadout from the tracers alone.
-  Orange is the guided channel (plans/MISSILES.md): an orange round is steering at something.
+  Orange is the guided channel (plans/MISSILES.md): an orange **plume** is one of yours steering at
+  something, a red plume is one hunting you. The body is light grey on both sides — the shape says guided,
+  the flame says whose.
 
 ### The guided-gun rules (added with missiles, plans/MISSILES.md)
 

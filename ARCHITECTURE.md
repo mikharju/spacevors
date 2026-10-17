@@ -208,7 +208,10 @@ a fixed-size nose: at 2.5 a round drew a 10 px dart and read as a bright dot at 
 fired across. The plume answers two numbers — the rudder (`Steering`) and the throttle (how far the round is
 still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The
 player's guided rounds are Orange (the guided colour) and the enemy's stay
-Red, because colour is the threat channel and the shape is what says "guided". A rack's mount marker is a
+Red, because colour is the threat channel and the shape is what says "guided". Both bodies are painted the
+same light grey (`MissileBodyColor`) — a missile is a piece of hardware, not a faction badge — so the
+**flame** is the colour channel: the round's own ammo colour, Orange for the player's racks and Red for an
+enemy's, washing toward white only while the round is turning hard. A rack's mount marker is a
 square that does not turn, against the round empty mounts and the aiming triangles of gun mounts.
 
 ## Cross-system signaling

@@ -539,8 +539,10 @@ plans/DIFFICULTY_SCALING.md R2.12).
   round at a slow launch. The enemy rack keeps its cone and keeps aiming, because a round launched backwards
   from a 980-1330 px ring could not cross that ring inside its fuse.
 - **The dart is drawn 7.5 × the collision radius** — a fixed 5 px nose over a 3× longer shaft, ~45 px for the
-  torpedo and ~30 px for the pod rounds. At 2.5 it drew ~15 px and read as a bright dot. The plume answers
-  both the turn and the throttle still running, with floors on length and brightness.
+  torpedo and ~30 px for the pod rounds. At 2.5 it drew ~15 px and read as a bright dot. The body is painted
+  light grey for both sides, so the **flame** is the colour channel: Orange for the player's racks, Red for an
+  enemy's. It answers both the turn and the throttle still running, keeps its full colour at cruise, washes
+  toward white only in a hard turn, and has floors on length and brightness either way.
 - Sim cost: the pinned scenarios run unarmed, so they prove no regression only — `ammo-spray` sim median
   **1.30-1.34 ms** and `impact-storm` **2.16-2.19 ms**, against 1.33 / 2.12 before any missile code (this
   host's p99 band is ±0.3 ms, so all of it sits inside noise). A missile-carrying scenario is the missing

@@ -185,10 +185,11 @@ public static class WorldRenderer
             float effort = MathF.Max(steering, boost);
             float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * effort);
 
-            Color body = AmmoColorOf(ammo.Color);
-            // The work the round is doing makes the flame longer, whiter and brighter: the player reads
-            // "this round is committed that way" off the same numbers the sim computed.
-            Color flame = MixTowardWhite(body, ExhaustWhiteMix + ExhaustHardTurnMix * effort);
+            Color body = MissileBodyColor;
+            // The flame carries the identity: the round's own ammo colour (Orange for the player's guns,
+            // Red for an enemy rack). The work the round is doing makes it longer, whiter and brighter, so
+            // the player reads "this round is committed that way" off the same numbers the sim computed.
+            Color flame = MixTowardWhite(AmmoColorOf(ammo.Color), ExhaustWhiteMix + ExhaustHardTurnMix * effort);
             flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * effort);
 
             ShapeSprites.DrawMissile(cx, cy, Angle.Of(ammo.Velocity),
@@ -198,15 +199,21 @@ public static class WorldRenderer
         }
     }
 
+    // A guided round's body is painted hardware, not a faction marker: light grey for both sides, so a
+    // missile reads as an object against the dark rather than as a coloured dot. The flame is the colour
+    // channel — the round's ammo colour — and the elongated shape is what says "guided".
+    static readonly Color MissileBodyColor = new(205, 208, 218, 255);
+
     // Drawn body length per px of collision radius. Three times what it was: at 2.5 a 4 px round drew a
     // 10 px dart, which at the ranges a missile is fired across read as a bright dot rather than an object
     // with a nose and a tail.
     const float MissileBodyStretch = 7.5f;
     const float MissileExhaustCruise = 0.45f, MissileExhaustHardTurn = 1f;
     const float ExhaustWidthScale = 1.5f;
-    // The flame stays the body's colour when cruising and only washes out toward white when the round
-    // is swinging hard, so the plume never turns grey.
-    const float ExhaustWhiteMix = 0.25f, ExhaustHardTurnMix = 0.45f;
+    // The flame keeps its full colour while cruising and only washes toward white at a hard turn, so the
+    // saturation reads as "this is an orange plume" at rest and as heat when the round is committed. With a
+    // grey body the plume is the only colour on the round, so it is not washed at cruise any more.
+    const float ExhaustWhiteMix = 0f, ExhaustHardTurnMix = 0.35f;
     // Cruise alpha stays high: a guided round the player cannot see is a guided round the player
     // cannot dodge, so the flame dims with the turn but never goes faint.
     const byte ExhaustCruiseAlpha = 210;

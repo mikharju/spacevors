@@ -42,7 +42,10 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   and its aim: a round launched backwards from a 980-1330 px ring cannot cross that ring inside a 6 s fuse
   (R21), so the exemption is deliberately one-sided. On screen the body is drawn 7.5 × the collision radius
   with a fixed 5 px nose over a 25 px shaft — a torpedo dart measures ~45 px long in a frame against ~15 px
-  before, which is what "reads as a bright dot" was really about.
+  before, which is what "reads as a bright dot" was really about. Both bodies are then painted the same
+  **light grey**, and the flame takes over the colour channel: Orange for the player's racks, Red for an
+  enemy's, at full saturation while cruising and washing toward white only in a hard turn (the grey body
+  means the plume no longer has to hold the identity on its own).
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
   prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
   missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is
