@@ -37,19 +37,25 @@ public static class ThreatMeter
         int ships = 0, shipsInRing = 0, enemyRounds = 0, mines = 0, smallRocks = 0;
         float incomingDps = 0f, playerDps = 0f;
 
-        foreach (var (entity, _, pos, turret) in view.GetEntitiesWithComponents<EnemyShip, Position, Turret>())
+        foreach (var (entity, ship, pos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
         {
             // A wreck still carries its gun while its death animation plays.
             if (view.HasComponent<Dead>(entity)) continue;
 
             ships++;
 
-            float reach = turret.Range + player.Radius;
+            // The ring is the hull's own firing range, which its gun is built from; a rack reaches
+            // farther than the guns and is counted as the hull's reach too. Read off the hull rather
+            // than off a `Turret`, because a missile-only hull has no gun to look at.
+            float reach = ship.FiringRange + player.Radius;
+            if (view.TryGetComponent<MissileWeapon>(entity, out var rack)) reach = Math.Max(reach, rack.Range + player.Radius);
+
             var diff = pos.Value - playerPos;
             if (diff.X * diff.X + diff.Y * diff.Y > reach * reach) continue;
 
             shipsInRing++;
-            incomingDps += turret.Weapon.FireRate * turret.Weapon.PelletCount * turret.Weapon.Damage;
+            if (view.TryGetComponent<Turret>(entity, out var turret))
+                incomingDps += turret.Weapon.FireRate * turret.Weapon.PelletCount * turret.Weapon.Damage;
         }
 
         foreach (var (_, ammo) in view.GetEntitiesWithComponents<Ammo>())

@@ -100,7 +100,7 @@ public class EnemyDifficultyTest
     {
         var em = new EntityManager();
         var ship = em.CreateEntity();
-        foreach (var component in EnemyShipFactory.CreateComponents(Vector2.Zero, Vector2.Zero, 0f, 0f, type, elapsed))
+        foreach (var component in EnemyShipFactory.CreateComponents(Vector2.Zero, Vector2.Zero, 0f, 0f, type, EnemyArmament.Guns, elapsed))
             component.Apply(em, ship);
 
         return (em.GetComponent<EnemyShip>(ship), em.GetComponent<Turret>(ship));

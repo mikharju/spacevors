@@ -359,7 +359,7 @@ public sealed class GameSession
             var pos = _em.GetComponent<Position>(_playerEntity);
             var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
             var testEnemy = _em.CreateEntity();
-            EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default);
+            EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default, EnemyArmament.Guns);
             _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }

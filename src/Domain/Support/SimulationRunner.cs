@@ -21,6 +21,7 @@ public sealed class SimulationRunner
         ActionSystems = new GameSystem[]
         {
             new TurretFiringSystem(),
+            new EnemyMissileFiringSystem(),
             new EnemyShipSpawnSystem()
         };
 

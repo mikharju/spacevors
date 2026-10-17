@@ -46,12 +46,12 @@ public class EnemyShipSpawnSystem : GameSystem
 
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
-        var enemyShipType = EnemyShipFactory.PickRandomType(rng);
+        var (enemyShipType, armament) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
         Vector2 initialVel = playerVel * SpawningStats.EnemyShips.FollowFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
         float facingAngle = SpawnPlacement.AngleFromTo(testSpawnPos, playerPos.Value);
 
         // Tier stats are derived from elapsed time at spawn (plans/DIFFICULTY_SCALING.md P5).
-        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType, view.ElapsedTime);
+        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType, armament, view.ElapsedTime);
 
         commands.AddEntity(components);
 

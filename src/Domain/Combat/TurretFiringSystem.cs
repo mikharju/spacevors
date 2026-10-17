@@ -18,6 +18,13 @@ public class TurretFiringSystem : GameSystem
     public const float AmmoSpawnOffset = 20f;
     public const float AmmoSpeedVariation = 0.3f;
 
+    // An enemy round — gun or rack — leaves its hull clear of the body, not merely clear of the mount,
+    // so it can never be born inside the hull that threw it. Both enemy passes use this one helper.
+    private const float HullClearance = 5f;
+
+    public static Vector2 EnemySpawnPosition(Vector2 hullPos, Vector2 aimDir, Vector2 hullForward, float hullRadius) =>
+        hullPos + aimDir * AmmoSpawnOffset + hullForward * (hullRadius + HullClearance);
+
     // A manually selected target may be engaged at this multiple of normal range, capped by ammo reach.
     private const float TargetedRangeMultiplier = 3f;
 
@@ -306,9 +313,8 @@ public class TurretFiringSystem : GameSystem
 
                     // Engage when any part of the hull is inside the firing cone.
                     float dist = MathF.Sqrt(distSq);
-                    float angularMargin = MathF.Asin(Math.Clamp(player.Radius / dist, -1f, 1f));
                     Vector2 toCenterDir = relPos / dist;
-                    if (Vector2.Dot(forwardDir, toCenterDir) < MathF.Cos(halfArc + angularMargin)) continue;
+                    if (!FiringArc.Engulfs(forwardDir, toCenterDir, halfArc, player.Radius, dist)) continue;
 
                     Vector2 relVel = playerVel.Value - enemyVelocity;
                     float ammoSpeed = es.TurretAmmoSpeed;
@@ -451,15 +457,13 @@ public class TurretFiringSystem : GameSystem
                 aimDir.X * sinOff + aimDir.Y * cosOff
             );
 
-            Vector2 spawnOffset = pelletDir * AmmoSpawnOffset;
+            Vector2 spawnPos = turretPos + pelletDir * AmmoSpawnOffset;
             if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var ship))
             {
-                float forwardOffset = ship.Radius + 5f;
                 Vector2 forwardDir = new Vector2((float)Math.Sin(turretAngle), -(float)Math.Cos(turretAngle));
-                spawnOffset += forwardDir * forwardOffset;
+                spawnPos = EnemySpawnPosition(turretPos, pelletDir, forwardDir, ship.Radius);
             }
 
-            var spawnPos = turretPos + spawnOffset;
             Vector2 ammoVel = pelletDir * ammoSpeed + carriedVelocity;
 
             float ammoRadius = GetAmmoRadius(turret);

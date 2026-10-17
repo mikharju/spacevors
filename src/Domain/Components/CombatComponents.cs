@@ -16,6 +16,16 @@ public readonly record struct FireCooldown(float Timer);
 // The turn limit is what makes a missile dodgeable — its turn radius is Speed / TurnRate.
 public readonly record struct Missile(Entity LockedTarget, float Speed, float TurnRate, float Steering);
 
+// The missile rack an enemy hull carries: its own gun stats and its own launch ring, separate from the
+// hull's `Turret` so a hull can carry guns, a rack, or both, each on its own cooldown. The ring is
+// deliberately wider than the hull's gun range (plans/MISSILES.md §9): missiles buy reach instead of
+// changing how the hull flies.
+public readonly record struct MissileWeapon(WeaponStats Weapon, float Range);
+
+// Countdown between this hull's missile launches, ticked by EnemyMissileFiringSystem. Held by the hull
+// rather than the round, because the limit that matters is how often a launcher can reload.
+public readonly record struct MissileCooldown(float Timer);
+
 // A weapon a turret entity carries. ArcAngle is only read for enemy turrets, which are aimed by
 // their hull; a player turret's arc comes from the TurretSlot it is mounted in.
 public readonly record struct Turret(
