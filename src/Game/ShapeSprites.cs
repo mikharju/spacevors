@@ -73,14 +73,19 @@ static class ShapeSprites
     // exhaust, authored white and tinted per draw like the disc. The exhaust is its own image so it
     // can stretch and brighten without moving the body, and it always has a floor: a guided round that
     // goes invisible mid-flight is a round the player cannot dodge.
-    const int BodyWidth = 8;
+    // Both sprites are an **odd** number of pixels wide on purpose. Each is rotated about the centre of its
+    // texture, and an even width has no centre column: the triangle's apex lands on a column to one side of
+    // that point and the slopes rasterise unevenly, so the shape leans half a pixel. On the exhaust that
+    // lean is all the player sees at cruise — only the apex end is outside the tail — and it reads as the
+    // flame sitting off the missile's axis when the round flies sideways.
+    const int BodyWidth = 9;
 
     // The nose is a fixed triangle — it is the point of the thing, it does not stretch with the airframe —
     // and the shaft under it is what carries the read. The shaft used to be 8 px tall, and at the length a
     // round is actually drawn on screen the whole missile read as a bright dot.
     const int TipHeight = 5, ShaftHeight = 25;
     const int BodyHeight = TipHeight + ShaftHeight;
-    const int ExhaustWidth = 8, ExhaustHeight = 12;
+    const int ExhaustWidth = 9, ExhaustHeight = 12;
 
     // How much of the plume's own length stays inside the body's tail: 0 butts the two shapes together,
     // 1 hides the whole plume inside the hull. The plume is anchored on the **tail**, not part-way between

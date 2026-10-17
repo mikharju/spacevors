@@ -48,7 +48,13 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   means the plume no longer has to hold the identity on its own). The plume is anchored on the body's tail
   with a quarter of its own length buried inside it: anchored part-way between the centre and the tail, a
   lengthening plume — which is exactly what boost and a hard turn do — slid forward and out past the nose,
-  and the flame read as a separate object trailing a turning missile.
+  and the flame read as a separate object trailing a turning missile. Both sprites are also an **odd** number
+  of pixels wide now: each is rotated about the centre of its texture, and an even width has no centre column,
+  so the generated triangle leaned half a pixel to one side of the axis. Measured by compositing the real
+  sprite masks with the renderer's own placement math: the plume's drawn mass sat 0.44 px off the missile's
+  centre line, which for a round flying right landed below the line (and above for one flying left) — the
+  small/cruise plume showed it most because only its apex end is outside the tail. At 9 px wide the lean is
+  0.13 px.
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
   prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
   missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is
