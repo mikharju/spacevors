@@ -7,7 +7,7 @@ public static class UpgradeStats
     public static int XpForLevel(int level) => level * 10;
 }
 
-public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust }
+public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth }
 
 public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multiplier = 1f, int Additive = 0)
 {
@@ -24,8 +24,11 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
     public static UpgradeDefinition TurnSpeed { get; } = new(UpgradeOption.TurnSpeed, Multiplier: 1.1f);
     public static UpgradeDefinition SideThrust { get; } = new(UpgradeOption.SideThrust, Multiplier: 1.1f);
     public static UpgradeDefinition BackThrust { get; } = new(UpgradeOption.BackThrust, Multiplier: 1.1f);
+    // R19: one more hit point on every round this mount fires, for the guns whose rounds can be shot
+    // down. Rounds that cannot be shot down ignore the stat.
+    public static UpgradeDefinition MissileHealth { get; } = new(UpgradeOption.MissileHealth, Additive: 1);
 
-    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust];
+    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth];
 
     public static UpgradeDefinition For(UpgradeOption stat) => All.First(d => d.Stat == stat);
 }

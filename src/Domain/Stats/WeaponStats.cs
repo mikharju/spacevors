@@ -39,13 +39,24 @@ public readonly record struct WeaponStats(
     bool SalvoGrows = true,
     // Hitscan multi-pellet weapons fire parallel beams offset perpendicular to the aim by
     // this spacing per pellet step (0 = all beams from the same point).
-    float BeamSpacing = 0f)
+    float BeamSpacing = 0f,
+    // Hit points of one guided round (R19). The other side's fire can shoot the missile down, so a
+    // guided round is a body with health; dumb ammo is not, and this is unused there.
+    int MissileHealth = 1)
 {
     // R17: how many guided rounds one mount may put in flight per second. Guided rounds live for
     // seconds and cannot be dodged by luck, so their budget is far tighter than the 12 rounds/s of
     // dumb ammo (R7). It is also the ceiling on a homing gun's growing volley (R18): a FireRate card
     // stops offering "+1 shot" once the next shot would break it.
     public const float HomingRoundBudget = 4f;
+
+    // R19: how tough one guided round can be made. A round that eats four hits of ordinary fire stops
+    // being a body worth shooting at and becomes a second magazine, so three is the ceiling.
+    public const int MissileHealthCeiling = 3;
+
+    // R19: whether a `MissileHealth` card on this gun has somewhere to go: only a guided round carries
+    // hit points, and only up to the ceiling. Same reason the "+1 shot" card is withdrawn at R18.
+    public bool CanToughenRound => Homing && MissileHealth < MissileHealthCeiling;
 
     // R18: whether a `FireRate` card on this gun still has somewhere to go as "+1 shot". Volley guns
     // grow forever as they always have; a guided volley stops when the next shot would break the

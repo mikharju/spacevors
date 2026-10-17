@@ -32,6 +32,7 @@ public class CollisionSystem : GameSystem
     private readonly Dictionary<Entity, int> _frameRemainingHealth = new();
     private readonly HashSet<Entity> _hitMines = new();
     private readonly HashSet<Entity> _hitAsteroids = new();
+    private readonly HashSet<Entity> _hitMissiles = new();
     private readonly Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)> _shipDeathData = new();
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
@@ -52,6 +53,7 @@ public class CollisionSystem : GameSystem
         _frameRemainingHealth.Clear();
         _hitMines.Clear();
         _hitAsteroids.Clear();
+        _hitMissiles.Clear();
         _shipDeathData.Clear();
         bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
@@ -114,6 +116,15 @@ public class CollisionSystem : GameSystem
 
                 ResolveCollision(view, pos, new Position(candidate.Position), entity, candidate.Id, ship.Radius, candidate.Radius, true, commands, EnemyShipMass);
             }
+        }
+
+        // Guided rounds are bodies, not just shots, so they go in the grid: the other side's fire can
+        // shoot them down. Their own side's rounds skip them in the sweep below, which also means a
+        // round can never collide with itself.
+        foreach (var (entity, _, round) in view.GetEntitiesWithComponents<Missile, Ammo>())
+        {
+            var pos = view.GetComponent<Position>(entity);
+            _grid.Insert(entity, SpatialGrid.CollisionKind.Missile, pos.Value, round.Radius);
         }
 
         gridBuildSw.Stop();
@@ -221,6 +232,10 @@ public class CollisionSystem : GameSystem
             Vector2 shipHitPos = default;
             float shipT = float.MaxValue;
 
+            Entity? earliestMissileHit = null;
+            Vector2 missileContact = default;
+            float missileT = float.MaxValue;
+
             int count = QueryBox(boxMin, boxMax);
             var queryBuffer = _queryBuffer;
 
@@ -267,6 +282,20 @@ public class CollisionSystem : GameSystem
                             shipT = t;
                         }
                         break;
+
+                    // A guided round is a body with hit points, and only the other side's fire counts:
+                    // that check is what stops the player's bullets from being eaten by the player's own
+                    // missiles, and it stops a round from colliding with itself.
+                    case SpatialGrid.CollisionKind.Missile:
+                        if (!view.TryGetComponent<Ammo>(candidate.Id, out var candidateRound)
+                            || candidateRound.IsEnemy == ammo.IsEnemy) break;
+                        if (t < missileT)
+                        {
+                            earliestMissileHit = candidate.Id;
+                            missileContact = contact;
+                            missileT = t;
+                        }
+                        break;
                 }
             }
 
@@ -305,6 +334,21 @@ public class CollisionSystem : GameSystem
                 var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
                 _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
                 // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
+                _entitiesToDestroy.Add(ammoEntity);
+            }
+
+            if (earliestMissileHit.HasValue && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
+            {
+                if (!_frameRemainingHealth.TryGetValue(earliestMissileHit.Value, out var mHealth))
+                {
+                    mHealth = missileHealthComp.Current;
+                    _frameRemainingHealth[earliestMissileHit.Value] = mHealth;
+                }
+                _frameRemainingHealth[earliestMissileHit.Value] -= ammo.Damage;
+                _hitMissiles.Add(earliestMissileHit.Value);
+                _effectsToSpawn.Add((missileContact, MineType.Small));
+                // The round that shot it down is spent, exactly as against a hull: a bullet that kills
+                // a missile does not carry on into whatever the missile was covering.
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
@@ -444,6 +488,25 @@ public class CollisionSystem : GameSystem
                                     _shipDeathData[firstHit.Value] = (beamHitPoint, beamShipPos.Value, beamShip.Radius, beamShip.GraphicsId);
                             }
                             break;
+
+                        case SpatialGrid.CollisionKind.Missile:
+                            // A beam stops at a guided round as it stops at a hull. Only the enemy's
+                            // rounds are in the way here: this branch runs for the player's beams, so a
+                            // round the player fired is on the same side and passes through.
+                            if (view.TryGetComponent<Ammo>(firstHit.Value, out var beamRound)
+                                && beamRound.IsEnemy
+                                && view.TryGetComponent<Health>(firstHit.Value, out var beamMissileHealth))
+                            {
+                                if (!_frameRemainingHealth.TryGetValue(firstHit.Value, out var beamMissileRemaining))
+                                {
+                                    beamMissileRemaining = beamMissileHealth.Current;
+                                    _frameRemainingHealth[firstHit.Value] = beamMissileRemaining;
+                                }
+                                _frameRemainingHealth[firstHit.Value] -= beam.Damage;
+                                _hitMissiles.Add(firstHit.Value);
+                                _effectsToSpawn.Add((firstContact, MineType.Small));
+                            }
+                            break;
                     }
                 }
             }
@@ -528,6 +591,26 @@ public class CollisionSystem : GameSystem
             view.TryGetComponent<Velocity>(asteroidEntity, out var drift);
             AsteroidFactory.SpawnBreakupSmoke(commands, pos.Value, drift.Value, rock.Radius, view.Rng);
             commands.Add(new DestroyEntityCommand(asteroidEntity));
+        }
+
+        foreach (var missileEntity in _hitMissiles)
+        {
+            var remaining = _frameRemainingHealth[missileEntity];
+            if (remaining > 0)
+            {
+                var missileHealth = view.GetComponent<Health>(missileEntity);
+                commands.Add(new AddComponentCommand<Health>(missileEntity, new Health(remaining, missileHealth.Max)));
+                continue;
+            }
+
+            // Shot down, not detonated: a missile that dies to gunfire breaks up in smoke where it hung
+            // and its warhead never goes off. A damage popup beside the hull from a shot the player
+            // took on purpose would teach the wrong lesson.
+            var pos = view.GetComponent<Position>(missileEntity);
+            view.TryGetComponent<Velocity>(missileEntity, out var drift);
+            var round = view.GetComponent<Ammo>(missileEntity);
+            AsteroidFactory.SpawnBreakupSmoke(commands, pos.Value, drift.Value, round.Radius, view.Rng);
+            commands.Add(new DestroyEntityCommand(missileEntity));
         }
 
         foreach (var (_, shipEntity, hitPoint, shipPos, _, shipRadius, graphicsId) in _ammoToShipHits)

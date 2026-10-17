@@ -109,6 +109,11 @@ public class LevelUpSystem : GameSystem
                 if (!stats.Hitscan)
                     allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
 
+                // R19: only a guided round has hit points to raise, and only up to the ceiling, so the
+                // card exists only for the guns that fire them and only while they can still take it.
+                if (stats.CanToughenRound)
+                    allOptions.Add(new UpgradableOption(weapon, UpgradeOption.MissileHealth));
+
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
             }
 

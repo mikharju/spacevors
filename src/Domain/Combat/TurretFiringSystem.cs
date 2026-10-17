@@ -488,13 +488,17 @@ public class TurretFiringSystem : GameSystem
             // A guided round carries its lock and its own flight numbers, so nothing downstream has to
             // find the gun back. The locked entity may be gone when the round arrives; guidance treats a
             // missing lock as "fly on until the fuse dies".
+            // It also carries hit points: a round that steers is worth shooting down, and only the
+            // other side's fire can do it.
             if (turret.Weapon.Homing)
             {
+                int missileHealth = turret.Weapon.MissileHealth;
                 commands.AddEntity(
                     new Position(spawnPos),
                     new Velocity(ammoVel),
                     ammo,
-                    new Missile(target.Target, ammoSpeed, turret.Weapon.HomingTurnRate, Steering: 0f));
+                    new Missile(target.Target, ammoSpeed, turret.Weapon.HomingTurnRate, Steering: 0f),
+                    new Health(missileHealth, missileHealth));
             }
             else
             {

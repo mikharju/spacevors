@@ -14,7 +14,9 @@ public class SpatialGrid
     {
         Asteroid,
         EnemyMine,
-        EnemyShip
+        EnemyShip,
+        // A guided round is a body the other side's fire can shoot down, so it is in the grid too.
+        Missile
     }
 
     public SpatialGrid(float cellSize)

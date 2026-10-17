@@ -208,6 +208,8 @@ public static class UpgradeMenuRenderer
         {
             UpgradeOption.Range => $"{o.WeaponName} range",
             UpgradeOption.Damage => $"{o.WeaponName} damage",
+            // R19: the rounds are what carry the hit points, so the card says whose rounds get tougher.
+            UpgradeOption.MissileHealth => $"{o.WeaponName} missile health",
             UpgradeOption.PickupRadius => "pickup radius",
             _ => $"{o.WeaponName} {o.Stat}"
         };

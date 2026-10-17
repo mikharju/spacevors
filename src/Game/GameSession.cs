@@ -930,6 +930,13 @@ public sealed class GameSession
                     em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { AmmoSpeed = turret.Weapon.AmmoSpeed * def.Multiplier } });
                 break;
 
+            case UpgradeOption.MissileHealth:
+                // The card is bought for the mount, so it lands on the rounds the mount fires next and
+                // not on the ones already in the air.
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = turret.Weapon.MissileHealth + def.Additive } });
+                break;
+
             case UpgradeOption.PickupRadius:
                 em.AddComponent(playerEntity, playerStats with { PickupRadius = playerStats.PickupRadius * def.Multiplier });
                 break;
