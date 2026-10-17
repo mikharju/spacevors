@@ -367,6 +367,19 @@ public sealed class GameSession
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
         }
 
+        // Diagnostic only: spawn a rack-armed hull, so an enemy missile can be watched without waiting for
+        // the armament ladder to roll one (composition tier 3, ~3 minutes of play).
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.U))
+        {
+            var pos = _em.GetComponent<Position>(_playerEntity);
+            var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
+            var rackHull = _em.CreateEntity();
+            EnemyShipFactory.AddComponents(_em, rackHull, spawnPos, Vector2.Zero, 0f, 0f,
+                EnemyShipType.Interceptor, EnemyArmament.Missiles, _em.ElapsedTime);
+            _em.AddComponent(rackHull, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
+            DiagnosticLogger.LogEvent("target", $"rack test hull {rackHull} at ({spawnPos.X}, {spawnPos.Y})");
+        }
+
         // Diagnostic only: halve the hp of the locked target (or nearest enemy ship) to reach
         // the smoke and hull damage shading tiers quickly.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.K))
