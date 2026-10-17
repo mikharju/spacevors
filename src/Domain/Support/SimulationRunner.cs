@@ -35,6 +35,9 @@ public sealed class SimulationRunner
 
         IntentSystems = new GameSystem[]
         {
+            // First: it decides next tick's heading for every missile, and the round must move by it
+            // before the collision sweep reads its velocity.
+            new MissileGuidanceSystem(),
             new MineDriftSystem(),
             new MineRespawnSystem(),
             new EnemyShipSystem(),

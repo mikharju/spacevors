@@ -256,14 +256,20 @@ public class TurretFiringSystem : GameSystem
                 else
                 {
                     float targetedRange = Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
-                    aimed = EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
+
+                    // A guided round steers instead of being led, so its lock is taken where the target
+                    // is; only the range cap is shared with the lead-predicted path.
+                    aimed = turret.Weapon.Homing
+                        ? EvaluateStaticTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange)
+                        : EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
                 }
                 if (aimed.HasValue) return aimed;
             }
 
             // Auto-targeting sees only what shoots back: enemy ships and mines. A rock is scenery
-            // until the player clicks one, which is the path above.
-            if (turret.AutoTarget && !turret.Weapon.Hitscan)
+            // until the player clicks one, which is the path above. A homing round needs no lead
+            // solution either — it will turn onto whatever it locked — so it scans like a beam does.
+            if (turret.AutoTarget && !turret.Weapon.Hitscan && !turret.Weapon.Homing)
             {
                 FindTargetWithPrediction(view, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed, ref nearestTarget, ref nearestDistSq);
             }
@@ -477,7 +483,23 @@ public class TurretFiringSystem : GameSystem
                 continue;
             }
 
-            commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor));
+            var ammo = new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor);
+
+            // A guided round carries its lock and its own flight numbers, so nothing downstream has to
+            // find the gun back. The locked entity may be gone when the round arrives; guidance treats a
+            // missing lock as "fly on until the fuse dies".
+            if (turret.Weapon.Homing)
+            {
+                commands.AddEntity(
+                    new Position(spawnPos),
+                    new Velocity(ammoVel),
+                    ammo,
+                    new Missile(target.Target, ammoSpeed, turret.Weapon.HomingTurnRate, Steering: 0f));
+            }
+            else
+            {
+                commands.AddEntity(new Position(spawnPos), new Velocity(ammoVel), ammo);
+            }
         }
 
         if (turret.Weapon.KickbackForce > 0)

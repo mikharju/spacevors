@@ -26,6 +26,13 @@ public readonly record struct WeaponStats(
     // Hitscan weapons fire instant LaserBeams instead of travelling Ammo:
     // AmmoSpeed/ShotLifetime are unused, aim skips lead prediction, beam length = turret range.
     bool Hitscan = false,
+    // Homing weapons fire guided Missiles instead of dumb Ammo: the round locks on whatever the gun
+    // acquired at launch and steers toward it, so it needs no lead solution and no clear line — only
+    // a fuse long enough to cross the distance and a turn limit good enough to catch what it hunts.
+    bool Homing = false,
+    // Steering limit of a homing round, rad/s. Its turn radius is AmmoSpeed / HomingTurnRate: below a
+    // target's own turn radius the missile cannot catch it, which is what keeps a lock dodgeable.
+    float HomingTurnRate = 0f,
     // Hitscan multi-pellet weapons fire parallel beams offset perpendicular to the aim by
     // this spacing per pellet step (0 = all beams from the same point).
     float BeamSpacing = 0f);

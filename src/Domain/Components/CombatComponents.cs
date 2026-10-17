@@ -10,6 +10,12 @@ public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetim
 
 public readonly record struct FireCooldown(float Timer);
 
+// A guided round: the entity it is locked onto, the speed it was launched at, how hard it may turn
+// (rad/s), and how hard it turned last tick (0..1) — the renderer draws the exhaust from that.
+// Self-contained: the round carries its own flight numbers, so guidance never looks upstream.
+// The turn limit is what makes a missile dodgeable — its turn radius is Speed / TurnRate.
+public readonly record struct Missile(Entity LockedTarget, float Speed, float TurnRate, float Steering);
+
 // A weapon a turret entity carries. ArcAngle is only read for enemy turrets, which are aimed by
 // their hull; a player turret's arc comes from the TurretSlot it is mounted in.
 public readonly record struct Turret(
