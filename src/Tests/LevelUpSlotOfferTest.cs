@@ -112,18 +112,54 @@ public class LevelUpSlotOfferTest
         }
     }
 
+    // R18: a guided volley that has reached its round budget (R17) is not dealt another "+1 shot"
+    // card. Below the ceiling the same gun still is, so the card is withdrawn, not banned.
+    [Fact]
+    public void GuidedVolleyAtItsCeiling_IsNotOfferedAnotherShot()
+    {
+        WeaponMount[] swarmOnly = [new(TurretSlotName.MainGun, WeaponType.Swarmlet)];
+
+        foreach (int pellets in new[] { WeaponType.Swarmlet.Stats.PelletCount, 5 })
+        {
+            var (em, _) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1, swarmOnly);
+            foreach (var (turretEntity, turret) in em.GetEntitiesWithComponents<Turret>().ToList())
+                em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { PelletCount = pellets } });
+
+            bool offered = false;
+            for (int levelUp = 0; levelUp < 12; levelUp++)
+            {
+                RunLevelUp(em);
+
+                foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
+                {
+                    if (options.Options.Any(o => o.Stat == UpgradeOption.FireRate && o.WeaponName == WeaponType.Swarmlet.Name))
+                        offered = true;
+                    em.DestroyEntity(entity);
+                }
+            }
+
+            var grown = WeaponType.Swarmlet.Stats with { PelletCount = pellets };
+            Assert.Equal(grown.CanGrowSalvo, offered);
+        }
+    }
+
     // Tier gating: the pool is what new-weapon cards are drawn from, so unlocking a gun is a matter
     // of which level its UnlockLevel reaches. Tier 2 opens with the first milestone hand (level 5).
     [Fact]
     public void TierTwoGuns_UnlockWithTheFirstMilestone()
     {
-        string[] advanced = ["RailGun", "LaserLance", "PrismLance", "GravitonBurst", "AcidBubbleSpray"];
+        string[] advanced = ["RailGun", "LaserLance", "PrismLance", "GravitonBurst", "AcidBubbleSpray", "SeekerPod", "Swarmlet"];
 
         foreach (string name in advanced)
         {
             Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(1), w => w.Name == name);
             Assert.Contains(WeaponType.NewWeaponPoolFor(5), w => w.Name == name);
         }
+
+        // Guided guns unlock in two steps: the small pods with the first milestone hand, the big
+        // torpedo only for a run that has reached level 10.
+        Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(5), w => w.Name == "HavocTorpedo");
+        Assert.Contains(WeaponType.NewWeaponPoolFor(10), w => w.Name == "HavocTorpedo");
 
         Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(5), w => w.Name == WeaponType.LoadTestWeapon.Name);
     }

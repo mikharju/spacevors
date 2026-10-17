@@ -2,7 +2,7 @@ using Spacevors.Domain.Stats; // WeaponStats
 
 namespace Spacevors.Domain.Components;
 
-public enum AmmoColor { Yellow, Green, Blue, Red, Cyan, Violet }
+public enum AmmoColor { Yellow, Green, Blue, Red, Cyan, Violet, Orange }
 
 // Radius is the capsule half-thickness: collision and rendering treat the bullet as the
 // segment [Position - Velocity*dt, Position] inflated by it, so wide shots score grazing hits.

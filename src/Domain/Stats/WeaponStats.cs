@@ -33,9 +33,26 @@ public readonly record struct WeaponStats(
     // Steering limit of a homing round, rad/s. Its turn radius is AmmoSpeed / HomingTurnRate: below a
     // target's own turn radius the missile cannot catch it, which is what keeps a lock dodgeable.
     float HomingTurnRate = 0f,
+    // Whether a `FireRate` card on this gun adds another shot to the volley (the Shotgun tradition) or
+    // genuinely fires the same shots sooner. Guided rounds stay live for seconds, so a gun that grows
+    // its volley is a standing claim on the round budget (R17): most homing guns do not grow.
+    bool SalvoGrows = true,
     // Hitscan multi-pellet weapons fire parallel beams offset perpendicular to the aim by
     // this spacing per pellet step (0 = all beams from the same point).
-    float BeamSpacing = 0f);
+    float BeamSpacing = 0f)
+{
+    // R17: how many guided rounds one mount may put in flight per second. Guided rounds live for
+    // seconds and cannot be dodged by luck, so their budget is far tighter than the 12 rounds/s of
+    // dumb ammo (R7). It is also the ceiling on a homing gun's growing volley (R18): a FireRate card
+    // stops offering "+1 shot" once the next shot would break it.
+    public const float HomingRoundBudget = 4f;
+
+    // R18: whether a `FireRate` card on this gun still has somewhere to go as "+1 shot". Volley guns
+    // grow forever as they always have; a guided volley stops when the next shot would break the
+    // guided-round budget, and a gun that never grows its volley takes the card as a rate instead.
+    // Both the offer (LevelUpSystem) and the apply (GameSession) read this, so a card is never a lie.
+    public bool CanGrowSalvo => SalvoGrows && PelletCount > 1 && (!Homing || FireRate * (PelletCount + 1) <= HomingRoundBudget);
+}
 
 // Static weapon identity: what fits where, and what the weapon is. Everything the turret carries
 // at runtime (fire rate, damage, slew rate) is in WeaponStats.
@@ -90,10 +107,28 @@ public readonly record struct WeaponType(
     // Wide flak disc: the disc width and the cone do the aiming.
     public static WeaponType FlakCurtain { get; } = new("FlakCurtain", new(FireRate: 12f, AmmoSpeed: 500f, KickbackForce: 0f, PelletCount: 1, Scatter: 0.5f, ShotLifetime: 1.5f, Damage: 1, TurnSpeed: TurnDeg(300f)), TurretSize.Small, 600f, AmmoRadius: 9f, Color: AmmoColor.Green);
 
+    // Guided rounds. A missile is not a slower bullet: it is delivery that cannot be missed, so it
+    // buys the *least* damage of its reach band (R15), and its turn radius — AmmoSpeed / HomingTurnRate
+    // — has to stay wider than what it hunts, or a lock becomes a death sentence (R16). They are all
+    // slow-firing: R17 caps a mount at 4 guided rounds in flight per second.
+    // SeekerPod: the small hull's first missile. 115 px turn radius catches anything but a turning
+    // Interceptor, and its FireRate card fires it more often rather than more at once.
+    public static WeaponType SeekerPod { get; } = new("SeekerPod", new(FireRate: 1.2f, AmmoSpeed: 300f, KickbackForce: 4f, PelletCount: 1, Scatter: 0f, ShotLifetime: 4f, Damage: 3, TurnSpeed: TurnDeg(180f), Homing: true, HomingTurnRate: TurnDeg(150f), SalvoGrows: false), TurretSize.Small, 900f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+
+    // Swarmlet: the swarm missile, and the only homing gun allowed to grow its volley. Three cheap
+    // locked rounds at once is the point; the growth stops at the R17 ceiling.
+    public static WeaponType Swarmlet { get; } = new("Swarmlet", new(FireRate: 0.8f, AmmoSpeed: 350f, KickbackForce: 3f, PelletCount: 3, Scatter: 0.25f, ShotLifetime: 2.5f, Damage: 2, TurnSpeed: TurnDeg(200f), Homing: true, HomingTurnRate: TurnDeg(170f)), TurretSize.Small, 600f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+
+    // HavocTorpedo: the big slow hull-killer. 10 damage per shot breaks R5's per-shot cap the way
+    // RailGun does — at 0.6/s nothing else in the game can carry a round that big — and it pays for
+    // the licence with the least DPS in its band (R15). A 255 px turn radius means it can only ever
+    // lock on hulls that cannot out-turn it.
+    public static WeaponType HavocTorpedo { get; } = new("HavocTorpedo", new(FireRate: 0.6f, AmmoSpeed: 200f, KickbackForce: 15f, PelletCount: 1, Scatter: 0f, ShotLifetime: 8f, Damage: 10, TurnSpeed: TurnDeg(90f), Homing: true, HomingTurnRate: TurnDeg(45f), SalvoGrows: false), TurretSize.Large, 1350f, AmmoRadius: 6f, Color: AmmoColor.Orange, UnlockLevel: 10);
+
     // Perf scenarios only: it must aim instantly so seeded volleys keep looking like fired ones.
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1), TurretSize.Large, 580f);
 
-    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, LoadTestWeapon];
+    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, SeekerPod, Swarmlet, HavocTorpedo, LoadTestWeapon];
 
     // Weapons a level-up new-weapon card may offer at `level`: never the load-test spray, and never
     // a gun whose tier has not unlocked yet.

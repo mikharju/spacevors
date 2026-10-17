@@ -224,8 +224,9 @@ public static class UpgradeMenuRenderer
             return weapon.Size == TurretSize.Large ? "large" : "small";
 
         // ApplyUpgrade hands a multi-pellet gun another pellet instead of speeding it up, so the card
-        // must not promise the +15% a single-pellet gun gets.
-        if (option.Stat == UpgradeOption.FireRate && weapon.Stats.PelletCount > 1)
+        // must not promise the +15% a single-pellet gun gets. A guided volley that has hit its round
+        // budget (R17) grows no further, and the card is withdrawn rather than relabelled.
+        if (option.Stat == UpgradeOption.FireRate && weapon.Stats.PelletCount > 1 && weapon.Stats.CanGrowSalvo)
             return "+1 shot";
 
         return UpgradeDefinition.For(option.Stat).DisplayValue;
@@ -236,13 +237,17 @@ public static class UpgradeMenuRenderer
     {
         if (!option.IsNewWeapon || WeaponType.FromName(option.WeaponName) is not { } weapon) return null;
 
-        string speed = weapon.Stats.Hitscan ? "beam instant" : $"projectile speed {Format(weapon.Stats.AmmoSpeed)}";
+        // A guided round has no ballistic speed worth quoting: the number that says what it is, and
+        // what the player dodges against, is how hard it can turn.
+        string delivery = weapon.Stats.Hitscan ? "beam instant"
+            : weapon.Stats.Homing ? $"homing turn {Format(Angle.ToDeg(weapon.Stats.HomingTurnRate))} deg/s"
+            : $"projectile speed {Format(weapon.Stats.AmmoSpeed)}";
         return
         [
             $"range {Format(weapon.Range)}",
             $"damage {weapon.Stats.Damage}{(weapon.Stats.PelletCount > 1 ? $" x{weapon.Stats.PelletCount}" : "")}",
             $"attack speed {Format(weapon.Stats.FireRate)}/s",
-            speed,
+            delivery,
         ];
     }
 

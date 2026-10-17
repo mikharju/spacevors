@@ -916,8 +916,11 @@ public sealed class GameSession
             case UpgradeOption.FireRate:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
                 {
-                    int newPelletCount = turret.Weapon.PelletCount > 1 ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
-                    float newFireRate = turret.Weapon.PelletCount == 1 ? turret.Weapon.FireRate * def.Multiplier : turret.Weapon.FireRate;
+                    // A volley gun grows a shot per card; a guided volley stops at the round budget
+                    // (R17/R18), and a gun whose volley never grows takes the card as a faster rate.
+                    bool grows = turret.Weapon.CanGrowSalvo;
+                    int newPelletCount = grows ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
+                    float newFireRate = grows ? turret.Weapon.FireRate : turret.Weapon.FireRate * def.Multiplier;
                     em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { FireRate = newFireRate, PelletCount = newPelletCount } });
                 }
                 break;

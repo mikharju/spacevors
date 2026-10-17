@@ -166,6 +166,8 @@ public static class WorldRenderer
         AmmoColor.Red => new Color(255, 80, 80, 255),
         AmmoColor.Cyan => new Color(90, 240, 240, 255),
         AmmoColor.Violet => new Color(200, 120, 255, 255),
+        // Orange is a new identity channel (R14): a guided round, whatever hull fired it.
+        AmmoColor.Orange => new Color(255, 150, 60, 255),
         _ => new Color(255, 230, 100, 255)
     };
 

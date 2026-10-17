@@ -96,11 +96,17 @@ public class LevelUpSystem : GameSystem
 
             foreach (var weapon in weaponNames)
             {
-                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
+                var stats = turrets.First(t => t.WeaponName == weapon).Weapon;
+
+                // R18: a guided volley that has reached its round budget (R17) would be offered a
+                // "+1 shot" card it cannot honour, so the card is withdrawn and the gun keeps the
+                // other two. Guns whose volleys never grow always have a working rate card.
+                if (!SalvoCardIsDead(stats))
+                    allOptions.Add(new UpgradableOption(weapon, UpgradeOption.FireRate));
 
                 // A hitscan beam has no travelling projectile: the card would multiply AmmoSpeed 0
                 // by 1.3 and be a dead choice.
-                if (WeaponType.FromName(weapon)?.Stats.Hitscan != true)
+                if (!stats.Hitscan)
                     allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
 
                 allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
@@ -154,6 +160,11 @@ public class LevelUpSystem : GameSystem
         string weaponName = parts[1].Trim();
         return new UpgradableOption(weaponName, stat);
     }
+
+    // R18: a growing guided volley that has reached the guided-round budget (R17) cannot take another
+    // shot, so the "+1 shot" card is withdrawn instead of being offered as a lie. Guns whose volleys
+    // never grow (SalvoGrows off) keep the card as a plain rate increase.
+    static bool SalvoCardIsDead(WeaponStats weapon) => weapon.SalvoGrows && weapon.PelletCount > 1 && !weapon.CanGrowSalvo;
 
     private static string FormatChoice(UpgradableOption option) =>
         option.IsNewWeapon ? $"new:{option.WeaponName}" : FormatStat(option);

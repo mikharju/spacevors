@@ -32,8 +32,11 @@ public class EnemyDifficultyTest
     public void EnemyAmmoStaysSlowerThanThePlayersSlowestRound()
     {
         float fastestEnemyAmmo = EnemyShipType.All.Max(t => EnemyShipStats.AmmoSpeedFor(t, EnemyShipStats.MaxTier));
+
+        // Guided rounds are not in this comparison: a missile is not something the player out-flies,
+        // and it is deliberately slower than anything else. What keeps *it* fair is its turn radius.
         float slowestPlayerRound = WeaponType.All
-            .Where(w => w.Name != WeaponType.LoadTestWeapon.Name && !w.Stats.Hitscan)
+            .Where(w => w.Name != WeaponType.LoadTestWeapon.Name && !w.Stats.Hitscan && !w.Stats.Homing)
             .Min(w => w.Stats.AmmoSpeed);
 
         Assert.True(fastestEnemyAmmo <= EnemyShipStats.MaxAmmoSpeed,

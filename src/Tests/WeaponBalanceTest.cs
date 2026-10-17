@@ -13,9 +13,11 @@ public class WeaponBalanceTest
 
     static float Dps(WeaponType w) => w.Stats.FireRate * w.Stats.PelletCount * w.Stats.Damage;
 
-    // Delivery class: how much a shot can lose on the way to the target.
+    // Delivery class: how much a shot can lose on the way to the target. A guided round is its own
+    // class: it cannot lose the target, so it is priced by R15 instead of by the speed ladder.
     static string Delivery(WeaponType w) =>
         w.Stats.Hitscan ? "hitscan"
+        : w.Stats.Homing ? "guided"
         : w.Stats.AmmoSpeed >= 2000f ? "fast"
         : w.Stats.AmmoSpeed >= 600f ? "medium"
         : "slow";
@@ -51,14 +53,83 @@ public class WeaponBalanceTest
         }
     }
 
+    // R17: a guided round stays live for seconds instead of a blink, so the same mount may keep far
+    // fewer of them in the air than of dumb ammo.
+    [Fact]
+    public void GuidedGunStaysInsideTheGuidedRoundBudget()
+    {
+        foreach (var w in Guns.Where(w => w.Stats.Homing))
+        {
+            float rounds = w.Stats.FireRate * w.Stats.PelletCount;
+            Assert.True(rounds <= WeaponStats.HomingRoundBudget,
+                $"{w.Name} puts {rounds:0.#} guided rounds a second into the air from one mount");
+        }
+    }
+
+    // R15: a guided round cannot lose its target on the way, which is the most certain delivery in the
+    // game — better than a beam's — so it must buy the least damage in its own reach band.
+    [Fact]
+    public void GuidedGunDpsStaysUnderItsOwnBand()
+    {
+        foreach (var missile in Guns.Where(w => w.Stats.Homing))
+        {
+            var peers = Guns.Where(w => !w.Stats.Homing && MathF.Abs(w.Range - missile.Range) <= 0.15f * missile.Range).ToList();
+            Assert.NotEmpty(peers);
+
+            var cheapest = peers[0];
+            foreach (var peer in peers)
+                if (Dps(peer) < Dps(cheapest)) cheapest = peer;
+
+            Assert.True(Dps(missile) <= 0.8f * Dps(cheapest),
+                $"{missile.Name} at {Dps(missile):0.#} dps is too certain beside {cheapest.Name} ({Dps(cheapest):0.#} dps)");
+        }
+    }
+
+    // R16: a guided round's turn radius is what makes it dodgeable. Tighter than the turn radius of
+    // what it hunts and a lock is a death sentence rather than a challenge.
+    [Fact]
+    public void GuidedRoundTurnsWiderThanAnythingItHunts()
+    {
+        float tightest = float.MaxValue;
+        foreach (var type in EnemyShipType.All)
+        {
+            float radius = EnemyShipStats.SpeedFor(type, EnemyShipStats.MaxTier) / EnemyShipStats.TurnRateFor(type, EnemyShipStats.MaxTier);
+            if (radius < tightest) tightest = radius;
+        }
+
+        foreach (var w in Guns.Where(w => w.Stats.Homing))
+        {
+            float turnRadius = w.Stats.AmmoSpeed / w.Stats.HomingTurnRate;
+            Assert.True(turnRadius > tightest,
+                $"{w.Name} turns inside {turnRadius:0} px, tighter than the {tightest:0} px a tier-{EnemyShipStats.MaxTier} hull can out-turn");
+        }
+    }
+
+    // R18: growing the volley is a privilege a guided gun has to be given, not the default — every
+    // guided gun growing its salvo is how one loadout ends up with a swarm on screen. The growth also
+    // has to have somewhere to go, so the card is never offered already dead.
+    [Fact]
+    public void OnlySomeGunsMayGrowTheirVolley()
+    {
+        var guided = Guns.Where(w => w.Stats.Homing).ToList();
+
+        Assert.True(guided.Count(w => w.Stats.SalvoGrows) < guided.Count,
+            "every guided gun grows its volley, so a missile loadout becomes a swarm by default");
+
+        foreach (var w in guided.Where(w => w.Stats.SalvoGrows))
+            Assert.True(w.Stats.CanGrowSalvo,
+                $"{w.Name}'s +1 shot card starts life past the {WeaponStats.HomingRoundBudget:0.#} guided rounds/s budget");
+    }
+
     // R1: instant delivery is the cheapest delivery, so a beam buys less damage than the slowest
-    // travelling round that covers the same band.
+    // travelling round that covers the same band. Guided rounds are excluded from the peer set: they
+    // are the delivery class *above* beams in certainty, and R15 prices them against it.
     [Fact]
     public void BeamGunDpsStaysUnderItsOwnBand()
     {
         foreach (var beam in Guns.Where(w => w.Stats.Hitscan))
         {
-            var peers = Guns.Where(w => !w.Stats.Hitscan && MathF.Abs(w.Range - beam.Range) <= 0.15f * beam.Range).ToList();
+            var peers = Guns.Where(w => !w.Stats.Hitscan && !w.Stats.Homing && MathF.Abs(w.Range - beam.Range) <= 0.15f * beam.Range).ToList();
             Assert.NotEmpty(peers);
 
             var slowest = peers[0];
@@ -98,7 +169,10 @@ public class WeaponBalanceTest
             var tierOne = Guns.Where(g => g.UnlockLevel == 1 && g.Size == w.Size).ToList();
 
             Assert.True(Dps(w) <= 1.4f * tierOne.Max(Dps), $"{w.Name} is more than 1.4x every tier-1 {w.Size} gun");
-            if (w.Stats.Hitscan) continue;
+
+            // Beams and guided rounds buy delivery, not a DPS step, so the floor is not theirs: R1 and
+            // R15 price them from underneath instead.
+            if (w.Stats.Hitscan || w.Stats.Homing) continue;
 
             bool aStepUp = tierOne.Any(g => Dps(w) >= 1.15f * Dps(g) || (Dps(w) >= Dps(g) && w.Range >= 1.3f * g.Range));
             Assert.True(aStepUp, $"{w.Name} neither out-damages nor clearly outranges a tier-1 {w.Size} gun");
