@@ -301,6 +301,26 @@ Borderline entries: they document project code/library issues rather than LLM-wo
 - **Fix / Prevention**: `dt` measures the frame, not the loop's whole life. To find unaccounted time, compare **wall time against the sum of dt** for the same run, and A/B the flag that adds work outside the frame (`--shots` vs `--no-shots`). Also check how much of the work is thrown away: that run wrote 12 PNGs and 3 survived, because every iteration overwrites the same filenames. And when the user reports a feel that contradicts my numbers, the numbers are measuring the wrong window until proven otherwise - it has now happened twice (ReadyToRun, this one).
 - **Implemented**: screenshots now happen only in the final run (3 encodes instead of 12, and the stall is in the one run whose PNGs survive), and the harness prints `iterations: N+1 runs = N measured + 1 discarded cold run` so the extra window is not read as an off-by-one. `scenario.py` got one `measured_blocks` rule shared by the frame, render-pass and system statistics: frame 1 of a run, a shot frame, and its successor are out of **all** of them. Only the pass/system tables changed - on a real-GPU run the pass means moved -1% (sparks) to -28% (asteroids, whose cold first frame is now excluded), and `perShapeNs` by -0.2% to -3%, i.e. retaking a baseline also tightens that gate slightly.
 
+## 49. A key hold longer than a frame is a key *repeat*, not one key press
+
+`.tools/input.sh` holds a key for 0.4 s on purpose (llvmpipe renders at ~4 fps and raylib only sees input
+that is still down when the next frame is polled). On a menu that steps once per press — the ship-select
+list — X11 auto-repeat fires *inside* that hold, so one `key Down` moves several cards, and pressing Down
+often enough clamps on the last card. Every run then starts on the same wrong ship, and the screenshot
+proves nothing about the feature under test.
+
+Recipe that works: `HOLD=0.05 bash .tools/input.sh key Down` (a few frames at 60 fps, under the repeat
+delay), then **verify the highlight in a screenshot before pressing Enter** — a list that clamps at its
+end makes a mis-count invisible. Crop before looking: `PYTHONPATH=.tools/pylibs python3` with PIL (no
+ImageMagick in this container), because a downscaled 1920x1024 frame hides a 4 px sprite entirely.
+
+## 50. An unattended run stops at the first level-up, not at death
+
+A long headless play session (a visual check of late-game content) freezes with the log still rendering
+frames and the `[THREAT]` line stuck at the same `t=`: `LevelUpSystem` spawns a `PendingChoice`, and the
+app pauses while the upgrade menu is open. Nothing is broken — the run is waiting for a card. Send
+`key 1` on a loop (or watch for the menu) and the clock starts again.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.
