@@ -55,6 +55,19 @@ Everything below shipped as planned, in the commit order of §13. Where the code
   centre line, which for a round flying right landed below the line (and above for one flying left) — the
   small/cruise plume showed it most because only its apex end is outside the tail. At 9 px wide the lean is
   0.13 px.
+ - **The flame still sat off the body, and it was a draw-convention bug, not geometry.** Both missile draws
+   built their dest rect as `centre - size/2` with a half-size origin, while every other sprite draw in this
+   renderer passes the centre as the dest rect's **position** and lets `RenderHelpers.CenterOrigin` supply the
+   half-size origin — under that convention the sprite's centre lands on the dest position. So the old form
+   slid each missile sprite up-left by half its own extent: 22.5 px for a 45 px body, 10 px for a cruise
+   plume. The 12 px difference between the two is what read as a detached flame, and it hid itself: for a dart
+   flying up or down the slide runs along its axis, for one flying across the screen it runs sideways.
+   Measured on the new diagnostic bench (B key: `ShapeSprites.DrawMissile` over 8 headings × both plume sizes
+   at fixed screen positions; V key: a cross at the anchor `ShapeSprites.PlumeAnchor` returns): before the fix
+   a facing-up body landed 22.5 px off its requested centre and a facing-right plume sat 11 px off the body
+   axis; after it all 16 cells are within ±2.8 px of the requested centre and the drawn flame stays within
+   4 px of the heading axis, spanning the expected 22.5→37.7 px out from the tail at cruise and 22.5→56.2 px
+   while boosting.
 - **Not done from §12/§13:** a `missile-barrage` perf scenario. The pinned scenarios run unarmed, so they
   prove no regression (ammo-spray sim median 1.30 ms, impact-storm 2.16 ms, against 1.33 / 2.12 before any
   missile code — inside this host's ±0.3 ms p99 band) and nothing about the cost of live missiles. That is

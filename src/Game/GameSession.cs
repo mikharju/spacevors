@@ -408,6 +408,24 @@ public sealed class GameSession
                 DiagnosticLogger.LogEvent("diag", $"J pressed: player hp -> {halved}/{health.Max}");
             }
         }
+
+        // Diagnostic only: B toggles the guided-round bench — the missile draw repeated over every heading
+        // and both plume sizes at fixed screen positions — so one screenshot measures the plume in all
+        // sixteen orientations with nothing else in the frame orange or grey.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.B))
+        {
+            WorldRenderer.ShowMissileBench = !WorldRenderer.ShowMissileBench;
+            DiagnosticLogger.LogEvent("diag", $"B: missile bench {(WorldRenderer.ShowMissileBench ? "on" : "off")}");
+        }
+
+        // Diagnostic only: V toggles the plume anchor overlay — for every live missile and every bench dart
+        // it marks the plume centre the code computes and the heading line it sits on, from the same helper
+        // the draw calls. A flame not centred on that cross is a placement bug rather than an eyesight one.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.V))
+        {
+            WorldRenderer.ShowPlumeAnchors = !WorldRenderer.ShowPlumeAnchors;
+            DiagnosticLogger.LogEvent("diag", $"V: plume anchors {(WorldRenderer.ShowPlumeAnchors ? "on" : "off")}");
+        }
     }
 
     // The locked primary target if alive, otherwise the nearest enemy ship with health.

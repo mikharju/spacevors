@@ -208,7 +208,14 @@ a fixed-size nose: at 2.5 a round drew a 10 px dart and read as a bright dot at 
 fired across. The plume answers two numbers — the rudder (`Steering`) and the throttle (how far the round is
 still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The plume
 is anchored on the body's **tail**, not part-way between the centre and the tail, so it stays aft as it grows
-with boost and turn. The
+with boost and turn. Both draws use the renderer-wide sprite convention: the dest rect's **position is the
+point the sprite is centred and rotated about** (`RenderHelpers.CenterOrigin` supplies the half-size origin),
+so building the dest rect as `centre - size/2` instead shifts a sprite up-left by half its own extent — a
+45 px body slides 22 px while its plume slides 10, and the two visibly come apart. `ShapeSprites.PlumeAnchor`
+computes that anchor, and the diagnostic overlay (V key) marks the same point it returns, so a screenshot
+shows the intended anchor under the drawn flame. The B key adds a static bench: the same `ShapeSprites.DrawMissile`
+call repeated over eight headings and both plume sizes at fixed screen positions, so one screenshot measures
+every orientation at once against numbers the renderer itself publishes. The
 player's guided rounds are Orange (the guided colour) and the enemy's stay
 Red, because colour is the threat channel and the shape is what says "guided". Both bodies are painted the
 same light grey (`MissileBodyColor`) — a missile is a piece of hardware, not a faction badge — so the

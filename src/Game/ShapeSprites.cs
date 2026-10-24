@@ -134,6 +134,12 @@ static class ShapeSprites
         }
     }
 
+    // Where the plume's centre goes for a body/plume pair. One place computes it, so a diagnostic overlay
+    // that marks the anchor cannot drift away from what actually gets drawn.
+    public static Vector2 PlumeAnchor(float cx, float cy, float angleRad, float bodyLength, float exhaustLength) =>
+        new Vector2(cx, cy) - new Vector2(MathF.Sin(angleRad), -MathF.Cos(angleRad))
+            * (bodyLength * 0.5f + exhaustLength * (0.5f - ExhaustBurialInsideTail));
+
     // `angleRad` follows the world's angle convention (0 faces up on screen), the same one the hull
     // sprites are drawn with. The flame hangs off the aft end along that heading.
     public static void DrawMissile(float cx, float cy, float angleRad, float bodyLength, float bodyWidth,
@@ -141,21 +147,24 @@ static class ShapeSprites
     {
         float degrees = angleRad * 180f / MathF.PI;
 
+        // The dest rect's position is the sprite's centre and rotation origin — the convention every sprite
+        // draw in the renderer uses (RenderHelpers.CenterOrigin). Subtracting half the size here instead
+        // shifts each sprite up-left by half its own extent, and because the flame and the body have
+        // different extents they come apart: a 45 px body drifts 22.5 px while its plume drifts 10.
         if (exhaustLength > 0f)
         {
             // The plume hangs off the tail with a quarter of its own length buried inside it: two shapes
             // that only touch edge to edge read as two objects flying in formation, however carefully the
             // arithmetic looks on paper. Anchoring on the tail rather than on a fixed distance from the
             // centre is what keeps the plume aft as it grows with boost and turn.
-            Vector2 aft = new Vector2(cx, cy) - new Vector2(MathF.Sin(angleRad), -MathF.Cos(angleRad))
-                * (bodyLength * 0.5f + exhaustLength * (0.5f - ExhaustBurialInsideTail));
+            Vector2 aft = PlumeAnchor(cx, cy, angleRad, bodyLength, exhaustLength);
             Raylib.DrawTexturePro(MissileExhaust, new Rectangle(0, 0, ExhaustWidth, ExhaustHeight),
-                new Rectangle(aft.X - exhaustWidth * 0.5f, aft.Y - exhaustLength * 0.5f, exhaustWidth, exhaustLength),
+                new Rectangle(aft.X, aft.Y, exhaustWidth, exhaustLength),
                 new Vector2(exhaustWidth * 0.5f, exhaustLength * 0.5f), degrees, exhaustColor);
         }
 
         Raylib.DrawTexturePro(MissileBody, new Rectangle(0, 0, BodyWidth, BodyHeight),
-            new Rectangle(cx - bodyWidth * 0.5f, cy - bodyLength * 0.5f, bodyWidth, bodyLength),
+            new Rectangle(cx, cy, bodyWidth, bodyLength),
             new Vector2(bodyWidth * 0.5f, bodyLength * 0.5f), degrees, bodyColor);
     }
 }

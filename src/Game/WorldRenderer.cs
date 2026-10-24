@@ -68,6 +68,12 @@ public static class WorldRenderer
             DrawDebugMarkers(em, camX, camY, windowWidth, windowHeight);
             RenderTimings.Pass("world.debugMarkers");
         }
+
+        if (ShowMissileBench)
+        {
+            DrawMissileBench();
+            RenderTimings.Pass("world.missileBench");
+        }
     }
 
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
@@ -182,22 +188,83 @@ public static class WorldRenderer
             // A round still building to its card speed is burning for it, so the plume answers the throttle
             // as well as the rudder: full length just after launch, and again when the round swings hard.
             float boost = missile.MaxSpeed > 0f ? 1f - Math.Clamp(ammo.Velocity.Magnitude / missile.MaxSpeed, 0f, 1f) : 0f;
-            float effort = MathF.Max(steering, boost);
-            float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * effort);
+            float angle = Angle.Of(ammo.Velocity);
+            var (exhaustLength, flame) = PlumeLook(MathF.Max(steering, boost), bodyLength, ammo.Color);
 
-            Color body = MissileBodyColor;
-            // The flame carries the identity: the round's own ammo colour (Orange for the player's guns,
-            // Red for an enemy rack). The work the round is doing makes it longer, whiter and brighter, so
-            // the player reads "this round is committed that way" off the same numbers the sim computed.
-            Color flame = MixTowardWhite(AmmoColorOf(ammo.Color), ExhaustWhiteMix + ExhaustHardTurnMix * effort);
-            flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * effort);
-
-            ShapeSprites.DrawMissile(cx, cy, Angle.Of(ammo.Velocity),
+            ShapeSprites.DrawMissile(cx, cy, angle,
                 bodyLength, ammo.Radius,
                 exhaustLength, ammo.Radius * ExhaustWidthScale,
-                body, flame);
+                MissileBodyColor, flame);
+
+            if (ShowPlumeAnchors) DrawPlumeAnchor(cx, cy, angle, bodyLength, exhaustLength);
         }
     }
+
+    // What the round's effort level (0 = cruising, 1 = boosting or turning hard) makes the plume look like:
+    // longer, whiter, brighter. The flame is the identity channel — the round's own ammo colour, Orange for
+    // the player's racks and Red for an enemy's — and the work the round is doing washes it toward white, so
+    // the player reads "this round is committed that way" off the same numbers the sim computed. Shared by
+    // the live pass and the diagnostic bench, so the bench cannot flatter the real draw.
+    private static (float Length, Color Flame) PlumeLook(float effort, float bodyLength, AmmoColor roundColour)
+    {
+        float exhaustLength = bodyLength * (MissileExhaustCruise + (MissileExhaustHardTurn - MissileExhaustCruise) * effort);
+        var flame = MixTowardWhite(AmmoColorOf(roundColour), ExhaustWhiteMix + ExhaustHardTurnMix * effort);
+        flame.A = (byte)(ExhaustCruiseAlpha + (255 - ExhaustCruiseAlpha) * effort);
+        return (exhaustLength, flame);
+    }
+
+    // Diagnostic: the plume anchor the code computes, and the heading line it sits on. The cross is where
+    // the plume's centre is *meant* to be, and it comes from the same helper the draw calls — so when the
+    // drawn flame is not centred on it, the placement is wrong rather than the eye.
+    private static void DrawPlumeAnchor(float cx, float cy, float angleRad, float bodyLength, float exhaustLength)
+    {
+        var anchor = ShapeSprites.PlumeAnchor(cx, cy, angleRad, bodyLength, exhaustLength);
+        // The same heading convention ShapeSprites rotates the sprites by: an angle of 0 faces up the screen.
+        float forwardX = MathF.Sin(angleRad), forwardY = -MathF.Cos(angleRad);
+        float reach = bodyLength * 0.5f + exhaustLength;
+        Raylib.DrawLine((int)(cx - forwardX * reach), (int)(cy - forwardY * reach),
+            (int)(cx + forwardX * bodyLength * 0.5f), (int)(cy + forwardY * bodyLength * 0.5f), AnchorHeadingLine);
+        Raylib.DrawLine((int)anchor.X - AnchorCrossReach, (int)anchor.Y, (int)anchor.X + AnchorCrossReach, (int)anchor.Y, AnchorCross);
+        Raylib.DrawLine((int)anchor.X, (int)anchor.Y - AnchorCrossReach, (int)anchor.X, (int)anchor.Y + AnchorCrossReach, AnchorCross);
+    }
+
+    // Diagnostic bench (V/B keys): the same draw call repeated over every heading and both plume sizes, at
+    // a fixed screen position, so one screenshot measures the plume in all sixteen orientations at once and
+    // nothing else in the frame is orange or grey.
+    private static void DrawMissileBench()
+    {
+        for (int row = 0; row < BenchRows; row++)
+        {
+            float effort = row == 0 ? 0f : 1f;
+            var (exhaustLength, flame) = PlumeLook(effort, BenchRadius * MissileBodyStretch, AmmoColor.Orange);
+
+            for (int column = 0; column < BenchHeadings.Length; column++)
+            {
+                float angle = BenchHeadings[column] * MathF.PI / 180f;
+                float cx = BenchFirstColumn + column * BenchColumnGap;
+                float cy = BenchFirstRow + row * BenchRowGap;
+
+                ShapeSprites.DrawMissile(cx, cy, angle,
+                    BenchRadius * MissileBodyStretch, BenchRadius,
+                    exhaustLength, BenchRadius * ExhaustWidthScale,
+                    MissileBodyColor, flame);
+
+                if (ShowPlumeAnchors) DrawPlumeAnchor(cx, cy, angle, BenchRadius * MissileBodyStretch, exhaustLength);
+            }
+        }
+    }
+
+    // Diagnostic switches, set by the B and V diagnostic keys. Render-only: nothing in the sim reads them.
+    public static bool ShowPlumeAnchors { get; set; }
+    public static bool ShowMissileBench { get; set; }
+
+    const float BenchRadius = 6f;
+    const int BenchFirstColumn = 150, BenchColumnGap = 220, BenchFirstRow = 200, BenchRowGap = 450, BenchRows = 2;
+    static readonly float[] BenchHeadings = [0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f];
+
+    static readonly Color AnchorHeadingLine = new(120, 200, 230, 200);
+    static readonly Color AnchorCross = new(255, 255, 255, 255);
+    const int AnchorCrossReach = 7;
 
     // A guided round's body is painted hardware, not a faction marker: light grey for both sides, so a
     // missile reads as an object against the dark rather than as a coloured dot. The flame is the colour

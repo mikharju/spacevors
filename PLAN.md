@@ -61,7 +61,7 @@ Goal:
 - K: halve hp of the locked target or nearest enemy ship to reach damage smoke tiers quickly (only when SPACEVORS_DIAGNOSTIC=1, for testing)
 
 ### Diagnostics env vars (testing only)
-- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin, K key halve target hp, J key halve player hp, U key rack-armed test hull (enemy missiles)
+- SPACEVORS_DIAGNOSTIC=1: enables [FRAME]/[UPGRADE]/[FIRE] logs, debug circles, fixed test asteroid at (0,-300), L key force level-up, M key test explosion, N key test enemy spawn, H key invincible player, T key position pin, K key halve target hp, J key halve player hp, U key rack-armed test hull (enemy missiles), B key guided-round bench (8 headings x 2 plume sizes, drawn in screen space), V key plume anchor overlay (marks the computed plume centre and heading line on every guided round)
 - SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun": scripts upgrade choices, one entry per level-up. Entry is a new weapon name or `Stat:WeaponName`. When exhausted, falls back to normal random pool
 
 ## MVP
