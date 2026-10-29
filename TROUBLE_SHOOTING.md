@@ -364,6 +364,22 @@ force the new path off with a one-line patch (restore with `git checkout`), meas
 ways, and only report the difference. Then make the world reach the new path: the stream now fires at an
 interceptor and the crowding rings are three different hulls.
 
+## 56. A filled shape drawn in the world pass can vanish with no error at all
+
+Two traps when drawing custom geometry over the world (`ShipSpriteRenderer.DrawCapsule` hit both):
+
+- **`Raylib.DrawPoly` in this binding is the regular-polygon form** — `DrawPoly(Vector2 center, int sides,
+  float radius, float rotationDeg, Color)`. There is no point-list overload, so an arbitrary silhouette is
+  fanned by hand with `DrawTriangle`.
+- **The world pass culls counter-clockwise triangles.** A correctly computed fan in the wrong winding draws
+  *nothing*: no warning, no artefact, the shape is simply absent, which reads as "the overlay is not being
+  drawn for this ship" while every call site is fine. Winding is the first thing to try when custom geometry
+  is invisible; `DrawFallbackShip`'s vertex order encodes the same rule.
+
+Check the overlay by counting its pixels instead of looking for it: the collider cyan is unmistakable
+(`g > 90 and b > 90 and r < 80` over the dark field), so a crop-region count says in one number whether the
+shape drew at all.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

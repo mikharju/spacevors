@@ -66,10 +66,9 @@ public static class ShipSpriteRenderer
         => new(x * cos - y * sin, x * sin + y * cos);
 
     // Diagnostics: a hull's collider drawn over its art, so the fit between the painted silhouette and
-    // what actually gets hit is something you look at instead of something you argue about. A capsule is
-    // its axis at twice its thickness; the round caps are left out, which is near enough to read the fit.
-    // One colour wherever a collider is drawn — on the select screen as much as in a fight — so
-    // "cyan is what you can hit" is a rule rather than three conventions.
+    // what actually gets hit is something you look at instead of something you argue about. One colour
+    // wherever a collider is drawn — on the select screen as much as in a fight — so "cyan is what you
+    // can hit" is a rule rather than three conventions.
     public static void DrawHullShape(HullShape shape, float radius, float cx, float cy, float angleDeg)
     {
         float angle = angleDeg * MathF.PI / 180f;
@@ -77,21 +76,51 @@ public static class ShipSpriteRenderer
         float sin = MathF.Sin(angle);
 
         foreach (var capsule in shape.Capsules)
-        {
-            var from = ScreenOf(cx, cy, capsule.From, cos, sin, radius);
-
-            if (capsule.To == capsule.From)
-            {
-                Raylib.DrawCircle((int)from.X, (int)from.Y, capsule.HalfThickness * radius, ColliderColor);
-                continue;
-            }
-
-            Raylib.DrawLineEx(
-                from,
+            DrawCapsule(
+                ScreenOf(cx, cy, capsule.From, cos, sin, radius),
                 ScreenOf(cx, cy, capsule.To, cos, sin, radius),
-                capsule.HalfThickness * 2f * radius,
-                ColliderColor);
+                capsule.HalfThickness * radius);
+    }
+
+    const int CapSegments = 12; // per half-circle: round enough to read at hull size, cheap in a diagnostic
+
+    // A capsule is a segment inflated by a disc, and that is exactly what the narrow phase tests, so the
+    // overlay shows the round caps. DrawLineEx ends flat: it reads as a rectangle and blames a missed or
+    // caught shot on a corner that nothing in the game can collide with.
+    static void DrawCapsule(System.Numerics.Vector2 from, System.Numerics.Vector2 to, float capRadius)
+    {
+        if (capRadius <= 0f) return;
+
+        var axis = to - from;
+        if (axis.X == 0f && axis.Y == 0f)
+        {
+            Raylib.DrawCircle((int)from.X, (int)from.Y, capRadius, ColliderColor);
+            return;
         }
+
+        // Two half-circles joined by the segment's sides — the convex outline of the pair of discs a
+        // capsule is. This raylib binding's DrawPoly only draws regular polygons, so the silhouette is
+        // fanned by hand: ~24 hairline-overlapping triangles per capsule, in a pass that draws nothing
+        // when diagnostics are off.
+        float axisAngle = MathF.Atan2(axis.Y, axis.X);
+        Span<System.Numerics.Vector2> outline = stackalloc System.Numerics.Vector2[2 * (CapSegments + 1)];
+
+        int count = 0;
+        for (int i = 0; i <= CapSegments; i++)
+        {
+            float a = axisAngle - MathF.PI / 2f + MathF.PI * i / CapSegments;
+            outline[count++] = to + new System.Numerics.Vector2(MathF.Cos(a), MathF.Sin(a)) * capRadius;
+        }
+        for (int i = 0; i <= CapSegments; i++)
+        {
+            float a = axisAngle + MathF.PI / 2f + MathF.PI * i / CapSegments;
+            outline[count++] = from + new System.Numerics.Vector2(MathF.Cos(a), MathF.Sin(a)) * capRadius;
+        }
+
+        // Wound the other way round from the outline walk: this pass culls counter-clockwise triangles,
+        // and an incorrectly wound fan draws nothing at all.
+        for (int i = 1; i + 1 < count; i++)
+            Raylib.DrawTriangle(outline[0], outline[i + 1], outline[i], ColliderColor);
     }
 
     static readonly Color ColliderColor = new(0, 255, 255, 110);

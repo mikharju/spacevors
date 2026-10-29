@@ -251,9 +251,10 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
 - Mass and inertia still come from the bounding radius, not from the shape: weight following silhouette
   is a balance change and has to be measured as one.
 - Diagnostics (`SPACEVORS_DIAGNOSTIC=1`) draws a hull's collider in cyan over its art — enemy hulls and the
-  player in play, and every ship preview on the select screen. A collider is drawn as its shape, never as
-  its bounding circle: the circle is the broad phase's business, and drawing it over the art hides the
-  mismatch the overlay exists to show.
+  player in play, and every ship preview on the select screen — as the exact capsule silhouette, round caps
+  included, because an overlay that ends flat blames the fit on a corner nothing can hit. A collider is
+  never drawn as its bounding circle: that is the broad phase's business, and drawing it over the art hides
+  the mismatch the overlay exists to show.
 
 ## Cross-system signaling
 
