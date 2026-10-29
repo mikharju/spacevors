@@ -53,39 +53,51 @@ public static class ScenarioWorld
 
     // A hull outlives the measured window however many rounds graze it: these worlds measure the cost
     // of testing, not the cost of a wreck.
-    private const float ScenarioHullRadius = 20f;
     private const int ScenarioHullHealth = 100_000;
 
-    // Three rings, spaced wider than two hull radii so nothing overlaps on tick 1 — the grind has to be
-    // built by the chase, not by an instant pile-up of position corrections. The stagger keeps the rings
-    // from lining up into channels the hulls could funnel through.
+    // The hulls the game actually spawns, at the radius their shapes were authored for. A world of small
+    // round swarmers would run the circle fast path and never price a capsule, so the stream fires at the
+    // middle hull and each crowding ring is a different hull.
+    private static readonly EnemyShipType StreamHullType = EnemyShipType.Interceptor;
+    private static readonly EnemyShipType[] CrowdingRingHullTypes = [EnemyShipType.Default, EnemyShipType.Interceptor, EnemyShipType.HeavyCannon];
+
+    // Rings sized from each hull's own width, so neighbours on a ring and the ring inside it start clear:
+    // the grind has to be built by the chase, not by an instant pile-up of position corrections. The
+    // stagger keeps the rings from lining up into channels the hulls could funnel through.
     private static readonly int[] CrowdingRingShipCounts = [6, 12, 18];
     private const float CrowdingRingGap = 50f;
     private const float CrowdingInnerClearance = 20f;
     private const float CrowdingRingStagger = 0.35f;
 
-    // Grinding hulls deal a little impact damage every tick; a player that dies mid-window would measure
-    // a different world than the one the scenario describes.
-    private const int CrowdingPlayerHealth = 1000;
+    // Grinding hulls deal impact damage every tick, and a ring of heavy hulls deals a great deal of it; a
+    // player that dies mid-window would measure a different world than the one the scenario describes.
+    private const int CrowdingPlayerHealth = 40_000;
 
     private static void PlaceHulls(EntityManager em, Entity playerEntity, Vector2 playerPos, ScenarioHulls hulls, Vector2 aim)
     {
         if (hulls == ScenarioHulls.StreamTarget)
         {
             var aside = new Vector2(-aim.Y, aim.X);
-            AddUnarmedHull(em, playerPos, playerPos + aim * StreamHullAlong + aside * StreamHullAside, holdAtPlayerDistance: true);
+            AddUnarmedHull(em, playerPos, playerPos + aim * StreamHullAlong + aside * StreamHullAside, holdAtPlayerDistance: true, StreamHullType);
             return;
         }
 
-        float first = em.GetComponent<Player>(playerEntity).Radius + ScenarioHullRadius + CrowdingInnerClearance;
+        float ringRadius = em.GetComponent<Player>(playerEntity).Radius + CrowdingRingHullTypes[0].Radius + CrowdingInnerClearance;
         for (int ring = 0; ring < CrowdingRingShipCounts.Length; ring++)
         {
-            float radius = first + ring * CrowdingRingGap;
+            var type = CrowdingRingHullTypes[ring];
             int count = CrowdingRingShipCounts[ring];
+
+            if (ring > 0)
+                ringRadius += CrowdingRingHullTypes[ring - 1].Radius + type.Radius + CrowdingRingGap;
+
+            // Out far enough that the ring's own circumference holds every hull placed on it.
+            ringRadius = Math.Max(ringRadius, count * (2f * type.Radius + CrowdingRingGap) / (MathF.PI * 2f));
+
             for (int i = 0; i < count; i++)
             {
                 float angle = MathF.PI * 2f * i / count + ring * CrowdingRingStagger;
-                AddUnarmedHull(em, playerPos, playerPos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius, holdAtPlayerDistance: false);
+                AddUnarmedHull(em, playerPos, playerPos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * ringRadius, holdAtPlayerDistance: false, type);
             }
         }
 
@@ -96,7 +108,7 @@ public static class ScenarioWorld
     // window and the world measures contact, not gunfire. A held hull sets FiringRange to its own
     // distance from the player, which makes the chase brake on the first tick and keeps the hull on its
     // post; a charging hull sets it to 0 and closes until it grinds.
-    private static void AddUnarmedHull(EntityManager em, Vector2 playerPos, Vector2 position, bool holdAtPlayerDistance)
+    private static void AddUnarmedHull(EntityManager em, Vector2 playerPos, Vector2 position, bool holdAtPlayerDistance, EnemyShipType type)
     {
         float firingRange = holdAtPlayerDistance ? (position - playerPos).Magnitude : 0f;
 
@@ -106,8 +118,8 @@ public static class ScenarioWorld
         em.AddComponent(entity, new Rotation(0f));
         em.AddComponent(entity, new AngularVelocity(0f));
         em.AddComponent(entity, new EnemyShip(
-            ScenarioHullRadius, Speed: 65f, TurnRate: 1f, FiringRange: firingRange,
-            TurretFireRate: 0f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+            type.Radius, type.Speed, type.TurnRate, FiringRange: firingRange,
+            TurretFireRate: 0f, type.TurretAmmoSpeed, type.Acceleration, type.GraphicsId));
         em.AddComponent(entity, new Health(ScenarioHullHealth, ScenarioHullHealth));
     }
 
