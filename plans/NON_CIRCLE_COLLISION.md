@@ -471,3 +471,31 @@ purpose.
 Pixel/alpha masks in the physics path · polygon manifolds and contact clipping · GJK/EPA ·
 an external physics engine · per-entity collider allocation · shape-based grid indexing ·
 rectangle decomposition.
+
+## What landed
+
+Steps 1-8 of the implementation order are in, in the order below, each measured:
+
+1. `hull-stream` and `hull-crowding` (the two worlds that can price hull contact).
+2. `NarrowPhase` (`Contact`, `TryCollide`, `TrySweep`) and the eight call sites moved onto it. Cost: zero
+   (ammo-spray 1.36 → 1.35 ms, impact-storm 2.18 → 2.14).
+3. `HullShapes` — three authored layouts, measured off the silhouette with `.tools/measure-hull.py`.
+4. The diagnostics overlay (collider in cyan over the bounding circle), judged against the art on the
+   virtual display before any collision changed.
+5. `CapsuleGeometry` with 10 unit tests, unwired.
+6. `CollisionBody` through the static and swept call sites, shapes still circles → no behaviour change.
+7. The interceptor's cross wired in, and the two scenarios changed to hulls that actually have shapes.
+8. The heavy cannon's four primitives (they arrived with step 3's table; the gap test came with step 7).
+
+Two deliberate deviations from the plan as written:
+
+- The plan expected "a shot that misses today must hit a wing tip". Impossible: the shapes are inscribed
+  in the bounding radius, so a shape can only take hits away. The tests are the opposite pair instead —
+  the gap a shape opens, and the tip a shape still covers — always with the same radius and circle art as
+  the control.
+- Steps 6 and 7 landed as separate commits but the interim "two discs" shape was skipped: step 5's tests
+  already pin the disc case, so the plumbing was verified by measuring shapes-on against shapes-off on
+  the same worlds (hull-stream 0.75 / 0.72 ms, hull-crowding 0.37 / 0.31).
+
+Still open on purpose: player hull shapes (a balance decision), mass and inertia following the silhouette
+(same), and the offline fitter for authoring layouts from a sprite.

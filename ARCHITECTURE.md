@@ -223,6 +223,34 @@ same light grey (`MissileBodyColor`) — a missile is a piece of hardware, not a
 enemy's, washing toward white only while the round is turning hard. A rack's mount marker is a
 square that does not turn, against the round empty mounts and the aiming triangles of gun mounts.
 
+## Collision
+
+Two passes and one seam between them. `SpatialGrid` is the broad phase: it indexes every collider by its
+**bounding radius** and answers "what could touch this box or circle". `NarrowPhase` answers "did they
+touch, how deep, and which way", and always answers it with one `Contact(Normal, Depth, Point)`.
+
+- Every overlap in the game goes through that seam; the eight call sites in `CollisionSystem` hold no
+  circle math of their own.
+- A body enters the narrow phase as a `CollisionBody(Position, Angle, Shape, Scale)`. Rocks, mines,
+  pickups and every round are `CollisionBody.Circle`; a hull brings the capsules its art was authored
+  with (`Stats/HullShapes.cs`: one table per art id, in the sprite's own frame, in units of `Radius`).
+  Shapes are committed data reviewed as a diff, never derived from pixels at run time — the sim must not
+  depend on the art.
+- Circles keep a one-test fast path, and the bounding circle is kept as a **conservative reject** in
+  front of the shape test: a shape never reaches past the radius the grid indexed it by (pinned by
+  `HullShapesTest`), so anything that misses the circle cannot touch the shape either. A volley through
+  empty space pays nothing new.
+- `CapsuleGeometry` is the whole shape math. A capsule is a segment inflated by a disc, so a disc is a
+  capsule with no axis and every pair of round primitives is one of point/point, point/segment,
+  segment/segment — the normal, the depth and the touch point all fall out of the closest points,
+  uniquely, with no "which feature touched which" case to specialise.
+- Ordering differs by caller and is not interchangeable: a swept round takes the **earliest** contact
+  along its path, a resting pair takes the **deepest** (which way to push). Either way a body pair yields
+  exactly one contact per tick, which is what the impulse, the position correction and the
+  impact-damage accumulator assume.
+- Mass and inertia still come from the bounding radius, not from the shape: weight following silhouette
+  is a balance change and has to be measured as one.
+
 ## Cross-system signaling
 
 No event queues. Systems signal each other through components, written via the CommandBuffer (see Write patterns). A later system in a same or next phase reacts to the component it finds.
@@ -275,9 +303,9 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; auto-aim solves the intercept in the hull's frame and re-solves it per round at the speed and from the muzzle that round really has; a lead the mount cannot point at inside its arc makes the target unselectable rather than being fired unled; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball), threat readout (`ThreatMeter.Measure`: one read a second of who can hit the hull right now, never called from the hot path)
+        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; auto-aim solves the intercept in the hull's frame and re-solves it per round at the speed and from the muzzle that round really has; a lead the mount cannot point at inside its arc makes the target unselectable rather than being fired unled; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health; narrow phase behind one seam — circles for rounds, rocks and mines, capsule composites for hulls), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball), threat readout (`ThreatMeter.Measure`: one read a second of who can hit the hull right now, never called from the hot path)
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
-        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types with their per-tier drifts — reach, closing speed, ammo speed — plus spawn weights, tier curves, enemy weapon and the ceilings those drifts obey), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; the difficulty ceilings (the firing ring stays inside the player's mid band, enemy ammo stays dodgeable, the toughest hull dies inside a TTK budget) by Tests/EnemyDifficultyTest.cs. plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
+        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types with their per-tier drifts — reach, closing speed, ammo speed — plus spawn weights, tier curves, enemy weapon and the ceilings those drifts obey), HullShapes (each hull art id's collision primitives: capsules in the sprite's frame, in units of the hull's Radius), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; the difficulty ceilings (the firing ring stays inside the player's mid band, enemy ammo stays dodgeable, the toughest hull dies inside a TTK budget) by Tests/EnemyDifficultyTest.cs. plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)

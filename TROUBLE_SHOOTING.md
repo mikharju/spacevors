@@ -339,6 +339,31 @@ attempts, no screenshot, and the misleading "is the game drawing?" while the log
 row every frame. `shot.sh` now **holds** F12 for `SHOT_HOLD` (default 1.5 s) like `input.sh` holds keys.
 Same rule for anything else driven by hand: `xdotool keydown K; sleep 2; xdotool keyup K`.
 
+## 53. The edit tool only accepts a file the read tool has seen
+
+`edit` answers `requires reading "…" first — read the file, then retry` even when the same lines were
+already inspected with `sed`, `grep` or `cat`, and `file changed since it was read — re-read the file,
+then retry` after a script rewrote it. The gate tracks the read/edit tools only. Read the region with the
+read tool immediately before editing, and re-read after any scripted change to the same file.
+
+## 54. A scripted bulk edit lands inside a multi-line call, and a fixture component moves unrelated tests
+
+Adding `Rotation` to every hand-built hull fixture (the collision pass started reading a hull's heading)
+was scripted over 21 sites: it inserted the line inside a multi-line `AddComponent(…)` — a brace-counting
+error nothing caught until compile — and in three fixtures it changed what the chase and turret systems
+saw, flipping 5 tests that had nothing to do with collision. Compile straight after any bulk edit, scope
+the pattern to single-line calls, and when a bulk edit moves a behaviour test, `git checkout` that fixture
+rather than adapting a test that was never exercising the new path.
+
+## 55. A perf gate that cannot reach the new code prices nothing
+
+The shape change measured as free on `hull-stream` and `hull-crowding` — and it was, because both worlds
+placed swarmers, whose shape is a disc, so the capsule path never ran once. A budget that passes proves
+the scenario still runs, not that the scenario touches the code being measured. Before accepting "no cost",
+force the new path off with a one-line patch (restore with `git checkout`), measure the same worlds both
+ways, and only report the difference. Then make the world reach the new path: the stream now fires at an
+interceptor and the crowding rings are three different hulls.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

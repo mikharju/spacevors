@@ -548,6 +548,37 @@ plans/DIFFICULTY_SCALING.md R2.12).
   host's p99 band is ±0.3 ms, so all of it sits inside noise). A missile-carrying scenario is the missing
   measurement.
 
+## Non-circle hull collision — done
+
+Hulls collide as the shape their art was drawn for (plans/NON_CIRCLE_COLLISION.md). Circles stay
+everywhere they were always right: rocks, mines, pickups, and every round in flight.
+
+- The primitive is a **capsule** — a segment inflated by a disc — and a hull is one to four of them.
+  Every pair of round primitives is then point/point, point/segment or segment/segment: normal, depth
+  and touch point all fall out of the closest points, uniquely, and round ends remove the
+  feature-pairing case that makes polygon pairs long and jittery. Polygon+SAT was priced at 10-50× this
+  for no gameplay gain; pixel-to-pixel was rejected outright (no normal, no depth, no contact point to
+  resolve, and it makes art load-bearing gameplay).
+- Shapes are **authored data** (`Domain/Stats/HullShapes.cs`), one per art id, in the sprite's frame and
+  in units of the hull's `Radius` — never derived from pixels at run time, because the sim must not
+  depend on the art. The numbers came off the silhouette with `.tools/measure-hull.py` (painted area in
+  R²: swarmer 3.97 against a disc's 3.14, so it stays a disc and it is also the most numerous hull;
+  interceptor 1.96, its disc 60% air → spine plus wing bar; heavy cannon 2.37 with paint out to
+  |u| = 0.89 → slab plus a pod at each wing end).
+- **The bounding radius did not move.** It is still what the grid indexes and culls by, so the broad
+  phase, explosion radii, spawn placement and the targeting ring are untouched, and a shape can never
+  reach past the query that found it (`HullShapesTest` pins it). The circle is kept as a conservative
+  reject in front of the shape test.
+- One contact per body pair per tick — deepest for resolution, earliest-along-path for a swept round —
+  so the impulse, the position correction and the impact-damage accumulator kept their shape.
+- Mass and inertia still come from the bounding radius, deliberately: making weight follow the silhouette
+  is a balance change and has to be measured as one.
+- Cost, same worlds with shapes on and off: `hull-stream` **0.75 vs 0.72 ms**, `hull-crowding` **0.37 vs
+  0.31 ms**. Against the pre-change baselines the stream got *cheaper* (1.20 → 0.75): a 5500-round volley
+  used to be eaten by a 45-radius disc its rounds could not see.
+- Player hulls are still circles on purpose — their shapes are a balance decision (an 84-radius Heavy's
+  silhouette is far thinner than its disc), not a plumbing one.
+
 ## Near future
 
 - New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)
@@ -564,7 +595,6 @@ plans/DIFFICULTY_SCALING.md R2.12).
 - save/load
 - replays
 - mod-friendly data definitions
-- non circle collisions and ship shapes (is this expensive)
 
 ## Done criteria
 
