@@ -111,10 +111,40 @@ public class ScenarioWorldTest
     [Fact]
     public void Scenarios_AreNamedAndUnique()
     {
-        Assert.Equal(5, Scenarios.All.Length);
+        Assert.Equal(7, Scenarios.All.Length);
         Assert.Equal(Scenarios.All.Length, Scenarios.All.Select(s => s.Name).Distinct().Count());
         Assert.Null(Scenarios.Find("nope"));
     }
+
+    // The two hull worlds price how a hull collides (plans/NON_CIRCLE_COLLISION.md), so they are only
+    // worth trusting if they really put unarmed hulls in the world: a hull that shoots back, or a ring
+    // that silently placed nobody, would quietly measure something else.
+    [Fact]
+    public void HullWorlds_PlaceUnarmedHullsAndKeepThePlayerStanding()
+    {
+        var (streamEm, streamPlayer, _) = WorldFactory.Create(ShipType.Shadow, WorldView.DefaultViewportSize, seed: 7, testAsteroid: true);
+        ScenarioWorld.Apply(streamEm, streamPlayer, Scenarios.Find("hull-stream")!);
+
+        var (crowdEm, crowdPlayer, _) = WorldFactory.Create(ShipType.Shadow, WorldView.DefaultViewportSize, seed: 7, testAsteroid: true);
+        ScenarioWorld.Apply(crowdEm, crowdPlayer, Scenarios.Find("hull-crowding")!);
+
+        Assert.Equal(InitialShips + 1, Count<EnemyShip>(streamEm));
+        Assert.Equal(InitialShips + CrowdingHulls, Count<EnemyShip>(crowdEm));
+
+        int unarmed = 0;
+        foreach (var (_, ship) in crowdEm.GetEntitiesWithComponents<EnemyShip>())
+        {
+            if (ship.FiringRange > 0f) continue; // a spawned hull, armed by EnemyShipFactory
+            unarmed++;
+        }
+        Assert.Equal(CrowdingHulls, unarmed);
+
+        Assert.True(crowdEm.GetComponent<Health>(crowdPlayer).Current > ShipType.Shadow.MaxHealth,
+            "the crowding player must outlast the grind, or the window measures a wreck");
+    }
+
+    private const int InitialShips = 6;      // SpawningStats.InitialWorld.EnemyShipCount
+    private const int CrowdingHulls = 36;    // ScenarioWorld.CrowdingRingShipCounts: 6 + 12 + 18
 
     private static int Count<T>(EntityManager em) where T : notnull =>
         em.TryGetStorage(out ComponentStorage<T> storage) ? storage.Count : 0;

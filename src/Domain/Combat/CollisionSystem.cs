@@ -14,14 +14,12 @@ public class CollisionSystem : GameSystem
     private const float CorrectionPercent = 0.4f;
     private const float Slop = 1.0f;
 
-    // Distance (or squared distance) below which bodies are treated as coincident.
-    private const float Epsilon = 0.001f;
     private const float EnemyShipMass = 3000f;
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly HashSet<Entity> _entitiesToDestroy = new();
     private readonly HashSet<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
-    private readonly List<(Entity ammo, Entity target, Vector2 contact, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
+    private readonly List<(Entity ammo, Entity target, Contact hit, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
     private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
@@ -61,15 +59,8 @@ public class CollisionSystem : GameSystem
         void CheckPlayerCollision(Vector2 entityPos, float entityRadius, Action onCollision)
         {
             if (!hasPlayer) return;
-
-            var diff = playerTuple.Value2.Value - entityPos;
-            float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float radiusSum = entityRadius + playerTuple.Value1.Radius;
-
-            if (distSq < radiusSum * radiusSum && distSq >= Epsilon)
-            {
+            if (NarrowPhase.TryCollide(playerTuple.Value2.Value, playerTuple.Value1.Radius, entityPos, entityRadius, out _))
                 onCollision();
-            }
         }
 
         var gridBuildSw = Stopwatch.StartNew();
@@ -219,13 +210,13 @@ public class CollisionSystem : GameSystem
                 MathF.Max(sweepFrom.Y, sweepTo.Y) + ammoRadius);
 
             Entity? earliestAsteroidHit = null;
-            Vector2 asteroidContact = default;
+            Contact asteroidHit = default;
             float asteroidT = float.MaxValue;
 
             Entity? earliestMineHit = null;
             MineSize? mineHitSize = null;
             Vector2 mineHitPos = default;
-            Vector2 mineContact = default;
+            Contact mineHit = default;
             float mineT = float.MaxValue;
 
             Entity? earliestShipHit = null;
@@ -233,7 +224,7 @@ public class CollisionSystem : GameSystem
             float shipT = float.MaxValue;
 
             Entity? earliestMissileHit = null;
-            Vector2 missileContact = default;
+            Contact missileHit = default;
             float missileT = float.MaxValue;
 
             int count = QueryBox(boxMin, boxMax);
@@ -242,11 +233,8 @@ public class CollisionSystem : GameSystem
             for (int i = 0; i < count; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
-                Vector2 contact = Vector2.ClosestPointOnSegment(sweepFrom, sweepTo, candidate.Position, out float t);
-                var diff = contact - candidate.Position;
-                float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                float rSum = ammoRadius + candidate.Radius;
-                if (dSq >= rSum * rSum) continue;
+                if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, candidate.Position, candidate.Radius, out Contact hit, out float t))
+                    continue;
 
                 switch (candidate.Kind)
                 {
@@ -254,7 +242,7 @@ public class CollisionSystem : GameSystem
                         if (t < asteroidT)
                         {
                             earliestAsteroidHit = candidate.Id;
-                            asteroidContact = contact;
+                            asteroidHit = hit;
                             asteroidT = t;
                         }
                         break;
@@ -264,21 +252,19 @@ public class CollisionSystem : GameSystem
                         {
                             earliestMineHit = candidate.Id;
                             mineHitPos = candidate.Position;
-                            mineContact = contact;
+                            mineHit = hit;
                             mineHitSize = candidate.Size!;
                             mineT = t;
                         }
                         break;
 
                     case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
+                        // The hit point is the hull surface facing the touch — where the spark, the
+                        // explosion and the wreck placement all go.
                         if (t < shipT)
                         {
                             earliestShipHit = candidate.Id;
-                            var toContact = contact - candidate.Position;
-                            float distToContact = toContact.Magnitude;
-                            shipHitPos = distToContact > Epsilon
-                                ? candidate.Position + (toContact / distToContact) * candidate.Radius
-                                : candidate.Position;
+                            shipHitPos = candidate.Position + hit.Normal * candidate.Radius;
                             shipT = t;
                         }
                         break;
@@ -292,7 +278,7 @@ public class CollisionSystem : GameSystem
                         if (t < missileT)
                         {
                             earliestMissileHit = candidate.Id;
-                            missileContact = contact;
+                            missileHit = hit;
                             missileT = t;
                         }
                         break;
@@ -302,9 +288,9 @@ public class CollisionSystem : GameSystem
             if (earliestAsteroidHit.HasValue)
             {
                 var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
-                ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidContact, commands);
+                ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidHit, commands);
                 if (DamageAsteroid(view, earliestAsteroidHit.Value, ammo.Damage))
-                    _effectsToSpawn.Add((asteroidContact, MineType.Small));
+                    _effectsToSpawn.Add((asteroidHit.Point, MineType.Small));
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
@@ -317,7 +303,7 @@ public class CollisionSystem : GameSystem
                 }
                 _frameRemainingHealth[earliestMineHit.Value] -= ammo.Damage;
                 _hitMines.Add(earliestMineHit.Value);
-                _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineContact, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
+                _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineHit, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
                 _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
 
@@ -346,7 +332,7 @@ public class CollisionSystem : GameSystem
                 }
                 _frameRemainingHealth[earliestMissileHit.Value] -= ammo.Damage;
                 _hitMissiles.Add(earliestMissileHit.Value);
-                _effectsToSpawn.Add((missileContact, MineType.Small));
+                _effectsToSpawn.Add((missileHit.Point, MineType.Small));
                 // The round that shot it down is spent, exactly as against a hull: a bullet that kills
                 // a missile does not carry on into whatever the missile was covering.
                 _entitiesToDestroy.Add(ammoEntity);
@@ -357,12 +343,8 @@ public class CollisionSystem : GameSystem
             if (!hasPlayer) continue;
 
             var playerPos = playerTuple.Value2;
-            Vector2 playerContact = Vector2.ClosestPointOnSegment(sweepFrom, sweepTo, playerPos.Value, out _);
-            var diff2 = playerContact - playerPos.Value;
-            float distSq2 = diff2.X * diff2.X + diff2.Y * diff2.Y;
-            float radiusSum2 = ammoRadius + playerTuple.Value1.Radius;
-
-            if (distSq2 >= radiusSum2 * radiusSum2) continue;
+            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerPos.Value, playerTuple.Value1.Radius, out _, out _))
+                continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
@@ -417,7 +399,7 @@ public class CollisionSystem : GameSystem
 
                 Entity? firstHit = null;
                 SpatialGrid.CollisionKind firstKind = default;
-                Vector2 firstContact = default;
+                Contact firstContact = default;
                 Vector2 firstCandidatePos = default;
                 MineSize firstMineSize = default;
                 float firstT = float.MaxValue;
@@ -428,15 +410,12 @@ public class CollisionSystem : GameSystem
                 for (int i = 0; i < beamCount; i++)
                 {
                     ref readonly var candidate = ref queryBuffer[i];
-                    Vector2 contact = Vector2.ClosestPointOnSegment(beamStart, beamEnd, candidate.Position, out float t);
-                    var diff = contact - candidate.Position;
-                    float dSq = diff.X * diff.X + diff.Y * diff.Y;
-                    float rSum = beam.Width + candidate.Radius;
-                    if (dSq >= rSum * rSum || t >= firstT) continue;
+                    if (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, candidate.Position, candidate.Radius, out Contact hit, out float t)
+                        || t >= firstT) continue;
 
                     firstHit = candidate.Id;
                     firstKind = candidate.Kind;
-                    firstContact = contact;
+                    firstContact = hit;
                     firstCandidatePos = candidate.Position;
                     if (candidate.Kind == SpatialGrid.CollisionKind.EnemyMine) firstMineSize = candidate.Size!.Value;
                     firstT = t;
@@ -451,7 +430,7 @@ public class CollisionSystem : GameSystem
                             // the hit; a big one is scenery with no Health to lose. A rock that is
                             // coming apart flashes nothing: its end is smoke, not fire.
                             if (DamageAsteroid(view, firstHit.Value, beam.Damage))
-                                _effectsToSpawn.Add((firstContact, MineType.Small));
+                                _effectsToSpawn.Add((firstContact.Point, MineType.Small));
                             break;
 
                         case SpatialGrid.CollisionKind.EnemyMine:
@@ -479,11 +458,7 @@ public class CollisionSystem : GameSystem
                                 _frameRemainingHealth[firstHit.Value] -= beam.Damage;
                                 var beamShip = view.GetComponent<EnemyShip>(firstHit.Value);
                                 var beamShipPos = view.GetComponent<Position>(firstHit.Value);
-                                var toContact = firstContact - beamShipPos.Value;
-                                float contactDist = toContact.Magnitude;
-                                Vector2 beamHitPoint = contactDist > Epsilon
-                                    ? beamShipPos.Value + (toContact / contactDist) * beamShip.Radius
-                                    : beamShipPos.Value;
+                                Vector2 beamHitPoint = beamShipPos.Value + firstContact.Normal * beamShip.Radius;
                                 if (!_shipDeathData.ContainsKey(firstHit.Value))
                                     _shipDeathData[firstHit.Value] = (beamHitPoint, beamShipPos.Value, beamShip.Radius, beamShip.GraphicsId);
                             }
@@ -504,7 +479,7 @@ public class CollisionSystem : GameSystem
                                 }
                                 _frameRemainingHealth[firstHit.Value] -= beam.Damage;
                                 _hitMissiles.Add(firstHit.Value);
-                                _effectsToSpawn.Add((firstContact, MineType.Small));
+                                _effectsToSpawn.Add((firstContact.Point, MineType.Small));
                             }
                             break;
                     }
@@ -524,7 +499,7 @@ public class CollisionSystem : GameSystem
 
         sw.Restart();
 
-        foreach (var (ammoEntity, mineEntity, contact, minePos, mineSize, ammoDamage, ammoVel) in _ammoToMineHits)
+        foreach (var (ammoEntity, mineEntity, hit, _, mineSize, _, ammoVel) in _ammoToMineHits)
         {
             var minePosComp = view.GetComponent<Position>(mineEntity);
 
@@ -534,12 +509,9 @@ public class CollisionSystem : GameSystem
             float mineMass = MathF.PI * mineRadius * mineRadius;
             float totalInvMass = 1f / AmmoMass + 1f / mineMass;
 
-            // Normal from the swept contact point, so a bullet that already jumped past the
-            // mine still pushes it in the travel direction.
-            var diff = contact - minePosComp.Value;
-            float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
-            if (dist < Epsilon) dist = Epsilon;
-            var normal = diff / dist;
+            // The normal comes from the swept touch, so a bullet that already jumped past the mine
+            // still pushes it along its travel.
+            var normal = hit.Normal;
 
             Vector2 mineVel = GetCollisionVelocity(view, mineEntity, default);
             float velAlongNormal = Vector2.Dot(ammoVel - mineVel, normal);
@@ -794,16 +766,10 @@ public class CollisionSystem : GameSystem
         CommandBuffer commands,
         float? aOverrideMass = null)
     {
-        var diff = bPos.Value - aPos.Value;
-        float distSq = diff.X * diff.X + diff.Y * diff.Y;
-        float radiusSum = aRadius + bRadius;
+        if (!NarrowPhase.TryCollide(aPos.Value, aRadius, bPos.Value, bRadius, out Contact contact)) return;
 
-        if (distSq >= radiusSum * radiusSum || distSq < Epsilon) return;
-
-        float dist = (float)Math.Sqrt(distSq);
-        var normal = diff / dist;
-
-        float penetration = radiusSum - dist;
+        var normal = contact.Normal;
+        float penetration = contact.Depth;
 
         float aMass = aOverrideMass ?? (MathF.PI * aRadius * aRadius);
         float bMass = MathF.PI * bRadius * bRadius;
@@ -829,7 +795,7 @@ public class CollisionSystem : GameSystem
 
         // Impact damage: only reached while approaching, so sustained/resting contact never
         // chips hp; -velAlongNormal is the closing speed (relative, normal component only).
-        ApplyImpactDamage(view, aEntity, bEntity, aPos.Value, normal, aRadius, aMass, bMass, -velAlongNormal, commands);
+        ApplyImpactDamage(view, aEntity, bEntity, contact.Point, aMass, bMass, -velAlongNormal, commands);
 
         float restitution = isAsteroidVsAsteroid ? AsteroidAsteroidRestitution : PlayerRestitution;
         if (MathF.Abs(velAlongNormal) < 5f)
@@ -854,8 +820,10 @@ public class CollisionSystem : GameSystem
 
         if (tangentSpeed > Slop)
         {
-            var rA = normal * aRadius;
-            var rB = normal * bRadius;
+            // Lever arms measured from the contact, not from `normal · radius`: with a circle the two
+            // are the same arm, and only the first one is still true for a shape that is not a circle.
+            var rA = contact.Point - aPos.Value;
+            var rB = contact.Point - bPos.Value;
 
             float aAngVel = GetCollisionAngularVelocity(view, aEntity, 0f);
             bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out _);
@@ -907,9 +875,7 @@ public class CollisionSystem : GameSystem
         WorldView view,
         Entity aEntity,
         Entity bEntity,
-        Vector2 aPos,
-        Vector2 normal,
-        float aRadius,
+        Vector2 contactPoint,
         float aMass,
         float bMass,
         float closingSpeed,
@@ -917,8 +883,6 @@ public class CollisionSystem : GameSystem
     {
         var (damageA, damageB) = ImpactDamage.ForMasses(aMass, bMass, closingSpeed);
         if (damageA == 0 && damageB == 0) return;
-
-        var contactPoint = aPos + normal * aRadius;
 
         AccumulateImpactHealth(view, aEntity, damageA, contactPoint);
         AccumulateImpactHealth(view, bEntity, damageB, contactPoint);
@@ -971,15 +935,11 @@ public class CollisionSystem : GameSystem
         Ammo ammo,
         Entity asteroidEntity,
         Asteroid asteroid,
-        Vector2 contactPoint,
+        Contact hit,
         CommandBuffer commands)
     {
-        var asteroidPos = view.GetComponent<Position>(asteroidEntity);
-
-        var diff = contactPoint - asteroidPos.Value;
-        float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
-        if (dist < Epsilon) return; // segment ran through the center: no meaningful normal
-        var normal = diff / dist;
+        if (!hit.HasNormal) return; // the segment ran through the centre: no meaningful normal
+        var normal = hit.Normal;
 
         Vector2 asteroidVel = GetCollisionVelocity(view, asteroidEntity, default);
         Vector2 ammoVel = ammo.Velocity;
@@ -1033,11 +993,7 @@ public class CollisionSystem : GameSystem
         var minePos = view.GetComponent<Position>(mineEntity);
         var playerPos = view.GetComponent<Position>(playerEntity);
 
-        var diff = playerPos.Value - minePos.Value;
-        float distSq = diff.X * diff.X + diff.Y * diff.Y;
-        float radiusSum = mine.Radius + PlayerRadius;
-
-        if (distSq >= radiusSum * radiusSum || distSq < Epsilon) return;
+        if (!NarrowPhase.TryCollide(minePos.Value, mine.Radius, playerPos.Value, PlayerRadius, out Contact contact)) return;
 
         commands.Add(new DestroyEntityCommand(mineEntity));
 
@@ -1049,9 +1005,8 @@ public class CollisionSystem : GameSystem
         }
         _frameRemainingHealth[playerEntity] -= MineStats.ContactDamage;
 
-        var normal = diff / (float)Math.Sqrt(distSq);
         var mineType = MineType.FromSize(mine.Size);
-        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + normal * mineType.PlayerContactForce;
+        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + contact.Normal * mineType.PlayerContactForce;
 
         SetCollisionVelocity(playerEntity, playerVel);
 
