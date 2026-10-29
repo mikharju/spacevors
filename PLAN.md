@@ -576,6 +576,9 @@ everywhere they were always right: rocks, mines, pickups, and every round in fli
 - Cost, same worlds with shapes on and off: `hull-stream` **0.75 vs 0.72 ms**, `hull-crowding` **0.37 vs
   0.31 ms**. Against the pre-change baselines the stream got *cheaper* (1.20 → 0.75): a 5500-round volley
   used to be eaten by a 45-radius disc its rounds could not see.
+- Diagnostics draws each hull's collider in cyan over its art instead of the old orange bounding circle —
+  enemy hulls and the player in play, and every preview on the ship select screen. The player's collider
+  is a cyan disc because that is what it still is.
 - Player hulls are still circles on purpose — their shapes are a balance decision (an 84-radius Heavy's
   silhouette is far thinner than its disc), not a plumbing one.
 

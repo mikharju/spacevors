@@ -65,11 +65,12 @@ public static class ShipSpriteRenderer
     static System.Numerics.Vector2 Rotated(float x, float y, float cos, float sin)
         => new(x * cos - y * sin, x * sin + y * cos);
 
-    // Diagnostics: a hull's collider drawn over its art, so the gap between the collision circle and
-    // the painted hull is something you look at instead of something you argue about. Each capsule is
-    // its axis at twice its thickness; the round caps are not drawn, which is near enough to read the
-    // fit, and a lone disc is left to the bounding circle the diagnostics pass already draws.
-    public static void DrawHullShape(HullShape shape, float radius, float cx, float cy, float angleDeg, Color color)
+    // Diagnostics: a hull's collider drawn over its art, so the fit between the painted silhouette and
+    // what actually gets hit is something you look at instead of something you argue about. A capsule is
+    // its axis at twice its thickness; the round caps are left out, which is near enough to read the fit.
+    // One colour wherever a collider is drawn — on the select screen as much as in a fight — so
+    // "cyan is what you can hit" is a rule rather than three conventions.
+    public static void DrawHullShape(HullShape shape, float radius, float cx, float cy, float angleDeg)
     {
         float angle = angleDeg * MathF.PI / 180f;
         float cos = MathF.Cos(angle);
@@ -77,14 +78,23 @@ public static class ShipSpriteRenderer
 
         foreach (var capsule in shape.Capsules)
         {
-            if (capsule.From == capsule.To) continue;
+            var from = ScreenOf(cx, cy, capsule.From, cos, sin, radius);
+
+            if (capsule.To == capsule.From)
+            {
+                Raylib.DrawCircle((int)from.X, (int)from.Y, capsule.HalfThickness * radius, ColliderColor);
+                continue;
+            }
+
             Raylib.DrawLineEx(
-                ScreenOf(cx, cy, capsule.From, cos, sin, radius),
+                from,
                 ScreenOf(cx, cy, capsule.To, cos, sin, radius),
                 capsule.HalfThickness * 2f * radius,
-                color);
+                ColliderColor);
         }
     }
+
+    static readonly Color ColliderColor = new(0, 255, 255, 110);
 
     // Shape units to screen: scale by the hull radius, then rotate by the hull's heading — the same
     // frame DrawTexturePro draws the sprite in, so an authored capsule lines up with the art.

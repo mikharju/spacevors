@@ -550,6 +550,10 @@ public static class WorldRenderer
         float damage = em.TryGetComponent<Health>(playerEntity, out var health) ? DamageShading.FromHealth(health) : 0f;
         ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg, damage);
 
-        if (diagnostics) Raylib.DrawCircle((int)screenCx, (int)screenCy, shipType.Radius, new Color(0, 255, 0, 60));
+        // The player's collider, in the same cyan as every other hull's. It is still one disc: giving a
+        // player hull a shape is a balance decision that has not been made (PLAN.md), so the honest
+        // diagnostic is a disc rather than an absence of one.
+        if (diagnostics)
+            ShipSpriteRenderer.DrawHullShape(HullShape.Circle, shipType.Radius, screenCx, screenCy, angleDeg);
     }
 }

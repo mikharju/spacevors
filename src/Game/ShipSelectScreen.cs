@@ -30,10 +30,12 @@ public sealed class ShipSelectScreen
 
     // The ships on offer: the real ones, plus the diagnostics copies in diagnostics mode.
     readonly ShipType[] _ships;
+    readonly bool _diagnostics;
 
     public ShipSelectScreen(bool diagnostics)
     {
         _ships = diagnostics ? [.. ShipType.All, .. ShipType.DiagnosticShips] : ShipType.All;
+        _diagnostics = diagnostics;
     }
 
     // Returns the chosen ship when a selection is made this frame.
@@ -188,6 +190,11 @@ public sealed class ShipSelectScreen
     {
         const float PreviewZoom = 1.6f;
         ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, ship.Radius * 2f * PreviewZoom, 0f);
+
+        // The same cyan collider the game draws over a hull, so the fit between paint and hitbox can be
+        // judged before a run starts. Player hulls collide as one disc today (PLAN.md).
+        if (_diagnostics)
+            ShipSpriteRenderer.DrawHullShape(HullShape.Circle, ship.Radius * PreviewZoom, cx, cy, 0f);
     }
 
     void DrawShipCard(int x, int y, int width, int height, string title, string details, Color borderColor, string keyLabel, bool highlighted)
