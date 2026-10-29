@@ -56,6 +56,13 @@ public class CollisionSystem : GameSystem
         bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
 
+        // The player's body, built once per tick: its shape turns with the hull, so every test the player is
+        // in reads the same transformed primitives instead of re-deriving them.
+        NarrowPhase.CollisionBody playerBody = hasPlayer ? PlayerBody(view, playerEntity, playerTuple.Value1) : default;
+
+        // The player's collision circle is the conservative reject in front of its shape, exactly as a hull's
+        // circle is in front of a bullet's sweep: the shape never reaches past the radius, so a body that
+        // misses the circle cannot touch the shape either.
         void CheckPlayerCollision(Vector2 entityPos, float entityRadius, Action onCollision)
         {
             if (!hasPlayer) return;
@@ -73,7 +80,7 @@ public class CollisionSystem : GameSystem
 
             CheckPlayerCollision(pos.Value, asteroid.Radius, () =>
                 ResolveCollision(view, CircleBody(pos.Value, asteroid.Radius), entity,
-                    CircleBody(playerTuple.Value2.Value, playerTuple.Value1.Radius), playerEntity, false, commands));
+                    playerBody, playerEntity, false, commands));
         }
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
@@ -82,7 +89,7 @@ public class CollisionSystem : GameSystem
             _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, mine.Size);
 
             CheckPlayerCollision(pos.Value, mine.Radius, () =>
-                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerTuple.Value1.Radius));
+                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerBody));
         }
 
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
@@ -95,7 +102,7 @@ public class CollisionSystem : GameSystem
             CheckPlayerCollision(pos.Value, ship.Radius, () =>
             {
                 ResolveCollision(view, hull, entity,
-                    CircleBody(playerTuple.Value2.Value, playerTuple.Value1.Radius), playerEntity, false, commands, EnemyShipMass);
+                    playerBody, playerEntity, false, commands, EnemyShipMass);
             });
 
             int asteroidCount = QueryCircle(pos.Value, ship.Radius);
@@ -359,7 +366,12 @@ public class CollisionSystem : GameSystem
             if (!hasPlayer) continue;
 
             var playerPos = playerTuple.Value2;
+
+            // The same two steps as against a hull: the circle rejects a round that cannot reach the player,
+            // and only a round inside it is tested against the hull's shape.
             if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerPos.Value, playerTuple.Value1.Radius, out _, out _))
+                continue;
+            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out _))
                 continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
@@ -385,23 +397,19 @@ public class CollisionSystem : GameSystem
 
             if (beam.IsEnemy)
             {
-                // Enemy beams engage only the player, mirroring enemy ammo.
-                if (hasPlayer)
+                // Enemy beams engage only the player, mirroring enemy ammo. A beam is a segment inflated by its
+                // width, so it crosses the swept seam and meets the player's shape instead of its bounding
+                // circle — which is what lets a beam pass through the gap in a hull that has one.
+                if (hasPlayer && NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, playerBody, out _, out _))
                 {
-                    Vector2 playerContact = Vector2.ClosestPointOnSegment(beamStart, beamEnd, playerTuple.Value2.Value, out _);
-                    var pDiff = playerContact - playerTuple.Value2.Value;
-                    float pRSum = beam.Width + playerTuple.Value1.Radius;
-                    if (pDiff.X * pDiff.X + pDiff.Y * pDiff.Y < pRSum * pRSum)
+                    var beamPlayerHealth = view.GetComponent<Health>(playerEntity);
+                    if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
                     {
-                        var beamPlayerHealth = view.GetComponent<Health>(playerEntity);
-                        if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
-                        {
-                            remaining = beamPlayerHealth.Current;
-                            _frameRemainingHealth[playerEntity] = remaining;
-                        }
-                        _frameRemainingHealth[playerEntity] -= beam.Damage;
-                        _effectsToSpawn.Add((playerTuple.Value2.Value, MineType.Small));
+                        remaining = beamPlayerHealth.Current;
+                        _frameRemainingHealth[playerEntity] = remaining;
                     }
+                    _frameRemainingHealth[playerEntity] -= beam.Damage;
+                    _effectsToSpawn.Add((playerTuple.Value2.Value, MineType.Small));
                 }
             }
             else
@@ -785,6 +793,18 @@ public class CollisionSystem : GameSystem
         new(view.GetComponent<Position>(entity).Value, view.GetComponent<Rotation>(entity).Angle,
             HullShapes.ForEnemy(ship.GraphicsId), ship.Radius);
 
+    // The player as a body: the shape its hull type was authored with, turned the way the hull is turned.
+    // `Radius` stays the bounding radius everything else reads — explosion damage, spawn clearance, the pickup
+    // ring — and the circle every shape test is queued behind, so a shape can only ever be smaller than the
+    // disc the player used to have.
+    static NarrowPhase.CollisionBody PlayerBody(WorldView view, Entity playerEntity, Player player)
+    {
+        // A world that never gave the player a heading collides with it facing the way it is drawn.
+        view.TryGetComponent<Rotation>(playerEntity, out var rotation);
+        return new(view.GetComponent<Position>(playerEntity).Value, rotation.Angle,
+            player.Shape ?? HullShape.Circle, player.Radius);
+    }
+
     // Rocks, mines and guided rounds are drawn as dots: they collide as one circle, as they always did.
     static NarrowPhase.CollisionBody CircleBody(Vector2 position, float radius) =>
         NarrowPhase.CollisionBody.Circle(position, radius);
@@ -1024,12 +1044,11 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity playerEntity, CommandBuffer commands, float PlayerRadius)
+    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity playerEntity, CommandBuffer commands, NarrowPhase.CollisionBody playerBody)
     {
         var minePos = view.GetComponent<Position>(mineEntity);
-        var playerPos = view.GetComponent<Position>(playerEntity);
 
-        if (!NarrowPhase.TryCollide(minePos.Value, mine.Radius, playerPos.Value, PlayerRadius, out Contact contact)) return;
+        if (!NarrowPhase.TryCollide(CircleBody(minePos.Value, mine.Radius), playerBody, out Contact contact)) return;
 
         commands.Add(new DestroyEntityCommand(mineEntity));
 

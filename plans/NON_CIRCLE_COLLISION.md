@@ -497,5 +497,55 @@ Two deliberate deviations from the plan as written:
   already pin the disc case, so the plumbing was verified by measuring shapes-on against shapes-off on
   the same worlds (hull-stream 0.75 / 0.72 ms, hull-crowding 0.37 / 0.31).
 
-Still open on purpose: player hull shapes (a balance decision), mass and inertia following the silhouette
-(same), and the offline fitter for authoring layouts from a sprite.
+## Player hulls — the same seam, one body later
+
+The enemy hulls proved the seam, so the player hulls went through it unchanged: no new geometry, no new
+contact rule, one `CollisionBody` built per tick and queued behind the same bounding-circle reject.
+
+- One authored layout per hull type in `Stats/PlayerHullShapes.cs` (Scout 4 capsules, Fighter 4, Heavy 5,
+  Shadow 6), mounted on `ShipType.Shape` and copied onto the `Player` component the way `Radius` is. A
+  `Player` built without one keeps the disc: that is the state of the 30 existing player fixtures, which is
+  how they stayed honest while the game's player got a shape (`WorldFactory` sets it, and a test pins it).
+- `.tools/measure-hull.py` grew `--fit "u0 v0 u1 v1 t ; …"`, which rasterises a layout against the paint and
+  prints the two numbers that matter: how much of the paint the shape covers, and how much of the shape sits
+  over transparent pixels. Eyeballing gets the fit roughly right and the reach rule wrong; scoring gets both.
+  It also fixed the tool's v axis, which was scaled by the texture's **height**: the renderer scales the whole
+  texture by `diameter / texture-width`, so on a 936×975 sprite the shape's v units are 4% taller than the old
+  printout claimed. The enemy layouts had been authored off that printout — their textures are within 2%
+  square, so none of them moved.
+- Scores: Scout 90% of the paint covered / 9% of the shape over air, Fighter 79 / 12, Heavy 90 / 14,
+  Shadow 90 / 8. The Fighter's number is capped by the bounding radius, not by the layout: 0.34 R² of its paint
+  is at radius > 1, and no shape inside the radius can cover any of it — the collision circle never could either.
+- For a hurtbox the honest error direction is stingy, so coverage was bought before margin: the Heavy's fore
+  pods get a thin bar down each pod rather than one bar across the transparent slot between them, and the
+  Shadow takes two extra bars to cover its slab's fore and aft edges.
+- Cost, same worlds: ammo-spray 1.32 vs 1.28 ms, impact-storm 2.11 vs 2.12, hull-stream 0.75 vs 0.78,
+  hull-crowding 0.36 vs 0.36. No scenario fires at the player, so the swept-round-vs-player step is priced by
+  proxy through hull-stream (+0.03 ms for a 2-capsule hull under a 5500-round volley); a 5-6 capsule player at
+  a similar density of enemy fire lands in the same fraction of a millisecond.
+
+### One radius per end — priced, not taken
+
+Asked whether a capsule whose ends have different half-thicknesses (the convex hull of two discs, i.e. a cone
+frustum capped by two discs) would make the math much heavier. Not free, not ruinous:
+
+- A capsule with equal ends is a segment ⊕ a disc, and that identity is why the pair test is one closed form:
+  closest points on the axes, minus `rA + rB`. Unequal ends are not a Minkowski sum of a segment and a disc, so
+  there is no single radius to subtract and the depth is no longer `rSum − distance`.
+- Round body (a round, a beam) against a tapered primitive: a 2-parameter minimisation, or 4×4 feature-pair
+  enumeration (2 tangent lines + 2 arcs per side) — roughly 4-10× the current pair test. Deep overlap stays
+  sane with feature enumeration and bad with GJK/EPA, which is iterative and blows up on penetration.
+- The grid and the bounding circle are untouched and the reject still does most of the work, so the frame cost
+  would be a fraction of that multiplier: 4-10× on the tests that already passed a reject is ~+0.15 ms on
+  hull-stream's delta, not on the frame.
+- The boundary stays C¹ (the tangent line is tangent to both arcs), so normals stay continuous — the
+  feature-jitter that ruled polygons out does not return. New failure modes: one disc swallowing the other
+  (the `asin` argument exceeds 1), equal-depth feature pairs needing index tie-breaks, and a pointed end
+  (r = 0), whose apex is C⁰ and genuinely discontinuous.
+- Not worth taking now: the residual mismatch it would buy is a few percent of painted area (the interceptor's
+  aft fins), the composites are already 2-6 primitives, and the same fit is available today with no new math by
+  stacking two or three collinear capsules of decreasing thickness — a staircase within Δr/2 of a taper, at
+  +1 primitive. Where tapering would earn its keep is a big hull the player judges by eye, not a swarmer.
+
+Still open on purpose: mass and inertia following the silhouette (a balance change to measure on its own),
+and an offline fitter that proposes layouts from a sprite instead of scoring the ones a human typed.

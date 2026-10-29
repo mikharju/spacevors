@@ -577,10 +577,21 @@ everywhere they were always right: rocks, mines, pickups, and every round in fli
   0.31 ms**. Against the pre-change baselines the stream got *cheaper* (1.20 → 0.75): a 5500-round volley
   used to be eaten by a 45-radius disc its rounds could not see.
 - Diagnostics draws each hull's collider in cyan over its art instead of the old orange bounding circle —
-  enemy hulls and the player in play, and every preview on the ship select screen. The player's collider
-  is a cyan disc because that is what it still is.
-- Player hulls are still circles on purpose — their shapes are a balance decision (an 84-radius Heavy's
-  silhouette is far thinner than its disc), not a plumbing one.
+  enemy hulls and the player in play, and every preview on the ship select screen.
+- **Player hulls followed** (`Domain/Stats/PlayerHullShapes.cs`: Scout 4 capsules, Fighter 4, Heavy 5, Shadow
+  6, mounted on `ShipType.Shape` and carried by the `Player` component). `.tools/measure-hull.py` grew a
+  `--fit` mode so a layout is *scored* rather than eyeballed: each hull now covers 79-90% of its painted
+  area with 8-14% of the shape over visible air, against a disc that leaves 0.17-0.95 R² of the box as air.
+- A player's hurtbox can only shrink. Reach ≤ 1.001 R is exactly the condition that puts a capsule inside the
+  bounding disc (a capsule is the convex hull of its end discs, and the disc is convex), and that disc is the
+  reject queued in front of every test the player is in. Shape areas came to 2.28-2.66 R² against 3.14.
+- The art can stick out past the collider, and does: the Fighter's fore wings are painted out to 1.10 R, which
+  no shape inside the bounding radius can cover. That under-reach is the collision circle's, inherited rather
+  than new; closing it means moving `Radius`, which is also mass, explosion radii and spawn clearance.
+- Cost with player shapes, same worlds: `ammo-spray` **1.32 vs 1.28 ms**, `impact-storm` **2.11 vs 2.12**,
+  `hull-stream` **0.75 vs 0.78**, `hull-crowding` **0.36 vs 0.36**. One body, and its shape is only reached by
+  candidates its own circle could not reject. No scenario fires at the player, so the swept-round-vs-player
+  step is priced by proxy through `hull-stream` (+0.03 ms for a 2-capsule hull under a 5500-round volley).
 
 ## Near future
 

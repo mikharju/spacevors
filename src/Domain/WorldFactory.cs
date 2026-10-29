@@ -25,7 +25,7 @@ public static class WorldFactory
         em.AddComponent(playerEntity, new Rotation(0f));
         em.AddComponent(playerEntity, new AngularVelocity(0f));
 
-        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerShipStats.Boost, Radius: shipType.Radius, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
+        em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerShipStats.Boost, Radius: shipType.Radius, Shape: shipType.Shape, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth, shipType.MaxHealth));
         // Guns not on the hull ride in the cargo: inactive, mountable later.
         em.AddComponent(playerEntity, WeaponCargo.Empty);

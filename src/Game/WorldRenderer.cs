@@ -550,10 +550,9 @@ public static class WorldRenderer
         float damage = em.TryGetComponent<Health>(playerEntity, out var health) ? DamageShading.FromHealth(health) : 0f;
         ShipSpriteRenderer.DrawShipSprite(shipType, screenCx, screenCy, shipType.Radius * 2f, angleDeg, damage);
 
-        // The player's collider, in the same cyan as every other hull's. It is still one disc: giving a
-        // player hull a shape is a balance decision that has not been made (PLAN.md), so the honest
-        // diagnostic is a disc rather than an absence of one.
+        // The player's collider, in the same cyan as every other hull's: what the player can be hit by is
+        // this shape, and nowhere else its art is painted.
         if (diagnostics)
-            ShipSpriteRenderer.DrawHullShape(HullShape.Circle, shipType.Radius, screenCx, screenCy, angleDeg);
+            ShipSpriteRenderer.DrawHullShape(shipType.Shape, shipType.Radius, screenCx, screenCy, angleDeg);
     }
 }

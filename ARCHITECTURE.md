@@ -233,13 +233,21 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
   circle math of their own.
 - A body enters the narrow phase as a `CollisionBody(Position, Angle, Shape, Scale)`. Rocks, mines,
   pickups and every round are `CollisionBody.Circle`; a hull brings the capsules its art was authored
-  with (`Stats/HullShapes.cs`: one table per art id, in the sprite's own frame, in units of `Radius`).
-  Shapes are committed data reviewed as a diff, never derived from pixels at run time — the sim must not
-  depend on the art.
+  with — an enemy by art id (`Stats/HullShapes.cs`), a player per hull type on `ShipType.Shape`, carried into
+  the `Player` component (`Stats/PlayerHullShapes.cs`) — both in the sprite's own frame and in units of
+  `Radius`. Shapes are committed data reviewed as a diff, never derived from pixels at run time — the sim
+  must not depend on the art. A `Player` built without one collides as the disc its `Radius` describes:
+  that is what test worlds do, and the game always sets it (`PlayerHullShapesTest` pins the wire-up).
 - Circles keep a one-test fast path, and the bounding circle is kept as a **conservative reject** in
   front of the shape test: a shape never reaches past the radius the grid indexed it by (pinned by
   `HullShapesTest`), so anything that misses the circle cannot touch the shape either. A volley through
   empty space pays nothing new.
+- The player is one more body, built once a tick and queued behind the same circle reject for everything it
+  meets: a grinding hull, a rock, a mine, an enemy round, an enemy beam. Because its shape lies inside the
+  bounding radius, a player's hurtbox can only be smaller than the disc it replaced — never hit where the disc
+  could not have been. `PlayerHullShapesTest` states that as the reach invariant;
+  `PlayerHullCollisionTest` pairs every pass-through with the same geometry against a shape-less player,
+  because a pass-through on its own proves only that the setup was wrong.
 - `CapsuleGeometry` is the whole shape math. A capsule is a segment inflated by a disc, so a disc is a
   capsule with no axis and every pair of round primitives is one of point/point, point/segment,
   segment/segment — the normal, the depth and the touch point all fall out of the closest points,

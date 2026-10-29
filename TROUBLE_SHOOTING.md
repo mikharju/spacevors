@@ -380,6 +380,16 @@ Check the overlay by counting its pixels instead of looking for it: the collider
 (`g > 90 and b > 90 and r < 80` over the dark field), so a crop-region count says in one number whether the
 shape drew at all.
 
+ ## 57. A crop saved to `/tmp` is unreadable from the next command
+
+- **Symptom**: cropped a ship preview to `/tmp/crop-scout.png` in one command, then the read tool answered
+  `cannot read "/tmp/crop-scout.png": not found` — as if the crop had failed, though PIL had written it.
+- **Cause**: `/tmp` is private to each command's sandbox (entry 26), and the read tool runs in a different one
+  from the `python3` that wrote the file. Same reason the unix socket in `/tmp` cannot reach Xvfb (entry 43).
+- **Fix / Prevention**: write anything meant to be looked at later into the workspace — `.tools/run/` is
+  gitignored and already holds the scenario output, so `Image.crop(...).save('.tools/run/crop-x.png')` and read
+  that path. It also keeps the crop next to the shot it came from (`.tools/shots/`), which is gitignored too.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

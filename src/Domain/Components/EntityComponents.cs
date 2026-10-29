@@ -12,7 +12,10 @@ public readonly record struct Player(
     int Xp = 0,
     int Level = 1,
     float PickupRadius = 60f,
-    float RotationSpeed = 5f)
+    float RotationSpeed = 5f,
+    // What the hull collides as, inside `Radius` (PlayerHullShapes). A player built without one collides as
+    // the disc its Radius has always described: the game always sets it, test worlds often do not.
+    HullShape? Shape = null)
 {
     public float MaxThrustForce => MathF.Max(Thrust * Boost, MathF.Max(SideThrust, BackThrust));
 }

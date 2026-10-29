@@ -192,9 +192,9 @@ public sealed class ShipSelectScreen
         ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, ship.Radius * 2f * PreviewZoom, 0f);
 
         // The same cyan collider the game draws over a hull, so the fit between paint and hitbox can be
-        // judged before a run starts. Player hulls collide as one disc today (PLAN.md).
+        // judged before a run starts.
         if (_diagnostics)
-            ShipSpriteRenderer.DrawHullShape(HullShape.Circle, ship.Radius * PreviewZoom, cx, cy, 0f);
+            ShipSpriteRenderer.DrawHullShape(ship.Shape, ship.Radius * PreviewZoom, cx, cy, 0f);
     }
 
     void DrawShipCard(int x, int y, int width, int height, string title, string details, Color borderColor, string keyLabel, bool highlighted)
