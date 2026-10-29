@@ -12,6 +12,11 @@ public static class EnemyShipRenderer
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
     private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
+    private static readonly List<(float Cx, float Cy, float AngleDeg, byte GraphicsId, float Radius)> _diagnosticShapes = new();
+
+    // The collider, in cyan over the orange bounding circle: what the hull actually hits versus the
+    // circle the broad phase indexes it by.
+    static readonly Color ColliderColor = new(0, 255, 255, 110);
 
     // Sprite of one GraphicsId, resolved once per frame. Every enemy of a type shares it, so the
     // texture-key lookups run per type instead of per entity.
@@ -39,6 +44,7 @@ public static class EnemyShipRenderer
         LitGroupRenderer.Clear(_litDraws);
         _turretMarkers.Clear();
         _diagnosticCircles.Clear();
+        _diagnosticShapes.Clear();
         _spritesByGraphicsId.Clear();
 
         if (ImageLoader.EnemyShipTextures == null)
@@ -85,7 +91,11 @@ public static class EnemyShipRenderer
 
             _turretMarkers.Add((screenCx, screenCy));
 
-            if (diagnostics) _diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
+            if (diagnostics)
+            {
+                _diagnosticCircles.Add(((int)screenCx, (int)screenCy, (int)enemyShip.Radius));
+                _diagnosticShapes.Add((screenCx, screenCy, angleDeg, enemyShip.GraphicsId, enemyShip.Radius));
+            }
         }
 
         LitGroupRenderer.Draw(_litDraws);
@@ -94,8 +104,13 @@ public static class EnemyShipRenderer
             RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 
         if (diagnostics)
+        {
             foreach (var (x, y, radius) in _diagnosticCircles)
                 Raylib.DrawCircle(x, y, radius, new Color(255, 165, 0, 60));
+
+            foreach (var (cx, cy, angleDeg, graphicsId, radius) in _diagnosticShapes)
+                ShipSpriteRenderer.DrawHullShape(HullShapes.ForEnemy(graphicsId), radius, cx, cy, angleDeg, ColliderColor);
+        }
     }
 
     private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
