@@ -115,6 +115,7 @@ public class ImpactDamageTest
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(pos));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(hp, 30));
         em.AddComponent(ship, new Velocity(vel));
         return ship;

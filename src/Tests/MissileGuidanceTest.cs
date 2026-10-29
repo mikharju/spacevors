@@ -22,6 +22,7 @@ public class MissileGuidanceTest
         em.AddComponent(target, new Position(new Vector2(0f, -400f)));
         em.AddComponent(target, new Velocity(Vector2.Zero));
         em.AddComponent(target, new EnemyShip(Radius: 20f, Speed: 0f, TurnRate: 0f, FiringRange: 0f, TurretFireRate: 0f, TurretAmmoSpeed: 0f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(target, new Rotation(0f));
         em.AddComponent(target, new Health(3, 3)); // one 3-damage missile kill ends it
 
         var missile = em.CreateEntity();
@@ -203,6 +204,7 @@ public class MissileGuidanceTest
         em.AddComponent(ship, new Position(new Vector2(0f, -600f)));
         em.AddComponent(ship, new Velocity(new Vector2(300f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 20f, Speed: 0f, TurnRate: 0f, FiringRange: 700f, TurretFireRate: 1f, TurretAmmoSpeed: 200f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
 
         var turret = em.CreateEntity();
@@ -258,6 +260,7 @@ public class MissileGuidanceTest
         em.AddComponent(ship, new Position(new Vector2(0f, 500f)));
         em.AddComponent(ship, new Velocity(Vector2.Zero));
         em.AddComponent(ship, new EnemyShip(Radius: 20f, Speed: 0f, TurnRate: 0f, FiringRange: 700f, TurretFireRate: 1f, TurretAmmoSpeed: 200f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
 
         var view = new WorldView(em);

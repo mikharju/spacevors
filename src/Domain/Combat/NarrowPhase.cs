@@ -1,3 +1,5 @@
+using Spacevors.Domain.Stats;
+
 namespace Spacevors.Domain.Systems;
 
 // What a collision has to report before anything can be resolved: which way to push, how far the
@@ -68,4 +70,74 @@ public static class NarrowPhase
         contact = new Contact(normal, radiusSum - distance, touch);
         return true;
     }
+
+    // A body as the narrow phase sees it: where it is, which way it faces, what it is made of, and how
+    // big it is. `Scale` is the hull's collision radius — the same bounding radius the broad phase
+    // indexed it by, which is why a shape must never reach past it.
+    public readonly record struct CollisionBody(Vector2 Position, float Angle, HullShape Shape, float Scale)
+    {
+        public static CollisionBody Circle(Vector2 position, float radius) => new(position, 0f, HullShape.Circle, radius);
+    }
+
+    // Two bodies of any shape. Circles keep the single-test fast path: rocks, mines, pickups and every
+    // round in flight are circles, and they are the bodies there are thousands of.
+    //
+    // For the rest the *deepest* primitive contact wins, so a body pair still gets one contact per tick
+    // — the same shape the impulse, the position correction and the impact-damage accumulator assume.
+    public static bool TryCollide(CollisionBody a, CollisionBody b, out Contact contact)
+    {
+        contact = default;
+        if (a.Shape.IsCircle && b.Shape.IsCircle) return TryCollide(a.Position, a.Scale, b.Position, b.Scale, out contact);
+
+        bool found = false;
+        foreach (var first in a.Shape.Capsules)
+        {
+            Capsule firstInWorld = InWorld(first, a);
+            foreach (var second in b.Shape.Capsules)
+            {
+                if (!CapsuleGeometry.TryCollide(firstInWorld, InWorld(second, b), out Contact hit)) continue;
+                if (found && hit.Depth <= contact.Depth) continue;
+                contact = hit;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    // A swept round body against a body of any shape. The *earliest* touch along the path is what the
+    // ammo pass needs, since it picks the first thing a round met rather than the deepest.
+    public static bool TrySweep(
+        Vector2 from, Vector2 to, float movingRadius, CollisionBody target, out Contact contact, out float t)
+    {
+        if (target.Shape.IsCircle) return TrySweep(from, to, movingRadius, target.Position, target.Scale, out contact, out t);
+
+        contact = default;
+        t = 0f;
+        bool found = false;
+        foreach (var primitive in target.Shape.Capsules)
+        {
+            if (!CapsuleGeometry.TrySweep(from, to, movingRadius, InWorld(primitive, target), out Contact hit, out float along)) continue;
+            if (found && along >= t) continue;
+            contact = hit;
+            t = along;
+            found = true;
+        }
+
+        return found;
+    }
+
+    // Shape units to world: turn by the body's heading, scale by its radius, move to its position.
+    static Capsule InWorld(Capsule local, CollisionBody body)
+    {
+        float cos = MathF.Cos(body.Angle);
+        float sin = MathF.Sin(body.Angle);
+        return new Capsule(
+            InWorld(local.From, cos, sin, body),
+            InWorld(local.To, cos, sin, body),
+            local.HalfThickness * body.Scale);
+    }
+
+    static Vector2 InWorld(Vector2 local, float cos, float sin, CollisionBody body) =>
+        body.Position + new Vector2(local.X * cos - local.Y * sin, local.X * sin + local.Y * cos) * body.Scale;
 }

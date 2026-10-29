@@ -236,6 +236,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
         em.AddComponent(ship, new Velocity(Vector2.Zero));
 
@@ -269,6 +270,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
         em.AddComponent(ship, new Velocity(new Vector2(50f, 0f)));
 
@@ -365,6 +367,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
 
         var ammo = em.CreateEntity();
@@ -393,6 +396,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
 
         var ammo1 = em.CreateEntity();
@@ -422,6 +426,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 78f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 2));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(30, 30));
 
         // Bullet starts inside the ship's collision radius (78 + 2.5 > 4) and never moves in this test,
@@ -536,6 +541,7 @@ public class CollisionSystemTests
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(new Vector2(-500f, 0f)));
         em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(10, 10));
 
         var mine = em.CreateEntity();

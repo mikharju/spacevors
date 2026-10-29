@@ -72,7 +72,8 @@ public class CollisionSystem : GameSystem
             _asteroidPositions.Add((entity, pos));
 
             CheckPlayerCollision(pos.Value, asteroid.Radius, () =>
-                ResolveCollision(view, pos, playerTuple.Value2, entity, playerEntity, asteroid.Radius, playerTuple.Value1.Radius, false, commands));
+                ResolveCollision(view, CircleBody(pos.Value, asteroid.Radius), entity,
+                    CircleBody(playerTuple.Value2.Value, playerTuple.Value1.Radius), playerEntity, false, commands));
         }
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
@@ -89,12 +90,12 @@ public class CollisionSystem : GameSystem
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius);
             _shipPositions.Add((entity, pos));
+            var hull = HullBody(view, entity, ship);
 
             CheckPlayerCollision(pos.Value, ship.Radius, () =>
             {
-                var aPos = view.GetComponent<Position>(entity);
-                var bPos = view.GetComponent<Position>(playerEntity);
-                ResolveCollision(view, aPos, bPos, entity, playerEntity, ship.Radius, playerTuple.Value1.Radius, false, commands, EnemyShipMass);
+                ResolveCollision(view, hull, entity,
+                    CircleBody(playerTuple.Value2.Value, playerTuple.Value1.Radius), playerEntity, false, commands, EnemyShipMass);
             });
 
             int asteroidCount = QueryCircle(pos.Value, ship.Radius);
@@ -105,7 +106,8 @@ public class CollisionSystem : GameSystem
                 ref readonly var candidate = ref queryBuffer[i];
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
 
-                ResolveCollision(view, pos, new Position(candidate.Position), entity, candidate.Id, ship.Radius, candidate.Radius, true, commands, EnemyShipMass);
+                ResolveCollision(view, hull, entity,
+                    CircleBody(candidate.Position, candidate.Radius), candidate.Id, true, commands, EnemyShipMass);
             }
         }
 
@@ -136,7 +138,8 @@ public class CollisionSystem : GameSystem
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
                 var bPos = view.GetComponent<Position>(candidate.Id);
-                ResolveCollision(view, aPos, bPos, aEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
+                ResolveCollision(view, CircleBody(aPos.Value, aRadius), aEntity,
+                    CircleBody(bPos.Value, candidate.Radius), candidate.Id, true, commands);
             }
 
             int count2 = QueryCircle(aPos.Value, aRadius + 15f);
@@ -149,7 +152,8 @@ public class CollisionSystem : GameSystem
 
                 var bPos = view.GetComponent<Position>(candidate.Id);
                 var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                ResolveCollision(view, aPos, bPos, aEntity, candidate.Id, aRadius, mine.Radius, true, commands);
+                ResolveCollision(view, CircleBody(aPos.Value, aRadius), aEntity,
+                    CircleBody(bPos.Value, mine.Radius), candidate.Id, true, commands);
             }
         }
 
@@ -161,6 +165,7 @@ public class CollisionSystem : GameSystem
         {
             var ship = view.GetComponent<EnemyShip>(sEntity);
             float aRadius = ship.Radius;
+            var hull = HullBody(view, sEntity, ship);
             int count = QueryCircle(sPos.Value, aRadius);
             var queryBuffer = _queryBuffer;
 
@@ -170,8 +175,8 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.EnemyShip) continue;
                 if (candidate.Id.Value <= sEntity.Value) continue;
 
-                var bPos = view.GetComponent<Position>(candidate.Id);
-                ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, candidate.Radius, true, commands);
+                ResolveCollision(view, hull, sEntity,
+                    HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), candidate.Id, true, commands);
             }
 
             int count2 = QueryCircle(sPos.Value, aRadius + 15f);
@@ -184,7 +189,8 @@ public class CollisionSystem : GameSystem
 
                 var bPos = view.GetComponent<Position>(candidate.Id);
                 var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                ResolveCollision(view, sPos, bPos, sEntity, candidate.Id, aRadius, mine.Radius, true, commands, EnemyShipMass);
+                ResolveCollision(view, hull, sEntity,
+                    CircleBody(bPos.Value, mine.Radius), candidate.Id, true, commands, EnemyShipMass);
             }
         }
 
@@ -233,7 +239,17 @@ public class CollisionSystem : GameSystem
             for (int i = 0; i < count; i++)
             {
                 ref readonly var candidate = ref queryBuffer[i];
+
+                // The bounding circle is a conservative reject: a hull's shape never reaches past the
+                // radius the grid indexed it by, so anything that misses the circle cannot touch the
+                // shape either. Only a candidate the circle cannot reject is tested against its shape,
+                // which keeps a volley through empty space exactly as cheap as it was.
                 if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, candidate.Position, candidate.Radius, out Contact hit, out float t))
+                    continue;
+
+                if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
+                    && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
+                        HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t))
                     continue;
 
                 switch (candidate.Kind)
@@ -412,6 +428,14 @@ public class CollisionSystem : GameSystem
                     ref readonly var candidate = ref queryBuffer[i];
                     if (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, candidate.Position, candidate.Radius, out Contact hit, out float t)
                         || t >= firstT) continue;
+
+                    // The same two steps as the ammo pass: the bounding circle rejects cheaply, and a
+                    // hull that survives it is tested against its shape. The shape sits inside the
+                    // circle, so its touch along the beam is never earlier and has to be re-compared.
+                    if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
+                        && (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width,
+                                HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t)
+                            || t >= firstT)) continue;
 
                     firstHit = candidate.Id;
                     firstKind = candidate.Kind;
@@ -754,25 +778,34 @@ public class CollisionSystem : GameSystem
         commands.AddEntity(new Position(position), new Velocity(velocity), new DamageSpark(sparkLifetime, sparkLifetime));
     }
 
+    // A hull's collision body: the shape its art was authored with, at the hull's size and turned the
+    // way the hull is turned. The radius stays the bounding radius the grid indexed it by, so the broad
+    // phase is untouched and a shape can never reach past the query that found it.
+    static NarrowPhase.CollisionBody HullBody(WorldView view, Entity entity, EnemyShip ship) =>
+        new(view.GetComponent<Position>(entity).Value, view.GetComponent<Rotation>(entity).Angle,
+            HullShapes.ForEnemy(ship.GraphicsId), ship.Radius);
+
+    // Rocks, mines and guided rounds are drawn as dots: they collide as one circle, as they always did.
+    static NarrowPhase.CollisionBody CircleBody(Vector2 position, float radius) =>
+        NarrowPhase.CollisionBody.Circle(position, radius);
+
     private void ResolveCollision(
         WorldView view,
-        Position aPos,
-        Position bPos,
+        NarrowPhase.CollisionBody a,
         Entity aEntity,
+        NarrowPhase.CollisionBody b,
         Entity bEntity,
-        float aRadius,
-        float bRadius,
         bool isAsteroidVsAsteroid,
         CommandBuffer commands,
         float? aOverrideMass = null)
     {
-        if (!NarrowPhase.TryCollide(aPos.Value, aRadius, bPos.Value, bRadius, out Contact contact)) return;
+        if (!NarrowPhase.TryCollide(a, b, out Contact contact)) return;
 
         var normal = contact.Normal;
         float penetration = contact.Depth;
 
-        float aMass = aOverrideMass ?? (MathF.PI * aRadius * aRadius);
-        float bMass = MathF.PI * bRadius * bRadius;
+        float aMass = aOverrideMass ?? (MathF.PI * a.Scale * a.Scale);
+        float bMass = MathF.PI * b.Scale * b.Scale;
         float invMassA = 1f / aMass;
         float invMassB = 1f / bMass;
         float totalInvMass = invMassA + invMassB;
@@ -822,8 +855,8 @@ public class CollisionSystem : GameSystem
         {
             // Lever arms measured from the contact, not from `normal · radius`: with a circle the two
             // are the same arm, and only the first one is still true for a shape that is not a circle.
-            var rA = contact.Point - aPos.Value;
-            var rB = contact.Point - bPos.Value;
+            var rA = contact.Point - a.Position;
+            var rB = contact.Point - b.Position;
 
             float aAngVel = GetCollisionAngularVelocity(view, aEntity, 0f);
             bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out _);
@@ -852,14 +885,17 @@ public class CollisionSystem : GameSystem
                 SetCollisionVelocity(aEntity, aVel);
                 SetCollisionVelocity(bEntity, bVel);
 
-                float aMOI = 0.5f * aMass * aRadius * aRadius;
+                // Mass and inertia stay what the hull's bounding radius has always given them: the shape
+                // decides what a hull hits, not how heavy it is, and changing that is a balance change
+                // that has to be measured on its own.
+                float aMOI = 0.5f * aMass * a.Scale * a.Scale;
                 if (hasAAngVel)
                 {
                     float torqueA = rA.X * frictionImpulse.Y - rA.Y * frictionImpulse.X;
                     SetCollisionAngularVelocity(aEntity, aAngVel + torqueA / aMOI);
                 }
 
-                float bMOI = 0.5f * bMass * bRadius * bRadius;
+                float bMOI = 0.5f * bMass * b.Scale * b.Scale;
                 if (hasBAngVel)
                 {
                     float torqueB = rB.X * (-frictionImpulse.Y) - rB.Y * (-frictionImpulse.X);

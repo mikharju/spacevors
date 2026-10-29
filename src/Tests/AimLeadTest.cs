@@ -133,6 +133,7 @@ public class AimLeadTest
         em.AddComponent(enemy, new Velocity(targetVel));
         em.AddComponent(enemy, new Rotation(0f));
         em.AddComponent(enemy, new EnemyShip(Radius: TargetRadius, Speed: 65f, TurnRate: 1f, FiringRange: 700f, TurretFireRate: 1.5f, TurretAmmoSpeed: 200f, Acceleration: 45f, GraphicsId: 0));
+        em.AddComponent(enemy, new Rotation(0f));
         return em;
     }
 }
