@@ -36,10 +36,18 @@ public sealed record ScenarioSpec(
     // Effect entities to place in the impact area, already aged. Without them the first second of a
     // scenario measures particles piling up toward a steady state rather than the steady state.
     SeededEffects? Effects = null,
+    // Unarmed hulls placed by ScenarioWorld. The rock-based scenarios price bullet-vs-circle and
+    // nothing else, so a change to how hulls collide would pass them unmeasured.
+    ScenarioHulls Hulls = ScenarioHulls.None,
     int Seed = EntityManager.DefaultRngSeed);
 
 // Steady-state particle counts for the impact area, in entities.
 public sealed record SeededEffects(int Sparks, int Explosions);
+
+// Which unarmed hulls ScenarioWorld puts in the world (plans/NON_CIRCLE_COLLISION.md).
+//   StreamTarget: one hull beside the seeded volley — what a bullet costs to test against a hull.
+//   Crowding:     a ring of hulls charging the player — hull against hull, grinding.
+public enum ScenarioHulls { None, StreamTarget, Crowding }
 
 public static class Scenarios
 {
@@ -104,6 +112,27 @@ public static class Scenarios
             Ship: ShipType.Heavy, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
             AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 0.1f,
             MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget),
+
+        new("hull-stream",
+            "The ammo-spray volley with an unarmed hull standing beside the stream: every bullet in that " +
+            "hull's grid cell tests against a hull instead of only against the rock. The pair with " +
+            "ammo-spray prices a bullet's narrow-phase test against a *hull*, which is what changes when " +
+            "hulls stop being circles. Most bullets still miss the hull, so density holds.",
+            Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
+            AimDirection: TowardTestAsteroid, AimOffsetR: 1.05f, StreamLength: 0f, WeaponFires: false,
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
+            // The same aged particle load as ammo-spray, so the two differ by exactly one thing: the hull.
+            Effects: new SeededEffects(Sparks: 6000, Explosions: 1200),
+            Hulls: ScenarioHulls.StreamTarget),
+
+        new("hull-crowding",
+            "No bullets: rings of unarmed hulls charging the player and grinding into each other. Prices " +
+            "hull-against-hull narrow phase and resolution, which every ammo-dominated scenario leaves " +
+            "invisible, and is where a composite of several primitives costs the most.",
+            Ship: ShipType.Heavy, SeededWeapon: null, BulletCount: 0, AimDirection: TowardTestAsteroid,
+            AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 1f,
+            MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
+            Hulls: ScenarioHulls.Crowding),
     ];
 
     public static ScenarioSpec? Find(string name) =>

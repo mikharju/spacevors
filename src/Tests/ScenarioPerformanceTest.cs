@@ -49,6 +49,11 @@ public class ScenarioPerformanceTest
         new("ammo-spray", DesktopMs: 5.0, CiMs: 15.0, AllocKbPerTick: 400.0),
         new("ammo-spray-miss", DesktopMs: 2.5, CiMs: 7.5, AllocKbPerTick: 16.0),
         new("impact-storm", DesktopMs: 5.0, CiMs: 15.0, AllocKbPerTick: 1000.0),
+        // The two hull worlds (plans/NON_CIRCLE_COLLISION.md): hull-stream is ammo-spray plus one hull
+        // standing in the stream, so it takes the same band; hull-crowding has 42 hulls and no bullets,
+        // and this host measured 0.29ms median against 0.22KB per tick.
+        new("hull-stream", DesktopMs: 5.0, CiMs: 15.0, AllocKbPerTick: 400.0),
+        new("hull-crowding", DesktopMs: 1.5, CiMs: 4.5, AllocKbPerTick: 40.0),
     ];
 
     public static IEnumerable<object[]> Budgets =>

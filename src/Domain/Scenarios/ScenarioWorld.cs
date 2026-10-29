@@ -35,6 +35,80 @@ public static class ScenarioWorld
 
         if (spec.PlayerHealthRatio < 1f)
             SetPlayerHealth(em, playerEntity, spec.PlayerHealthRatio);
+
+        if (spec.Hulls != ScenarioHulls.None)
+            PlaceHulls(em, playerEntity, playerPos, spec.Hulls, spec.AimDirection);
+    }
+
+    // ── Hull worlds (plans/NON_CIRCLE_COLLISION.md) ────────────────────────────────────────────
+    // The rock-based scenarios price a bullet's narrow-phase test against a circle and never against a
+    // hull, and no scenario puts two hulls in contact at all, so a change to how hulls collide would be
+    // accepted without ever being measured. These two worlds close that gap.
+
+    // Along and beside the aim axis: near enough that the hull lands in the grid cells the volley
+    // travels through, far enough off-axis that almost every round misses it — so the bullet density
+    // the scenario measures stays put instead of draining into the hull.
+    private const float StreamHullAlong = 150f;
+    private const float StreamHullAside = 40f;
+
+    // A hull outlives the measured window however many rounds graze it: these worlds measure the cost
+    // of testing, not the cost of a wreck.
+    private const float ScenarioHullRadius = 20f;
+    private const int ScenarioHullHealth = 100_000;
+
+    // Three rings, spaced wider than two hull radii so nothing overlaps on tick 1 — the grind has to be
+    // built by the chase, not by an instant pile-up of position corrections. The stagger keeps the rings
+    // from lining up into channels the hulls could funnel through.
+    private static readonly int[] CrowdingRingShipCounts = [6, 12, 18];
+    private const float CrowdingRingGap = 50f;
+    private const float CrowdingInnerClearance = 20f;
+    private const float CrowdingRingStagger = 0.35f;
+
+    // Grinding hulls deal a little impact damage every tick; a player that dies mid-window would measure
+    // a different world than the one the scenario describes.
+    private const int CrowdingPlayerHealth = 1000;
+
+    private static void PlaceHulls(EntityManager em, Entity playerEntity, Vector2 playerPos, ScenarioHulls hulls, Vector2 aim)
+    {
+        if (hulls == ScenarioHulls.StreamTarget)
+        {
+            var aside = new Vector2(-aim.Y, aim.X);
+            AddUnarmedHull(em, playerPos, playerPos + aim * StreamHullAlong + aside * StreamHullAside, holdAtPlayerDistance: true);
+            return;
+        }
+
+        float first = em.GetComponent<Player>(playerEntity).Radius + ScenarioHullRadius + CrowdingInnerClearance;
+        for (int ring = 0; ring < CrowdingRingShipCounts.Length; ring++)
+        {
+            float radius = first + ring * CrowdingRingGap;
+            int count = CrowdingRingShipCounts[ring];
+            for (int i = 0; i < count; i++)
+            {
+                float angle = MathF.PI * 2f * i / count + ring * CrowdingRingStagger;
+                AddUnarmedHull(em, playerPos, playerPos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius, holdAtPlayerDistance: false);
+            }
+        }
+
+        em.AddComponent(playerEntity, new Health(CrowdingPlayerHealth, CrowdingPlayerHealth));
+    }
+
+    // Unarmed by construction: no `Turret` and no `MissileWeapon`, so nothing shoots back inside the
+    // window and the world measures contact, not gunfire. A held hull sets FiringRange to its own
+    // distance from the player, which makes the chase brake on the first tick and keeps the hull on its
+    // post; a charging hull sets it to 0 and closes until it grinds.
+    private static void AddUnarmedHull(EntityManager em, Vector2 playerPos, Vector2 position, bool holdAtPlayerDistance)
+    {
+        float firingRange = holdAtPlayerDistance ? (position - playerPos).Magnitude : 0f;
+
+        var entity = em.CreateEntity();
+        em.AddComponent(entity, new Position(position));
+        em.AddComponent(entity, new Velocity(Vector2.Zero));
+        em.AddComponent(entity, new Rotation(0f));
+        em.AddComponent(entity, new AngularVelocity(0f));
+        em.AddComponent(entity, new EnemyShip(
+            ScenarioHullRadius, Speed: 65f, TurnRate: 1f, FiringRange: firingRange,
+            TurretFireRate: 0f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(entity, new Health(ScenarioHullHealth, ScenarioHullHealth));
     }
 
     private static void SeedVolleyInFlight(
