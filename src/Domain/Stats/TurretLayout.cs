@@ -53,6 +53,16 @@ public static class TurretLayouts
         Slot(TurretSlotName.SmallBack, TurretSize.Small, 0f, 26f, 180f, 270f),
     ];
 
+    // Falcon: one heavy gun ahead and a small mount on each flank pod, each sweeping 180°. The two
+    // flanks together cover the whole circle, which is why this hull has no aft mount at all. The offsets
+    // sit on the painted pods, which are at ±0.50 R — ±37 px of this 74 px hull.
+    public static TurretSlotDefinition[] Falcon { get; } =
+    [
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -18f, 0f, 60f),
+        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -37f, 10f, -90f, 180f),
+        Slot(TurretSlotName.SmallRight, TurretSize.Small, 37f, 10f, 90f, 180f),
+    ];
+
     public static TurretSlotDefinition[] Shadow { get; } =
     [
         Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -14f, 0f, 60f),

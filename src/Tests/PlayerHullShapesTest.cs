@@ -18,6 +18,7 @@ public class PlayerHullShapesTest
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
+    [InlineData(4)]
     public void PlayerHullShape_FitsInsideTheBoundingRadiusEverythingElseReads(int shipIndex)
     {
         ShipType ship = ShipType.All[shipIndex];
@@ -46,7 +47,7 @@ public class PlayerHullShapesTest
         foreach (var ship in ShipType.All)
             Assert.NotNull(ship.Shape);
 
-        Assert.Equal(4, ShipType.All.Length); // a fifth hull means a fifth shape to author
+        Assert.Equal(5, ShipType.All.Length); // a sixth hull means a sixth shape to author
     }
 
     // The shape reaches the entity as well as the hull type: `Player.Shape` is what the collision system

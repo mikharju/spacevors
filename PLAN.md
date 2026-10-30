@@ -595,6 +595,34 @@ everywhere they were always right: rocks, mines, pickups, and every round in fli
   candidates its own circle could not reject. No scenario fires at the player, so the swept-round-vs-player
   step is priced by proxy through `hull-stream` (+0.03 ms for a 2-capsule hull under a 5500-round volley).
 
+## Falcon hull — done
+
+- New player hull, no new machinery: `assets/player-ships/falcon-{texture,normals,depth}.png` (a 1024² lit
+  set, matched by `LitSpriteMatcher` and drawn by the existing `ShipSpriteRenderer`), plus data —
+  `ShipType.Falcon` (`PlayerShipStats`, card 5), `TurretLayouts.Falcon`, `PlayerHullShapes.Falcon`.
+- A deliberately slim hull: 1.01 R² of paint against the other four's 2.2-3.0, and only 1.22 R across against
+  their ~2 R. `Radius` is therefore **74**, not the mediums' 58: at 58 the paint measured 71 px across and
+  97 px long and the hull read clearly smaller in play, while at 74 it measures 90 × 124 px — the Fighter's
+  length is 123 px, so the two hulls now stand the same size on screen even though this one is a third
+  narrower across. Its longest axis was always in the medium band (Scout 92, Shadow 108, Fighter 123,
+  Heavy 165); matching the *width* too would need R 94, longer than the Heavy, which is not what a
+  slim-hulled ship should do to mass, spawn clearance and explosion radii.
+- Shape: 6 capsules, 1.11 R² (6.1k px² at R 74, against the Fighter's 9.0k), reach 0.95 R, 90% of the paint
+  covered with 0.20 R² (18% of the shape) over air — outside the 8-14% of the solid hulls, because its two
+  flank pods are detached from the body and the one bar that joins them has to cross the see-through gaps
+  between them. The bounding circle over-reaches by more than on any other hull (17.1k px² against a shape
+  of 6.1k): that is what the grid and every circle reject in front of a shape test read, so it costs extra
+  narrow-phase candidates, never extra hits.
+- Mounts: main gun 60° ahead, plus one small mount on each flank pod (±37 px, painted at ±0.50 R) sweeping
+  **180° each**. The pair covers the whole circle, so this hull has no aft mount at all — the Fighter's 270°
+  `small_back` is simply gone. These are the widest small mounts in the game: a 400 px/s round in one can
+  lead 400 px/s of cross-line drift where the Fighter's 45° side mounts manage 153 (plans/WEAPON_BALANCE.md
+  open knob).
+- Starts alone with `WeaponLoadout.InMainGun(MachineGun)` — `MachineGun` is the only tier-1 Large gun in the
+  table (`RailGun`, `GravitonBurst` and the two lances are tier 2, `HavocTorpedo` tier 3), so the Falcon's
+  single big gun is the one Fighter and Heavy already carry. 12 DPS at the start against Fighter 22.5 and
+  Heavy 45, paid for with the smallest hurtbox in the game and two free 180° mounts for the first pickup.
+
 ## Near future
 
 - New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)

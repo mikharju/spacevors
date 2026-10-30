@@ -5,7 +5,8 @@ using Spacevors.Domain.Systems;
 using Spacevors.Game;
 using Xunit;
 
-// Ship roster: Shadow's own weapon, plus the diagnostics-only Shadow copies on the select screen.
+// Ship roster: Shadow's own weapon, the Falcon's flank arcs, plus the diagnostics-only Shadow copies
+// on the select screen.
 public class ShipRosterTest
 {
     [Fact]
@@ -60,6 +61,23 @@ public class ShipRosterTest
                 var slot = Assert.Single(ship.Slots, s => s.Name == mount.SlotName);
                 Assert.True(TurretMount.Fits(slot, mount.Weapon), $"{ship.Name}: {mount.Weapon.Name} does not fit {slot.Name}");
             }
+    }
+
+    // The Falcon's answer to an aft mount is two 180° flanks: nothing behind the hull is left uncovered
+    // even though the hull has no `small_back` at all. The arcs are the whole claim, so they are asserted.
+    [Fact]
+    public void Falcon_FlanksTogetherCoverWhatIsBehindTheHull()
+    {
+        Assert.DoesNotContain(ShipType.Falcon.Slots, s => s.Name == TurretSlotName.SmallBack);
+
+        var left = Assert.Single(ShipType.Falcon.Slots, s => s.Name == TurretSlotName.SmallLeft);
+        var right = Assert.Single(ShipType.Falcon.Slots, s => s.Name == TurretSlotName.SmallRight);
+        Assert.Equal(Angle.FromDeg(180f), left.ArcAngle);
+        Assert.Equal(Angle.FromDeg(180f), right.ArcAngle);
+
+        float half = Angle.FromDeg(90f);
+        Assert.Equal(-MathF.PI, left.ArcCenter - half, 3);
+        Assert.Equal(MathF.PI, right.ArcCenter + half, 3);
     }
 
     [Fact]

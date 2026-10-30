@@ -173,7 +173,7 @@ public readonly record struct WeaponMount(string SlotName, WeaponType Weapon);
 // The turrets a ship starts with. Slot geometry (position, arc, size) comes from the ship's layout.
 public readonly record struct WeaponLoadout(string Name, IReadOnlyList<WeaponMount> Mounts)
 {
-    // A single weapon in the main gun slot: what a diagnostics ship carries.
+    // A single weapon in the main gun slot: what a diagnostics ship carries, and the Falcon too.
     public static WeaponLoadout InMainGun(WeaponType weapon) => new(weapon.Name, [new WeaponMount(TurretSlotName.MainGun, weapon)]);
 
     // Scout: the longest-reach gun it can carry plus the fast-mount twin covering one flank.

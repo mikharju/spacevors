@@ -99,7 +99,26 @@ public readonly record struct ShipType(
         DrawB: 170,
         PickupRadius: 160f);
 
-    public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow];
+    // The slim hull: 1.22 R of paint across against the others' ~2 R, so its `Radius` is raised to 74 to
+    // bring the painted length in line with the Fighter's (124 px against 123). A hurtbox of 1.11 R² at that
+    // radius is still smaller in px than the Fighter's 2.67 — the big bounding circle is what tells the broad
+    // phase where to look, not what gets hit — and it starts as the lightest shooter in the game.
+    public static ShipType Falcon { get; } = new(
+        Name: "Falcon",
+        TextureKey: "falcon",
+        Description: "Pursuit engines, a machine gun, two free 180° flank mounts",
+        Engine: EngineLayout.Pursuit,
+        Loadout: WeaponLoadout.InMainGun(WeaponType.MachineGun),
+        Slots: TurretLayouts.Falcon,
+        MaxHealth: 10,
+        Radius: 74f,
+        Shape: PlayerHullShapes.Falcon,
+        DrawR: 255,
+        DrawG: 176,
+        DrawB: 96,
+        PickupRadius: 205f);
+
+    public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow, Falcon];
 
     // Extra ships on the select screen in diagnostics mode (SPACEVORS_DIAGNOSTIC=1): the Shadow
     // hull, engines and graphics with one weapon each, so any weapon can be play-tested from a

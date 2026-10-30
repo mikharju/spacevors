@@ -63,4 +63,18 @@ public static class PlayerHullShapes
         new Capsule(new Vector2(-0.42f, -0.55f), new Vector2(0.42f, -0.55f), 0.25f),
         new Capsule(new Vector2(-0.42f, 0.55f), new Vector2(0.42f, 0.55f), 0.25f),
     ]);
+
+    // Falcon (R 74): the slim hull — 1.01 R² of paint, and the widest thing about it is 1.22 R across.
+    // Its two flank pods are detached from the body by see-through gaps, so the one bar that joins them
+    // is where the hurtbox sits on air; the body is a spine tapered fore to aft, each pod a thin capsule.
+    // Covers 90% of the paint, 18% of it over air.
+    public static HullShape Falcon { get; } = new(
+    [
+        new Capsule(new Vector2(0f, -0.75f), new Vector2(0f, -0.10f), 0.20f),
+        new Capsule(new Vector2(0f, 0f), new Vector2(0f, 0.40f), 0.17f),
+        new Capsule(new Vector2(0f, 0.42f), new Vector2(0f, 0.76f), 0.11f),
+        new Capsule(new Vector2(-0.52f, 0.03f), new Vector2(0.55f, 0.03f), 0.16f),
+        new Capsule(new Vector2(-0.44f, -0.26f), new Vector2(-0.53f, 0.54f), 0.08f),
+        new Capsule(new Vector2(0.47f, -0.26f), new Vector2(0.56f, 0.54f), 0.08f),
+    ]);
 }
