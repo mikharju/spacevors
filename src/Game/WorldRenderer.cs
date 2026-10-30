@@ -334,10 +334,10 @@ public static class WorldRenderer
         }
     }
 
-    // A beam's impact: one round glow slightly wider than the beam, in a darkened copy of the
-    // beam's colour, centred exactly on the shortened beam's end. It fades out with its lifetime.
-    private const float BeamImpactGlowDarken = 0.6f;
-
+    // A beam's impact: one radial glow centred exactly on the shortened beam's end - the beam's own
+    // colour, opaque at a broad core that swallows the beam's square cap, fading to a dark perimeter,
+    // with an added white-hot spot at the centre. It lingers past the beam and fades only once the
+    // beam is gone.
     private static void DrawBeamImpacts(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
         foreach (var (entity, impact, pos) in em.GetEntitiesWithComponents<BeamImpact, Position>())
@@ -345,19 +345,31 @@ public static class WorldRenderer
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
             if (RenderHelpers.IsOffScreen(cx, cy, impact.Radius, windowWidth, windowHeight)) continue;
 
-            float lifeRatio = Math.Clamp(impact.Lifetime / impact.InitialLifetime, 0f, 1f);
-            int alpha = (int)(255f * lifeRatio);
+            // Full opacity while the beam still lives (its lifetime counts down alongside the glow's,
+            // and hits zero when the glow has BeamImpact.FlashLifetime - LaserBeam.FlashLifetime left),
+            // then the lingering glow fades on its own - the beam's square end is never seen through it.
+            float fade = MathF.Min(1f, impact.Lifetime / (BeamImpact.FlashLifetime - LaserBeam.FlashLifetime));
+            int alpha = (int)(255f * fade);
             Color baseColor = AmmoColorOf(impact.Color);
 
-            ShapeSprites.DrawCircle(cx, cy, impact.Radius, new Color(
-                (byte)(baseColor.R * BeamImpactGlowDarken),
-                (byte)(baseColor.G * BeamImpactGlowDarken),
-                (byte)(baseColor.B * BeamImpactGlowDarken),
-                (byte)alpha));
+            // Beam-coloured disc, opaque core: covers the beam end under it.
+            ShapeSprites.DrawGlow(cx, cy, impact.Radius,
+                new Color(baseColor.R, baseColor.G, baseColor.B, (byte)alpha));
+
+            // White-hot spot at the centre, added on top so it reads brighter than the beam itself -
+            // a laser spot off solid metal, not an ionised haze.
+            Color hot = MixTowardWhite(baseColor, BeamImpactHotspotWhiteMix);
+            Raylib.BeginBlendMode(BlendMode.Additive);
+            ShapeSprites.DrawGlow(cx, cy, impact.Radius * BeamImpactHotspotFraction,
+                new Color(hot.R, hot.G, hot.B, (byte)alpha));
+            Raylib.EndBlendMode();
 
             if (BeamImpactDebug) Mark(cx, cy, Color.Red);
         }
     }
+
+    const float BeamImpactHotspotFraction = 0.4f;
+    const float BeamImpactHotspotWhiteMix = 0.6f;
 
     // Debug overlay for the SPACEVORS_BEAM_SHOT capture: red = the impact pass's centre,
     // lime = the beam pass's Start and End. They must coincide with the glow core and line tip.

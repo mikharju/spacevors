@@ -36,7 +36,7 @@ public class EffectSystem : GameSystem
             }
             else
             {
-                commands.Add(new AddComponentCommand<BeamImpact>(entity, new BeamImpact(impact.Radius, impact.Color, newLifetime, impact.InitialLifetime)));
+                commands.Add(new AddComponentCommand<BeamImpact>(entity, new BeamImpact(impact.Radius, impact.Color, newLifetime)));
             }
         }
 

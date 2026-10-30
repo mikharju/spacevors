@@ -92,7 +92,7 @@ Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 
 Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an entity damageable, so the large asteroids that are pure scenery have none and a hit on them stays an obstacle hit.
 
-A beam never penetrates what it hits: the first-hit pass shortens its length to the target's near side and puts one round glow — slightly wider than the beam, a darkened copy of its colour — exactly on the shortened beam's end. Nothing else flashes on a beam hit.
+A beam never penetrates what it hits: the first-hit pass shortens its length to the target's exact first contact (the ray entry into the body primitives inflated by the beam's width) and puts one round glow — the beam's own colour, opaque at a broad core so it swallows the beam's square cap, an added white-hot centre, fading to a dark perimeter — exactly on the shortened beam's end; it lingers half a flash past the beam and fades only once the beam is gone. Nothing else flashes on a beam hit.
 
 ## Write patterns
 

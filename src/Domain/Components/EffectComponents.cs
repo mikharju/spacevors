@@ -9,12 +9,12 @@ public readonly record struct DamageSpark(float Lifetime, float InitialLifetime 
 
 // The flash where a beam stopped: one round glow, slightly wider than the beam, in a darkened copy
 // of the beam's colour, centred exactly on the shortened beam's end. Fades over its lifetime.
-public readonly record struct BeamImpact(float Radius, AmmoColor Color, float Lifetime = BeamImpact.FlashLifetime, float InitialLifetime = BeamImpact.FlashLifetime)
+public readonly record struct BeamImpact(float Radius, AmmoColor Color, float Lifetime = BeamImpact.FlashLifetime)
 {
-    // Lives exactly as long as the beam streak (LaserBeam.FlashLifetime) it crowns, and starts
-    // ticking on the same next tick: a glow is never seen outliving its own beam, which with
-    // several turrets firing in turn would leave one looking stranded far off the next beam.
-    public const float FlashLifetime = LaserBeam.FlashLifetime;
+    // Lingers half a flash past the beam streak (LaserBeam.FlashLifetime): the hit point keeps glowing
+    // after the streak is gone. The renderer keeps the glow core fully opaque while the beam still
+    // lives, so the longer glow never exposes the beam's square end.
+    public const float FlashLifetime = LaserBeam.FlashLifetime * 1.5f;
 
     // The glow scales with the beam that made it; the floor keeps thin beams' impacts visible.
     public static float GlowRadiusFor(float beamHalfThickness) => MathF.Max(3f, beamHalfThickness * 2.5f);

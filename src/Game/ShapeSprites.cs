@@ -42,6 +42,48 @@ static class ShapeSprites
 
     static Rectangle FullSource => new(0, 0, TextureSize, TextureSize);
 
+    // The glow's opaque core, as a fraction of its radius. 0.65 keeps the core (26 px on a 40 px
+    // beam glow) comfortably wider than the beam's half-thickness (16 px) and pushes the fade-out
+    // close to the rim, leaving a broad beam-coloured centre.
+    const float GlowCoreFraction = 0.65f;
+
+    static Texture2D _glowDisc;
+
+    // The same disc with its alpha ramped up from nothing at the rim to opaque at the core:
+    // a bright centre fading to a dark perimeter. Rings are painted rim-inward with rising alpha,
+    // bilinear filtering smooths the steps at the sizes glow circles draw at.
+    static Texture2D GlowDisc
+    {
+        get
+        {
+            if (_glowDisc.Id != 0) return _glowDisc;
+
+            Image image = Raylib.GenImageColor(TextureSize, TextureSize, Transparent);
+            int core = (int)(TextureRadius * GlowCoreFraction);
+            for (int r = TextureRadius; r > core; r--)
+            {
+                int alpha = 255 * (TextureRadius - r) / (TextureRadius - core);
+                Raylib.ImageDrawCircleV(ref image, new Vector2(TextureRadius, TextureRadius), r,
+                    new Color(255, 255, 255, alpha));
+            }
+            Raylib.ImageDrawCircleV(ref image, new Vector2(TextureRadius, TextureRadius), core, Opaque);
+
+            _glowDisc = Raylib.LoadTextureFromImage(image);
+            Raylib.UnloadImage(image);
+            return _glowDisc;
+        }
+    }
+
+    // A radial glow: brightest at the centre, transparent at the rim, tinted per draw like everything else.
+    public static void DrawGlow(float cx, float cy, float radius, Color color)
+    {
+        float size = MathF.Max(radius, 0.5f) * 2f;
+
+        Raylib.DrawTexturePro(GlowDisc, FullSource,
+            new Rectangle(cx, cy, size, size),
+            new Vector2(size * 0.5f, size * 0.5f), 0f, color);
+    }
+
     public static void DrawCircle(float cx, float cy, float radius, Color color)
     {
         float size = MathF.Max(radius, 0.5f) * 2f;
