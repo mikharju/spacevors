@@ -604,6 +604,7 @@ public sealed class GameSession
         _lastRenderTicks = _renderSw.ElapsedTicks;
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
         TryTakeBeamShot(renderCam);
+        TryTakeExplosionShot(renderCam);
     }
 
     // Debug: SPACEVORS_BEAM_SHOT=<path> writes exactly one PNG — the first frame that renders a
@@ -642,6 +643,33 @@ public sealed class GameSession
             Console.WriteLine($"[BEAM-SHOT] beam start=({beam.Start.X:F1},{beam.Start.Y:F1}) end=({beam.End.X:F1},{beam.End.Y:F1}) length={beam.Length:F1} pending={beam.DamagePending}");
         foreach (var (_, _, impactPos) in _em.GetEntitiesWithComponents<BeamImpact, Position>())
             Console.WriteLine($"[BEAM-SHOT] impact at ({impactPos.Value.X:F1},{impactPos.Value.Y:F1})");
+    }
+
+    // Debug: SPACEVORS_EXPLOSION_SHOT=<path> writes exactly one PNG — the first frame that renders a
+    // fully on-screen Explosion grown past ExplosionShotRadius, i.e. stretched far beyond the disc
+    // texture it draws from, which is where a too-small source texture steps at the edge. One shot
+    // per process; prints [EXPLOSION-SHOT] with the radius and position.
+    private static readonly string? ExplosionShotPath = Environment.GetEnvironmentVariable("SPACEVORS_EXPLOSION_SHOT");
+    private const float ExplosionShotRadius = 100f;
+    private bool _explosionShotTaken;
+
+    private void TryTakeExplosionShot(Camera camera)
+    {
+        if (_explosionShotTaken || ExplosionShotPath is null) return;
+
+        int width = Raylib.GetScreenWidth(), height = Raylib.GetScreenHeight();
+        foreach (var (_, explosion, pos) in _em.GetEntitiesWithComponents<Explosion, Position>())
+        {
+            float radius = explosion.CurrentRadius;
+            if (radius < ExplosionShotRadius) continue;
+            var (sx, sy) = RenderHelpers.ToScreen(pos.Value, camera.Target.X, camera.Target.Y, width, height);
+            if (RenderHelpers.IsOffScreen(sx, sy, radius, width, height)) continue;
+
+            _explosionShotTaken = true;
+            Raylib.TakeScreenshot(ExplosionShotPath);
+            Console.WriteLine($"[EXPLOSION-SHOT] radius={radius:F1} at ({pos.Value.X:F1},{pos.Value.Y:F1}) life={explosion.Lifetime:F2}/{explosion.InitialLifetime:F2} -> {ExplosionShotPath}");
+            return;
+        }
     }
 
     // The stats screen: read-only stats plus the way into mount and cargo management.

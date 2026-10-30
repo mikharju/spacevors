@@ -10,21 +10,26 @@ public class ShipDeathExplosionSystem : GameSystem
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        foreach (var (entity, explosion, pos, rot, enemyShip) in view.GetEntitiesWithComponents<ShipDeathExplosion, Position, Rotation, EnemyShip>())
+        // Driven by the component's own ShipRadius, so any hull - enemy or player - runs the
+        // sequence; the blast size comes from whoever queued it.
+        foreach (var (entity, explosion, pos, rot) in view.GetEntitiesWithComponents<ShipDeathExplosion, Position, Rotation>())
         {
             var newTimeRemaining = explosion.TimeRemaining - deltaTime;
 
             if (explosion.TimeRemaining > SecondaryThreshold && newTimeRemaining <= SecondaryThreshold)
             {
-                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, enemyShip.Radius, explosion.InheritedVelocity, view.Rng);
-                ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: true);
+                SpawnSecondaryExplosions(commands, pos.Value, rot.Angle, explosion.ShipRadius, explosion.InheritedVelocity, view.Rng);
+                ApplyImpactVelocity(view, commands, entity, pos.Value, explosion.ShipRadius, lateralOnly: true);
             }
 
             if (explosion.TimeRemaining > FinalThreshold && newTimeRemaining <= FinalThreshold)
             {
-                SpawnFinalExplosion(commands, pos.Value, enemyShip.Radius, explosion.InheritedVelocity, view.Rng);
-                ApplyImpactVelocity(view, commands, entity, pos.Value, enemyShip.Radius, lateralOnly: false);
-                commands.Add(new DestroyEntityCommand(entity));
+                SpawnFinalExplosion(commands, pos.Value, explosion.ShipRadius, explosion.InheritedVelocity, view.Rng);
+                ApplyImpactVelocity(view, commands, entity, pos.Value, explosion.ShipRadius, lateralOnly: false);
+                // Enemy hulls vanish under the final blast; the player's corpse stays - the death
+                // animation, camera and game-over screen all read the player entity.
+                if (!view.HasComponent<Player>(entity))
+                    commands.Add(new DestroyEntityCommand(entity));
             }
 
             if (newTimeRemaining <= FinalThreshold)

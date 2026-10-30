@@ -217,6 +217,18 @@ public class ImpactDamageTest
         // The fatal hit must zero the health: the hull damage shading reads Health, and a
         // stale high value would render a pristine hull while dying.
         Assert.Equal(0, em.GetComponent<Health>(player).Current);
+
+        // The run ends with the player blowing up like an enemy hull, only bigger: the blast
+        // sequence is keyed to 1.5x the hull radius.
+        Assert.Equal(69f, em.GetComponent<ShipDeathExplosion>(player).ShipRadius);
+
+        // The sequence must reach its end without destroying the player entity - the game-over
+        // screen and camera still read it, unlike an enemy hull that vanishes under the final blast.
+        em.AddComponent(player, new Rotation(0f));
+        var sequence = new CommandBuffer();
+        new ShipDeathExplosionSystem().Update(view, 1.01f, sequence);
+        sequence.Apply(em);
+        Assert.True(em.HasComponent<Health>(player), "the player corpse must survive its death sequence");
     }
 
     [Fact]

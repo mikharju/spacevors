@@ -447,6 +447,18 @@ bash .tools/diff.sh a.png b.png --expect-same
 bash .tools/stop.sh
 ```
 
+`job_kill` on a game job leaves its X window **mapped**: `xdotool search --class SpaceVors` then finds
+two windows and `input.sh` focuses the stale one, so keys land nowhere and captures never fire. Run
+`stop.sh` (or wait for the window to close) before starting the next game job, and check
+`xdotool search --class SpaceVors | wc -l` == 1 when input seems ignored.
+
+For moments no hand can time with F12, start the game with `SPACEVORS_BEAM_SHOT=<file.png>` (first
+frame rendering a beam impact, with position logs and debug cross-hairs) or
+`SPACEVORS_EXPLOSION_SHOT=<file.png>` (first frame with an Explosion grown past 100 px). One shot per
+process, path relative to the run directory. Both need live gameplay: a GAME OVER screen stops the
+world render passes, so press R (after the ship-select screen appears — early keys land on nothing)
+and let it play.
+
 Notes: run the game with `dotnet Game.dll`, not the apphost — the built `Game`
 binary asks for a linuxbrew `ld.so` that this container does not have. Whether a
 frame can be *looked at* depends on the active model: an image-capable one reads

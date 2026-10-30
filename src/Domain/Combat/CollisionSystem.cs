@@ -9,6 +9,8 @@ public readonly record struct Dead();
 public class CollisionSystem : GameSystem
 {
     private const float PlayerRestitution = 0.2f;
+    // The player's death blast is bigger than an equal-hull enemy's - the run ends with the big one.
+    private const float PlayerDeathBlastScale = 1.5f;
     private const float AsteroidAsteroidRestitution = 0.4f;
     private const float AmmoRestitution = 0.15f;
     private const float CorrectionPercent = 0.4f;
@@ -654,18 +656,7 @@ public class CollisionSystem : GameSystem
                 commands.Add(new RemoveComponentCommand<Health>(shipEntity));
                 commands.Add(new AddComponentCommand<Dead>(shipEntity, new Dead()));
                 view.TryGetComponent<Velocity>(shipEntity, out var deathVel);
-                Vector2 inheritedVel = deathVel.Value;
-                commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, data.hitPoint, data.shipRadius, data.graphicsId, inheritedVel)));
-                commands.AddEntity(new Position(data.hitPoint), new Explosion(data.shipRadius * 0.8f, 0.6f, 0.6f));
-                var rng = view.Rng;
-                for (int i = 0; i < 4; i++)
-                {
-                    float sparkAngle = (float)(rng.NextDouble() * MathF.PI * 2f);
-                    float sparkSpeed = (data.shipRadius + 15f) / 0.7f * (0.8f + (float)rng.NextDouble() * 0.4f);
-                    Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
-                    float sparkLifetime = 0.7f + (float)rng.NextDouble() * 0.3f;
-                    commands.AddEntity(new Position(data.hitPoint), new Velocity(sparkVel), new DamageSpark(sparkLifetime, sparkLifetime));
-                }
+                SpawnDeathBlast(commands, shipEntity, data.hitPoint, data.shipRadius, data.graphicsId, deathVel.Value, view.Rng);
             }
             else
             {
@@ -683,6 +674,17 @@ public class CollisionSystem : GameSystem
                 var playerHealth = view.GetComponent<Health>(playerEntity);
                 commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(0, playerHealth.Max)));
                 commands.Add(new AddComponentCommand<Dead>(playerEntity, new Dead()));
+
+                // The run ends with the player blowing up like an enemy hull, only bigger: the
+                // death animation window (1.2 s) covers the full 1.0 s sequence. The guard keeps a
+                // hit landing on the corpse from restarting the blast.
+                if (!view.HasComponent<ShipDeathExplosion>(playerEntity))
+                {
+                    view.TryGetComponent<Velocity>(playerEntity, out var playerDeathVel);
+                    float blastRadius = view.GetComponent<Player>(playerEntity).Radius * PlayerDeathBlastScale;
+                    SpawnDeathBlast(commands, playerEntity, view.GetComponent<Position>(playerEntity).Value,
+                        blastRadius, 0, playerDeathVel.Value, view.Rng);
+                }
             }
             else
             {
@@ -793,6 +795,24 @@ public class CollisionSystem : GameSystem
     }
 
 
+
+    // The staged death blast every hull gets when shot down: the sequence component, the first
+    // fireball, and four sparks off the hit point. Everything scales with blastRadius - the player's
+    // death passes a deliberately larger one.
+    private static void SpawnDeathBlast(CommandBuffer commands, Entity shipEntity, Vector2 hitPoint,
+        float blastRadius, byte graphicsId, Vector2 inheritedVel, Random rng)
+    {
+        commands.Add(new AddComponentCommand<ShipDeathExplosion>(shipEntity, new ShipDeathExplosion(1.0f, hitPoint, blastRadius, graphicsId, inheritedVel)));
+        commands.AddEntity(new Position(hitPoint), new Explosion(blastRadius * 0.8f, 0.6f, 0.6f));
+        for (int i = 0; i < 4; i++)
+        {
+            float sparkAngle = (float)(rng.NextDouble() * MathF.PI * 2f);
+            float sparkSpeed = (blastRadius + 15f) / 0.7f * (0.8f + (float)rng.NextDouble() * 0.4f);
+            Vector2 sparkVel = new Vector2((float)Math.Cos(sparkAngle) * sparkSpeed, (float)Math.Sin(sparkAngle) * sparkSpeed);
+            float sparkLifetime = 0.7f + (float)rng.NextDouble() * 0.3f;
+            commands.AddEntity(new Position(hitPoint), new Velocity(sparkVel), new DamageSpark(sparkLifetime, sparkLifetime));
+        }
+    }
 
     private void SpawnExplosion(CommandBuffer commands, Vector2 position, MineType mineType)
     {
