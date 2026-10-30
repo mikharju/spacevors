@@ -6,7 +6,8 @@ public class MineDriftSystem : GameSystem
 {
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
-        bool hasPlayer = view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple);
+        // Joined on Position so the player's post-death husk (physical components stripped) is skipped.
+        bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
 
         foreach (var (mineEntity, mine, minePos) in view.GetEntitiesWithComponents<EnemyMine, Position>())

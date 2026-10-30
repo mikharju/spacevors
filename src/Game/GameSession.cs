@@ -133,6 +133,10 @@ public sealed class GameSession
     }
 
     // Returns true when the player restarts from game over (caller returns to ship select).
+    // The death sequence strips the player's physical components (husk) but keeps the Dead tag,
+    // so one read covers every dying state.
+    private bool PlayerDead => _em.HasComponent<Dead>(_playerEntity);
+
     public bool Update()
     {
         if (_gameOver && Raylib.IsKeyPressed(KeyboardKey.R)) return true;
@@ -155,7 +159,7 @@ public sealed class GameSession
         // Tab toggles the stats screen (also while picking an upgrade). It does nothing on the mount
         // screen, which has its own way out (Escape).
         bool onMountsScreen = _upgradeStep == UpgradeStep.Mounts;
-        if (!_gameOver && !onMountsScreen && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
+        if (!_gameOver && !PlayerDead && !onMountsScreen && Raylib.IsKeyPressed(KeyboardKey.Tab)) _showStats = !_showStats;
 
         // Scenario mode never pauses: a level-up applies its first option immediately, so a
         // PendingChoice cannot insert unmeasured frames into the run.
@@ -185,7 +189,7 @@ public sealed class GameSession
         _frameSw.Restart();
         _accumulator = Math.Min(_accumulator + frameTime, MaxAccumulator);
 
-        bool playerDead = _em.HasComponent<Dead>(_playerEntity);
+        bool playerDead = PlayerDead;
 
         if (!_gameOver && !playerDead) ReadPlayerInput();
 
@@ -436,7 +440,9 @@ public sealed class GameSession
             && !_em.HasComponent<Dead>(primary.Target))
             return primary.Target;
 
-        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
+        if (!_em.TryGetComponent<Position>(_playerEntity, out var playerPosComponent))
+            return null; // only the husk is left once the death sequence ends
+        var playerPos = playerPosComponent.Value;
         Entity? nearest = null;
         float bestDistSq = float.MaxValue;
 

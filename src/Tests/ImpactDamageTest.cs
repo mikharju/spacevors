@@ -222,13 +222,29 @@ public class ImpactDamageTest
         // sequence is keyed to 1.5x the hull radius.
         Assert.Equal(69f, em.GetComponent<ShipDeathExplosion>(player).ShipRadius);
 
-        // The sequence must reach its end without destroying the player entity - the game-over
-        // screen and camera still read it, unlike an enemy hull that vanishes under the final blast.
+        // Like every enemy hull, the player stops existing as a ship under the final blast: the
+        // sequence component, Position and Rotation come off (no draw, motion, collision or
+        // camera), and the turret mounts are destroyed. Player/Health/Dead remain as a husk for
+        // the HUD and the game-over screen - and with the component gone, ticking the sequence
+        // system again can never re-fire the final stage.
         em.AddComponent(player, new Rotation(0f));
+        var mount = em.CreateEntity();
+        em.AddComponent(mount, new TurretSlot(TurretLayouts.Scout[0]));
         var sequence = new CommandBuffer();
         new ShipDeathExplosionSystem().Update(view, 1.01f, sequence);
         sequence.Apply(em);
-        Assert.True(em.HasComponent<Health>(player), "the player corpse must survive its death sequence");
+        Assert.False(em.HasComponent<ShipDeathExplosion>(player), "the sequence must end, not re-fire");
+        Assert.False(em.HasComponent<Position>(player), "the husk draws and collides as nothing");
+        Assert.False(em.HasComponent<Rotation>(player));
+        Assert.True(em.HasComponent<Health>(player), "the husk keeps Health for the hud");
+        Assert.True(em.HasComponent<Dead>(player), "the husk keeps Dead for game-over detection");
+        Assert.False(em.HasComponent<TurretSlot>(mount), "the turret mounts go with the wreck");
+
+        int explosionsBefore = em.GetEntitiesWithComponents<Explosion>().Count();
+        var retick = new CommandBuffer();
+        new ShipDeathExplosionSystem().Update(view, 1f, retick);
+        retick.Apply(em);
+        Assert.Equal(explosionsBefore, em.GetEntitiesWithComponents<Explosion>().Count());
     }
 
     [Fact]

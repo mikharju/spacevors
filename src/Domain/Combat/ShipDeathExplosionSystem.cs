@@ -26,10 +26,24 @@ public class ShipDeathExplosionSystem : GameSystem
             {
                 SpawnFinalExplosion(commands, pos.Value, explosion.ShipRadius, explosion.InheritedVelocity, view.Rng);
                 ApplyImpactVelocity(view, commands, entity, pos.Value, explosion.ShipRadius, lateralOnly: false);
-                // Enemy hulls vanish under the final blast; the player's corpse stays - the death
-                // animation, camera and game-over screen all read the player entity.
-                if (!view.HasComponent<Player>(entity))
+                if (view.HasComponent<Player>(entity))
+                {
+                    // Enemy hulls vanish under the blast; the player becomes a husk: Position and
+                    // Rotation come off (no draw, no motion, no collision, no camera anchor) but
+                    // Player/Health/Dead stay - the HUD bars, stats screen and game-over detection
+                    // keep reading them like before. The sequence component goes too: a leftover
+                    // one would re-fire the final stage every frame forever.
+                    commands.Add(new RemoveComponentCommand<ShipDeathExplosion>(entity));
+                    commands.Add(new RemoveComponentCommand<Position>(entity));
+                    commands.Add(new RemoveComponentCommand<Rotation>(entity));
+                    // The turret mounts rode the wreck; they go with the blast.
+                    foreach (var (mount, _) in view.GetEntitiesWithComponents<TurretSlot>())
+                        commands.Add(new DestroyEntityCommand(mount));
+                }
+                else
+                {
                     commands.Add(new DestroyEntityCommand(entity));
+                }
             }
 
             if (newTimeRemaining <= FinalThreshold)

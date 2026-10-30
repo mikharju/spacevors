@@ -271,7 +271,7 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
 No event queues. Systems signal each other through components, written via the CommandBuffer (see Write patterns). A later system in a same or next phase reacts to the component it finds.
 
 Examples:
-- CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions; Dead entities are not auto-targeted, so weapons retarget instead of firing into a wreck
+- CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions; Dead entities are not auto-targeted, so weapons retarget instead of firing into a wreck. An enemy entity is destroyed under the final blast; the player becomes a husk instead - Position, Rotation and the sequence component come off and the turret mounts are destroyed, while Player/Health/Dead stay for the HUD bars, stats and game-over detection (the sequence component must never outlive its sequence: a leftover re-fires the final stage every frame).
 - TurretFiringSystem / EnemyMissileFiringSystem put `Missile` + `Health` on a round at launch; MissileGuidanceSystem steers it each tick; CollisionSystem reads the same round's `Ammo` to shoot it down
 - PickupMagnetSystem raises Player.Xp (direct ref write, see Write patterns); LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
 - GameSession reads PendingChoice to pause and show the upgrade menu

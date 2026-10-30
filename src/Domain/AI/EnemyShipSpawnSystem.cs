@@ -22,7 +22,9 @@ public class EnemyShipSpawnSystem : GameSystem
     {
         var rng = view.Rng;
 
-        bool hasPlayer = view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple);
+        // Joined on Position so the player's post-death husk (physical components stripped) is skipped:
+        // spawning a fresh wave around a corpse teaches nothing anyway.
+        bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
         Entity playerEntity = playerTuple.Entity;
 
         if (!hasPlayer) return;

@@ -442,6 +442,9 @@ public static class WorldRenderer
 
     private static void DrawTurrets(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight)
     {
+        // The death sequence strips the player's Position (husk): nothing to anchor or draw after.
+        if (!em.HasComponent<Position>(playerEntity)) return;
+
         var hullPos = em.GetComponent<Position>(playerEntity).Value;
         float hullRotation = em.GetComponent<Rotation>(playerEntity).Angle;
 
@@ -599,6 +602,7 @@ public static class WorldRenderer
 
     private static void DrawPlayerShip(EntityManager em, Entity playerEntity, float camX, float camY, int windowWidth, int windowHeight, ShipType shipType, bool diagnostics)
     {
+        if (!em.HasComponent<Position>(playerEntity)) return; // the husk left after the death sequence draws no ship
         var shipPos = em.GetComponent<Position>(playerEntity);
         var shipRot = em.GetComponent<Rotation>(playerEntity);
 
