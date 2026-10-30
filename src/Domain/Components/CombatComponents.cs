@@ -65,7 +65,8 @@ public readonly record struct AutoTargetMark(float LastTargetedAt)
 
 // Instant hitscan beam: static segment [Start, Start + Direction * Length], Width is half-thickness.
 // CollisionSystem applies its damage exactly once (clearing DamagePending) to the first thing
-// hit; afterwards the beam lingers only as a fading visual until Lifetime expires.
+// hit and shortens Length to that target's near side, so the beam never draws through what it hit;
+// afterwards the beam lingers only as a fading visual until Lifetime expires.
 public readonly record struct LaserBeam(
     Vector2 Start,
     Vector2 Direction,

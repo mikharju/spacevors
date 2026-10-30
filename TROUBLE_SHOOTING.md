@@ -390,6 +390,39 @@ shape drew at all.
   gitignored and already holds the scenario output, so `Image.crop(...).save('.tools/run/crop-x.png')` and read
   that path. It also keeps the crop next to the shot it came from (`.tools/shots/`), which is gitignored too.
 
+## 58. Two systems rewriting one component in the same phase: the per-phase flush makes the stale write win
+
+- **Symptom**: unit tests that ran one system at a time passed, but in the live game a hitscan beam drew at
+  full range *through* its target and its impact glow re-spawned every tick — while
+  `CollisionSystem` verifiably wrote the shortened length.
+- **Cause**: `SimulationRunner` flushes the command buffer once per phase, and `CollisionSystem` and
+  `EffectSystem` are in the same phase (Resolution). Both queued `AddComponentCommand<LaserBeam>` for the
+  beam: the collision one shortened `Length` and cleared `DamagePending`, the effect one — derived from the
+  pre-resolution component copy it had read — wrote the beam back with the *old* length and `DamagePending`
+  restored. Commands apply in order, so the stale copy landed last: full-length drawing, damage applied
+  every tick of the flash, a fresh impact per tick.
+- **Fix / Prevention**: when two systems in one phase can write the same component, the later one must skip
+  entities the earlier one just resolved (`EffectSystem` skips `beam.DamagePending` beams). Pin the semantics
+  with a test that runs **both systems against one view and applies the commands once** — the shape of a
+  phase — not each system in isolation (`LaserTest.CollisionAndEffectInOnePhaseFlush_…`).
+
+## 59. `DrawTexturePro` places the sprite's *origin* at the dest rect's position — DrawCircle forgot
+
+- **Symptom**: a beam's impact glow rendered ~its own radius up-left of the beam tip, and a debug cross
+  drawn at the very `cx, cy` the circle pass computed landed clearly outside the circle it annotated.
+- **Cause**: the renderer-wide convention (ARCHITECTURE.md, settled by the DrawMissile centre fix
+  62d3917) is that the dest rect's **position is the point the sprite is centred/rotated about** —
+  `RenderHelpers.CenterOrigin` supplies the half-size origin. `ShapeSprites.DrawCircle` built its rect as
+  `centre - size/2` with a half-size origin instead, sliding every disc it draws (explosions, sparks, smoke,
+  ammo dots, beam impacts) up-left by its own radius; `DrawStreak` was off by half its thickness. The
+  convention was documented and had already bitten the missile once.
+- **Fix / Prevention**: for any new `DrawTexturePro` call, pass the centre as the dest rect's position. When
+  a positioned effect looks off, settle it numerically before theorising: mark the computed centre with a
+  `DrawPixel` cross behind the effect (`WorldRenderer.BeamImpactDebug`, on when `SPACEVORS_BEAM_SHOT` is
+  set) and measure both against the same screenshot. Also note `Raylib.TakeScreenshot` treats its path as
+  relative to the process cwd and glues cwd in front of absolute-looking paths (`FILEIO: [.../run/.../run/x.png]
+  Failed to open file`) — pass a bare file name and run the game from the intended directory, as game.sh does.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

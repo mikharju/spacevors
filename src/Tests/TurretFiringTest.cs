@@ -232,4 +232,77 @@ public class TurretFiringTest
         float offLine = (toPlayer - lineDir * along).Magnitude;
         Assert.True(offLine <= 1f, $"Round runs {offLine} px past the player it was aimed at");
     }
+
+    private static void AddAutoTurretWorld(EntityManager em, WeaponStats weapon)
+    {
+        var playerEntity = em.CreateEntity();
+        em.AddComponent(playerEntity, new Position(new Vector2(100f, 100f)));
+        em.AddComponent(playerEntity, new Velocity(Vector2.Zero));
+        em.AddComponent(playerEntity, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 40f, Boost: 2.5f, MaxHealth: 10));
+
+        var turretEntity = em.CreateEntity();
+        em.AddComponent(turretEntity, new Position(Vector2.Zero));
+        em.AddComponent(turretEntity, new Rotation(0f));
+        em.AddComponent(turretEntity, new Turret(
+            Weapon: weapon, WeaponName: "TestWeapon", ArcAngle: MathF.PI / 2f, Range: 300f, AutoTarget: true));
+    }
+
+    private static void AddShipForTargeting(EntityManager em, Vector2 position, bool dead)
+    {
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(position));
+        em.AddComponent(ship, new Velocity(Vector2.Zero));
+        em.AddComponent(ship, new Rotation(0f));
+        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new Health(10, 10));
+        if (dead) em.AddComponent(ship, new Dead());
+    }
+
+    [Fact]
+    public void AutoTarget_HoldsFireWhenTheOnlyShipIsADeadWreck()
+    {
+        var em = new EntityManager();
+        AddAutoTurretWorld(em, new WeaponStats(FireRate: 5f, AmmoSpeed: 500f, KickbackForce: 0f, PelletCount: 1, Scatter: 0f, Damage: 1));
+        AddShipForTargeting(em, new Vector2(0f, -100f), dead: true);
+
+        var commands = new CommandBuffer();
+        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+        commands.Apply(em);
+
+        Assert.Equal(0, em.GetEntitiesWithComponents<Ammo>().Count());
+    }
+
+    [Fact]
+    public void AutoTarget_TakesTheLiveShipBesideACloserWreck()
+    {
+        var em = new EntityManager();
+        AddAutoTurretWorld(em, new WeaponStats(FireRate: 5f, AmmoSpeed: 500f, KickbackForce: 0f, PelletCount: 1, Scatter: 0f, Damage: 1));
+        AddShipForTargeting(em, new Vector2(60f, -100f), dead: true);   // nearer, but already dead
+        AddShipForTargeting(em, new Vector2(0f, -200f), dead: false);   // the live target straight ahead
+
+        var commands = new CommandBuffer();
+        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+        commands.Apply(em);
+
+        Assert.True(em.GetEntitiesWithComponents<Ammo, Velocity>().TryFirst(out var shotTuple));
+        var dir = shotTuple.Value2.Value;
+        dir = dir / dir.Magnitude;
+        Assert.True(Vector2.Dot(dir, new Vector2(0f, -1f)) > 0.99f, "the round aims at the wreck instead of the live ship");
+    }
+
+    [Fact]
+    public void HitscanAutoTarget_BeamsTheLiveShipNotTheWreck()
+    {
+        var em = new EntityManager();
+        AddAutoTurretWorld(em, new WeaponStats(FireRate: 5f, AmmoSpeed: 0f, KickbackForce: 0f, PelletCount: 1, Scatter: 0f, Damage: 1, Hitscan: true));
+        AddShipForTargeting(em, new Vector2(60f, -100f), dead: true);
+        AddShipForTargeting(em, new Vector2(0f, -200f), dead: false);
+
+        var commands = new CommandBuffer();
+        new TurretFiringSystem().Update(new WorldView(em), 1f / 60f, commands);
+        commands.Apply(em);
+
+        Assert.True(em.GetEntitiesWithComponents<LaserBeam>().TryFirst(out var beamTuple));
+        Assert.True(Vector2.Dot(beamTuple.Value1.Direction, new Vector2(0f, -1f)) > 0.99f, "the beam aims at the wreck instead of the live ship");
+    }
 }

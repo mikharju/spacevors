@@ -136,4 +136,60 @@ public class CapsuleGeometryTest
         Assert.Equal(0f, t, 4);
         Assert.Equal(0.1f, contact.Depth, 4);
     }
+
+    // Where a beam stops on a target is the entry of its ray: these pin that math.
+    [Fact]
+    public void EntryAlongRay_DeadOnDisc_IsTheNearSide()
+    {
+        var disc = Capsule.Disc(new Vector2(100f, 0f), 10f);
+
+        Assert.True(CapsuleGeometry.TryEntryAlongRay(Vector2.Zero, new Vector2(1f, 0f), disc, out float entry));
+        Assert.Equal(90f, entry, 3);
+    }
+
+    // A grazing ray enters at the tangent along its axis, not at the disc's nominal near side:
+    // x = 100 - sqrt(10^2 - 6^2) = 92, while the naive 100 - 10 = 90 would stop 2 units short.
+    [Fact]
+    public void EntryAlongRay_GrazingDisc_IsTheTangentEntryPoint()
+    {
+        var disc = Capsule.Disc(new Vector2(100f, 0f), 10f);
+
+        Assert.True(CapsuleGeometry.TryEntryAlongRay(new Vector2(0f, 6f), new Vector2(1f, 0f), disc, out float entry));
+        Assert.Equal(92f, entry, 3);
+    }
+
+    [Fact]
+    public void EntryAlongRay_SideOnALimb_IsTheBandEntry()
+    {
+        var limb = new Capsule(new Vector2(100f, -40f), new Vector2(100f, 40f), 10f);
+
+        Assert.True(CapsuleGeometry.TryEntryAlongRay(Vector2.Zero, new Vector2(1f, 0f), limb, out float entry));
+        Assert.Equal(90f, entry, 3);
+    }
+
+    [Fact]
+    public void EntryAlongRay_PastTheTipOfALimb_EntersThroughTheCapDisc()
+    {
+        var limb = new Capsule(new Vector2(100f, -40f), new Vector2(100f, 40f), 10f);
+
+        Assert.True(CapsuleGeometry.TryEntryAlongRay(new Vector2(0f, 45f), new Vector2(1f, 0f), limb, out float entry));
+        Assert.Equal(91.34f, entry, 2);
+    }
+
+    [Fact]
+    public void EntryAlongRay_BesideAndPastTheEnd_IsNoEntry()
+    {
+        var limb = new Capsule(new Vector2(100f, -40f), new Vector2(100f, 40f), 10f);
+
+        Assert.False(CapsuleGeometry.TryEntryAlongRay(new Vector2(0f, 60f), new Vector2(1f, 0f), limb, out _));
+    }
+
+    [Fact]
+    public void EntryAlongRay_StartingInside_EntersAtZero()
+    {
+        var disc = Capsule.Disc(new Vector2(10f, 0f), 10f);
+
+        Assert.True(CapsuleGeometry.TryEntryAlongRay(new Vector2(5f, 0f), new Vector2(1f, 0f), disc, out float entry));
+        Assert.Equal(0f, entry, 3);
+    }
 }

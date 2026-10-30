@@ -27,6 +27,24 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
+        foreach (var (entity, impact) in view.GetEntitiesWithComponents<BeamImpact>())
+        {
+            var newLifetime = impact.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(entity));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<BeamImpact>(entity, new BeamImpact(impact.Radius, impact.Color, newLifetime, impact.InitialLifetime)));
+            }
+        }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Effects: beam impact", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, explosion) in view.GetEntitiesWithComponents<Explosion>())
         {
             var newLifetime = explosion.Lifetime - deltaTime;
@@ -83,6 +101,13 @@ public class EffectSystem : GameSystem
 
         foreach (var (entity, beam) in view.GetEntitiesWithComponents<LaserBeam>())
         {
+            // CollisionSystem resolves beams in this same phase and rewrites their component (hit
+            // length, DamagePending cleared). Commands apply once per phase, so writing this
+            // pre-resolution copy back would undo that: the beam would draw at full length, damage
+            // again every tick, and flash its impact glow again every tick. An unresolved beam is
+            // left alone; its lifetime starts ticking the next tick.
+            if (beam.DamagePending) continue;
+
             var newLifetime = beam.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {

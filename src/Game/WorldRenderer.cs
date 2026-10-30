@@ -38,6 +38,8 @@ public static class WorldRenderer
         RenderTimings.Pass("world.missiles");
         DrawLaserBeams(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.beams");
+        DrawBeamImpacts(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.beamImpacts");
         DrawExplosions(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.explosions");
         DrawDamageSparks(em, camX, camY, windowWidth, windowHeight);
@@ -323,7 +325,51 @@ public static class WorldRenderer
                 new System.Numerics.Vector2(x2, y2),
                 MathF.Max(1f, beam.Width * 2f),
                 color);
+
+            if (BeamImpactDebug)
+            {
+                Mark(x1, y1, Color.Lime);
+                Mark(x2, y2, Color.Lime);
+            }
         }
+    }
+
+    // A beam's impact: one round glow slightly wider than the beam, in a darkened copy of the
+    // beam's colour, centred exactly on the shortened beam's end. It fades out with its lifetime.
+    private const float BeamImpactGlowDarken = 0.6f;
+
+    private static void DrawBeamImpacts(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, impact, pos) in em.GetEntitiesWithComponents<BeamImpact, Position>())
+        {
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+            if (RenderHelpers.IsOffScreen(cx, cy, impact.Radius, windowWidth, windowHeight)) continue;
+
+            float lifeRatio = Math.Clamp(impact.Lifetime / impact.InitialLifetime, 0f, 1f);
+            int alpha = (int)(255f * lifeRatio);
+            Color baseColor = AmmoColorOf(impact.Color);
+
+            ShapeSprites.DrawCircle(cx, cy, impact.Radius, new Color(
+                (byte)(baseColor.R * BeamImpactGlowDarken),
+                (byte)(baseColor.G * BeamImpactGlowDarken),
+                (byte)(baseColor.B * BeamImpactGlowDarken),
+                (byte)alpha));
+
+            if (BeamImpactDebug) Mark(cx, cy, Color.Red);
+        }
+    }
+
+    // Debug overlay for the SPACEVORS_BEAM_SHOT capture: red = the impact pass's centre,
+    // lime = the beam pass's Start and End. They must coincide with the glow core and line tip.
+    public static bool BeamImpactDebug { get; set; }
+
+    private static void Mark(float x, float y, Color color)
+    {
+        Raylib.DrawPixel((int)x - 1, (int)y, color);
+        Raylib.DrawPixel((int)x, (int)y, color);
+        Raylib.DrawPixel((int)x + 1, (int)y, color);
+        Raylib.DrawPixel((int)x, (int)y - 1, color);
+        Raylib.DrawPixel((int)x, (int)y + 1, color);
     }
 
     private static void DrawExplosions(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)

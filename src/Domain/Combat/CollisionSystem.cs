@@ -395,6 +395,11 @@ public class CollisionSystem : GameSystem
             Vector2 beamStart = beam.Start;
             Vector2 beamEnd = beam.End;
 
+            // A beam never draws through what it hit: on a hit, Length shortens to where the beam's
+            // inflated axis first touches the target, and a BeamImpact flashes on that very point.
+            bool beamStopped = false;
+            float stopLength = beam.Length;
+
             if (beam.IsEnemy)
             {
                 // Enemy beams engage only the player, mirroring enemy ammo. A beam is a segment inflated by its
@@ -409,7 +414,9 @@ public class CollisionSystem : GameSystem
                         _frameRemainingHealth[playerEntity] = remaining;
                     }
                     _frameRemainingHealth[playerEntity] -= beam.Damage;
-                    _effectsToSpawn.Add((playerTuple.Value2.Value, MineType.Small));
+
+                    stopLength = BeamEntryLength(playerBody, beamStart, beam.Direction, beam.Width, beam.Length);
+                    beamStopped = true;
                 }
             }
             else
@@ -425,7 +432,7 @@ public class CollisionSystem : GameSystem
                 SpatialGrid.CollisionKind firstKind = default;
                 Contact firstContact = default;
                 Vector2 firstCandidatePos = default;
-                MineSize firstMineSize = default;
+                float firstCandidateRadius = default;
                 float firstT = float.MaxValue;
 
                 int beamCount = QueryBox(beamBoxMin, beamBoxMax);
@@ -449,7 +456,7 @@ public class CollisionSystem : GameSystem
                     firstKind = candidate.Kind;
                     firstContact = hit;
                     firstCandidatePos = candidate.Position;
-                    if (candidate.Kind == SpatialGrid.CollisionKind.EnemyMine) firstMineSize = candidate.Size!.Value;
+                    firstCandidateRadius = candidate.Radius;
                     firstT = t;
                 }
 
@@ -458,11 +465,9 @@ public class CollisionSystem : GameSystem
                     switch (firstKind)
                     {
                         case SpatialGrid.CollisionKind.Asteroid:
-                            // The beam stops at the rock with an impact flash. A small rock also takes
-                            // the hit; a big one is scenery with no Health to lose. A rock that is
-                            // coming apart flashes nothing: its end is smoke, not fire.
-                            if (DamageAsteroid(view, firstHit.Value, beam.Damage))
-                                _effectsToSpawn.Add((firstContact.Point, MineType.Small));
+                            // The beam stops at the rock with its own impact glow. A small rock also
+                            // takes the hit; a big one is scenery with no Health to lose.
+                            DamageAsteroid(view, firstHit.Value, beam.Damage);
                             break;
 
                         case SpatialGrid.CollisionKind.EnemyMine:
@@ -475,7 +480,6 @@ public class CollisionSystem : GameSystem
                                 }
                                 _frameRemainingHealth[firstHit.Value] -= beam.Damage;
                                 _hitMines.Add(firstHit.Value);
-                                _effectsToSpawn.Add((firstCandidatePos, MineType.FromSize(firstMineSize)));
                             }
                             break;
 
@@ -511,14 +515,32 @@ public class CollisionSystem : GameSystem
                                 }
                                 _frameRemainingHealth[firstHit.Value] -= beam.Damage;
                                 _hitMissiles.Add(firstHit.Value);
-                                _effectsToSpawn.Add((firstContact.Point, MineType.Small));
                             }
                             break;
                     }
+
+                    // The stop point is where the beam's inflated axis first touches the body — the
+                    // exact circle or hull primitive, not the bounding circle — so the beam tip and
+                    // its glow sit on the first visible contact, grazing hits included.
+                    NarrowPhase.CollisionBody hitBody = firstKind == SpatialGrid.CollisionKind.EnemyShip
+                        ? HullBody(view, firstHit.Value, view.GetComponent<EnemyShip>(firstHit.Value))
+                        : CircleBody(firstCandidatePos, firstCandidateRadius);
+                    stopLength = BeamEntryLength(hitBody, beamStart, beam.Direction, beam.Width, beam.Length);
+                    beamStopped = true;
                 }
             }
 
-            commands.Add(new AddComponentCommand<LaserBeam>(beamEntity, beam with { DamagePending = false }));
+            if (beamStopped)
+            {
+                commands.AddEntity(
+                    new Position(beamStart + beam.Direction * stopLength),
+                    new BeamImpact(BeamImpact.GlowRadiusFor(beam.Width), beam.Color));
+                commands.Add(new AddComponentCommand<LaserBeam>(beamEntity, beam with { DamagePending = false, Length = stopLength }));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<LaserBeam>(beamEntity, beam with { DamagePending = false }));
+            }
         }
 
         ammoDetectionSw.Stop();
@@ -808,6 +830,35 @@ public class CollisionSystem : GameSystem
     // Rocks, mines and guided rounds are drawn as dots: they collide as one circle, as they always did.
     static NarrowPhase.CollisionBody CircleBody(Vector2 position, float radius) =>
         NarrowPhase.CollisionBody.Circle(position, radius);
+
+    // How far a beam travels before it first touches a body: the earliest entry of the ray into the
+    // body's primitives, each inflated by the beam's own half-thickness. A beam's shortened Length and
+    // its impact glow both hang off this distance, so the glow sits on the beam tip at the point of
+    // first contact. Clamped to the beam's own length; 0 when the muzzle is already inside.
+    static float BeamEntryLength(NarrowPhase.CollisionBody body, Vector2 start, Vector2 direction, float beamHalfThickness, float maxLength)
+    {
+        float best = maxLength;
+
+        if (body.Shape.IsCircle)
+        {
+            var disc = new Capsule(body.Position, body.Position, body.Scale + beamHalfThickness);
+            if (CapsuleGeometry.TryEntryAlongRay(start, direction, disc, out float entry)) best = MathF.Min(best, entry);
+            return best;
+        }
+
+        float cos = MathF.Cos(body.Angle);
+        float sin = MathF.Sin(body.Angle);
+        foreach (var primitive in body.Shape.Capsules)
+        {
+            var inflated = new Capsule(
+                NarrowPhase.InWorld(primitive.From, cos, sin, body),
+                NarrowPhase.InWorld(primitive.To, cos, sin, body),
+                primitive.HalfThickness * body.Scale + beamHalfThickness);
+            if (CapsuleGeometry.TryEntryAlongRay(start, direction, inflated, out float entry)) best = MathF.Min(best, entry);
+        }
+
+        return best;
+    }
 
     private void ResolveCollision(
         WorldView view,

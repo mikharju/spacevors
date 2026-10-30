@@ -370,6 +370,10 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (enemyShipEntity, _, _, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
         {
+            // A dead ship is already spent: its hull rides out the death sequence as a wreck, and
+            // weapons retarget instead of emptying into the fireball.
+            if (view.HasComponent<Dead>(enemyShipEntity)) continue;
+
             var aimed = EvaluateMovingTarget(view, enemyShipEntity, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed);
             if (!aimed.HasValue) continue;
 
@@ -411,6 +415,9 @@ public class TurretFiringSystem : GameSystem
 
         foreach (var (enemyShipEntity, enemyShip, velocity, shipPos) in view.GetEntitiesWithComponents<EnemyShip, Velocity, Position>())
         {
+            // Same rule as the lead pass: wrecks riding out their death sequence are not targets.
+            if (view.HasComponent<Dead>(enemyShipEntity)) continue;
+
             Vector2 toTarget = shipPos.Value - turretPos;
             float distSq = toTarget.X * toTarget.X + toTarget.Y * toTarget.Y;
 

@@ -175,9 +175,145 @@ public class LaserTest
 
         var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 100f, damage: 1);
 
+        // The lifetime only starts ticking once collision has resolved the beam (it cleared
+        // DamagePending without hitting anything here), matching EffectSystem's same-phase guard.
+        var resolve = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, resolve);
+        resolve.Apply(em);
+
         var commands = new CommandBuffer();
         new EffectSystem().Update(view, LaserBeam.FlashLifetime + 0.01f, commands);
 
         Assert.Contains(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == beam);
+    }
+
+    [Fact]
+    public void Beam_HittingShip_StopsAtItsNearSide_AndFlashes()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        // Ship radius 18 on the axis at x=300, beam half-thickness 3: the near side sits at 300 - 18 - 3.
+        AddShip(em, new Vector2(300f, 0f));
+        var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 1000f, damage: 5);
+
+        var commands = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, commands);
+        commands.Apply(em);
+
+        Assert.Equal(279f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.True(em.GetEntitiesWithComponents<BeamImpact, Position>().TryFirst(out var impactTuple));
+        Assert.Equal(279f, impactTuple.Value2.Value.X, 1);
+        Assert.Equal(0f, impactTuple.Value2.Value.Y, 1);
+    }
+
+    [Fact]
+    public void Beam_MissingEverything_KeepsItsLength_AndFlashesNothing()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        AddShip(em, new Vector2(300f, 500f));
+        var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 1000f, damage: 5);
+
+        var commands = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, commands);
+        commands.Apply(em);
+
+        Assert.Equal(1000f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.Equal(0, em.GetEntitiesWithComponents<BeamImpact>().Count());
+    }
+
+    [Fact]
+    public void EnemyBeam_HittingPlayer_StopsAtItsNearSide_AndFlashes()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        var player = em.CreateEntity();
+        em.AddComponent(player, new Position(new Vector2(400f, 0f)));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
+        em.AddComponent(player, new Health(10, 10));
+
+        // Player bounding radius 18, beam half-thickness 3: the near side sits at 400 - 18 - 3.
+        var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 1000f, damage: 3, isEnemy: true);
+
+        var commands = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, commands);
+        commands.Apply(em);
+
+        Assert.Equal(379f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.True(em.GetEntitiesWithComponents<BeamImpact, Position>().TryFirst(out var impactTuple));
+        Assert.Equal(379f, impactTuple.Value2.Value.X, 1);
+    }
+
+    [Fact]
+    public void BeamImpact_ExpireDestroysEntity()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        var impact = em.CreateEntity();
+        em.AddComponent(impact, new Position(new Vector2(10f, 0f)));
+        em.AddComponent(impact, new BeamImpact(4f, AmmoColor.Blue));
+
+        var commands = new CommandBuffer();
+        new EffectSystem().Update(view, BeamImpact.FlashLifetime + 0.01f, commands);
+
+        Assert.Contains(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == impact);
+    }
+
+    [Fact]
+    public void WideBeamGrazingARock_StopsAtTheTrueEntryPoint_NotTheNominalNearSide()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        // Rock r18 centred at (300,30): a 32 px beam (half-thickness 16, sum radius 34) touches at
+        // 300 - sqrt(34^2 - 30^2) = 284; the old bounding-near-side formula would stop 34 px short.
+        var rock = em.CreateEntity();
+        em.AddComponent(rock, new Position(new Vector2(300f, 30f)));
+        em.AddComponent(rock, new Asteroid(IsSmall: true, Radius: 18f));
+        var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 1000f, damage: 5, width: 16f);
+
+        var commands = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, commands);
+        commands.Apply(em);
+
+        Assert.Equal(284f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.True(em.GetEntitiesWithComponents<BeamImpact, Position>().TryFirst(out var impactTuple));
+        Assert.Equal(284f, impactTuple.Value2.Value.X, 1);
+    }
+
+    [Fact]
+    public void CollisionAndEffectInOnePhaseFlush_DamageLandsOnce_TheBeamStaysShortened_AndTheGlowSpawnsOnce()
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        var ship = AddShip(em, new Vector2(300f, 0f));
+        var beam = AddBeam(em, new Vector2(0f, 0f), new Vector2(1f, 0f), 1000f, damage: 5);
+
+        // Mimic one Resolution phase: both systems queue commands against the same view, then the
+        // single flush applies them in order. EffectSystem's stale beam copy must not undo
+        // CollisionSystem's shortened, resolved one.
+        var first = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, first);
+        new EffectSystem().Update(view, Dt, first);
+        first.Apply(em);
+
+        Assert.Equal(5, em.GetComponent<Health>(ship).Current);
+        Assert.Equal(279f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.False(em.GetComponent<LaserBeam>(beam).DamagePending);
+        Assert.Equal(1, em.GetEntitiesWithComponents<BeamImpact>().Count());
+
+        var second = new CommandBuffer();
+        new CollisionSystem().Update(view, Dt, second);
+        new EffectSystem().Update(view, Dt, second);
+        second.Apply(em);
+
+        Assert.Equal(5, em.GetComponent<Health>(ship).Current);
+        Assert.Equal(279f, em.GetComponent<LaserBeam>(beam).Length, 1);
+        Assert.Equal(1, em.GetEntitiesWithComponents<BeamImpact>().Count());
     }
 }

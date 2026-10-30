@@ -86,11 +86,13 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
 Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim WeaponCargo PrimaryTarget AutoTargetMark
-Explosion DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
+Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
 Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an entity damageable, so the large asteroids that are pure scenery have none and a hit on them stays an obstacle hit.
+
+A beam never penetrates what it hits: the first-hit pass shortens its length to the target's near side and puts one round glow — slightly wider than the beam, a darkened copy of its colour — exactly on the shortened beam's end. Nothing else flashes on a beam hit.
 
 ## Write patterns
 
@@ -269,7 +271,7 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
 No event queues. Systems signal each other through components, written via the CommandBuffer (see Write patterns). A later system in a same or next phase reacts to the component it finds.
 
 Examples:
-- CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions
+- CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions; Dead entities are not auto-targeted, so weapons retarget instead of firing into a wreck
 - TurretFiringSystem / EnemyMissileFiringSystem put `Missile` + `Health` on a round at launch; MissileGuidanceSystem steers it each tick; CollisionSystem reads the same round's `Ammo` to shoot it down
 - PickupMagnetSystem raises Player.Xp (direct ref write, see Write patterns); LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
 - GameSession reads PendingChoice to pause and show the upgrade menu

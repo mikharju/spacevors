@@ -46,8 +46,11 @@ static class ShapeSprites
     {
         float size = MathF.Max(radius, 0.5f) * 2f;
 
+        // The dest rect's position is the point the disc is centred on — the renderer-wide sprite
+        // convention (ARCHITECTURE.md, the DrawMissile centre fix): a rect built as centre - size/2
+        // draws the disc up-left by its own radius instead.
         Raylib.DrawTexturePro(Disc, FullSource,
-            new Rectangle(cx - size * 0.5f, cy - size * 0.5f, size, size),
+            new Rectangle(cx, cy, size, size),
             new Vector2(size * 0.5f, size * 0.5f), 0f, color);
     }
 
@@ -63,7 +66,9 @@ static class ShapeSprites
             return;
         }
 
-        Rectangle dest = new(from.X, from.Y - thickness * 0.5f, length + thickness, thickness);
+        // Same convention as DrawCircle: the rect's position lands under the origin — here the streak's
+        // left-end centre — so the capsule sits on the path [from,to], as collision sees it.
+        Rectangle dest = new(from.X, from.Y, length + thickness, thickness);
 
         Raylib.DrawTexturePro(Disc, FullSource, dest,
             new Vector2(0f, thickness * 0.5f), MathF.Atan2(axis.Y, axis.X) * 180f / MathF.PI, color);

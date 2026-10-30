@@ -603,6 +603,45 @@ public sealed class GameSession
         _renderSw.Stop();
         _lastRenderTicks = _renderSw.ElapsedTicks;
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        TryTakeBeamShot(renderCam);
+    }
+
+    // Debug: SPACEVORS_BEAM_SHOT=<path> writes exactly one PNG — the first frame that renders a
+    // BeamImpact on screen, which is the tick the beam fired and collision resolved, so the beam,
+    // its shortened length and the impact glow are all captured at the moment of impact with
+    // nobody needing to press F12 in time. One shot per process; prints [BEAM-SHOT] when taken.
+    // Paths are relative to the game's working directory, as raylib requires.
+    private static readonly string? BeamShotPath = Environment.GetEnvironmentVariable("SPACEVORS_BEAM_SHOT");
+    private bool _beamShotTaken;
+
+    private void TryTakeBeamShot(Camera camera)
+    {
+        if (BeamShotPath is null) return;
+        WorldRenderer.BeamImpactDebug = true;
+        if (_beamShotTaken) return;
+
+        int width = Raylib.GetScreenWidth(), height = Raylib.GetScreenHeight();
+        bool impactOnScreen = false;
+        foreach (var (_, _, impactPos) in _em.GetEntitiesWithComponents<BeamImpact, Position>())
+        {
+            var (sx, sy) = RenderHelpers.ToScreen(impactPos.Value, camera.Target.X, camera.Target.Y, width, height);
+            // Well inside the frame: the whole glow and a slice of target and beam stay visible.
+            if (sx > 150f && sy > 150f && sx < width - 150f && sy < height - 150f)
+            {
+                impactOnScreen = true;
+                break;
+            }
+        }
+
+        if (!impactOnScreen) return;
+
+        _beamShotTaken = true;
+        Raylib.TakeScreenshot(BeamShotPath);
+        Console.WriteLine($"[BEAM-SHOT] beams={Count<LaserBeam>()} impacts={Count<BeamImpact>()} -> {BeamShotPath}");
+        foreach (var (_, beam) in _em.GetEntitiesWithComponents<LaserBeam>())
+            Console.WriteLine($"[BEAM-SHOT] beam start=({beam.Start.X:F1},{beam.Start.Y:F1}) end=({beam.End.X:F1},{beam.End.Y:F1}) length={beam.Length:F1} pending={beam.DamagePending}");
+        foreach (var (_, _, impactPos) in _em.GetEntitiesWithComponents<BeamImpact, Position>())
+            Console.WriteLine($"[BEAM-SHOT] impact at ({impactPos.Value.X:F1},{impactPos.Value.Y:F1})");
     }
 
     // The stats screen: read-only stats plus the way into mount and cargo management.

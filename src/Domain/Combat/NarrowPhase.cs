@@ -138,6 +138,7 @@ public static class NarrowPhase
             local.HalfThickness * body.Scale);
     }
 
-    static Vector2 InWorld(Vector2 local, float cos, float sin, CollisionBody body) =>
+    // Public for callers that place one point (a beam's inflated primitive) rather than a whole shape.
+    public static Vector2 InWorld(Vector2 local, float cos, float sin, CollisionBody body) =>
         body.Position + new Vector2(local.X * cos - local.Y * sin, local.X * sin + local.Y * cos) * body.Scale;
 }

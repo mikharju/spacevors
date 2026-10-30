@@ -169,4 +169,82 @@ public static class CapsuleGeometry
         side = new Vector2(-axis.Y / length, axis.X / length);
         return true;
     }
+
+    // Where an unbounded ray `from + t*dir` (dir unit) first enters a capsule. A 2D capsule is the
+    // union of the two cap discs and the rectangular side band between them, so the entry is the
+    // earliest entry into any of the three features; a ray already inside enters at 0. Returns
+    // false if the ray never touches the capsule. Callers clamp the distance to their own length.
+    public static bool TryEntryAlongRay(Vector2 from, Vector2 dir, Capsule capsule, out float entry)
+    {
+        entry = float.MaxValue;
+        bool found = false;
+
+        foreach (Vector2 cap in new[] { capsule.From, capsule.To })
+        {
+            if (!TryEnterDisc(from, dir, cap, capsule.HalfThickness, out float discEntry)) continue;
+            entry = MathF.Min(entry, discEntry);
+            found = true;
+        }
+
+        if (TryEnterBand(from, dir, capsule, out float bandEntry))
+        {
+            entry = MathF.Min(entry, bandEntry);
+            found = true;
+        }
+
+        return found;
+    }
+
+    // Ray vs the disc at `center`: the quadratic along the unit direction.
+    static bool TryEnterDisc(Vector2 from, Vector2 dir, Vector2 center, float radius, out float t)
+    {
+        t = 0f;
+        Vector2 apart = from - center;
+        float offSq = Vector2.Dot(apart, apart) - radius * radius;
+        if (offSq <= 0f) return true;
+
+        float onto = Vector2.Dot(dir, apart);
+        float discriminant = onto * onto - offSq;
+        if (discriminant < 0f) return false;
+
+        t = -onto - MathF.Sqrt(discriminant);
+        return t >= 0f;
+    }
+
+    // Ray vs the band's rectangle, read in (along-axis s, perpendicular v) coordinates: s in
+    // [0, axisLength], v in [-half, +half]. A plain slab test; a disc capsule has no band, its two
+    // cap discs already cover it.
+    static bool TryEnterBand(Vector2 from, Vector2 dir, Capsule capsule, out float t)
+    {
+        t = 0f;
+        Vector2 axis = capsule.To - capsule.From;
+        float axisSq = Vector2.Dot(axis, axis);
+        if (axisSq <= DegenerateLengthSq) return false;
+
+        float axisLength = MathF.Sqrt(axisSq);
+        Vector2 unit = axis / axisLength;
+        Vector2 apart = from - capsule.From;
+
+        float enter = 0f, leave = float.MaxValue;
+        if (!SlabWindow(Vector2.Dot(apart, unit), Vector2.Dot(dir, unit), 0f, axisLength, ref enter, ref leave)) return false;
+        if (!SlabWindow(apart.X * unit.Y - apart.Y * unit.X, dir.X * unit.Y - dir.Y * unit.X,
+                -capsule.HalfThickness, capsule.HalfThickness, ref enter, ref leave)) return false;
+
+        t = enter;
+        return true;
+    }
+
+    // Tightens the ray's [enter,leave] window against one slab [low,high] along a coordinate.
+    static bool SlabWindow(float at, float rate, float low, float high, ref float enter, ref float leave)
+    {
+        if (MathF.Abs(rate) <= DegenerateLengthSq) return at >= low && at <= high;
+
+        float t0 = (low - at) / rate;
+        float t1 = (high - at) / rate;
+        if (t0 > t1) (t0, t1) = (t1, t0);
+
+        enter = MathF.Max(enter, t0);
+        leave = MathF.Min(leave, t1);
+        return enter <= leave;
+    }
 }
