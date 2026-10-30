@@ -25,9 +25,11 @@ public readonly record struct HealSpark(float Lifetime, float InitialLifetime = 
 // Damage smoke: trails behind damaged ships, fades over its lifetime. Radius is set at spawn from the source hull size.
 public readonly record struct SmokePuff(float Lifetime, float InitialLifetime = 1f, float Radius = 6f);
 
-public readonly record struct HealthOrb(float Lifetime = 30f, float Radius = 8f);
+// Loot lifetimes are 90 s — long enough for one wave's scattered loot to outlive the lull that
+// follows it (plans/WAVES_AND_BREATHERS.md).
+public readonly record struct HealthOrb(float Lifetime = 90f, float Radius = 8f);
 
-public readonly record struct XpPickup(int XpAmount, float Lifetime = 30f, float Radius = 6f, bool Chased = false);
+public readonly record struct XpPickup(int XpAmount, float Lifetime = 90f, float Radius = 6f, bool Chased = false);
 
 public readonly record struct DebugMarker(float Lifetime, float InitialLifetime = 0.5f);
 

@@ -22,6 +22,8 @@ Enemies:
 - swarm
 - collide
 - attack
+- arrive in timed waves (increasing size), separated by lulls: quiet gaps (ships pause, mines keep
+  coming) and full lulls (nothing spawns) — the loot-collection window
 
 Weapons:
 - automatic

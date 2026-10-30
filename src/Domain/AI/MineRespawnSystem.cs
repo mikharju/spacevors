@@ -5,10 +5,14 @@ namespace Spacevors.Domain.Systems;
 
 public class MineRespawnSystem : GameSystem
 {
-    private float _timer = SpawningStats.Mines.InitialDelay;
+    private float _timer;
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
+        // Mines pause during full lulls and the opening lull; quiet gaps keep them coming, which is
+        // what makes a gap "less pressure" rather than "none" (plans/WAVES_AND_BREATHERS.md).
+        if (WaveSchedule.PhaseFor(view.ElapsedTime).MinesPaused) return;
+
         _timer -= deltaTime;
 
         if (_timer > 0f) return;

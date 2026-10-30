@@ -296,6 +296,8 @@ public static class WorldRenderer
     public static Color AmmoColorOf(AmmoColor color) => color switch
     {
         AmmoColor.Green => new Color(80, 255, 80, 255),
+        // The acid spray's deep toxic green: dark enough to never read as a health orb.
+        AmmoColor.DarkGreen => new Color(35, 120, 50, 255),
         AmmoColor.Blue => new Color(100, 180, 255, 255),
         AmmoColor.Red => new Color(255, 80, 80, 255),
         AmmoColor.Cyan => new Color(90, 240, 240, 255),
@@ -546,7 +548,8 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
-            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, new Color(50, 255, 100, 200));
+            // Bright mint at full alpha: health must never be mistaken for the acid spray's dark bubbles.
+            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, new Color(150, 255, 190, 255));
         }
     }
 

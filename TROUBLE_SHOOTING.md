@@ -133,6 +133,7 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Symptom**: Any `dotnet` command dies with `System.IO.IOException: Read-only file system : '/home/agent/.dotnet'` during first-time-use configuration; or "The user's home directory could not be determined."
 - **Cause**: The sandbox makes the default HOME read-only, and /tmp is a per-command overlay — writes there do not persist between commands. dotnet needs a writable HOME for its first-run sentinel files.
 - **Fix / Prevention**: Do it all in one command: `mkdir -p /tmp/dotnet-home && export HOME=/tmp/dotnet-home NUGET_PACKAGES=/tmp/nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 && dotnet test src/Tests/Tests.csproj`. NuGet packages (xunit, Test.Sdk, Raylib-cs) are not preinstalled and re-download from nuget.org on each invocation (network required); bin/obj outputs inside the workspace do persist.
+- **Addendum**: `.tools/scenario.sh` publishes in a child process that does not see an exported `HOME` alone — publish then dies with "The user's home directory could not be determined." and `scenario.sh` reports only "publish failed; see .tools/run/publish.log". Also export `DOTNET_CLI_HOME=/tmp/dotnet-home` when driving `scenario.sh` in the sandbox.
 
 ## 24. `new Color(...)` is ambiguous when mixing byte and int arguments
 

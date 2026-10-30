@@ -68,10 +68,11 @@ public class OffScreenSpawnTest
         var view = new WorldView(em);
 
         AddPlayer(em, velocity: new Vector2(100f, 0f));
+        em.AddElapsedTime(WaveStats.OpeningLull); // wave 1 is underway once the opening lull ends
 
         var spawner = new EnemyShipSpawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 10f, commands); // expires the initial delay (9 s)
+        spawner.Update(view, 10f, commands); // the wave opens with its first spawn
         commands.Apply(em);
 
         var ships = em.GetEntitiesWithComponents<EnemyShip>().ToList();
@@ -102,7 +103,8 @@ public class OffScreenSpawnTest
 
         var spawner = new MineRespawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 21f, commands); // expires the initial delay (20 s)
+        em.AddElapsedTime(WaveStats.OpeningLull); // mine respawning resumes when the opening lull ends
+        spawner.Update(view, 21f, commands); // the timer starts at 0: first respawn fires at once
         commands.Apply(em);
 
         var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();
@@ -122,7 +124,8 @@ public class OffScreenSpawnTest
 
         var spawner = new MineRespawnSystem();
         var commands = new CommandBuffer();
-        spawner.Update(view, 21f, commands); // expires the initial delay (20 s)
+        em.AddElapsedTime(WaveStats.OpeningLull); // mine respawning resumes when the opening lull ends
+        spawner.Update(view, 21f, commands); // the timer starts at 0: first respawn fires at once
         commands.Apply(em);
 
         var mines = em.GetEntitiesWithComponents<EnemyMine>().ToList();

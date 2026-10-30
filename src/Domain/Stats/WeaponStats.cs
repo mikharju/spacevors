@@ -108,8 +108,9 @@ public readonly record struct WeaponType(
     public static WeaponType RailGun { get; } = new("RailGun", new(1f, 2500f, 25f, 1, Scatter: 0f, ShotLifetime: 2f, Damage: 14, TurnSpeed: TurnDeg(55f)), TurretSize.Large, 1500f, AmmoRadius: 3.75f, Color: AmmoColor.Blue, AutoTarget: false, UnlockLevel: 5);
 
     // Corrosive spray: slow bubbles in a wide cone, covering an area instead of a target. The lifetime
-    // is what makes the 900 px on its card reachable at 400 px/s.
-    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 400f, 4f, 1, Scatter: 0.45f, ShotLifetime: 3f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 900f, AmmoRadius: 5f, Color: AmmoColor.Green, UnlockLevel: 5);
+    // is what makes the 900 px on its card reachable at 400 px/s. DarkGreen keeps it clearly apart
+    // from the bright mint health orbs.
+    public static WeaponType AcidBubbleSpray { get; } = new("AcidBubbleSpray", new(12f, 400f, 4f, 1, Scatter: 0.45f, ShotLifetime: 3f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 900f, AmmoRadius: 5f, Color: AmmoColor.DarkGreen, UnlockLevel: 5);
     // Twin close-range snap: the fastest mount in the game, so it keeps its aim on a ship that is
     // circling the hull instead of the one it locked at the start.
     public static WeaponType InterceptorTurret { get; } = new("InterceptorTurret", new(4.5f, 1200f, 2f, 2, Scatter: 0.2f, Damage: 1, TurnSpeed: TurnDeg(360f)), TurretSize.Small, 900f);

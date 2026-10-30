@@ -1,3 +1,4 @@
+using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 using Xunit;
 
@@ -17,40 +18,26 @@ public class SpawnIntervalScalingTest
     }
 
     [Fact]
-    public void NextInterval_EarlyGame_IsWithinRampRangeDividedBySpeedFactor()
+    public void NextInterval_InWave_IsWithinRangeDividedBySpeedFactor()
     {
-        // At t=0 the ramp interval is random in [5, 10]; a player at 300 px/s (factor 3) divides it.
+        // Within a wave the interval is random in [InWaveMinInterval, InWaveMaxInterval];
+        // a player at 300 px/s (factor 3) divides it (plans/WAVES_AND_BREATHERS.md, P3 kept).
         var rng = new Random(42);
         for (int i = 0; i < 100; i++)
         {
-            float slow = EnemyShipSpawnSystem.NextInterval(0f, 0f, rng);
-            Assert.InRange(slow, 5f - Eps, 10f + Eps);
+            float slow = EnemyShipSpawnSystem.NextInterval(0f, rng);
+            Assert.InRange(slow, WaveStats.InWaveMinInterval - Eps, WaveStats.InWaveMaxInterval + Eps);
 
-            float fast = EnemyShipSpawnSystem.NextInterval(0f, 300f, rng);
-            Assert.InRange(fast, 5f / 3f - Eps, 10f / 3f + Eps);
-        }
-    }
-
-    [Fact]
-    public void NextInterval_LateGame_IsWithinPlateauRangeDividedBySpeedFactor()
-    {
-        // Past the 180 s ramp the interval is random in [2, 4].
-        var rng = new Random(7);
-        for (int i = 0; i < 100; i++)
-        {
-            float slow = EnemyShipSpawnSystem.NextInterval(300f, 0f, rng);
-            Assert.InRange(slow, 2f - Eps, 4f + Eps);
-
-            float fast = EnemyShipSpawnSystem.NextInterval(300f, 600f, rng);
-            Assert.InRange(fast, 2f / 3f - Eps, 4f / 3f + Eps);
+            float fast = EnemyShipSpawnSystem.NextInterval(300f, rng);
+            Assert.InRange(fast, WaveStats.InWaveMinInterval / 3f - Eps, WaveStats.InWaveMaxInterval / 3f + Eps);
         }
     }
 
     [Fact]
     public void NextInterval_SameSeed_IsDeterministic()
     {
-        float a = EnemyShipSpawnSystem.NextInterval(120f, 250f, new Random(99));
-        float b = EnemyShipSpawnSystem.NextInterval(120f, 250f, new Random(99));
+        float a = EnemyShipSpawnSystem.NextInterval(250f, new Random(99));
+        float b = EnemyShipSpawnSystem.NextInterval(250f, new Random(99));
         Assert.Equal(a, b);
     }
 

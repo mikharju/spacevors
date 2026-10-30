@@ -15,22 +15,10 @@ public static class SpawningStats
         public const float EnemyShipMaxDistance = 5000f;
     }
 
-    // Continuous enemy ship spawning (EnemyShipSpawnSystem).
+    // Enemy ship spawning (EnemyShipSpawnSystem). Cadence is the wave clock (WaveStats/WaveSchedule);
+    // what stays here is the per-spawn placement and velocity rule set.
     public static class EnemyShips
     {
-        // Grace period before the first spawn.
-        public const float InitialDelay = 9f;
-
-        // Spawn interval ramps from random [StartMinInterval, StartMaxInterval] s down to random
-        // [MinInterval, MaxInterval] s over RampDuration (EnemyShipSpawnSystem.NextInterval).
-        public const float StartMinInterval = 5f;
-        public const float StartMaxInterval = 10f;
-        public const float MinInterval = 2f;
-        public const float MaxInterval = 4f;
-
-        // Time over which the interval ramp completes.
-        public const float RampDuration = 180f;
-
         // Hard cap on live enemy ships before spawning pauses.
         public const int MaxEnemyShips = 100;
 
@@ -46,12 +34,10 @@ public static class SpawningStats
         public const float MaxSpeedFactor = 3f;
     }
 
-    // Mine respawning (MineRespawnSystem).
+    // Mine respawning (MineRespawnSystem). Paused during the opening and full lulls; keeps running
+    // (slowly) through quiet gaps.
     public static class Mines
     {
-        // Grace period before the first respawn.
-        public const float InitialDelay = 20f;
-
         // Respawn interval ramps from random [StartMinInterval, StartMaxInterval] s up to random
         // [LateMinInterval, LateMaxInterval] s over RampDuration.
         public const float StartMinInterval = 4f;

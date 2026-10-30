@@ -5,17 +5,20 @@ namespace Spacevors.Domain.Systems;
 
 public class EnemyShipSpawnSystem : GameSystem
 {
-    private float _timer = SpawningStats.EnemyShips.InitialDelay;
+    // Which wave's quota is being spent and how much of it is left. Derived state: the wave index
+    // always follows view.ElapsedTime through WaveSchedule, never an independent clock.
+    private int _waveIndex;
+    private int _quotaLeft;
+    private float _timer;
 
     public static float SpeedFactor(float playerSpeed) => Math.Clamp(playerSpeed / SpawningStats.EnemyShips.ReferenceSpeed, 1f, SpawningStats.EnemyShips.MaxSpeedFactor);
 
-    // Random spawn interval for the given elapsed time and player speed. Pure: rng is the only input.
-    public static float NextInterval(float elapsedTime, float playerSpeed, Random rng)
+    // Random interval between spawns within a wave. Pure: rng is the only input.
+    public static float NextInterval(float playerSpeed, Random rng)
     {
-        float progress = MathF.Min(elapsedTime / SpawningStats.EnemyShips.RampDuration, 1f);
-        float minInterval = SpawningStats.EnemyShips.MinInterval + (SpawningStats.EnemyShips.StartMinInterval - SpawningStats.EnemyShips.MinInterval) * (1f - progress);
-        float maxInterval = SpawningStats.EnemyShips.MaxInterval + (SpawningStats.EnemyShips.StartMaxInterval - SpawningStats.EnemyShips.MaxInterval) * (1f - progress);
-        return (minInterval + (float)rng.NextDouble() * (maxInterval - minInterval)) / SpeedFactor(playerSpeed);
+        float interval = WaveStats.InWaveMinInterval
+            + (float)rng.NextDouble() * (WaveStats.InWaveMaxInterval - WaveStats.InWaveMinInterval);
+        return interval / SpeedFactor(playerSpeed);
     }
 
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
@@ -28,6 +31,20 @@ public class EnemyShipSpawnSystem : GameSystem
         Entity playerEntity = playerTuple.Entity;
 
         if (!hasPlayer) return;
+
+        // Lulls stop spawning. The schedule is pure arithmetic over elapsed time, so no system
+        // needs to be told about phase changes (plans/WAVES_AND_BREATHERS.md).
+        var phase = WaveSchedule.PhaseFor(view.ElapsedTime);
+        if (!phase.InWave) return;
+
+        if (phase.WaveIndex != _waveIndex)
+        {
+            _waveIndex = phase.WaveIndex;
+            _quotaLeft = WaveSchedule.WaveSize(phase.WaveIndex);
+            _timer = 0f;
+        }
+
+        if (_quotaLeft <= 0) return;
 
         _timer -= deltaTime;
 
@@ -57,7 +74,8 @@ public class EnemyShipSpawnSystem : GameSystem
 
         commands.AddEntity(components);
 
-        _timer = NextInterval(view.ElapsedTime, velMagnitude, rng);
+        _quotaLeft--;
+        _timer = NextInterval(velMagnitude, rng);
     }
 
     private bool IsSpawnClear(WorldView view, Vector2 spawnPos)
