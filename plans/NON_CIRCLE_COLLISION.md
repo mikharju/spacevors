@@ -138,8 +138,11 @@ fetch per test, normal included.
   buggy. This single choice is what makes shapes affordable here.
 - **Bullets and beams stay circles/segments forever.** They are drawn as 1.5–6 px dots and streaks;
   there is nothing to gain.
-- **Asteroids stay circles.** The rock art is round-ish and rocks already read as discs. Lumpy rocks
-  can be a 3–4 circle composite later if they read wrong.
+- **A rock is a circle until its art says otherwise.** The first three variants of each size paint
+  2.4–3.2 R² of the 3.14 R² their collision circle covers, so they keep the disc and its one-test fast
+  path. The lumpy variants added later paint 1.7–2.3 R², and each of those is two capsules across its
+  lobes (`Stats/AsteroidShapes.cs`): 96–98% of the paint covered with 0.02–0.06 R² of collider sitting on
+  air, against the 0.9–1.5 R² of air their disc was covering.
 - **2–4 primitives per hull, core first, early exit.** Ammo only needs the earliest hit and already
   orders by `t`, so stopping at the first sub-pair hit is natural.
 - **Derive mass and MOI from the shape definition once** and store scalars. Do not recompute `π·r²`
@@ -230,8 +233,9 @@ playtesting — never mixed into these commits.
 player makes the wings easier to hit and nose-first ramming survivable, which changes the game's
 core feel. Land it only once the pipeline is trusted and playtesting backs it.
 
-**Independent follow-ups, any time after 7:** lumpy rocks as an option-A composite (no new math);
-polygon or SDF only if a large boss hull eventually needs hard edges.
+**Independent follow-ups, any time after 7:** lumpy rocks as an option-A composite (no new math) — taken later,
+two capsules per lumpy art variant in `Stats/AsteroidShapes.cs`; polygon or SDF only if a large boss hull
+eventually needs hard edges.
 
 Deliberately **not** in this order, and why: rocks before hulls (rock art is round-ish and rocks are
 the cheap, plentiful bodies — the shape win is all in hulls); balance retuning interleaved (it would
@@ -254,7 +258,8 @@ step-4 evidence, so it has to come before the decision it informs).
 
 - Which option (B recommended; A as a stepping stone inside it).
 - Does the player hull get a shape, or only enemies?
-- Rocks: stay circles now (recommended) or go lumpy with the first batch?
+- Rocks: stay circles now (recommended) or go lumpy with the first batch? — settled once the lumpy rock art
+  arrived: discs for the round variants, two capsules for each lumpy one.
 - Should enemy keep-distance/formation read the shape, or keep using radii (recommended: radii)?
 
 ## Option B in detail: capsules

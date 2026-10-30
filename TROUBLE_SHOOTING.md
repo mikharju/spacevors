@@ -424,6 +424,25 @@ shape drew at all.
   relative to the process cwd and glues cwd in front of absolute-looking paths (`FILEIO: [.../run/.../run/x.png]
   Failed to open file`) — pass a bare file name and run the game from the intended directory, as game.sh does.
 
+## 60. New art that is never drawn, and a lit set dropped by one misspelt map file
+
+- **Symptom**: six new asteroid sprites were in `assets/asteroids/{small,large}`, shapes were authored for
+  them, tests passed — and nothing in play changed. Separately, one variant rendered as a fallback rectangle
+  in an earlier session.
+- **Cause**: three lists have to agree and none of them fails loudly: the art directory,
+  `Asteroid.SmallVariantCount`/`LargeVariantCount` (which decide which variant the domain ever rolls), and the
+  shape table's entry per variant (`Stats/AsteroidShapes.cs`). With the counts at 3, variants 4-7 were never
+  picked, so both the new art and its shape were dead data. And `LoadSpriteSets` needs
+  `X-texture/-normals/-depth` to share a prefix: `large-aseroid-6-depth.png` (one letter missing) left that
+  set without a depth map, so the whole variant vanished from the loaded list — which also *shifted the index*
+  every later variant maps to. Both cases log at most one `[WARNING] ... no complete lit set` line in a load
+  log hundreds of lines long.
+- **Fix / Prevention**: when adding art, check the count and the shape table in the same change, and read the
+  loader's log: `grep -c "TEXTURE: \[ID" <game log>` counts the textures that actually loaded, and
+  `grep "skipped map file\|no complete lit set"` must be empty for a new set. `AsteroidShapesTest` now pins the
+  coupling — the highest variant each count can roll must have a non-circle entry — so raising a count without
+  authoring the shape fails a test instead of shipping a disc.
+
 ## General workflow that works
 
 Headless build + run + screenshot. Details in `.tools/README.md`.

@@ -625,6 +625,50 @@ public class CollisionSystemTests
         Assert.DoesNotContain(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
     }
 
+    // A lumpy rock's shape sits inside the collision circle its art is drawn in, so there is a band of
+    // air the old disc used to catch. Large variant 3 (large-asteroid-4) reaches 34.8 px of its 40 px
+    // radius in this direction, and the two capsules reach 21.6 and 24.8, so an r=2 round travelling
+    // along y=38 crosses 1.2 px clear of the nearer one while the bounding circle would have caught it.
+    [Fact]
+    public void Ammo_ThroughTheAirBandOfALumpyRock_Misses()
+    {
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 40f, Variant: 3));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-100f, 38f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(-96000f, 0f), Radius: 2f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        Assert.DoesNotContain(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+    }
+
+    // The same round over a rock whose art fills its circle: the shape is what changed here, not where
+    // the bullet flew.
+    [Fact]
+    public void Ammo_SameLine_OverARoundRock_Hits()
+    {
+        var (em, view, system) = Setup();
+
+        var asteroid = em.CreateEntity();
+        em.AddComponent(asteroid, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(asteroid, new Asteroid(IsSmall: false, Radius: 40f, Variant: 0));
+
+        var ammo = em.CreateEntity();
+        em.AddComponent(ammo, new Position(new Vector2(-100f, 38f)));
+        em.AddComponent(ammo, new Ammo(Velocity: new Vector2(-96000f, 0f), Radius: 2f, Lifetime: 10f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+
+        Assert.Contains(commands.Commands, c => c is DestroyEntityCommand dec && dec.Entity == ammo);
+    }
+
     [Fact]
     public void Ammo_EarliestAsteroidAlongSweep_TakesTheHit()
     {

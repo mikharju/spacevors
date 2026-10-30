@@ -8,7 +8,9 @@ namespace Spacevors.Game;
 public static class WorldRenderer
 {
     private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
-    private static readonly List<(int X, int Y, int Radius)> _diagnosticCircles = new();
+    // Asteroid colliders, queued while the rocks draw and painted after the lit batch flush so they sit
+    // over the art instead of under it.
+    private static readonly List<(HullShape Shape, float Radius, float X, float Y, float AngleDeg)> _diagnosticShapes = new();
 
     // Damage smoke: grey puffs that fade out over their lifetime.
     private const int SmokeColorR = 120;
@@ -81,7 +83,7 @@ public static class WorldRenderer
     private static void DrawAsteroids(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)
     {
         LitGroupRenderer.Clear(_litDraws);
-        _diagnosticCircles.Clear();
+        _diagnosticShapes.Clear();
 
         foreach (var (entity, asteroid, rot, pos) in em.GetEntitiesWithComponents<Asteroid, Rotation, Position>())
         {
@@ -97,7 +99,8 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, extent, windowWidth, windowHeight)) continue;
 
-            if (diagnostics) _diagnosticCircles.Add(((int)cx, (int)cy, (int)asteroid.Radius));
+            if (diagnostics)
+                _diagnosticShapes.Add((AsteroidShapes.For(asteroid.IsSmall, asteroid.Variant), asteroid.Radius, cx, cy, angleDeg));
 
             if (baseTex.HasValue && baseTex.Value.Id != 0)
                 DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
@@ -115,8 +118,8 @@ public static class WorldRenderer
         LitGroupRenderer.Draw(_litDraws);
 
         if (diagnostics)
-            foreach (var (x, y, radius) in _diagnosticCircles)
-                Raylib.DrawCircle(x, y, radius, new Color(255, 0, 0, 60));
+            foreach (var (shape, radius, x, y, angleDeg) in _diagnosticShapes)
+                ShipSpriteRenderer.DrawHullShape(shape, radius, x, y, angleDeg);
     }
 
     private static AsteroidSprite? GetAsteroidSprite(Asteroid asteroid)

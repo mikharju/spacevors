@@ -233,17 +233,21 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
 
 - Every overlap in the game goes through that seam; the eight call sites in `CollisionSystem` hold no
   circle math of their own.
-- A body enters the narrow phase as a `CollisionBody(Position, Angle, Shape, Scale)`. Rocks, mines,
-  pickups and every round are `CollisionBody.Circle`; a hull brings the capsules its art was authored
+- A body enters the narrow phase as a `CollisionBody(Position, Angle, Shape, Scale)`. Mines, pickups and
+  every round are `CollisionBody.Circle`; a hull and a rock bring the capsules their art was authored
   with — an enemy by art id (`Stats/HullShapes.cs`), a player per hull type on `ShipType.Shape`, carried into
-  the `Player` component (`Stats/PlayerHullShapes.cs`) — both in the sprite's own frame and in units of
-  `Radius`. Shapes are committed data reviewed as a diff, never derived from pixels at run time — the sim
-  must not depend on the art. A `Player` built without one collides as the disc its `Radius` describes:
-  that is what test worlds do, and the game always sets it (`PlayerHullShapesTest` pins the wire-up).
+  the `Player` component (`Stats/PlayerHullShapes.cs`), a rock by art variant (`Stats/AsteroidShapes.cs`) —
+  all in the sprite's own frame and in units of `Radius`. Shapes are committed data reviewed as a diff, never
+  derived from pixels at run time — the sim must not depend on the art. A `Player` built without one collides
+  as the disc its `Radius` describes: that is what test worlds do, and the game always sets it
+  (`PlayerHullShapesTest` pins the wire-up).
 - Circles keep a one-test fast path, and the bounding circle is kept as a **conservative reject** in
   front of the shape test: a shape never reaches past the radius the grid indexed it by (pinned by
-  `HullShapesTest`), so anything that misses the circle cannot touch the shape either. A volley through
-  empty space pays nothing new.
+  `HullShapesTest` and `AsteroidShapesTest`), so anything that misses the circle cannot touch the shape
+  either. A volley through empty space pays nothing new. Round art stays a disc — the first three variants of
+  each rock size paint 2.4-3.2 of the 3.14 R² their circle covers, so a disc is the honest fit and the pair
+  stays one test; the lumpy later variants paint 1.7-2.3 R² and are two capsules across their lobes instead,
+  which takes the collider's air from ~1 R² down to ~0.05.
 - The player is one more body, built once a tick and queued behind the same circle reject for everything it
   meets: a grinding hull, a rock, a mine, an enemy round, an enemy beam. Because its shape lies inside the
   bounding radius, a player's hurtbox can only be smaller than the disc it replaced — never hit where the disc
@@ -260,9 +264,9 @@ touch, how deep, and which way", and always answers it with one `Contact(Normal,
   impact-damage accumulator assume.
 - Mass and inertia still come from the bounding radius, not from the shape: weight following silhouette
   is a balance change and has to be measured as one.
-- Diagnostics (`SPACEVORS_DIAGNOSTIC=1`) draws a hull's collider in cyan over its art — enemy hulls and the
-  player in play, and every ship preview on the select screen — as the exact capsule silhouette, round caps
-  included, because an overlay that ends flat blames the fit on a corner nothing can hit. A collider is
+- Diagnostics (`SPACEVORS_DIAGNOSTIC=1`) draws a collider in cyan over its art — enemy hulls, the player and
+  every rock in play, and every ship preview on the select screen — as the exact capsule silhouette, round
+  caps included, because an overlay that ends flat blames the fit on a corner nothing can hit. A collider is
   never drawn as its bounding circle: that is the broad phase's business, and drawing it over the art hides
   the mismatch the overlay exists to show.
 
@@ -318,9 +322,9 @@ src/
 
     Domain/                  -- pure game logic, no Raylib
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; auto-aim solves the intercept in the hull's frame and re-solves it per round at the speed and from the muzzle that round really has; a lead the mount cannot point at inside its arc makes the target unselectable rather than being fired unled; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health; narrow phase behind one seam — circles for rounds, rocks and mines, capsule composites for hulls), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball), threat readout (`ThreatMeter.Measure`: one read a second of who can hit the hull right now, never called from the hot path)
+        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; auto-aim solves the intercept in the hull's frame and re-solves it per round at the speed and from the muzzle that round really has; a lead the mount cannot point at inside its arc makes the target unselectable rather than being fired unled; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health; narrow phase behind one seam — circles for rounds and mines, capsule composites for hulls and for the lumpy rock art), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball), threat readout (`ThreatMeter.Measure`: one read a second of who can hit the hull right now, never called from the hot path)
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
-        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types with their per-tier drifts — reach, closing speed, ammo speed — plus spawn weights, tier curves, enemy weapon and the ceilings those drifts obey), HullShapes (each hull art id's collision primitives: capsules in the sprite's frame, in units of the hull's Radius), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; the difficulty ceilings (the firing ring stays inside the player's mid band, enemy ammo stays dodgeable, the toughest hull dies inside a TTK budget) by Tests/EnemyDifficultyTest.cs. plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
+        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types with their per-tier drifts — reach, closing speed, ammo speed — plus spawn weights, tier curves, enemy weapon and the ceilings those drifts obey), HullShapes (each hull art id's collision primitives: capsules in the sprite's frame, in units of the hull's Radius), AsteroidShapes (the same for each rock art variant — a disc where the art is round, two capsules where it is lumpy), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; the difficulty ceilings (the firing ring stays inside the player's mid band, enemy ammo stays dodgeable, the toughest hull dies inside a TTK budget) by Tests/EnemyDifficultyTest.cs. plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)

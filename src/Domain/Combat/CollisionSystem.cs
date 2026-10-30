@@ -81,7 +81,7 @@ public class CollisionSystem : GameSystem
             _asteroidPositions.Add((entity, pos));
 
             CheckPlayerCollision(pos.Value, asteroid.Radius, () =>
-                ResolveCollision(view, CircleBody(pos.Value, asteroid.Radius), entity,
+                ResolveCollision(view, AsteroidBody(view, entity, pos.Value, asteroid), entity,
                     playerBody, playerEntity, false, commands));
         }
 
@@ -116,7 +116,8 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
 
                 ResolveCollision(view, hull, entity,
-                    CircleBody(candidate.Position, candidate.Radius), candidate.Id, true, commands, EnemyShipMass);
+                    AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)),
+                    candidate.Id, true, commands, EnemyShipMass);
             }
         }
 
@@ -137,6 +138,7 @@ public class CollisionSystem : GameSystem
         {
             var asteroid = view.GetComponent<Asteroid>(aEntity);
             float aRadius = asteroid.Radius;
+            var rock = AsteroidBody(view, aEntity, aPos.Value, asteroid);
             int count = QueryCircle(aPos.Value, aRadius);
             var queryBuffer = _queryBuffer;
 
@@ -146,9 +148,9 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
                 if (candidate.Id.Value <= aEntity.Value) continue;
 
-                var bPos = view.GetComponent<Position>(candidate.Id);
-                ResolveCollision(view, CircleBody(aPos.Value, aRadius), aEntity,
-                    CircleBody(bPos.Value, candidate.Radius), candidate.Id, true, commands);
+                var bEntity = candidate.Id;
+                ResolveCollision(view, rock, aEntity,
+                    AsteroidBody(view, bEntity, candidate.Position, view.GetComponent<Asteroid>(bEntity)), bEntity, true, commands);
             }
 
             int count2 = QueryCircle(aPos.Value, aRadius + 15f);
@@ -161,7 +163,7 @@ public class CollisionSystem : GameSystem
 
                 var bPos = view.GetComponent<Position>(candidate.Id);
                 var mine = view.GetComponent<EnemyMine>(candidate.Id);
-                ResolveCollision(view, CircleBody(aPos.Value, aRadius), aEntity,
+                ResolveCollision(view, rock, aEntity,
                     CircleBody(bPos.Value, mine.Radius), candidate.Id, true, commands);
             }
         }
@@ -259,6 +261,13 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
                     && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
                         HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t))
+                    continue;
+
+                // A rock gets the same treatment: its art's lumps are inside the circle the grid indexed
+                // it by, so a round that survives the circle is asked again against the rock's shape.
+                if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
+                    && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
+                        AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)), out hit, out t))
                     continue;
 
                 switch (candidate.Kind)
@@ -454,6 +463,11 @@ public class CollisionSystem : GameSystem
                                 HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t)
                             || t >= firstT)) continue;
 
+                    if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
+                        && (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width,
+                                AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)), out hit, out t)
+                            || t >= firstT)) continue;
+
                     firstHit = candidate.Id;
                     firstKind = candidate.Kind;
                     firstContact = hit;
@@ -522,11 +536,16 @@ public class CollisionSystem : GameSystem
                     }
 
                     // The stop point is where the beam's inflated axis first touches the body — the
-                    // exact circle or hull primitive, not the bounding circle — so the beam tip and
-                    // its glow sit on the first visible contact, grazing hits included.
-                    NarrowPhase.CollisionBody hitBody = firstKind == SpatialGrid.CollisionKind.EnemyShip
-                        ? HullBody(view, firstHit.Value, view.GetComponent<EnemyShip>(firstHit.Value))
-                        : CircleBody(firstCandidatePos, firstCandidateRadius);
+                    // exact circle, hull primitive or rock primitive, not the bounding circle — so the
+                    // beam tip and its glow sit on the first visible contact, grazing hits included.
+                    NarrowPhase.CollisionBody hitBody = firstKind switch
+                    {
+                        SpatialGrid.CollisionKind.EnemyShip =>
+                            HullBody(view, firstHit.Value, view.GetComponent<EnemyShip>(firstHit.Value)),
+                        SpatialGrid.CollisionKind.Asteroid =>
+                            AsteroidBody(view, firstHit.Value, firstCandidatePos, view.GetComponent<Asteroid>(firstHit.Value)),
+                        _ => CircleBody(firstCandidatePos, firstCandidateRadius),
+                    };
                     stopLength = BeamEntryLength(hitBody, beamStart, beam.Direction, beam.Width, beam.Length);
                     beamStopped = true;
                 }
@@ -847,7 +866,18 @@ public class CollisionSystem : GameSystem
             player.Shape ?? HullShape.Circle, player.Radius);
     }
 
-    // Rocks, mines and guided rounds are drawn as dots: they collide as one circle, as they always did.
+    // A rock as a body: the shape its art was authored with, at the rock's size and turned the way it is
+    // spinning. The radius stays the bounding radius the grid indexed it by, so the broad phase is
+    // untouched and a shape can never reach past the query that found it.
+    static NarrowPhase.CollisionBody AsteroidBody(WorldView view, Entity entity, Vector2 position, Asteroid asteroid)
+    {
+        // A rock that was never given a heading collides facing the way its art is drawn.
+        view.TryGetComponent<Rotation>(entity, out var rotation);
+        return new(position, rotation.Angle,
+            AsteroidShapes.For(asteroid.IsSmall, asteroid.Variant), asteroid.Radius);
+    }
+
+    // Mines and guided rounds are drawn as dots: they collide as one circle, as they always did.
     static NarrowPhase.CollisionBody CircleBody(Vector2 position, float radius) =>
         NarrowPhase.CollisionBody.Circle(position, radius);
 

@@ -38,8 +38,10 @@ public readonly record struct EnemyMine(MineSize Size, float Speed, float Angle)
 
 public readonly record struct Asteroid(bool IsSmall, float Radius, byte Variant = 0)
 {
-    public const int SmallVariantCount = 3;
-    public const int LargeVariantCount = 3;
+    // Must match how many art sets `assets/asteroids/{small,large}` actually hold: the renderer picks a
+    // variant by index, and `AsteroidShapes` gives that same index its collision shape.
+    public const int SmallVariantCount = 5;
+    public const int LargeVariantCount = 7;
 
     // Only the small rocks can be shot to pieces: enough hits that clearing one costs real ammo,
     // few enough that holding a gun on it for a couple of seconds does it. The large ones are scenery.
