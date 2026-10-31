@@ -44,6 +44,37 @@ public class ScatterConeTest
         Assert.Equal(0.2f, angles[2], 5);
     }
 
+    // An even-count fan straddling the aim line put every round a little off a small target, so the
+    // whole volley missed at any range worth shooting at. Whatever the count, one round flies at the
+    // target and the rest scatter around it.
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(8)]
+    public void EveryVolleyHasARoundOnTheAimLine(int pelletCount)
+    {
+        float[] angles = FireAngles(seed: 7, scatter: 0.2f, pelletCount);
+
+        Assert.Equal(pelletCount, angles.Length);
+        Assert.Contains(angles, angle => Math.Abs(angle) < 1e-4f);
+        Assert.Equal(pelletCount, angles.Distinct().Count());
+    }
+
+    // The rounds fan out from that centre round instead of bunching on one side of it.
+    [Fact]
+    public void RoundsFanOutOnBothSidesOfTheCentre()
+    {
+        float[] angles = FireAngles(seed: 7, scatter: 0.2f, pelletCount: 4);
+
+        Array.Sort(angles);
+        Assert.Equal(0f, angles[2], 5);
+        Assert.Equal(-0.4f, angles[0], 5);
+        Assert.Equal(-0.2f, angles[1], 5);
+        Assert.Equal(0.2f, angles[3], 5);
+    }
+
     // One volley from a turret at the origin aiming straight down (-Y) at an asteroid, returned as
     // each shot's angle from that aim. The entity order is not part of the ECS contract, so callers
     // sort what they get back.

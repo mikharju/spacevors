@@ -694,6 +694,22 @@ The newer rock art is not a ball, so rocks now cross the same narrow-phase seam 
   2.21-2.23 — the scenarios pin `LoadTestWeapon` and the crowding ring hulls, so a roster change
   cannot move them; the one hot row re-ran at baseline. Keep.
 
+## Every volley keeps one round on the aim line — done
+
+- A fan of `N` pellets used offsets `(i - (N-1)/2) × Scatter`, so an even volley straddled the aim line:
+  `InterceptorTurret` (2) and any Shotgun/ScatterCannon/Swarmlet grown past 3 to an even count put every
+  round a little off and missed a small target at everything but touching range.
+- `ScatterOffset` now fans **out from a centre round**: steps `0, -1, +1, -2, +2 …`, so round 0 always
+  flies down the aim (or intercept) direction and the rest alternate to each side. Odd counts keep the
+  exact same set of angles; even counts gain the centre round and widen their outer edge from
+  `(N-1)/2` to `N/2` steps — a four-pellet Shotgun now reaches ±0.24 rad instead of ±0.18.
+- `BeamSpacing` (PrismLance, grown to an even volley) uses the same steps, so one beam stays exactly on
+  the aim line instead of straddling it at ±35 px.
+- `ScatterConeTest` gained the even-count case: every volley has a round on the aim line, all rounds
+  distinct, and a 4-pellet fan measured at `-0.4, -0.2, 0, +0.2`.
+- Cost (`--sim --iters 3`, host=sim): `ammo-spray` median 1.35 vs 1.33, p99 2.26 vs 2.24;
+  `impact-storm` 2.23/4.80 vs 2.18/4.62, entity counts unchanged. Noise — keep.
+
 ## Near future
 
 - New ships and engines (crab and broadside landed as Manta/Raptor; what else?)

@@ -499,12 +499,13 @@ public class TurretFiringSystem : GameSystem
             if (turret.Weapon.Hitscan)
             {
                 // Instant beam to max range; CollisionSystem damages the first thing hit.
-                // With BeamSpacing, pellets form parallel beams instead of overlapping ones.
+                // With BeamSpacing, pellets form parallel beams instead of overlapping ones, and the
+                // same fan applies: one beam stays exactly on the aim line at every pellet count.
                 Vector2 beamStart = spawnPos;
                 if (turret.Weapon.BeamSpacing > 0f && pelletCount > 1)
                 {
                     var perp = new Vector2(-pelletDir.Y, pelletDir.X);
-                    beamStart += perp * ((i - (pelletCount - 1) / 2f) * turret.Weapon.BeamSpacing);
+                    beamStart += perp * (FanStep(i) * turret.Weapon.BeamSpacing);
                 }
                 commands.AddEntity(
                     new Position(beamStart),
@@ -551,14 +552,25 @@ public class TurretFiringSystem : GameSystem
         }
     }
 
-    // Scatter is the half-angle of the cone a shot pattern covers. Several pellets spread evenly
-    // across it; a lone pellet has nothing to spread against, so it rolls a random angle inside the
-    // cone — without that roll Scatter would do nothing at all for a spray weapon.
+    // Scatter is the half-angle of the cone a shot pattern covers. The volley always has one round on
+    // the aim line and the rest fan out from it; a volley that straddled the line — every even pellet
+    // count does — put its whole pattern a little off a small target and missed with all of it. A lone
+    // pellet has nothing to fan against, so it rolls a random angle inside the cone instead — without
+    // that roll Scatter would do nothing at all for a spray weapon.
     private static float ScatterOffset(Random rng, float scatter, int pellet, int pelletCount)
     {
-        if (pelletCount > 1) return (pellet - (pelletCount - 1) / 2f) * scatter;
-        return scatter == 0f ? 0f : (rng.NextSingle() * 2f - 1f) * scatter;
+        if (pelletCount == 1) return scatter == 0f ? 0f : (rng.NextSingle() * 2f - 1f) * scatter;
+        return FanStep(pellet) * scatter;
     }
+
+    // Steps of a fan around its centre round: 0, -1, +1, -2, +2 ... The first round flies straight at
+    // the target, the rest alternate to each side of it. Even counts cannot be symmetric around a
+    // centre round, so their last step falls on the far side.
+    private static float FanStep(int pellet) => pellet switch
+    {
+        0 => 0f,
+        _ => (pellet % 2 == 1 ? -1 : 1) * (float)((pellet + 1) / 2)
+    };
 
     // Fallback ammo radius when the weapon name is not a known player WeaponType.
     private const float DefaultAmmoRadius = 2.5f;
