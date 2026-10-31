@@ -1,6 +1,6 @@
 # Turret layouts — implementation plan
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-10-16 in 4844d24, cargo follow-up 25e124b; the weapon table below is stale — see Follow-up)
 
 Implements PLAN.md "Turret layouts". Plan only: no code changed here.
 
@@ -306,4 +306,35 @@ Ships get the same starting weapons as currently, but they are now in their turr
 
 - Fitting-screen and card follow-up: every hull mount carries its number all the time (a mount's key no longer depends on what else is on screen), the mounts that accept the weapon in hand are drawn with a green ring (`Palette.TurretFits`, doubled when hovered), and a new-weapon card names its mount size in the accent line and lists the gun's base range / damage / attack speed / projectile speed below it — honest numbers because a new weapon has no upgrades yet. The stat block is skipped rather than squeezed on cards narrower than 150 px.
 - Marker shape follow-up: a bare triangle read as ambiguous about which way the gun points, so a mounted mount is drawn as the same circle an empty mount has, plus a triangle whose base corners sit inside the circle (0.93 radius, hidden by the opaque disc) and whose tip reaches 1.9 radius. One helper, `RenderHelpers.DrawTurretMarker`, draws both shapes for the world and the mount screen. Measured on the sandbox's software-GL host (`ammo-spray`, window mode, iters 1): median 15.62 ms against 15.55 ms before — the extra draw call per mount is noise; the `world.turrets` pass stays at 0.014 ms mean over 240 frames. Bug found while drawing them: the marker heading (`Rotation`) was only written on ticks where a mount slewed, so a mount holding still kept an old heading while the ship turned and then snapped to the right one the instant it started firing — which read as turrets teleporting onto a target. A mount's `Rotation` is now derived every frame from the hull plus `TurretAim` (`TurretMount.SyncWorldTransforms`), the same way its position already was; the simulation writes only `TurretAim`.
+
+## Follow-up (2026-10-31): status audit
+
+The mount machinery in this plan is exactly what runs: one entity per hull mount from
+`Stats/TurretLayout.cs:41-113` (Scout 3, Fighter 4, Shadow 3, Heavy 7 with the offsets/arcs written
+here), Small-fits-both at `TurretMount.cs:11-14`, hull-relative slew with the 3° acquire / 8° fire
+tolerances at `Combat/TurretFiringSystem.cs:34-35`, one `MountMenuRenderer` screen, and
+`TurretOffset`/`ArcOffset`/`WeaponSlots` really are gone. What is **not** current:
+
+- **The weapon table is the pre-balance-pass snapshot.** The same day's pass (aadc3fc + 2382172) raised
+  the ranges: MachineGun 1260→1350, Shotgun 860→900, Cyclotron 1360→1600, AcidBubbleSpray 650→900,
+  RippleCutter 260→600, FlakCurtain 220→600, LaserLance 1400→1650, GravitonBurst 1600→1700,
+  PrismLance 1200→1350, RailGun 1200→1500. Turn speeds (180/140/300/… °/s) are unchanged, and
+  `Stats/WeaponStats.cs:100-140` is the live source for every number in that table — do not tune from
+  this file.
+- **The PointDefenceTurret row is dead**: the weapon was deleted, `InterceptorTurret` (360°/s, 900 px,
+  `WeaponStats.cs:122`) fills point defence.
+- The table and layouts miss everything added later: `ScatterCannon`, the three missile weapons, and
+  the Falcon/Eagle/Manta/Raptor hulls (`TurretLayout.cs:59-102`, 8 hulls total).
+- **Mount API lives at `src/Domain/TurretMount.cs` as `TurretMount`,** not the planned
+  `Domain/Progression/WeaponMount.cs`, and its surface is `Fits`, `FreeSlots`, `MountedSlots`,
+  `TryFindSlot`, `Mount`, `CarriedTurret`, `SyncWorldTransforms` — there is no `FirstFreeSlot` or
+  `CountFreeSlots`.
+- New-weapon offers are level-gated now: `WeaponType.NewWeaponPoolFor(level)` with a per-gun
+  `UnlockLevel` (`WeaponStats.cs:95,168`).
+- Starting weapons changed after this table: Fighter starts LaserLance + Cyclotron, Shadow runs
+  RippleCutter in all three mounts (`WeaponStats.cs:191-199`).
+- Stage 4's planned `SlotMountTest` shipped as `Tests/TurretMountTest.cs` (plus `TurretSlewTest`,
+  `LevelUpSlotOfferTest`, `CargoTest`).
+- Line 56 asked for a note that `TwinChainGun` was deleted to be written in plans/SHIP_TYPES.md — it
+  was never written there; it now is (see that file's 2026-10-31 follow-up).
 

@@ -161,3 +161,20 @@ of which `world.missiles` render is only 0.055 ms); missile-1024 **5.11 ms**, ma
 0.01 ms everywhere confirms the HUD fix. Only watch item: at 1024 (≈100× play counts) the p99
 tail (10.3 ms) crosses the 8.33 ms budget on 22/592 frames; irrelevant at play counts, lever is
 an effects budget if missile-heavy content ever ships.
+
+## Follow-up (2026-10-31): naming audit
+
+The shipped halves are accurate against both code and `.tools/baselines/` (ceilings 5.0/15.0 ms and
+8.0/24.0 ms with 450/500 KB per tick at `Tests/ScenarioPerformanceTest.cs:60-61`; 20 warm-up + 100
+measured ticks; the `missiles=` column; the 40 000 hp trick on missile worlds at
+`Domain/Scenarios/ScenarioWorld.cs:144`). Two **prerequisite names in the plan body never landed as
+written**, so search for these instead:
+
+- `SeedMissilesInFlight(count, spread, aimAt)` shipped as **`ScenarioWorld.SeedMissileWorld(em,
+  playerEntity, playerPos, count, aim)`** (`ScenarioWorld.cs:157`).
+- "extend `AddUnarmedHull` with an opt-in armed hull" shipped as a **separate `AddArmedHull`**
+  (`:188-205`, always tier 10) plus a now-public `EnemyShipFactory.BuildTurret`
+  (`AI/EnemyShipFactory.cs:74`).
+- "`hud.health` is gone from the render passes entirely" overstates: the pass label is still emitted
+  (`Game/Renderer.cs:113`); it just costs 0.01 ms now because the bar is a constant-cost proportional
+  fill (`Game/HudRenderer.cs:18-40`).

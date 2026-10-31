@@ -217,3 +217,25 @@ Done: all original items, plus ImageLoader robustness + `AppContext.BaseDirector
 Remaining, smallest first:
 
 1. Per-entity `Position` second lookup in draw loops (multi-component queries) — last; measure first per AGENTS.md, only do it if profiling shows it matters for the 10k-object goal
+
+## Status of this record (2026-10-31)
+
+Frozen review, left as written. A read-only re-check found **no regression of any "Fixed" item**:
+the starfield size clamp (`Game/BackgroundRenderer.cs:30`), `Explosion.CurrentRadius` as the single
+growth source (`Components/EffectComponents.cs:5`, `LightGatherer.cs:31`, `WorldRenderer.cs:399`),
+`Player.MaxThrustForce` as the common normalization in both the light gatherer and the flame renderer
+(`Components/EntityComponents.cs:20`, `LightGatherer.cs:49`, `ThrusterFlameRenderer.cs:63`),
+`HandleGlobalKeys` in every loop (`SpaceVorsApp.cs:50,80,90`), thrusters cleared on pause
+(`Game/GameSession.cs:176,597-598`), the `GetUpgradeCardRect` guard (`:62`), lit-set warnings plus
+`AppContext.BaseDirectory` paths (`ImageLoader.cs:46,93,112`), viewport culling of thrust lights
+(`LightGatherer.cs:52-59`), `VariantStems`/`IsMapFile` (`LitSpriteMatcher.cs:54,57`), and the ammo
+colour enum (`Components/CombatComponents.cs:10`).
+
+**The one open item is still open**, unchanged in nearly three months: four lit depth maps still
+mismatch their base sprite — `small-1` 574×524 vs 524×478, `interceptor` 945×926 vs 926×907,
+`fighter` 851×937 vs 930×1024, `heavy` 922×913 vs 1024×1014 (read from the PNG headers). The load-time
+warnings still fire for them.
+
+Note on internal drift: the fix note at :93 mentions wiring through `Lighting.TryDraw`, an API that no
+longer exists; the batching section at :191 (BeginDraw/Draw/EndDraw) supersedes it in-file, and current
+code matches that later section.

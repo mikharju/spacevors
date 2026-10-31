@@ -1,6 +1,6 @@
 # Ship types
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (the four original hulls; the roster has since grown to 8 and parts of the tables below are superseded — see Follow-up)
 
 Ship types have:
 - One engine layout
@@ -162,4 +162,25 @@ When one of these weapon types is equipped on the player ship, it's upgrades are
   0.85, `hull-crowding` 0.39 vs 0.38-0.39, `ammo-spray` 1.33 vs 1.35-1.42, `impact-storm` 2.18 vs
   2.21-2.23 — the scenarios pin `LoadTestWeapon` and the crowding ring hulls, so a roster change
   cannot move them; the one hot row re-ran at baseline. Keep.
+
+## Follow-up (2026-10-31): status audit
+
+Header still true. Earlier sections are frozen intent and four of their claims are now false — read
+them as history, not as the current roster:
+
+- Phase 2's **TwinChainGun** and **PointDefenceTurret** no longer exist in `src/` at all; the point
+  defence slot is filled by `InterceptorTurret` (`Stats/WeaponStats.cs:122`, since 2382172). This is
+  the note plans/TURRET_LAYOUTS.md asked for at its line 56 — it was never written, so it is here now.
+- Phase 3's card math is stale: a milestone level offers **3** new-weapon cards, not 2
+  (`Progression/LevelUpSystem.cs:12`), and the Hp card is **+2**, not +5 (`Stats/UpgradeStats.cs:22`).
+- There is no "auto targeting range +15%" upgrade. `UpgradeOption.Range` (+15%) covers firing range
+  and shot lifetime only (`Stats/UpgradeStats.cs:20`).
+- Phase 1's Scout starter armament ("side shotguns") was superseded by the balance pass: Scout starts
+  with Cyclotron + InterceptorTurret (`Stats/PlayerShipStats.cs:51`).
+
+Still exact against code: 8 hulls in `ShipType.All` plus 16 `DiagnosticShips`
+(`PlayerShipStats.cs:182,188-207`), `EngineLayout.Crab` (`:24`), Falcon's 3 mounts with 180° flanks
+and no aft mount (`Stats/TurretLayout.cs:59-64`), the Streak/Carmine numbers above
+(`Stats/EnemyShipStats.cs:86-98`), ScatterCannon's numbers (`Stats/WeaponStats.cs:106`), the R12 DPS
+ladder, and the named tests.
 

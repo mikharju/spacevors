@@ -113,6 +113,7 @@ plans/functional-ecs.md.
 - Loot/reward loop: salvage currency buys rerolls (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
 - Off-screen threat indicators for enemy racks and missiles
 - Run modifiers / seed flags: spawn-table toggles
+- Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
 
 ## Roadmap — future (new systems)
 

@@ -1,10 +1,10 @@
 # IMPACT_DAMAGE.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-10-11 in fa32c38, softened 1bfccda, retuned 18cfb7e; see Follow-up for two stale claims)
 
 Proposal: impact damage rules for ship↔ship and ship↔asteroid collisions (2026-09-16).
 
-## Status: done (2026-09-16)
+## Status: done — designed 2026-09-16, landed 2026-10-11
 
 Implemented in one commit (`ImpactDamage.cs` + wiring in `ResolveCollision` + tests),
 then retuned per playtest feedback (2026-09-16): `MinClosingSpeed` 80 → 160 px/s
@@ -169,4 +169,28 @@ Implementation (plan: plans/IMPACT_DAMAGE.md):
 - Hits where either body absorbs ≥ 2 damage throw a spark burst (2 + damage/3, cap 6) at the contact point
 - Death graphics render fully: the fatal hit writes `Health(0)` (without it the killing blow from high hp left the hull shading scalar stale and the wreck looked pristine), and game over waits 1.2 s after the player dies — simulation keeps running so holes, ember glow, smoke and sparks play out before the overlay; input stops at death
 - 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, 1-point ram and 3-point big-impact calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
+
+## Follow-up (2026-10-31): status audit
+
+The rule set is exactly as the Shipped section describes — `ImpactDamage.ForMasses` with ½·μ·v² split
+by inverse mass, floor 0.5, ceiling 3, zero below 160 px/s (`Combat/ImpactDamage.cs:11-21,25-43`),
+sparks `min(2 + damage/3, 6)` when either body absorbs ≥ 2, the `velAlongNormal > 0 → return`
+approach-only guard, mines excluded with their own `MineStats.ContactDamage = 3`, fatal hit writing
+`Health(0)`, 1.2 s death animation, and still exactly 16 tests. Two things in that section are now
+wrong:
+
+- **"asteroids (no Health) … take none" is half gone.** Small rocks have had Health since 8caaf9d
+  (2026-10-16): `Asteroid.SmallHealth = 50` (`Components/EntityComponents.cs:48`), armed in
+  `Combat/AsteroidFactory.cs:30`, shot-breakup in `CollisionSystem.DamageAsteroid` (`:1079-1088`) with
+  breakup smoke (`:634-641`). What is still true is only that rocks are **excluded from impact
+  damage**: `AccumulateImpactHealth` skips any `Asteroid` (`:1061`), with the current rationale
+  "rock is broken by gunfire only" (`:1053-1055`).
+- **"PerformanceBenchmark collision stress unchanged" cites a harness that no longer exists** —
+  `Tests/PerformanceBenchmark.cs` was deleted in f48a626 (2026-10-14). The current gate is
+  `Tests/ScenarioPerformanceTest.cs` ceilings plus `.tools/run/index.tsv`.
+- Minor: "enemy chase speeds are ≤ 90" (constants table note, repeated in the `ImpactDamage.cs:9`
+  comment) is no longer true — Streak cruises at 115 px/s (`Stats/EnemyShipStats.cs:86`). It stays
+  under the 160 px/s threshold, so nothing about the rule changes, but the sentence is false.
+- Dating correction: the body's "done (2026-09-16)" was the design date; the first impact-damage code
+  anywhere in git is fa32c38 (2026-10-11).
 

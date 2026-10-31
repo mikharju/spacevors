@@ -1,10 +1,10 @@
 # TARGETING_HP_BARS.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-09-18 in 44041f5 + 487f75d; bar rendering since changed — see Follow-up)
 
 Plan for the PLAN.md section "Enemy hp bar visible on targeting graphic" (2026-09-14).
 
-## Status: not started
+## Status: shipped (see the Shipped section at the end; "not started" was this line's stale text)
 
 ## Requirements (verbatim from PLAN.md)
 
@@ -132,4 +132,31 @@ Implementation:
 - `TargetingRenderer` (Game layer) draws both bracket kinds after ships/mines: manual red takes priority over auto on the same entity; auto brackets expire 1 s after last selection using world time (frozen while paused); dead and off-screen targets are skipped
 - HP bar above each bracket: dark background, fill lerps green→red by current/max ratio; entities without Health draw no bar
 - Verified in-game via manual playtest (brackets + bars on auto and manual targets); 6 new mark-lifecycle tests in TurretTargetMarkTest; PerformanceBenchmark worst case (1k ships) keeps TurretFiringSystem at ~1.1 ms/frame — within budget, no optimization needed
+
+## Follow-up (2026-10-31): status audit
+
+The targeting half is exactly as described: `Health(Current, Max)` with damage writes preserving Max
+(`Components/GameplayComponents.cs:5`, `CollisionSystem.cs:620-711`), `AutoTargetMark(LastTargetedAt)`
+written every tick by **player turrets only** and only on ships/mines
+(`CombatComponents.cs:61`, `TurretFiringSystem.cs:59,65-67,239` — enemy turrets never mark, pinned by
+`TurretTargetMarkTest.cs:79`), renderer-side expiry with no cleanup system, manual suppressing auto,
+`FindTarget` every tick, manual-lock reach `min(3×Range, AmmoSpeed×ShotLifetime)`
+(`TurretFiringSystem.cs:29,279`), stale `PrimaryTarget` cleared every tick (`:44,155`), click zones
+ships ×1.5 (R≤45)/×1.1, mines ×4/×2, rocks at own radius, closest-wins
+(`Combat/PrimaryTargetPicker.cs:11-52`), and the 6 mark-lifecycle tests. What is now wrong:
+
+- **"every bracket shows an HP bar" is no longer true.** Bars are **damaged-only**: the draw skips an
+  entity whose `Current >= Max` (`Game/TargetingRenderer.cs:63`, since dd61927 "damaged-only bars",
+  2026-10-11). The fill is a three-stop green→amber→red through `Palette.HealthColor`
+  (`Game/Palette.cs:10-12,40-42`), not a two-stop green→red lerp, and the bar is 3 px, not 4. The
+  verbatim requirement line at the top of this file therefore no longer matches the game.
+- **The `PerformanceBenchmark` anchor is dead** — that harness was deleted in f48a626 (2026-10-14), so
+  the "~1.1 ms/frame at 1k ships" number has no current in-repo re-measurement.
+- Stage-1 details have moved: the HUD reads `Health.Max` (`Game/HudRenderer.cs:25,38`), not
+  `Player.MaxHealth`; the call sites this plan put in `GameInitializer` now live in
+  `Domain/WorldFactory.cs:29,86`; mines' `(2, 2)` comes from `MineType.Health`
+  (`Stats/MineStats.cs:27-28`, used by `AI/MineRespawnSystem.cs:42`).
+- Naming drift: the 1 s expiry constant is `AutoTargetMark.FreshWindow` on the component, not a
+  renderer-local `AutoBracketPersistence`; `TargetSelection` gained a `Led` field
+  (`TurretFiringSystem.cs:9`); the bar track colour is `Palette.TrackDark`, not the proposed (40,40,40,180).
 

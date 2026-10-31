@@ -1,6 +1,6 @@
 # WAVES_AND_BREATHERS.md
 
-Status: shipped (verified 2026-10-31; WaveSchedule in EnemyShipSpawnSystem)
+Status: shipped (landed 2026-10-30 in 8dc1539; header corrected 2026-10-31 — WaveSchedule lives in Stats/, see Follow-up)
 
 Plan: discrete enemy waves + scheduled breather windows for loot/health collection, and how to
 *show* the pause instead of printing "Wave 4". 2026-10-19.
@@ -183,3 +183,23 @@ pressure bar (5) carries it non-verbally.
   the same rule that empties the field also protects the lull. Accept.
 - Fixed cycle is the simplest pure schedule; variable cycle (longer waves late) is easy arithmetic in
   the same class if playtest wants it.
+
+## Follow-up (2026-10-31): status audit
+
+- **Where the clock lives.** The header used to say "WaveSchedule in EnemyShipSpawnSystem" — wrong.
+  `WaveSchedule` is a pure class in `src/Domain/Stats/WaveSchedule.cs:9` (exactly the Stats/ placement
+  this plan's Option A argued for), `PhaseFor(elapsed) -> WavePhase(WaveIndex, InWave, MinesPaused)`
+  at `:15-34`. Two consumers: `AI/EnemyShipSpawnSystem.cs:37` (gates ships on `InWave`) and
+  `AI/MineRespawnSystem.cs:14` (gates mines on `MinesPaused`).
+- **Every number in "Tuning first pass" is still exactly what runs**: opening lull 20 s, wave 45 s,
+  quiet gap 9 s, full lull 15 s, quota `6 + 2/wave` capped at 40, in-wave interval 0.6–1.5 s
+  (`Stats/WaveStats.cs:9-28`), and the interval is still divided by `SpeedFactor(playerSpeed)`
+  (`EnemyShipSpawnSystem.cs:14-21`).
+- The earlier **"Current state (read off the code)"** section is pre-plan history, not current: the
+  ship interval ramp (5–10 → 2–4 s, `RampDuration = 180`) and the initial delays are deleted for
+  ships. Only mine respawning keeps a ramp (`Stats/SpawningStats.cs:41-49`: 4–8 → 10–20 s over
+  180 s, cap 23). Its "orbs live 30 s" is now 90 s (`Components/EffectComponents.cs:30,32`).
+- Still unimplemented, as the plan's own "Not implemented" note says: the whole render half (edge
+  telegraph, tint lerp, camera breath, pressure bar), the last-of-wave health orb, and the magnet
+  bonus — `WaveSchedule` has no other consumers in `src/`. Boundary/growth/cap/determinism are pinned
+  by `Tests/WaveScheduleTest.cs`.

@@ -1,6 +1,6 @@
 # WEAPON_BALANCE.md
 
-Status: active (reviewed 2026-10-31; open knobs marked below)
+Status: active (implemented 2026-10-16; rule set still asserted — but several anchors are stale, audited 2026-10-31, see the audit at the end)
 
 Plan for a weapon balance pass: per-weapon identity, a DPS ordering rule (hitscan weakest), a
 lifted range ladder, and a two-tier split — starter guns at level 1, slightly stronger guns only
@@ -379,3 +379,53 @@ Raw DPS (fire rate × pellets × damage). Tier 1: Cyclotron 8 (1600 px, 4200 px/
 ### Follow-up note (2026-10-31)
 
 ScatterCannon (tier-1 Large, 3 slugs x 2 dmg, range 1000) landed with the Eagle hull; details in plans/SHIP_TYPES.md. It fills the (close, slow, burst, 3-pellet, Large) identity cell.
+
+## Follow-up (2026-10-31): audit of this plan against code
+
+Still true and still enforced: the rule set is asserted as pure data — reach honesty
+(`CardRangeIsReachableByTheSlowestAmmoItFires`), the ≤12 rounds/s round-rate budget, the beam band
+(0.8×), large guns earning their mount (≥1.25×), tier 2 ≤ 1.4× tier 1, at most two guns slewing slower
+than a Balanced hull turns (1.33 rad/s = 76 °/s; only RailGun 55 °/s and PrismLance 70 °/s do,
+InterceptorTurret at 360 °/s on top), one gun per identity cell, starter firepower by hull size —
+`Tests/WeaponBalanceTest.cs:27-227`; the range ladder (600 / 900 / 1350 / 1600-1700, RailGun 1500 with
+`TargetedRangeMultiplier = 3` at `TurretFiringSystem.cs:29`); `AutoTarget: false` meaning
+lead-prediction-off (`:293`); the milestone hand (interval 5, 5 choices, ≤3 new-weapon cards, tier-gated
+pool — `LevelUpSystem.cs:8-12`); and R15-R22 for the guided trio under the exact cited names
+(`WeaponBalanceTest.cs:59,72,93,116`, `LevelUpSlotOfferTest.cs:118`, `EnemyMissileLadderTest.cs`).
+
+**Anchors that drifted — do not quote them as current:**
+
+- Weapon count: **15 real weapons + `LoadTestWeapon`**, not 11 (`Stats/WeaponStats.cs:164`), so the
+  identity matrix in §4 is incomplete: it omits SeekerPod, Swarmlet and HavocTorpedo even though R13
+  (`NoTwoGunsShareAnIdentityCell`) iterates all 15 (`WeaponBalanceTest.cs:199`).
+- The enemy engagement ring is per-hull now: 700 for Default/Interceptor/HeavyCannon, **520 Streak**,
+  **640 Carmine**, each drifting per tier and capped by `MaxFiringRange = 1000`
+  (`Stats/EnemyShipStats.cs:55-95,136-141`). "700 + your hull radius → 746/784" only holds at tier 0
+  and for those three hulls. Ammo speed likewise drifts up to `MaxAmmoSpeed = 250`, not 160-200.
+- Enemy hp tiers (R5/R11 "7 / 15 / 30") ignore the two new hulls: Streak **5 hp**, Carmine **22 hp**
+  (`:87,95`).
+- R12's ladder and `StarterFirepowerFollowsHullSize` still only read the original four hulls
+  (`WeaponBalanceTest.cs:214-227`) while `ShipType.All` has eight, radii 46/58/66/74/74/78/84
+  (`PlayerShipStats.cs:110-180`) — the guard is narrower than the roster.
+- MachineGun shipped at **FireRate 4 / Damage 3**, not "8 → 6 / 1 → 2" (`WeaponStats.cs:100`); DPS 12
+  is unchanged, so the ladder text stands but the knob history does not.
+- The level-5 pool is **seven** tier-2 guns (SeekerPod and Swarmlet unlock at 5 too), HavocTorpedo at
+  10 (`:149-159,168`); the bench is **15** Shadow copies + the load-test spray
+  (`PlayerShipStats.cs:188-205`).
+- RippleCutter's identity row says 32 px wide; it is **16 px** since c364664 (`WeaponStats.cs:132`).
+  Heavy's side mounts are offset 30 px, not 31 (`Stats/TurretLayout.cs:107-108`).
+- **§8 "No anti-projectile mechanic" is no longer true.** Since 38ec8ee the sim shoots guided rounds
+  down: round-vs-missile (`CollisionSystem.cs:309-368`) and beam-vs-missile (`:519-533`), cross-faction
+  only. Bullet-vs-bullet is still absent, as designed — that is the sentence worth keeping.
+
+**A real gap, not just stale text:** §9 says `WeaponBalanceTest` asserts R5 (auto-target guns ≤ 4 damage
+per pellet). **No such assertion exists** anywhere in `src/Tests` — RailGun at 14 and HavocTorpedo at 10
+are unguarded. Either write the assertion or drop the claim from §9.
+
+**Open items re-checked:** all three §11 knobs are still genuinely open (Scout 17 DPS on 8 hp —
+Cyclotron 8 + InterceptorTurret 9, `PlayerShipStats.cs:51,53`; Heavy 45 DPS across four mounts,
+`WeaponStats.cs:202-207`; PrismLance still 70 px parallel beams, `:129` + `TurretFiringSystem.cs:505-509`).
+Still unimplemented from §8: mine hp scaling (both sizes fixed at 2 hp with an explicit "tiers do not
+apply" comment, `Stats/MineStats.cs:25-28`) and viewport-gated auto-fire (no viewport check in
+`TurretFiringSystem`/`PrimaryTargetPicker`). §8's "prefer weapons that fit a free mount" was resolved
+differently — cargo shipped instead (`Components/GameplayComponents.cs:16`).

@@ -1,6 +1,6 @@
 # PLAN: Functional Command-Based ECS
 
-Status: record (frozen design note)
+Status: record (frozen design note — decisions unchanged; see "Current state against this note" at the end for what did not ship)
 
 ## Goal
 
@@ -313,3 +313,40 @@ Each phase runs all its systems sequentially (initially) against a shared View, 
 **Decision: allocate once per system, clear at start of each step.**
 
 Each system holds its own `CommandBuffer` as a field, allocated at construction time. Buffers are cleared before use within each phase (after systems write to them), not recreated each frame. This avoids per-frame allocations while keeping the isolation benefit of per-system buffers.
+
+## Current state against this note (2026-10-31)
+
+This file is a **frozen design record** — its decisions and reasoning are left exactly as written, and
+the record was not rewritten. What shipped, and what did not, so nobody codes against the wrong
+premise:
+
+**Shipped as decided**: commands are `readonly record struct`s behind the `ICommand` marker
+(`CreateEntityWithComponentsCommand`, `AddComponentCommand<T>`, `DestroyEntityCommand`, plus a later
+`RemoveComponentCommand<T>`) — `Commands.cs:16-56`; one batch per phase, applied before the next
+phase (`SimulationRunner.cs:76-87`); `GameSystem.Update(WorldView, float, CommandBuffer)`
+(`Domain/System.cs`); components stay immutable record structs.
+
+**Decided here but never implemented** — the current invariant lives in ARCHITECTURE.md, not here:
+
+- **Per-system `CommandBuffer`s do not exist.** There is one shared buffer owned by the caller and
+  passed to every system of every phase (`SimulationRunner.cs:102,109`; `GameSession` holds it).
+  `GameSystem` has no buffer field.
+- **`WorldView` is not mutation-free.** It exposes `GetComponentRef<T>` returning `ref T`,
+  `GetStorage`/`TryGetStorage`, and settable `ViewportSize`/`MouseScreenPosition`
+  (`WorldView.cs:15-31`), and three systems mutate in place through it (ARCHITECTURE.md "Write
+  patterns") — so "compile-time errors stop systems mutating ECS state" is not the current guarantee.
+- **One `WorldView` is constructed and reused** across phases and ticks, not created per phase.
+- **`EntityManager.ProcessCommands(IEnumerable<ICommand>)` does not exist.** The flush path is
+  `CommandBuffer.Apply(em)` → `CommandProcessor.Process` (`Commands.cs:135-140`), and the processor
+  defers destructions until after every other command of the flush.
+- **Systems are not fields of `SpaceVorsApp.cs`**; they are constructed and ordered in
+  `Domain/Support/SimulationRunner.cs`, driven by `GameSession`.
+- **Phase membership moved on from this note.** Today: Movement = Physics, PositionIntegration,
+  AmmoLifetime · Action = TurretFiring, EnemyMissileFiring, EnemyShipSpawn · Resolution = Collision,
+  PickupMagnet, LevelUp, ShipDeathExplosion, Effect · **Intent** (this note's "Cleanup") =
+  MissileGuidance, MineDrift, MineRespawn, EnemyShip, Camera, DamageEffect
+  (`SimulationRunner.cs:14-47`).
+- **"Systems within the same phase have no data dependencies" is false as a general rule.**
+  `PickupMagnetSystem` writes `Player.Xp` by ref and `LevelUpSystem` reads it later in the same
+  Resolution phase — a deliberate exception documented in ARCHITECTURE.md. Any parallel-scheduling
+  idea has to respect that chain, not this sentence.

@@ -187,7 +187,8 @@ returns one `Contact(Normal, Depth, Point)`.
 - Every overlap in the game goes through that seam; no call site in `CollisionSystem` holds circle
   math of its own.
 - A body enters as `CollisionBody(Position, Angle, Shape, Scale)`: circles (one-test fast path)
-  for every round, mine and pickup; a hull is 1-4 capsules, a rock is a disc or two capsules by
+  for every round, mine and pickup; a hull is 1-7 capsules (the swarmer is still an honest disc,
+  the lean enemy hulls reach 7), a rock is a disc or two capsules by
   art variant — authored in `Stats/HullShapes.cs`, `Stats/PlayerHullShapes.cs`,
   `Stats/AsteroidShapes.cs`, in the sprite's frame and in units of `Radius`, never derived from
   pixels at run time.

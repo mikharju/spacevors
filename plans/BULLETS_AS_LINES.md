@@ -1,6 +1,6 @@
 # BULLETS_AS_LINES.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-10-11 in 792b069 + 727eda8 + 004b6d8; swept collision is live, but anchors in the Shipped block are stale — see Follow-up)
 
 Plan for turning bullets from points into swept lines, adding lasers and particle
 accelerators, and giving projectiles a width that scores grazing hits (2026-10-11).
@@ -223,4 +223,35 @@ Implementation (plan: plans/BULLETS_AS_LINES.md):
 - Ship loadouts: Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy = machinegun + side shotguns + Flak Curtain, Shadow = Graviton Burst; old weapons remain in the milestone upgrade pool
 - Milestone (every 5th) level-ups now offer 5 random choices instead of 3
 - 24 new tests (box query, closest-point math, tunneling, grazing, earliest-hit order, laser once-only/first-hit/blocking, hitscan firing, milestone choice count); ammo-heavy benchmark stays inside the 8.3 ms budget (CollisionSystem ≈ 7.3 ms at ~15k bullets)
+
+## Follow-up (2026-10-31): status audit
+
+Header was "verified 2026-10-31", but parts of the block above were already out of date **before** that
+stamp, so it is now marked honestly. The swept-capsule design itself is intact and is still the shape of
+the code: the segment `[Position − Velocity·dt, Position]` is one source for both collision and the
+drawn streak (`CollisionSystem.cs:220`, `WorldRenderer.cs:155,165`, dt from `GameSession.cs:16`);
+earliest-touch-along-`t` decides the first hit (`Combat/NarrowPhase.cs:56-72`,
+`CollisionSystem.cs:243,275-300`); `SpatialGrid.GetQueryItemsInBox` (`SpatialGrid.cs:77`) and
+`Vector2.ClosestPointOnSegment` (`Vector2.cs:30`) are still the shared math; `LaserBeam` still does
+one-damage-ever to the first thing hit with `DamagePending` (`Components/CombatComponents.cs:71-86`,
+`CollisionSystem.cs:399-520`) fading in `EffectSystem.cs:102-118`; the named tests all still exist;
+milestone hands still offer 5 (`LevelUpSystem.cs:9`). What moved:
+
+- **The hit test no longer lives in `CollisionSystem`.** Every overlap — segment or not — goes through
+  the one seam `NarrowPhase.TryCollide` / `TrySweep` (`NarrowPhase.cs:56` and the shape overload `:110`),
+  called at `CollisionSystem.cs:258`; enemy hulls and lumpy rocks are re-tested against their capsules
+  with the circle as only a conservative reject (`:258-272`). See plans/NON_CIRCLE_COLLISION.md.
+- **`WeaponType.AddOnWeapons` and the `AddOn` mount are gone entirely** (no such symbol in `src/`):
+  new weapons come from `WeaponType.NewWeaponPoolFor(level)` with per-gun `UnlockLevel`, offered into
+  the hull's turret slots (`Stats/WeaponStats.cs:168`, plans/TURRET_LAYOUTS.md).
+- **The starter loadouts above were rewritten on 2026-10-16** (2382172): Scout = Cyclotron +
+  InterceptorTurret (`Stats/PlayerShipStats.cs:51`), Fighter = MachineGun + Shotgun (`:66`),
+  Shadow = RippleCutter in all three mounts (`:96`). plans/WEAPON_BALANCE.md is the live record.
+- **Ripple Cutter is 16 px wide, not 32**: `AmmoRadius: 8f` and `LaserBeam.Width` is a *half*-thickness
+  drawn at `Width*2` (`Stats/WeaponStats.cs:132`, `TurretFiringSystem.cs:512`, `WorldRenderer.cs:331`) —
+  halved in c364664 (2026-10-30).
+- **The perf anchor is stale twice over.** `Tests/PerformanceBenchmark.cs` was deleted (f48a626,
+  2026-10-14), and today the same world measures sim median **1.21 ms** with `CollisionSystem` at
+  **0.456 ms** (54% of sim) — `.tools/baselines/ammo-spray.json`. The "8.3 ms budget with CollisionSystem
+  ≈ 7.3 ms" sentence describes the pre-swept build; do not use it as a budget.
 

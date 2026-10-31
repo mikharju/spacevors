@@ -1,6 +1,6 @@
 # PERF_SCENARIOS.md — scripted perf scenarios with fixed start states + trace capture
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (harness live and in use; the live scenario set, flags and current numbers are in the corrected record section at the end)
 
 Written while unimplemented; everything in this file has since shipped — see the Shipped
 sections below. Companion to `plans/PARALLEL_SIM.md` (it supplies the measurement that plan's
@@ -359,15 +359,39 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - `impact-storm` met the 120 fps budget after shape batching (4.76 ms), so its `ExpectedOverBudget` mark was removed. `hull-damage`'s per-shape canary was a false alarm (fixed pass overhead divided by a handful of sparks), so `perShapeNs` now needs ≥100 drawn shapes.
 
 
-## Follow-up (record, 2026-10-31) — perf current status, lifted from ARCHITECTURE.md
+## Follow-up (record, 2026-10-31) — perf current status, corrected against code
 
-- `Tests/ScenarioPerformanceTest.cs` drives the scenario specs headless (sim only, no GL)
-  against characterized ceilings, and CI runs the suite, so a sim regression fails the build.
-- Render cost is measured on real hardware by `.tools/scenario.sh`: every scenario carries a
-  1000/120 ms budget, an unmarked breach exits non-zero, and `perShapeNs` tracks the cost of
-  one drawn shape (~1.1 µs before shape batching, ~0.1 µs after).
-- `impact-storm` is knowingly over budget (23,876 entities, ~15k sparks) and marked
-  `ExpectedOverBudget`.
-- Open question: the sim tail — repeatable spikes at fixed tick indices, with no GC involved.
-- Attribution as of 2026-10: in `ammo-spray`, `CollisionSystem` is 76.4% of sim mean and the
-  frame-9 tail is `Collision: detection` at 10.6 ms.
+This section is a *current status* record, so it was rewritten rather than annotated: two of its
+bullets contradicted the code and the section above it. Live facts, each with its anchor:
+
+- **Nine scenarios, not five.** The original `baseline-idle`, `ammo-spray`, `ammo-spray-miss`,
+  `impact-storm`, `hull-damage` plus `hull-stream` and `hull-crowding` (`Scenarios.cs:119-138`, added
+  with the capsule work) and `missile-384`, `missile-1024` (`:143-160`, plans/MISSILE_PERF.md).
+  Committed baselines exist for all but the two `hull-*` ones (`.tools/baselines/`).
+- **No scenario is marked `ExpectedOverBudget` any more** — `impact-storm` met the 1000/120 ms budget
+  after shape batching and the flag was deleted (`Scenarios.cs:108-110` explains why it is gone).
+  Every row in the current `.tools/run/index.tsv` says `pass`.
+- **The 76.4% / 10.6 ms attribution is retracted**, as the section above already concluded: it was
+  tiered-JIT warm-up. With `TieredCompilation=false` compiled into `Game.csproj:16`,
+  `Collision: detection` measures ~0.37 ms mean at ~5.5k bullets, and sim medians across the nine
+  scenarios sit at 0.28-3.0 ms (host=sim). The open tail is particle generation
+  (`Effects: explosion` / `Effects: damage spark` ~2.1 ms at ticks 33/76), not the broadphase.
+- `Tests/ScenarioPerformanceTest.cs` drives the specs headless (20 warm-up + 100 measured ticks)
+  against per-host ceilings — desktop 0.5 / 1.0 / 5.0 / 2.5 / 5.0 ms and CI ×3, plus one allocation
+  budget set 15 / 16 / 400 / 16 / 1000 KB, and 8.0 / 24.0 ms + 450 / 500 KB for the missile worlds —
+  selected by `SPACEVORS_PERF_HOST=ci`; CI runs the suite, so a sim regression fails the build.
+- Harness surface (so nobody invents flags): `--sim --shots LIST --no-shots --measure N --iters N
+  --hold S --cap FPS --out DIR --compare --check-baseline --update-baseline`
+  (`.tools/scenario.sh:38-49`). There is no `--seed`, `--trace`, `--apitrace` or `--shot`: shots are
+  taken by the game itself through `SPACEVORS_SCENARIO_SHOTS` (`GameSession.cs:534,563`), and
+  `scenario.sh` exports `hold=0` so an unattended run never waits on input.
+- Two implementation deviations from the plan that were never recorded: **`ScenarioHost` was never
+  created** — scenario mode lives inline in `Game/GameSession.cs` plus `SpaceVorsApp.cs`; and the
+  `[PERF]` row gained `missiles=` and a `shot=1` marker (`GameSession.cs:523-526`) beyond the count
+  list in the Shipped section. `ammo-spray` is 5,500 bullets (`Scenarios.cs:90,99`), not the 7,000
+  quoted there, and the render pass list is now 17 `world.*` passes (`WorldRenderer.cs:36-68`).
+- Everything else in the perf design still measures as documented: the shared 1000/120 ms budget
+  (`Scenarios.cs:66`), gate factors ×1.15 median / ×1.25 p99 / ×2.0 per-shape, the ≥100-shape
+  `perShapeNs` canary (~95-109 ns/shape today), the one shared exclusion rule for frame/pass/system
+  statistics, R2R + tiering-off publishing, and the pinned determinism contract (seed 42, 1920×1024,
+  centred mouse, one tick per frame).

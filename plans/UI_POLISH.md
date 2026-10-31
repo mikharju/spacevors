@@ -1,6 +1,6 @@
 # UI_POLISH.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-10-11 in 2632f08 + dd61927, recorded in 5c6085c; the hp-pip bullet was superseded by 4c7edc3 on 2026-10-31 — see Follow-up)
 
 Proposal: make the UI plain, elegant, pleasant — no new bitmaps, no fancy effects.
 All techniques are raylib immediate-mode primitives (rects, circles, gradients, alpha).
@@ -145,4 +145,20 @@ Implementation (plan: plans/UI_POLISH.md):
 - Upgrade cards: rounded panels with shadow, hover lifts 4px + accent border, value in accent / label muted, rounded key badge, 150 ms fade-in; stats screen: rounded panels, accent headers with hairline rule, alternating row tint, accent LV readout; ship select: rounded cards, accent selection stripe, trackless rounded scrollbar
 - Targeting: 1.5px arms, manual lock pulses at 1 Hz (alpha 229–255), hp bars rounded 3px and only when damaged
 - Renderer-only; visual verification pending a display (TROUBLE_SHOOTING.md #25)
+
+## Follow-up (2026-10-31): one bullet superseded the day it was stamped
+
+**The hp bar is no longer one pip per hp point.** 4c7edc3 (2026-10-31, the same day as this file's
+"verified" stamp, recorded in plans/MISSILE_PERF.md) replaced it with a **fixed track plus an eased
+proportional fill**, because pips scale with hp: on missile-world benches 40,000 hp meant ~40,000 pips
+and 181 ms in the `hud.health` pass (`Game/HudRenderer.cs:14-42`, whose comment records exactly that).
+The "8/8" readout and the eased fade on loss stayed.
+
+Everything else in the block is still what ships: `Ui.cs` helpers (`Ui.cs:12,25,44,48`), the palette
+language (`Game/Palette.cs:16-21,40`), the top-edge xp bar with "LV n" (`HudRenderer.cs:46-60`), the
+"Press R to restart" hint (`:85`) wired to the R restart (`GameSession.cs:142`), targeting arms at
+1.5 px with the 1 Hz manual-lock pulse α 229+26 and damaged-only 3 px bars
+(`TargetingRenderer.cs:18,28-30,60-72`), card fade at 150 ms with a 4 px hover lift
+(`UpgradeMenuRenderer.cs:26,45,81`), and the trackless rounded scrollbar with the accent stripe
+(`ShipSelectScreen.cs:183-186,203`).
 

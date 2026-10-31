@@ -341,3 +341,33 @@ topology, so the sweep — not the core count — should set the default.
 The scenario plan's prerequisite landed: `missile-384` / `missile-1024` are seeded, deterministic,
 missile-loaded worlds (`--sim` numbers in plans/MISSILE_PERF.md Shipped). Stage 0/3/4 gates can
 A/B against them without writing a fixture.
+
+## Follow-up (2026-10-31): premise audit
+
+Header stays **proposed** — there is still no threading anywhere (`Parallel.`, `Task.Run`,
+`SPACEVORS_PARALLEL`, `SPACEVORS_WORKERS` all absent from Domain and Game). The structural premises
+this plan rests on are all still true, with updated anchors: `CommandBuffer` is a `List<ICommand>`
+of boxed record structs (`Commands.cs:66`); the per-frame accumulators P2 targets are unchanged
+(`CollisionSystem.cs:22-36`); the 5 unconditional `Stopwatch.StartNew()` calls per tick are now at
+`CollisionSystem.cs:40,75,135,173,210` (this file cites 38/71/119/154/189); the double `r` / `r+15f`
+queries are still there (`:142+156`, `:180+193`); `SpatialGrid` is still
+`Dictionary<(int,int), List<SpatialItem>>` with one shared `_seen` (`SpatialGrid.cs:9-10`); entity ids
+are still never recycled; the `PickupMagnet` → `LevelUp` same-phase ref chain (Tier-3 hazard) is still
+`PickupMagnetSystem.cs:71` + both systems in Resolution (`SimulationRunner.cs:31-32`);
+`EnemyShipSystem` still uses no RNG, so it remains the cleanest parallel candidate; `TurretFiringSystem`
+is still O(turrets × targets).
+
+What to discard from this plan before using it:
+
+- **The cost basis is obsolete.** "CollisionSystem ≈ 7.3 ms/tick ≈ 88% of budget" (quoted from the old
+  PLAN.md) is gone: the number lives now in plans/BULLETS_AS_LINES.md, and post-JIT-freeze measurement
+  puts `Collision: detection` at **0.374 ms mean** with sim medians of 0.28-3.0 ms across the nine
+  scenarios. As plans/PERF_SCENARIOS.md already says, PARALLEL_SIM is aimed at a 0.36 ms cost — which
+  is not worth threading until something more expensive exists.
+- **The budget anchor is gone**: `Tests/PerformanceBenchmark.cs` was deleted in f48a626 (2026-10-14),
+  so the §2 table row about scenarios "currently over budget (`mustMeetBudget: false`)" and the Stage 0b
+  recipe `dotnet test --filter FullyQualifiedName~PerformanceBenchmark` both point at a file that does
+  not exist. Budget today = `Scenarios.cs:66` (1000/120 ms) + the ceilings in
+  `ScenarioPerformanceTest.cs`; no scenario is over budget.
+- Cross-references to "PLAN.md, targeting" now belong in plans/BULLETS_AS_LINES.md and
+  plans/CODE_REVIEW.md.

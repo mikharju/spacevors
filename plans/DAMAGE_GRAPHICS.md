@@ -1,6 +1,6 @@
 # DAMAGE_GRAPHICS.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-09-18 in 7f050d4 + 2e68a43 + 787ecd0; two errors in the Shipped summary are corrected in the note at the end)
 
 Plan for the PLAN.md section "Graphical damage indicators" (2026-09-15).
 
@@ -123,4 +123,22 @@ Implementation:
 - Ships outside the viewport (plus a 100 px margin) and dead ships never emit; all randomness goes through `view.Rng` after candidate sorting, so determinism is preserved
 - K diagnostic key (SPACEVORS_DIAGNOSTIC=1): halves hp of the locked target or nearest enemy ship to reach smoke tiers quickly
 - 7 new tests in DamageEffectTest (tiers, culling, ordering, budget, expiry); PerformanceBenchmark: DamageEffectSystem <= 0.09 ms/frame at 1k ships — no optimization needed
+
+## Follow-up (2026-10-31): two corrections to the block above
+
+- **Sparks are orange, not white**: r = 255·lossRatio, g = 80·lossRatio², b = 0
+  (`Game/WorldRenderer.cs:440-445`). The plan body already described them as orange; only this summary
+  said white.
+- The method is **`DrawDamageSparks`** (`WorldRenderer.cs:428`), renamed from `DrawSparks` in 7f050d4.
+- `PerformanceBenchmark` is a dead anchor — that harness was deleted in f48a626 (2026-10-14). Nothing in
+  this feature has been re-measured since; the systems cost is now visible as a `[SYSTEM]` line under
+  `SPACEVORS_DIAGNOSTIC=1` (see DIAGNOSTICS.md).
+- Everything else in the block checks out against code: `SmokePuff(Lifetime, InitialLifetime, Radius)`
+  (`Components/EffectComponents.cs:26`) aged by `EffectSystem` (`:84`), `DamageEffectSystem` in the Intent
+  phase (`Support/SimulationRunner.cs:46`), 2 / 6 puffs+sper-heavy-tier rates with the 1 puff + 1 spark
+  budget, 100 px viewport margin, `FollowFactor` 0.5, the tier → distance → entity-id tie-break
+  (`Combat/DamageEffectSystem.cs:21-45,154-159`), `AutoTargetMark.FreshWindow` = 1 s
+  (`Components/CombatComponents.cs:64`), smoke drawn after heal sparks and before thrusters in grey capped
+  at α 80 growing 2× (`WorldRenderer.cs:16-19,47-53,576-591`), the K key (`GameSession.cs:389`) and the 7
+  tests.
 

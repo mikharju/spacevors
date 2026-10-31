@@ -1,6 +1,6 @@
 # NON_CIRCLE_COLLISION.md
 
-Status: shipped (verified 2026-10-31)
+Status: shipped (landed 2026-10-29, rocks followed in 72f1015 on 2026-10-31; seam has grown since — see Follow-up)
 
 Proposal: replace the circle-vs-circle narrow phase with shape-aware collision so hulls can
 collide as hulls and not as discs (2026-10-24).
@@ -637,4 +637,44 @@ The newer rock art is not a ball, so rocks now cross the same narrow-phase seam 
   stream shoots at are still discs. Worst case, measured on a scratch world where the seeded stream's target
   rock *is* lumpy: `ammo-spray` **1.49**, `impact-storm` **2.33-2.39**, i.e. **+7-8%** for every round that
   reaches a rock, still 3.5× inside the 8.33 ms budget. Keep, and leave the scenarios pricing the common case.
+
+## Follow-up (2026-10-31): current state of the seam
+
+This file is the decision record for the seam; the seam itself has grown since the "verified" pass the
+same day (0464963 added five more shaped hulls). Correct facts, so nobody works from the plan-era text:
+
+- **The "Current state (verified in code)" line-number table near the top is plan-era** (it was accurate
+  at 62d3917) and wholly superseded: the circle math it points at inside `CollisionSystem` now lives in
+  `Combat/NarrowPhase.cs:34-72`, and `ResolveCollision` is at `CollisionSystem.cs:913` taking
+  `CollisionBody`/`Contact`.
+- **The seam returns `Contact`, not out-params.** The proposal's
+  `TryCollide(a, b, out normal, out depth, out contact)` never shipped: the API is
+  `NarrowPhase.TryCollide` / `TrySweep` returning `bool` + a `Contact(Normal, Depth, Point)` record with
+  `HasNormal` (`NarrowPhase.cs:14,34,87`). `CollisionBody` is nested: `NarrowPhase.CollisionBody`
+  (`:77`), not a top-level type.
+- **Call-site count is 12, not eight** (":487" in the phase list): `CollisionSystem.cs:71,258,262,269,
+  383,385,419,455,462,467,923,1152` — missile, beam, rock and player steps were added after.
+- **CapsuleGeometry has 16 tests, not 10** (`Tests/CapsuleGeometryTest.cs`; six ray-entry tests came
+  with 1f2df24 "fix beam impacts", which added `CapsuleGeometry.TryEntryAlongRay` at
+  `Combat/CapsuleGeometry.cs:177`).
+- **Roster: 8 player hull shape sets and 5 enemy ones**, not "4 player + 3 enemy" and not "7 hull arts
+  exist" (":416"): `Stats/PlayerHullShapes.cs` has all eight hulls, `Stats/HullShapes.cs` the five
+  `EnemyShipType.All` art ids.
+- **Primitive counts per hull are 1–7, not "1–4 / 2–4"**: Streak has 7 (`HullShapes.cs:65-74`),
+  Carmine 5 (`:81-88`), Falcon and Eagle 6, Manta and Raptor 5
+  (`PlayerHullShapes.cs:71,86,102,115`). The "core first, early exit" rule still holds at those sizes.
+- **"No scenario fires at the player" is no longer true.** `missile-384`/`missile-1024` (7dfce06, see
+  plans/MISSILE_PERF.md) seed armed tier-10 hulls with guns trained on the player and guided rounds that
+  detonate on it (`Scenarios/ScenarioWorld.cs:143-145,170-187`), so swept-round-vs-player-hull is now
+  priced directly instead of by proxy.
+- The scenario proposed as `stream-through-hull` landed as **`hull-stream`** (`Scenarios/Scenarios.cs:119`),
+  alongside `hull-crowding` (`:131`).
+
+Unchanged and still test-enforced: every overlap goes through the one seam; circles keep the fast path
+and the bounding disc stays the conservative reject in front of every shape test; the grid is unchanged
+(128 px cells, radius-keyed); exactly one contact per body pair per tick (deepest for resting pairs,
+earliest for sweeps); mass and inertia still come from the bounding radius; shapes are authored tables,
+never pixel-derived; reach ≤ 1.001 R is pinned by `HullShapesTest`, `PlayerHullShapesTest`,
+`AsteroidShapesTest`; the "shape only ever takes hits away" gap/tip pairs are pinned with circle
+controls in `HullShapeCollisionTest` / `PlayerHullCollisionTest`.
 

@@ -558,3 +558,32 @@ POP_AND_SWAP.md: historical; implementation deviated as already noted in Chunk 2
 - **[nit] TROUBLE_SHOOTING #1 claims each F12 shot produces both screenshot0NN.png and screenshot.png**, but the app only calls TakeScreenshot("screenshot.png") (SpaceVorsApp.cs:35); the doc hedges that the mechanism lives in the stripped native raylib lib — unverified. Consider a note or removal once confirmed.
 - **[nit] AGENTS.md typo** — "problems encountered before and and avoid" (:57).
 
+## Status of this record (2026-10-31)
+
+Frozen record, left as written; this block only marks what has since changed so the review is not read
+as current fact. **No "done" item has regressed** — re-checks came back clean for every spot-checked
+fix: no `Random.Shared`, `Thread.Sleep`, `LogMouse`, `LogAllEnemyShips`, `MaxEntityId` or reflection in
+the command processor anywhere in `src/`; the 0.25 accumulator clamp (`Game/GameSession.cs:19,190`), the
+aged orb write-back (`Combat/PickupMagnetSystem.cs:120`), the `LitGroupRenderer` buffer clear (`:12`),
+the dead-entity skip in `Progression/LevelUpSystem.cs:29`, the R restart (`GameSession.cs:142`), the
+shared card rect (`Game/UpgradeMenuRenderer.cs:60` + `StatsScreenRenderer.cs:96`), `IsOffScreen` culling
+throughout `WorldRenderer`, `Entity` as a `readonly record struct`, the `id >= 0` storage guard
+(`ComponentStorage.cs:71`) and the per-simulation `SimulationRunner` (`Support/SimulationRunner.cs:7-10`)
+are all still in place.
+
+Statements in the review that are **no longer true**:
+
+- Scout "carries the SideShot loadout" (:114, :284) — SideShot is gone from `src/` (004b6d8, 2026-10-11);
+  Scout starts on `WeaponLoadout.CyclotronRepeater` (`Stats/PlayerShipStats.cs:51`). The review's
+  conclusion stands: a real loadout in play, `LoadTestWeapon` only on the diagnostic clone.
+- "still xunit 2.9.3 + runner.visualstudio 3.0.2" (:105, :495) — the mismatch is gone; the runner is
+  2.8.2 (`Tests/Tests.csproj:14`).
+- Items listed as dead code present are now deleted: `UpgradeExplosion`, `EngineLayout.Maneuverable`,
+  the `Weapon` struct, `protectedEntities`, `mineDamageMap`, `ResolveCircleVsCircle` (zero grep hits).
+- The AGENTS.md typo nit (:559) is fixed, and the functional-ecs notes at :547-549 are now recorded as
+  shipped-as-decided vs never-implemented in plans/functional-ecs.md's own closing section.
+
+Genuinely **still open**, exactly as recorded: entity ids are never recycled (`EntityManager.cs:12,29`),
+`DestroyEntity` scans every storage, `Vector2` has no `LengthSquared`, and `CoolDownHelper.cs` is still a
+file named differently from its `CooldownHelper` class.
+

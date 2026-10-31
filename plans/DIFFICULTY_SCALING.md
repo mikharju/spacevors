@@ -388,3 +388,32 @@ impact-storm 2.16 ms medians, against 1.33 / 2.12 before any missile code; the p
 - Measured: `ammo-spray` sim median **1.28 ms** / p99 2.58 against 1.29 / 2.08, `impact-storm` **2.07** / 4.08 against 2.09 / 4.35 — this costs ~0%, keep. The scenarios run at tier 0, where the new drifts are zero, so they prove no regression rather than the tier-10 cost; the readout itself is 1 Hz in the window path only.
 - Still open (plans/DIFFICULTY_SCALING.md R2): composition unlocks and weight drift (P6), pellet volleys and concurrency, mines getting scarcer rather than weaker, the reward side (heal-orb chance), elites, spawn surges, and the fairness purchase of a weapons-hot delay on spawn.
 
+## Follow-up (2026-10-31): item-by-item audit against code
+
+Status stays **active**. The file contradicts itself about P6 — line 7 says it landed as the armament
+ladder, line 389 still lists it open. Both are half right, so split it: the **armament ladder shipped**
+(two tier axes: `MaxTier = 10` for hp/damage/fire-rate and `MaxCompositionTier = 20` for which hulls
+carry racks, per-hull armament rows and `MissileCapFor` 3/4/5/6/7 at `Stats/EnemyShipStats.cs:153-217`,
+pinned by `EnemyMissileLadderTest`); **hull-type time-gating and `SpawnWeight` drift over elapsed time
+did not** — all five hull types roll from t=0 and their weights are static.
+
+Implemented, with the live anchor: P1 cull 5500 (`Stats/SpawningStats.cs:60`) · P2 chase at 0.75×
+player speed capped ×2 (`:65-66`) · P3 spawn interval ÷ `SpeedFactor` (`AI/EnemyShipSpawnSystem.cs:14`)
+· P4 early world 9 mines / 6 ships / 2400–5000 band (`SpawningStats.cs:9-15`) · P5 tier curves capped
+at 10 (`EnemyShipStats.cs:119-128`) · R2.3 reach drift (plus Streak +12 and Carmine +18, added after
+this plan: `:87,95`) · R2.4 ammo speed · R2.5 small-ship speed (shipped 120/85, proposed 117/84) ·
+tracking +0.03/tier · R2.8 `[THREAT]` · R2.12 ladder · D1/D3/D6 ceilings and the ≤7 s TTK
+(`Tests/EnemyDifficultyTest.cs`).
+
+Still open, with proof it is not implemented: pellet volleys (`WeaponPelletCount = 1` constant,
+`EnemyShipStats.cs:110`, asserted flat even at tier cap); concurrency scaling (`MaxEnemyShips = 100`
+static — and the "2–4 s interval floor" this item referred to no longer exists, the wave clock replaced
+it, so the item needs rewording); mines getting scarcer (cap still 23, interval still decaying, mine hp
+tierless by design); reward side (`LootStats.HealthOrbChance = 0.05` constant); elites (no code);
+spawn-geometry tightening and rear spawns (band static, placement still a forward cone,
+`EnemyShipSpawnSystem.cs:63`); orbit/strafe/kamikaze behaviour and a weapons-hot delay on spawn (no
+cooldown is added at spawn); difficulty selection (no such code); P7 surges.
+
+Stale detail: the example `[THREAT]` row above predates ff58b55 — the line now carries `tier=T/C` and
+`missiles=/cap` columns (`GameSession.cs:230-233`).
+

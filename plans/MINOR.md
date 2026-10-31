@@ -1,6 +1,6 @@
 # MINOR.md — small shipped features (combined record)
 
-Status: record (entries verified 2026-10-31). Features too small for their own plan file.
+Status: record (entries audited 2026-10-31; one entry's detail corrected in the note at the end). Features too small for their own plan file.
 
 ## Camera follows mouse (shipped, verified 2026-10-31)
 
@@ -73,3 +73,15 @@ Shadow carries a real weapon in normal play; the load-test spray moved to a diag
   distinct, and a 4-pellet fan measured at `-0.4, -0.2, 0, +0.2`.
 - Cost (`--sim --iters 3`, host=sim): `ammo-spray` median 1.35 vs 1.33, p99 2.26 vs 2.24;
   `impact-storm` 2.23/4.80 vs 2.18/4.62, entity counts unchanged. Noise — keep.
+
+## Entry correction (2026-10-31)
+
+All six entries are live in code, but one entry's detail was already stale at the moment it was stamped
+"verified": **`WeaponLoadout.MountedAsUpgrade(weapon)` no longer exists** — it was removed with the
+turret-layout work (4844d24 / c6283ec, 2026-10-16/17). The diagnostic clones are built today from
+`ShipType.DiagnosticShips` with `ShadowCarrying` + `WeaponLoadout.InMainGun`
+(`Stats/PlayerShipStats.cs:210,215`), and the clone list is **16** entries (one per real weapon plus
+`LoadTestWeapon`), not the seven named above. The four clone-roster tests still exist
+(`Tests/ShipRosterTest.cs:13,21,47,96`), and `AsteroidHealthTest` has grown from 6 to 8 tests. The
+duplicated sim medians in the last entry sit inside today's bands in `.tools/run/index.tsv` — that file
+stays the source of truth for live numbers.

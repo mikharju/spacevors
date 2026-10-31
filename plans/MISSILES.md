@@ -494,3 +494,41 @@ plans/DIFFICULTY_SCALING.md R2.12).
 
 The missing "missile-carrying scenario" this file recorded as open now exists: `missile-384` /
 `missile-1024`, with the measured missile price. See plans/MISSILE_PERF.md Shipped section.
+
+## Follow-up (2026-10-31): number audit
+
+The architecture is exactly as planned and shipped: missile = `Ammo` + `Missile` lock + `Health`
+(`Components/CombatComponents.cs:14-26`), `MissileGuidanceSystem` runs **first in Intent** with the
+stated rationale (`Support/SimulationRunner.cs:37-41`), `EnemyMissileFiringSystem` sits right after
+`TurretFiringSystem` in Action (`:21-25`), one grid kind (`Combat/SpatialGrid.cs:19`), shoot-down is
+cross-faction only and the probing round burns its own `Ammo.Damage`
+(`CollisionSystem.cs:309-368,519-533`), and the player rack is range-gated and never slews
+(`TurretFiringSystem.cs:56,250,283`). Budgets/ceilings also match:
+`HomingRoundBudget = 4`, launch fraction 0.7, launch acceleration 200, hp ceiling 3 and the card
+withdrawal rules (`Stats/WeaponStats.cs:54-79`, `Progression/LevelUpSystem.cs:103-115`); enemy comp
+tier capped at 20 against the stat cap of 10, missile cap 0/3/4/5/6/7, rack ring ×1.4 ≤ 1450, turn
+≤ 90°/s, fuse ≤ 6 s, missile damage tier/3 (`Stats/EnemyShipStats.cs:65-81,150-246`).
+
+Numbers and names in the plan body that are **not** what the code says:
+
+- **Player guided rounds are all 1 hp.** "1 hp small, 3 hp large" and HavocTorpedo "Round hp 3" are
+  wrong: the three guided guns never set `MissileHealth`, so it stays at the default 1
+  (`Stats/WeaponStats.cs:48,149,153,159`). Only enemy racks carry 2/3 (`:69,81`). "Cyclotron needs
+  three hits on a torpedo" is therefore moot — a Cyclotron round kills a player torpedo outright.
+- **HavocTorpedo fires at 0.6/s, not 0.7** (`:159`; it shipped at 0.6 in 2ec4385), so a full rack is
+  ~5 live rounds, not ~17.
+- **§12's test file names do not exist.** `MissileHealthUpgradeTest`, `SalvoGrowthTest`,
+  `EnemyMissileCapTest`, `EnemyMissileReachTest` and `EnemyArmamentLadderTest` were never created as
+  files; those assertions are methods in `Tests/EnemyMissileLadderTest.cs:16-155`,
+  `Tests/EnemyMissileFiringTest.cs:46-129` and `Tests/LevelUpSlotOfferTest.cs:118`. There is also no
+  "200 ticks with 40 hulls" test.
+- **R21 reach is a ramp trapezoid, not `165 × 6`.** See `MissileReachFor` (`EnemyShipStats.cs:235-241`),
+  asserted at `EnemyMissileLadderTest.cs:87`.
+- **The dart is one generated sprite**, 9 × 30 px drawn at 7.5 × radius (`Game/ShapeSprites.cs:126-133`,
+  `WorldRenderer.cs:282`) — not "10×4 px small / 16×6 px large", and the shaft is 25 px, not 3× a 5 px
+  nose in the ratio described.
+- §9's "guns + missiles ~100% at comp tier 10" is ~80% (rack weight 4:1, `EnemyShipStats.cs:80`); the
+  Shipped block already self-corrects to "mostly".
+- The §3 component sketch `Missile(LockedTarget, Speed, TurnRate, Steering)` is short three fields —
+  today it is `(LockedTarget, Speed, MaxSpeed, Acceleration, TurnRate, Steering)` (`:20-26`); the
+  revision-2 note above documents the growth, so only the body is stale.
