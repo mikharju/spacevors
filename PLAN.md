@@ -710,22 +710,45 @@ The newer rock art is not a ball, so rocks now cross the same narrow-phase seam 
 - Cost (`--sim --iters 3`, host=sim): `ammo-spray` median 1.35 vs 1.33, p99 2.26 vs 2.24;
   `impact-storm` 2.23/4.80 vs 2.18/4.62, entity counts unchanged. Noise — keep.
 
-## Near future
+## Near future — data on existing machinery
 
 - New ships and engines (crab and broadside landed as Manta/Raptor; what else?)
-- New mines (Turns into missile, fires a delayed beam)
+- New enemy archetypes: kamikaze (no gun, big collision), sniper (long ring, low rate), minelayer,
+  shielded hull (absorbs N hits). A species is stats + shape + art (Streak/Carmine proved it).
+- New mines: turns into a missile on approach; fires one delayed beam after lock-on.
+- Fill empty weapon identity cells in plans/WEAPON_BALANCE.md (small hitscan, very slow giant slug).
+- Missile-carrying perf scenario: the known measurement gap; price missiles before any parallel-sim
+  decision.
 - Difficulty scaling: pellet volleys and concurrency; mines and the reward side (the type/composition
-  drift landed as the armament ladder)
+  drift landed as the armament ladder).
+- Loot/reward loop: salvage dropped by waves buys rerolls, free mount swaps, cargo space.
+- Off-screen threat indicators for enemy racks and missiles: dodgeable must also mean seeable.
+- Run modifiers / seed flags: spawn-table toggles (asteroids ×3, faster everything) — near-zero code
+  if the spawner reads a modifier table.
 
-## Future
+## Future — new systems
 
-- bosses
-- asteroid fields
-- procedural sectors
-- elite enemies
-- save/load
-- replays
-- mod-friendly data definitions
+- Weapon evolutions: two tagged upgrades fuse into one stronger card (VS-style); evolutions need
+  their own balance rules.
+- Asteroid fields as terrain: cover that blocks lines of fire; mostly spawn placement + a scenario.
+- Procedural sectors: per-N-minutes biome chosen from spawn/composition tables, reusing the
+  composition-tier machinery.
+- Elite enemies: mount/aura/hp modifiers on normal hulls, scaling with difficulty tiers; cheaper
+  than bosses, adds mid-run spikes.
+- Bosses: one huge hull, many mounts, phases as a small state table, not a behavior tree.
+- Deterministic replays first (input recording + seed; feeds regression videos for the tooling),
+  save/load second (enables meta-progression).
+- 100k-object prep before parallelism (plans/PARALLEL_SIM.md): SoA audit of hot components, a 50k
+  scenario to find the real cliff.
+- Mod-friendly data: `Domain/Stats/` tables exported to JSON/TOML with a loader; the `*Test` classes
+  become validator tests, compile-time checks are the cost.
+
+## Infrastructure / QA
+
+- Perf gate in CI: `.tools/scenario.sh --check-baseline` already exits non-zero; run it on every push.
+- Balance fuzzing: random upgrade sequences asserting no card is ever a lie (generalizes the
+  `MissileHealth`-withdrawal pattern).
+- Portability: a Windows CI leg or a documented cross-platform run matrix (builds are linux-x64).
 
 ## Done criteria
 
