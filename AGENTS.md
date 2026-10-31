@@ -59,6 +59,7 @@ For every task:
 3. Keep the project compiling.
 4. Verify behavior.
 5. Update documentation per the Documentation routing below.
+6. Only commit large multi phase work to git, leave planning only and small changes for humans to commit
 
 When a feature is completed: append `## Shipped (YYYY-MM-DD):` to its plan file (what landed,
 deviations from the plan, dated perf verdict), set its header to `Status: shipped`, and add or

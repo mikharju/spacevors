@@ -111,10 +111,55 @@ public class ScenarioWorldTest
     [Fact]
     public void Scenarios_AreNamedAndUnique()
     {
-        Assert.Equal(7, Scenarios.All.Length);
+        Assert.Equal(9, Scenarios.All.Length);
         Assert.Equal(Scenarios.All.Length, Scenarios.All.Select(s => s.Name).Distinct().Count());
         Assert.Null(Scenarios.Find("nope"));
     }
+
+    // The missile worlds price guidance and cross-fire (plans/MISSILE_PERF.md), so the seeded counts
+    // and the two factions must be exactly what the spec says: racks silent, both sides present, the
+    // armed hulls really armed, and a player that outlasts the detonations.
+    [Fact]
+    public void MissileWorlds_SeedExactCountsOnBothSides_WithArmedHulls_AndSilentRacks()
+    {
+        var (em, player, _) = WorldFactory.Create(ShipType.Shadow, WorldView.DefaultViewportSize, seed: 7, testAsteroid: true);
+        ScenarioWorld.Apply(em, player, Scenarios.Find("missile-384")!);
+
+        Assert.Equal(384, Count<Missile>(em));
+
+        int enemyGuided = 0;
+        foreach (var (_, _, ammo) in em.GetEntitiesWithComponents<Missile, Ammo>())
+            if (ammo.IsEnemy) enemyGuided++;
+        Assert.Equal(192, enemyGuided);
+
+        // Every seeded round has a live lock: guidance steering against a missing entity would measure
+        // "fly on until the fuse dies", not steering.
+        foreach (var (entity, missile) in em.GetEntitiesWithComponents<Missile>())
+            Assert.True(em.TryGetComponent<Position>(missile.LockedTarget, out _), $"missile {entity} is locked on a dead entity");
+
+        // The 8 scenario hulls are recognisable by the health ScenarioWorld gives them — a factory
+        // hull at any tier is far lighter — and each must really be armed and holding its post. No
+        // hull anywhere carries a rack, so the seeded count is the missile count for the window.
+        int armedHulls = 0;
+        foreach (var (entity, health) in em.GetEntitiesWithComponents<Health>())
+        {
+            if (health.Max != ScenarioHullHealth) continue;
+            armedHulls++;
+            Assert.True(em.TryGetComponent<Turret>(entity, out _), $"scenario hull {entity} lost its gun");
+            Assert.True(em.TryGetComponent<EnemyShip>(entity, out var ship) && ship.FiringRange > 0f,
+                $"scenario hull {entity} is not holding its post");
+        }
+        Assert.Equal(MissileWorldHulls, armedHulls);
+        Assert.False(em.GetEntitiesWithComponents<MissileWeapon>().TryFirst(out _));
+
+        Assert.True(em.GetComponent<Health>(player).Current > ShipType.Shadow.MaxHealth,
+            "the missile-world player must outlast the detonations, or the window measures a wreck");
+    }
+
+    private const int InitialShips = 6;      // SpawningStats.InitialWorld.EnemyShipCount
+    private const int CrowdingHulls = 36;    // ScenarioWorld.CrowdingRingShipCounts: 6 + 12 + 18
+    private const int MissileWorldHulls = 8; // ScenarioWorld.MissileWorldHullTypes x MissileWorldHullsPerType
+    private const int ScenarioHullHealth = 100_000; // ScenarioWorld.ScenarioHullHealth
 
     // The two hull worlds price how a hull collides (plans/NON_CIRCLE_COLLISION.md), so they are only
     // worth trusting if they really put unarmed hulls in the world: a hull that shoots back, or a ring
@@ -142,9 +187,6 @@ public class ScenarioWorldTest
         Assert.True(crowdEm.GetComponent<Health>(crowdPlayer).Current > ShipType.Shadow.MaxHealth,
             "the crowding player must outlast the grind, or the window measures a wreck");
     }
-
-    private const int InitialShips = 6;      // SpawningStats.InitialWorld.EnemyShipCount
-    private const int CrowdingHulls = 36;    // ScenarioWorld.CrowdingRingShipCounts: 6 + 12 + 18
 
     private static int Count<T>(EntityManager em) where T : notnull =>
         em.TryGetStorage(out ComponentStorage<T> storage) ? storage.Count : 0;

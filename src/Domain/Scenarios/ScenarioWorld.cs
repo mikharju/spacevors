@@ -38,6 +38,9 @@ public static class ScenarioWorld
 
         if (spec.Hulls != ScenarioHulls.None)
             PlaceHulls(em, playerEntity, playerPos, spec.Hulls, spec.AimDirection);
+
+        if (spec.MissileCount > 0)
+            SeedMissileWorld(em, playerEntity, playerPos, spec.MissileCount, spec.AimDirection);
     }
 
     // ── Hull worlds (plans/NON_CIRCLE_COLLISION.md) ────────────────────────────────────────────
@@ -122,6 +125,169 @@ public static class ScenarioWorld
             TurretFireRate: 0f, type.TurretAmmoSpeed, type.Acceleration, type.GraphicsId));
         em.AddComponent(entity, new Health(ScenarioHullHealth, ScenarioHullHealth));
     }
+
+    // ── Missile worlds (plans/MISSILE_PERF.md) ─────────────────────────────────────────────────
+    // The ammo worlds are unarmed by construction, so guidance, missiles in the grid and the
+    // cross-fire rule have never been measured. These worlds are ammo-spray plus guided rounds on
+    // both sides: half enemy-guided flying back down the ammo corridor — the seeded player stream
+    // *is* their point defence — and half player-guided locked on armed hulls whose guns shoot them
+    // down. Racks stay silent (no `MissileWeapon` anywhere): the seeded count is the missile count,
+    // and the delta against ammo-spray on the same seed is the missile price.
+
+    // Tier 10: the stat ladder the missile-carrying armament ladder actually reaches in play.
+    private const int MissileScenarioTier = 10;
+    private static readonly EnemyShipType[] MissileWorldHullTypes = [EnemyShipType.Interceptor, EnemyShipType.HeavyCannon];
+    private const int MissileWorldHullsPerType = 4;
+
+    // Guided rounds detonate on the player and on the hulls inside the window; both have to outlive
+    // it. Same rationale as CrowdingPlayerHealth.
+    private const int MissileWorldPlayerHealth = 40_000;
+
+    // The enemy-guided corridor sits along the ammo stream so the player's own rounds meet the
+    // rounds head-on, and stays wide enough that the grazing stream (AimOffsetR 1.05) still sweeps
+    // most of it.
+    private const float EnemyMissileCorridorMin = 300f;
+    private const float EnemyMissileCorridorMax = 1400f;
+    private const float EnemyMissileCorridorLateral = 150f;
+
+    // Player-guided rounds are seeded mid-run at cruise: some reach their hull before the window
+    // closes (warhead + effects are part of the price), some are still steering at the end.
+    private const float PlayerMissileLateral = 120f;
+
+    private static void SeedMissileWorld(EntityManager em, Entity playerEntity, Vector2 playerPos, int missileCount, Vector2 aim)
+    {
+        var hulls = PlaceMissileWorldHulls(em, playerPos);
+
+        SeedPlayerGuidedRounds(em, playerPos, missileCount / 2, hulls);
+        SeedEnemyGuidedRounds(em, playerEntity, playerPos, missileCount - missileCount / 2, aim);
+
+        em.AddComponent(playerEntity, new Health(MissileWorldPlayerHealth, MissileWorldPlayerHealth));
+    }
+
+    // One ring per hull type at the tier-10 firing ring, so every hull holds its post and fires from
+    // the start. The rack stays off: live launches would grow the missile count past the scenario's.
+    private static List<(Entity Entity, Vector2 Position, float Radius)> PlaceMissileWorldHulls(EntityManager em, Vector2 playerPos)
+    {
+        var hulls = new List<(Entity, Vector2, float)>();
+
+        for (int type = 0; type < MissileWorldHullTypes.Length; type++)
+        {
+            var hullType = MissileWorldHullTypes[type];
+            float ring = EnemyShipStats.FiringRangeFor(hullType, MissileScenarioTier);
+
+            for (int i = 0; i < MissileWorldHullsPerType; i++)
+            {
+                float angle = MathF.PI * 2f * i / MissileWorldHullsPerType + type * 0.4f;
+                Vector2 position = playerPos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * ring;
+                hulls.Add((AddArmedHull(em, playerPos, position, hullType), position, hullType.Radius));
+            }
+        }
+
+        return hulls;
+    }
+
+    // Like AddUnarmedHull but shooting: the factory's own tier-10 gun, nose pointed at the player,
+    // and FiringRange at the spawn distance so the chase brakes on the post while the gun fires.
+    private static Entity AddArmedHull(EntityManager em, Vector2 playerPos, Vector2 position, EnemyShipType type)
+    {
+        Vector2 toPlayer = playerPos - position;
+
+        var entity = em.CreateEntity();
+        em.AddComponent(entity, new Position(position));
+        em.AddComponent(entity, new Velocity(Vector2.Zero));
+        em.AddComponent(entity, new Rotation(MathF.Atan2(toPlayer.Y, toPlayer.X)));
+        em.AddComponent(entity, new AngularVelocity(0f));
+        em.AddComponent(entity, new EnemyShip(
+            type.Radius, type.Speed, type.TurnRate, FiringRange: toPlayer.Magnitude,
+            TurretFireRate: type.TurretFireRate, type.TurretAmmoSpeed, type.Acceleration, type.GraphicsId));
+        em.AddComponent(entity, EnemyShipFactory.BuildTurret(type, MissileScenarioTier));
+        em.AddComponent(entity, new Health(ScenarioHullHealth, ScenarioHullHealth));
+        return entity;
+    }
+
+    // Player-guided rounds locked on the armed hulls round-robin, seeded between the player and the
+    // lock with a lateral offset so guidance has real arcs to steer, at cruise speed like a volley
+    // already in flight. Stats come from the real SeekerPod card.
+    private static void SeedPlayerGuidedRounds(EntityManager em, Vector2 origin, int count, List<(Entity Entity, Vector2 Position, float Radius)> hulls)
+    {
+        var gun = WeaponType.SeekerPod;
+        float cruise = gun.Stats.AmmoSpeed;
+
+        for (int i = 0; i < count; i++)
+        {
+            var (hullEntity, hullPos, hullRadius) = hulls[i % hulls.Count];
+            Vector2 toHull = hullPos - origin;
+            float along = toHull.Magnitude;
+            Vector2 dirToHull = toHull / along;
+            Vector2 aside = new Vector2(-dirToHull.Y, dirToHull.X);
+
+            Vector2 start = Vector2.Zero;
+            for (int attempt = 0; attempt < ResampleAttempts; attempt++)
+            {
+                start = origin + dirToHull * ((float)em.Rng.NextDouble() * 0.6f + 0.2f) * along
+                    + aside * ((float)em.Rng.NextDouble() - 0.5f) * 2f * PlayerMissileLateral;
+                if (!OverlapsAsteroid(em, start) && !OverlapsHull(start, hulls, hullRadius)) break;
+            }
+
+            Vector2 velocity = (hullPos - start).Normalized * cruise;
+            float remainingFuse = RemainingFuse(gun.Stats.ShotLifetime, em.Rng);
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(start));
+            em.AddComponent(entity, new Velocity(velocity));
+            em.AddComponent(entity, new Ammo(velocity, gun.AmmoRadius, remainingFuse, IsEnemy: false, gun.Stats.Damage, gun.Color));
+            em.AddComponent(entity, new Missile(hullEntity, cruise, cruise, WeaponStats.MissileLaunchAcceleration, gun.Stats.HomingTurnRate, Steering: 0f));
+            em.AddComponent(entity, new Health(gun.Stats.MissileHealth, gun.Stats.MissileHealth));
+        }
+    }
+
+    // Enemy-guided rounds locked on the player, seeded inside the ammo corridor and flying inboard:
+    // the seeded player stream meets them head-on, which is where point-defence cost lives. Stats
+    // from the HeavyCannon rack at the scenario tier, on the shared enemy damage ladder.
+    private static void SeedEnemyGuidedRounds(EntityManager em, Entity playerEntity, Vector2 origin, int count, Vector2 aim)
+    {
+        if (EnemyShipType.HeavyCannon.Missiles is not { } rack) return;
+
+        float cruise = EnemyShipStats.MissileSpeedFor(rack, MissileScenarioTier);
+        int damage = EnemyShipStats.BaseDamage + EnemyShipStats.MissileDamageAdd(MissileScenarioTier) + rack.DamageBonus;
+        Vector2 aside = new Vector2(-aim.Y, aim.X);
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 start = Vector2.Zero;
+            for (int attempt = 0; attempt < ResampleAttempts; attempt++)
+            {
+                float along = EnemyMissileCorridorMin + (float)em.Rng.NextDouble() * (EnemyMissileCorridorMax - EnemyMissileCorridorMin);
+                start = origin + aim * along + aside * ((float)em.Rng.NextDouble() - 0.5f) * 2f * EnemyMissileCorridorLateral;
+                if (!OverlapsAsteroid(em, start)) break;
+            }
+
+            Vector2 velocity = (origin - start).Normalized * cruise;
+            float remainingFuse = RemainingFuse(rack.Fuse, em.Rng);
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(start));
+            em.AddComponent(entity, new Velocity(velocity));
+            em.AddComponent(entity, new Ammo(velocity, EnemyShipStats.MissileAmmoRadius, remainingFuse, IsEnemy: true, damage, AmmoColor.Red));
+            em.AddComponent(entity, new Missile(playerEntity, cruise, cruise, WeaponStats.MissileLaunchAcceleration, rack.TurnRate, Steering: 0f));
+            em.AddComponent(entity, new Health(rack.RoundHealth, rack.RoundHealth));
+        }
+    }
+
+    private static bool OverlapsHull(Vector2 position, List<(Entity Entity, Vector2 Position, float Radius)> hulls, float clearanceRadius)
+    {
+        foreach (var (_, hullPos, radius) in hulls)
+        {
+            float clearance = MathF.Max(radius, clearanceRadius) + AsteroidClearance;
+            Vector2 offset = hullPos - position;
+            if (offset.X * offset.X + offset.Y * offset.Y < clearance * clearance) return true;
+        }
+        return false;
+    }
+
+    // A seeded round has been flying for a while: its fuse is half-to-fully unspent, uniformly, so
+    // the window neither ends every round on the same tick nor hands the world fresh fuses.
+    private static float RemainingFuse(float fuse, Random rng) => fuse * (0.5f + (float)rng.NextDouble() * 0.5f);
 
     private static void SeedVolleyInFlight(
         EntityManager em, Vector2 origin, WeaponType weapon, int count, Vector2 aim, float streamLength, Random rng,

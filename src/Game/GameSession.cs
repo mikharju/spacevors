@@ -523,7 +523,7 @@ public sealed class GameSession
             $"[PERF] frame={frame} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +
             $"render={renderMs:F2} other={frameMs - simMs - renderMs:F2} " +
             $"ents={Count<Position>()} ammo={Count<Ammo>()} sparks={Count<DamageSpark>()} explosions={Count<Explosion>()} " +
-            $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()} " +
+            $"beams={Count<LaserBeam>()} mines={Count<EnemyMine>()} ships={Count<EnemyShip>()} asteroids={Count<Asteroid>()} pickups={Count<XpPickup>()} missiles={Count<Missile>()} " +
             GcColumns() + (shot ? " shot=1" : string.Empty));
 
         if (frame == _scenario!.MeasureTicks)

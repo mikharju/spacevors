@@ -91,12 +91,12 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md
+- Missile-loaded perf scenarios (missile-384/1024) — shipped — plans/MISSILE_PERF.md
 - Minor shipped features (camera-follows-mouse, rocks-as-cover, aim-line volley, ...) — record — plans/MINOR.md
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
 - Parallel sim — plans/PARALLEL_SIM.md
-- Missile-carrying perf scenarios — plans/MISSILE_PERF.md
 - Pop/swap compact ECS storage — plans/POP_AND_SWAP.md
 - Loot drops — plans/LOOT_DROPS.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
@@ -109,7 +109,6 @@ plans/functional-ecs.md.
 - New enemy archetypes: kamikaze, sniper, minelayer, shielded hull
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
 - Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
-- Missile-carrying perf scenario: price missiles before any parallel-sim decision (plans/MISSILE_PERF.md)
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
 - Loot/reward loop: salvage buys rerolls, free mount swaps, cargo space (plans/LOOT_DROPS.md)
 - Off-screen threat indicators for enemy racks and missiles

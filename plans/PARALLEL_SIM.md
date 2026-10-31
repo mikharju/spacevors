@@ -335,3 +335,9 @@ never more than half the machine, exposed as a settings value + `SPACEVORS_WORKE
 Prefer blocking/yield waits over spin-wait barriers (spin-wait steals cycles from other apps and
 heats laptops). Note `Environment.ProcessorCount` counts *logical* CPUs and ignores hybrid P/E
 topology, so the sweep — not the core count — should set the default.
+
+## Follow-up (2026-10-31) — a missile-loaded gate world exists
+
+The scenario plan's prerequisite landed: `missile-384` / `missile-1024` are seeded, deterministic,
+missile-loaded worlds (`--sim` numbers in plans/MISSILE_PERF.md Shipped). Stage 0/3/4 gates can
+A/B against them without writing a fixture.

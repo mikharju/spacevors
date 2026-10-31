@@ -41,7 +41,7 @@ GATE_MEDIAN_FACTOR = 1.15
 GATE_P99_FACTOR = 1.25
 GATE_SHAPE_FACTOR = 2.0
 SECONDS = ["dt", "sim", "apply", "render", "other"]
-COUNTS = ["ents", "ammo", "sparks", "explosions", "beams", "mines", "ships", "asteroids", "pickups"]
+COUNTS = ["ents", "ammo", "sparks", "explosions", "beams", "mines", "ships", "asteroids", "pickups", "missiles"]
 GC = ["gen0", "gen1", "gen2"]
 
 

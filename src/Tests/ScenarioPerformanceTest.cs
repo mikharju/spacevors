@@ -54,6 +54,11 @@ public class ScenarioPerformanceTest
         // and this host measured 0.29ms median against 0.22KB per tick.
         new("hull-stream", DesktopMs: 5.0, CiMs: 15.0, AllocKbPerTick: 400.0),
         new("hull-crowding", DesktopMs: 1.5, CiMs: 4.5, AllocKbPerTick: 40.0),
+        // The two missile worlds (plans/MISSILE_PERF.md): ammo-spray plus guided rounds. This host
+        // measured 1.79ms (384) and 3.02ms (1024) sim median at --iters 3, so the desktop band
+        // follows ammo-spray's 2.5x headroom over the observed number.
+        new("missile-384", DesktopMs: 5.0, CiMs: 15.0, AllocKbPerTick: 450.0),
+        new("missile-1024", DesktopMs: 8.0, CiMs: 24.0, AllocKbPerTick: 500.0),
     ];
 
     public static IEnumerable<object[]> Budgets =>

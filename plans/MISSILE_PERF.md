@@ -1,6 +1,6 @@
 # MISSILE_PERF.md — missile-carrying perf scenarios
 
-Status: proposed (2026-10-31). Plan only; no code changed.
+Status: shipped (2026-10-31)
 
 ## Why
 
@@ -29,19 +29,24 @@ ladders) arrives.
 
 ## Scenarios
 
-Names final at implementation; roles fixed:
+Two scenarios, one per missile count (decisions below). Both measure 120 ticks.
 
-- `missile-barrage` — **realistic steady state**: Shadow with 2-3 armed racks firing at a
-  ring of enemy hulls that carry tier-10 racks of their own; missiles live in both
-  directions; launch/detonation cycles inside the measured window (measure longer than the
-  default 120 ticks — a rack volley is cooldown-paced, see open question 2).
-- `missile-ladder` — **headroom curve**: N silent guided rounds already in flight aimed at
-  high-hp hulls, N = 16 / 64 / 256 / 1024, one spec parameterized like `scale-ladder`.
-  `perEntity` gives per-missile guidance + collision ns; circle-reject and grid behaviour
-  included.
-- `missile-vs-ammo` — **point-defence interaction**: `ammo-spray`'s ~7k-round stream with
-  enemy missiles crossing it. Prices the cross-fire pass, missile hp absorption and breakup
-  smoke — the answer to "is shooting down missiles free?" in numbers.
+- `missile-384` — 384 guided rounds live, mixed on purpose: **half enemy-guided** rounds
+  flying through a seeded `ammo-spray`-scale player round stream (player guns shoot them
+  down), and **half player-guided** rounds locked on seeded enemy hulls that carry their
+  normal guns and racks (enemy fire shoots those down). So both PD directions run, and
+  guidance runs for the full count. Racks stay silent: everything is seeded already in
+  flight, like `ammo-spray` does with bullets.
+- `missile-1024` — same composition, 1024 rounds.
+
+How the numbers are read:
+
+- `missile-X` vs the same-seed `ammo-spray` twin → **the missile price** at that load.
+- `missile-1024` minus `missile-384`, divided by 640 → **marginal per-missile ns**
+  (guidance + grid + PD), the ladder point without a ladder of runs.
+
+Detonations and shot-downs happen inside the window and are reported as count ranges
+(`missiles=n/cap`, effects), not held constant.
 
 Keep the existing unarmed scenarios untouched; these are additions, not edits.
 
@@ -54,9 +59,10 @@ Keep the existing unarmed scenarios untouched; these are additions, not edits.
    invariant), so no rng draw there. Locks point at seeded hulls. Reuse the bullet guard
    pattern: resample until clear of every hull/asteroid, and randomize fuse ages so detonations
    do not stack on one tick.
-2. **Armed-hull variant** — extend `AddUnarmedHull` with an opt-in `MissileWeapon` +
-   `MissileCooldown` on a hull (default stays unarmed so `hull-stream` / `hull-crowding` stay
-   byte-identical).
+2. **Armed-hull variant** — extend `AddUnarmedHull` with an opt-in hull that carries its
+   normal guns (so enemy fire can shoot down player-guided rounds) and, for enemy racks,
+   `MissileWeapon` + `MissileCooldown` (default stays unarmed so `hull-stream` /
+   `hull-crowding` stay byte-identical).
 3. **Scenario specs + budgets + count ranges** (`missiles=N/cap` range in `frames.jsonl` is
    already reported — reuse it), baselines, `.tools/scenario.sh` names.
 
@@ -69,19 +75,54 @@ Keep the existing unarmed scenarios untouched; these are additions, not edits.
 
 ## Acceptance when shipped
 
-- Table in the Shipped section: median/p99 sim ms and **per-missile ns** for each ladder rung,
-  plus `missile-barrage` and `missile-vs-ammo` deltas against their unarmed twins
-  (`baseline-idle`, `ammo-spray`) — that delta *is* the missile price.
+- Table in the Shipped section: median/p99 sim ms and **per-missile ns** for both counts,
+  plus each scenario's delta against its same-seed `ammo-spray` twin — that delta *is* the
+  missile price.
 - Verdict line for PLAN.md: keep/optimize/revert posture for missiles before parallel sim.
 - Add dated `## Follow-up:` pointer lines to plans/MISSILES.md (gap closed) and
   plans/PARALLEL_SIM.md (gate world exists).
 - Update the PLAN.md roadmap line to shipped and this file's header.
 
-## Open questions for the user
+## Decisions (user, 2026-10-31)
 
-1. Ladder ceiling: 1024 or 512 guided rounds? (1024 is far beyond play; it prices future
-   boss/elite content and the grid's behaviour under many moving hp-bodies.)
-2. `missile-barrage` measured window: 1200 ticks (one full rack volley cycle) at the cost of
-   longer runs, or 120 ticks with racks seeded mid-cooldown?
-3. Should `missile-vs-ammo` include a player-missile variant too, or is the enemy-missile
-   PD case enough for now?
+1. Two scenarios, fixed loads of **384** and **1024** missiles (no ladder of 16/64/256;
+   the 384→1024 delta gives the marginal per-missile number).
+2. Measured window: the default **120 ticks** to start; a longer volley-cycle window is a
+   later follow-up only if the 120-tick numbers say so.
+3. **Include the player-missile PD variant**: each scenario seeds guided rounds on both
+   sides, so player guns PD enemy missiles and enemy guns PD player missiles.
+
+## Shipped (2026-10-31)
+
+Landed as planned: `missile-384` and `missile-1024` scenarios, 120 ticks, both PD directions,
+silent racks. New seams: `ScenarioSpec.MissileCount`, `ScenarioWorld.SeedMissileWorld` (armed
+tier-10 hulls via the now-public `EnemyShipFactory.BuildTurret`, SeekerPod rounds on the player
+side, HeavyCannon-rack rounds on the enemy side), and a `missiles=` column on every `[PERF]`
+row. `ScenarioWorldTest` pins exact counts, both factions, live locks, armed hulls, no racks.
+
+Numbers (`--sim --iters 3`, host=sim, this host; medians):
+
+| world | median | p99 | alloc KB/frame | missiles mean→end |
+|---|---|---|---|---|
+| ammo-spray (twin) | 1.33-1.35 ms | 2.24-2.26 | ~296 | — |
+| missile-384 | 1.79 ms | 4.59 | 312 | 374 → 165 |
+| missile-1024 | 3.02 ms | 6.72 | 343.5 | 984 → 459 |
+
+- Missile price at play-relevant load: **+0.44 ms for 384 missiles (+34% of ammo-spray)**
+  ≈ 1.2 µs per missile per tick. Real play carries single-digit missiles, so its sim cost is
+  microseconds — the answer to plans/MISSILES.md's open question is "free at real counts".
+- Marginal cost 384→1024: (3.02−1.79)/640 ≈ **1.9 µs per missile** — mildly super-linear
+  (more PD hits and effect spawns per tick as density rises), still 45% inside the 8.33 ms
+  sim budget at 1024, which is ~100× the live missile count play can produce.
+- Counts decay hard (PD works), so the means sit well below the seeded counts — perEntity
+  style numbers should divide by the mean, not the seed.
+- Render (one llvmpipe window run, relative only per TROUBLE_SHOOTING #25): `world.missiles`
+  is 1.7 ms mean of a llvmpipe render dominated by the `hud.health` software-rasteriser
+  artifact — the missiles pass is small against `world.sparks`. Absolute render numbers need
+  a real-GPU run: `update-baseline-perf-stats.sh`-style window runs will create
+  `.tools/baselines/missile-*.json` on user hardware; no baselines were written from the
+  sandbox.
+- Ceilings added to `ScenarioPerformanceTest`: 5.0/15.0 and 8.0/24.0 ms (desktop/CI),
+  450/500 KB per tick; all 18 perf assertions pass.
+- Verdict for PLAN.md: **keep** — guidance, cross-fire PD and detonation are linear-ish and
+  cheap at play counts; the pre-condition for parallel-sim gate decisions now exists.

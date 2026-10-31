@@ -39,6 +39,9 @@ public sealed record ScenarioSpec(
     // Unarmed hulls placed by ScenarioWorld. The rock-based scenarios price bullet-vs-circle and
     // nothing else, so a change to how hulls collide would pass them unmeasured.
     ScenarioHulls Hulls = ScenarioHulls.None,
+    // Guided rounds seeded by ScenarioWorld (plans/MISSILE_PERF.md): half enemy-guided down the
+    // ammo corridor, half player-guided on armed hulls that shoot back. 0 leaves the world unarmed.
+    int MissileCount = 0,
     int Seed = EntityManager.DefaultRngSeed);
 
 // Steady-state particle counts for the impact area, in entities.
@@ -133,6 +136,28 @@ public static class Scenarios
             AimOffsetR: 0f, StreamLength: 0f, WeaponFires: false, PlayerHealthRatio: 1f,
             MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
             Hulls: ScenarioHulls.Crowding),
+
+        // plans/MISSILE_PERF.md: the same ammo-spray world plus guided rounds. The pair with
+        // ammo-spray prices guidance + missiles-in-the-grid + cross-fire PD; the pair 384/1024
+        // divided by their count difference prices one marginal missile.
+        new("missile-384",
+            "ammo-spray plus 384 guided rounds: 192 enemy-guided flying back down the ammo corridor " +
+            "(the seeded stream is their point defence) and 192 player-guided locked on 8 tier-10 " +
+            "armed hulls that shoot back. Racks silent, so the count is exact.",
+            Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
+            AimDirection: TowardTestAsteroid, AimOffsetR: 1.05f, StreamLength: 0f, WeaponFires: false,
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
+            Effects: new SeededEffects(Sparks: 6000, Explosions: 1200),
+            MissileCount: 384),
+
+        new("missile-1024",
+            "The same missile world at 1024 guided rounds. missile-1024 minus missile-384, over 640 " +
+            "more missiles, is the marginal per-missile cost without running a ladder.",
+            Ship: LoadTestShip, SeededWeapon: WeaponType.LoadTestWeapon, BulletCount: 5500,
+            AimDirection: TowardTestAsteroid, AimOffsetR: 1.05f, StreamLength: 0f, WeaponFires: false,
+            PlayerHealthRatio: 1f, MeasureTicks: DefaultMeasureTicks, FrameMsBudget: TargetFrameMsBudget,
+            Effects: new SeededEffects(Sparks: 6000, Explosions: 1200),
+            MissileCount: 1024),
     ];
 
     public static ScenarioSpec? Find(string name) =>

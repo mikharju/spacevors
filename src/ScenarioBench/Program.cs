@@ -75,7 +75,7 @@ public static class Program
             $"[PERF] frame={tick} dt={simMs:F2} sim={simMs:F2} apply=0.00 render=0.00 other=0.00 " +
             $"ents={Count<Position>(em)} ammo={Count<Ammo>(em)} sparks={Count<DamageSpark>(em)} " +
             $"explosions={Count<Explosion>(em)} beams={Count<LaserBeam>(em)} mines={Count<EnemyMine>(em)} " +
-            $"ships={Count<EnemyShip>(em)} asteroids={Count<Asteroid>(em)} pickups={Count<XpPickup>(em)} " +
+            $"ships={Count<EnemyShip>(em)} asteroids={Count<Asteroid>(em)} pickups={Count<XpPickup>(em)} missiles={Count<Missile>(em)} " +
             $"gc0={gen0 - _lastGc0} gc1={gen1 - _lastGc1} gc2={gen2 - _lastGc2} allocKb={(allocated - _lastAllocBytes) / 1024}");
 
         _lastGc0 = gen0;

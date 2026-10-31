@@ -489,3 +489,8 @@ plans/DIFFICULTY_SCALING.md R2.12).
   host's p99 band is ±0.3 ms, so all of it sits inside noise). A missile-carrying scenario is the missing
   measurement.
 
+
+## Follow-up (2026-10-31) — measurement gap closed
+
+The missing "missile-carrying scenario" this file recorded as open now exists: `missile-384` /
+`missile-1024`, with the measured missile price. See plans/MISSILE_PERF.md Shipped section.
