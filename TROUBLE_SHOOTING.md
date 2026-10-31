@@ -485,3 +485,9 @@ frame can be *looked at* depends on the active model: an image-capable one reads
 `.tools/shots/*.png` directly, but 1920x1024 is downscaled, so crop first when
 small text or 1-px detail matters. Keep the assertions numeric (`diff.sh`), so a
 test never depends on the model's eyes.
+
+## 61. A scenario's slow window run can be the HUD reacting to the scenario's data, not the feature measured
+
+- **Symptom**: `missile-384` window runs at 183 ms median while its `--sim` median was 1.8 ms, so sim was fine and render was pathological — but nothing about missiles was being changed.
+- **Cause**: `HudRenderer.DrawHealthBar` drew one rounded pip per hp point (six primitives each); the scenario set the player's hp to 40,000, so the HUD emitted ~240,000 draw primitives per frame. Any scenario that inflates a "small integer" stat can trip a per-unit loop written for play-scale values.
+- **Fix / Prevention**: With `SPACEVORS_DIAGNOSTIC=1` every window run carries a `renderPasses` worst-first table — read it before touching the feature under test; one pass at 96% of the frame names the culprit outright. Keep HUD/per-unit renderers bounded (fixed draw counts) when the stat can be inflated by tests or upgrades.
