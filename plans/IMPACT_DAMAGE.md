@@ -155,3 +155,18 @@ so impact kills loot/explode identically to gun kills.
    spark commands spawned only above threshold.
 3. **Tune + docs**: playtest feel (ram a few asteroids), adjust the table constants,
    PLAN.md/ARCHITECTURE.md updates.
+
+## Shipped — impact damage (verified 2026-10-31)
+
+
+Fast collisions between ships and asteroids (and ships vs ships) deal closing-speed damage; gentle bumps deal none, and one hit can never destroy the initial hull.
+
+Implementation (plan: plans/IMPACT_DAMAGE.md):
+- `ImpactDamage.ForMasses` (Domain/Combat): absorbed energy ½·μ·v² at the contact normal split by inverse-mass share (lighter body absorbs more); zero below 160 px/s closing speed — side-by-side flight and swarm jostling never hurt; quadratic ramp capped at 3, so one hit costs at most 3 of the initial 8 hp Scout hull
+- Tuning targets: normal 400 px/s ram = 1 (small impact); big collision at 800 px/s closing (explosion-flung, head-on) = 3; retuned down again (was 2/7) — tune constants at the top of `ImpactDamage.cs`
+- Wired into `CollisionSystem.ResolveCollision` using the closing speed and masses the impulse solve already computes (hot-path cost: one compare); damage only on approach, so resting contact never chips hp — no cooldown state
+- Player and enemy ships take damage through the existing per-frame health accumulator, so the existing death pass runs the full kill flow (loot, explosion, sparks) for impact kills; asteroids (no Health) and mines (own contact rule) take none
+- Hits where either body absorbs ≥ 2 damage throw a spark burst (2 + damage/3, cap 6) at the contact point
+- Death graphics render fully: the fatal hit writes `Health(0)` (without it the killing blow from high hp left the hull shading scalar stale and the wreck looked pristine), and game over waits 1.2 s after the player dies — simulation keeps running so holes, ember glow, smoke and sparks play out before the overlay; input stops at death
+- 16 new tests in ImpactDamageTest (threshold, quadratic scaling, mass split, cap, 1-point ram and 3-point big-impact calibration, death flow, zero-health on fatal hit, side-by-side zero damage, mine exclusion); PerformanceBenchmark collision stress unchanged
+

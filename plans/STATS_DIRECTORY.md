@@ -127,3 +127,9 @@ Optional add-on: asteroid stats (`AsteroidFactory` radius ranges 35–50 / 125�
 - `PickRandomType` was rewritten from threshold checks (0.333 / 0.666) to a weighted cumulative walk over `EnemyShipType.All` using the new `SpawnWeight` field (all 1f). Result: exactly ⅓ each instead of 0.333/0.333/0.334, still one RNG draw per call — determinism preserved (`WorldRngTest` passes).
 - Enemy ammo radius now lives on `EnemyShipStats.AmmoRadius`; `TurretFiringSystem.DefaultAmmoRadius` stays as the fallback for unknown player weapon names (as planned in item 3).
 - Asteroid stats were not added (optional add-on, out of scope).
+
+## Shipped — stats directory (verified 2026-10-31)
+
+
+All tuning data lives in `src/Domain/Stats/` as code-first record structs + named constants: player ships/engines (`PlayerShipStats`), weapons/loadouts (`WeaponStats`), enemy types + spawn weights + tier curves + shared enemy weapon (`EnemyShipStats`), mines (`MineStats`), upgrades + XP curve (`UpgradeStats`), loot/magnet values (`LootStats`), and the whole difficulty/spawn curve in `SpawningStats` (initial world, enemy-ship spawning, mine respawns, chase/cull). `Components/` holds runtime per-entity components only. See plans/STATS_DIRECTORY.md.
+

@@ -267,3 +267,43 @@ All previously open questions are settled — implement as written, tune by play
 - `AimAcquireTolerance` / `FireAimTolerance` (3°/8°): widen `FireAimTolerance` only if guns read as too eager to miss; per-weapon tolerances are the first fields to add to `WeaponStats` if flak-type weapons want a "point roughly" allowance.
 - Slot arc spans per ship (`TurretLayout.cs`) — the whole point of putting arcs on slots is that these are retunable without touching weapons.
 - If the pattern proves fun, an obvious later upgrade is per-weapon **turn speed** as an upgradeable stat, so the player can buy out of a sluggish heavy gun.
+
+## Shipped — turret layouts (verified 2026-10-31)
+
+
+Ships have a turret layout: Multiple turret slots with following properties:
+- size (large, small)
+- arc of fire (degrees) how far can the turret turn
+- direction (degrees) which way the weapon points if centered in the middle of it's firing arc
+- Location on hull (Vector from ship center)
+- name (eg. main_gun, small_left,, small_right, small_back)
+
+Weapons get:
+- Size (large, small)
+- Turning speed (degrees / s)
+
+Ships may get new weapons to put into their turret slots on the 5 level new weapon cards.
+- User chooses which slot the weapon goes into.
+- Large weapon may not be mounted on small slot
+
+During upgrade when user is choosing where to new weapon: 
+- render large ship graphic with empty turrets shown as greyish blue circles
+- render the arc of fire as green section of circle originating from center of turret showing which directions the turret may fire in
+
+Graphics: 
+- Render a greyish blue circle where the turret location is, different size for large and small
+- Render triangle greyish red triangle in turret circle when turret is mounted
+- Triangle turns to point where the turret is pointing
+
+Ships get the same starting weapons as currently, but they are now in their turret slots
+- Add one more turret slot to each ship (small ships end up with two empty slots and large ship with three)
+- If ship has free turret slots, most weapons offered must be of type fitting the free slot. 
+- Minority of offered new weapons may be of size whose slots are all full; instead of forcing a replacement, such a weapon can wait in cargo and be swapped in later.
+- Implemented: one entity per hull mount (`TurretSlot`), created by `WorldFactory` from `TurretLayouts` (Scout 3, Fighter 4, Shadow 3, Heavy 7 — two free on the small ships, three on Heavy). A filled mount also carries `Turret`/`TurretAim`/`Position`/`Rotation`; the arc, offset and size belong to the slot, the size/range/turn speed to the weapon (`WeaponType.Size`, `WeaponStats.TurnSpeed`). Slew is hull-relative, so absolute rate = hull rate + turn rating and a hull turning faster than a gun drags its aim off target — intended. `AimAcquireTolerance` 3° stops the correction, `FireAimTolerance` 8° restarts it and is also the firing gate, so a sweeping mount fires as it crosses a target and a spinning hull silences guns rated below its turn rate. With no valid target a mount walks back to the middle of its arc and parks. `TwinChainGun` is gone (it needed a slot of its own); every other weapon fits a slot. Mount screen: `MountMenuRenderer` (hull unrotated, empty mounts as greyish-blue circles sized by slot, arcs as green sectors, mounted guns as greyish-red circles with a point sticking out, number badges + right-click back); in-game markers use the same shapes. Perf: `ammo-spray` sim median 1.25 ms vs 1.26 ms on `HEAD`, `impact-storm` 2.06 vs 2.09 ms — no measurable cost (scenarios silence player turrets, so the slew path is not in these numbers).
+
+
+- Cargo follow-up: replacing a mounted weapon destroyed it, so weapons now have a home instead. `WeaponCargo` on the player holds inactive turrets — with their upgraded stats, because it stores the `Turret` component, not a weapon name — and the mount screen is one screen for both entries: placing a card's weapon, or rearranging from the stats screen. With a weapon in hand, clicking or pressing a mount fits it there and any gun in the way is displaced into cargo and becomes what is held next; with nothing in hand, clicking a mounted gun takes it down into cargo. A weapon from a card can be stored with C and re-offered never happens: cargo weapons count as owned, and being inactive they are not offered stat upgrades either (those come from the turrets on the hull). The old `ReplaceSlot` step and the "at most one weapon that needs a replacement" hand rule are gone. Cargo never appears in perf scenarios (their player has no turrets, so no level-up). Sim cost unchanged: `ammo-spray` 1.26/1.27 ms against 1.30/1.32 on the previous commit, `impact-storm` 2.09/2.11 against 2.17/2.19 — measured in one session, this change is free.
+
+- Fitting-screen and card follow-up: every hull mount carries its number all the time (a mount's key no longer depends on what else is on screen), the mounts that accept the weapon in hand are drawn with a green ring (`Palette.TurretFits`, doubled when hovered), and a new-weapon card names its mount size in the accent line and lists the gun's base range / damage / attack speed / projectile speed below it — honest numbers because a new weapon has no upgrades yet. The stat block is skipped rather than squeezed on cards narrower than 150 px.
+- Marker shape follow-up: a bare triangle read as ambiguous about which way the gun points, so a mounted mount is drawn as the same circle an empty mount has, plus a triangle whose base corners sit inside the circle (0.93 radius, hidden by the opaque disc) and whose tip reaches 1.9 radius. One helper, `RenderHelpers.DrawTurretMarker`, draws both shapes for the world and the mount screen. Measured on the sandbox's software-GL host (`ammo-spray`, window mode, iters 1): median 15.62 ms against 15.55 ms before — the extra draw call per mount is noise; the `world.turrets` pass stays at 0.014 ms mean over 240 frames. Bug found while drawing them: the marker heading (`Rotation`) was only written on ticks where a mount slewed, so a mount holding still kept an old heading while the ship turned and then snapped to the right one the instant it started firing — which read as turrets teleporting onto a target. A mount's `Rotation` is now derived every frame from the hull plus `TurretAim` (`TurretMount.SyncWorldTransforms`), the same way its position already was; the simulation writes only `TurretAim`.
+

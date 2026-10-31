@@ -133,3 +133,16 @@ no new draw passes; batching of the world is untouched.
 2. Upgrade menu (4a: dim + soft cards) + stats screen (5) + ship select (6).
 3. Targeting polish (3a) + optional XP bar (2a) — 2a needs `Player.Xp/Level` reads
    in the HUD, still renderer-only.
+
+## Shipped — UI polish (verified 2026-10-31)
+
+
+Plain soft-depth UI language across HUD and menus: rounded translucent panels, soft shadows, one accent color, eased values — no new bitmaps or fonts.
+
+Implementation (plan: plans/UI_POLISH.md):
+- `Ui.cs` helper: rounded rects (2 rects + 4 circles), panels (shadow + translucent fill + 1px border), alpha/easing/fade helpers; `Palette` gains the design language (accent cyan, off-white/muted text, translucent panel colors, green→amber→red `HealthColor` gradient)
+- HUD: hp bar is one rounded pip per hp point with eased fade-out on loss + muted "8/8" readout; new thin top-edge xp bar (accent fill, "LV n" readout — the HUD showed no xp before); game over fades a dark overlay + title + accent rule + "Press R to restart" hint (the hint never existed)
+- Upgrade cards: rounded panels with shadow, hover lifts 4px + accent border, value in accent / label muted, rounded key badge, 150 ms fade-in; stats screen: rounded panels, accent headers with hairline rule, alternating row tint, accent LV readout; ship select: rounded cards, accent selection stripe, trackless rounded scrollbar
+- Targeting: 1.5px arms, manual lock pulses at 1 Hz (alpha 229–255), hp bars rounded 3px and only when damaged
+- Renderer-only; visual verification pending a display (TROUBLE_SHOOTING.md #25)
+

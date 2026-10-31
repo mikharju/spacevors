@@ -173,3 +173,16 @@ Same thresholds as the smoke/spark system, so the effect language stays consiste
 2. Tier C holes + D embers; tune thresholds/rates visually.
 3. Wire hp ratio from `Health` in `EnemyShipRenderer` / player ship draw path;
    diagnostic key; docs update.
+
+## Shipped — hull damage shading (verified 2026-10-31)
+
+
+Damaged ship hulls show procedural scorch marks, impact craters, perforation holes and pulsing ember glow — no new bitmaps; undamaged hulls render bit-identically to before.
+
+Implementation (plan: plans/DAMAGE_SHADING.md):
+- Damage scalar [0,1] rides the previously unused vertex-color B channel (RG already held the rotation angle); `DamageShading.FromHealth` maps hp ratio: 0 until the 2/3 smoke threshold, continuous to 1 at destruction; wired for player and enemy ships only (asteroids/mines pass 0)
+- Lighting shader damage block (skipped entirely at damage 0): hash Voronoi field over sprite-local UVs → impacts appear and craters widen with damage; soot darkens albedo, crater dents perturb the normal map and sink the depth map so the existing diffuse + self-shadow passes shade them; patterns rotate with the hull while lighting stays screen-space (turning damaged ships keep lit/shadow sides)
+- Above ~0.55 damage: interior impacts punch alpha holes (space shows through) and craters/holes glow with a pulsing additive ember term (frame-global `uTime`); glow stays small so directional shading keeps reading
+- Diagnostic keys (SPACEVORS_DIAGNOSTIC=1): K halves target hp (existing, now also walks hull shading), new J halves player hp
+- Shader validated offline with glslang (no display in the build environment — in-game visual tuning pending); 4 new tests in DamageShadingTest (mapping, continuity, clamping)
+

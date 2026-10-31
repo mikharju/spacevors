@@ -110,3 +110,17 @@ Deviations from this plan:
 - Exact rates (2/6 puffs/s, 3 sparks/s), follow factor (0.5), and per-tick caps — starting values above are guesses.
 - Smoke color: single grey vs slightly darker/heavier tint for the <1/3 tier.
 - Puff size scaling with ship radius (`clamp(radius × 0.35, 4, 14)`) — Heavy (84 px) puffs may need a lower cap to avoid blobs.
+
+## Shipped — graphical damage indicators (verified 2026-10-31)
+
+
+Damaged ships emit grey smoke puffs below 2/3 hp, more smoke plus white sparks below 1/3 hp; both fade after 1 second and trail behind moving ships.
+
+Implementation:
+- `SmokePuff(Lifetime, InitialLifetime, Radius)` component (EffectComponents.cs), aged by EffectSystem like the other effects; rendered as a grey circle that grows to ~2x its spawn radius while fading (`WorldRenderer.DrawSmokePuffs`)
+- `DamageEffectSystem` (Domain/Combat, Intent phase): probabilistic per-tick emission — roll `rng < rate x dt`, light tier 2 puffs/s, heavy tier 6 puffs/s + 3 sparks/s; spawns inherit half the ship's velocity plus jitter, so puffs trail behind moving ships without per-tick source tracking
+- Per-tick spawn budget (1 puff + 1 spark) allocated in priority order: player > live manual target > fresh auto-mark (< `AutoTargetMark.FreshWindow` = 1 s old, shared with the bracket renderer) > others; ties broken by distance to camera then entity id. Particles live exactly 1 second, so steady-state live count is bounded by the budget — no separate culling pass
+- Ships outside the viewport (plus a 100 px margin) and dead ships never emit; all randomness goes through `view.Rng` after candidate sorting, so determinism is preserved
+- K diagnostic key (SPACEVORS_DIAGNOSTIC=1): halves hp of the locked target or nearest enemy ship to reach smoke tiers quickly
+- 7 new tests in DamageEffectTest (tiers, culling, ordering, budget, expiry); PerformanceBenchmark: DamageEffectSystem <= 0.09 ms/frame at 1k ships — no optimization needed
+

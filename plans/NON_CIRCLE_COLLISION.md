@@ -556,3 +556,85 @@ frustum capped by two discs) would make the math much heavier. Not free, not rui
 
 Still open on purpose: mass and inertia following the silhouette (a balance change to measure on its own),
 and an offline fitter that proposes layouts from a sprite instead of scoring the ones a human typed.
+
+## Shipped — non-circle hull collision (verified 2026-10-31)
+
+
+Hulls collide as the shape their art was drawn for (plans/NON_CIRCLE_COLLISION.md). Circles stay
+everywhere they were always right: rocks, mines, pickups, and every round in flight.
+
+- The primitive is a **capsule** — a segment inflated by a disc — and a hull is one to four of them.
+  Every pair of round primitives is then point/point, point/segment or segment/segment: normal, depth
+  and touch point all fall out of the closest points, uniquely, and round ends remove the
+  feature-pairing case that makes polygon pairs long and jittery. Polygon+SAT was priced at 10-50× this
+  for no gameplay gain; pixel-to-pixel was rejected outright (no normal, no depth, no contact point to
+  resolve, and it makes art load-bearing gameplay).
+- Shapes are **authored data** (`Domain/Stats/HullShapes.cs`), one per art id, in the sprite's frame and
+  in units of the hull's `Radius` — never derived from pixels at run time, because the sim must not
+  depend on the art. The numbers came off the silhouette with `.tools/measure-hull.py` (painted area in
+  R²: swarmer 3.97 against a disc's 3.14, so it stays a disc and it is also the most numerous hull;
+  interceptor 1.96, its disc 60% air → spine plus wing bar; heavy cannon 2.37 with paint out to
+  |u| = 0.89 → slab plus a pod at each wing end).
+- **The bounding radius did not move.** It is still what the grid indexes and culls by, so the broad
+  phase, explosion radii, spawn placement and the targeting ring are untouched, and a shape can never
+  reach past the query that found it (`HullShapesTest` pins it). The circle is kept as a conservative
+  reject in front of the shape test.
+- One contact per body pair per tick — deepest for resolution, earliest-along-path for a swept round —
+  so the impulse, the position correction and the impact-damage accumulator kept their shape.
+- Mass and inertia still come from the bounding radius, deliberately: making weight follow the silhouette
+  is a balance change and has to be measured as one.
+- Cost, same worlds with shapes on and off: `hull-stream` **0.75 vs 0.72 ms**, `hull-crowding` **0.37 vs
+  0.31 ms**. Against the pre-change baselines the stream got *cheaper* (1.20 → 0.75): a 5500-round volley
+  used to be eaten by a 45-radius disc its rounds could not see.
+- Diagnostics draws each hull's collider in cyan over its art instead of the old orange bounding circle —
+  enemy hulls and the player in play, and every preview on the ship select screen.
+- **Player hulls followed** (`Domain/Stats/PlayerHullShapes.cs`: Scout 4 capsules, Fighter 4, Heavy 5, Shadow
+  6, mounted on `ShipType.Shape` and carried by the `Player` component). `.tools/measure-hull.py` grew a
+  `--fit` mode so a layout is *scored* rather than eyeballed: each hull now covers 79-90% of its painted
+  area with 8-14% of the shape over visible air, against a disc that leaves 0.17-0.95 R² of the box as air.
+- A player's hurtbox can only shrink. Reach ≤ 1.001 R is exactly the condition that puts a capsule inside the
+  bounding disc (a capsule is the convex hull of its end discs, and the disc is convex), and that disc is the
+  reject queued in front of every test the player is in. Shape areas came to 2.28-2.66 R² against 3.14.
+- The art can stick out past the collider, and does: the Fighter's fore wings are painted out to 1.10 R, which
+  no shape inside the bounding radius can cover. That under-reach is the collision circle's, inherited rather
+  than new; closing it means moving `Radius`, which is also mass, explosion radii and spawn clearance.
+- Cost with player shapes, same worlds: `ammo-spray` **1.32 vs 1.28 ms**, `impact-storm` **2.11 vs 2.12**,
+  `hull-stream` **0.75 vs 0.78**, `hull-crowding` **0.36 vs 0.36**. One body, and its shape is only reached by
+  candidates its own circle could not reject. No scenario fires at the player, so the swept-round-vs-player
+  step is priced by proxy through `hull-stream` (+0.03 ms for a 2-capsule hull under a 5500-round volley).
+
+
+## Follow-up (shipped, verified 2026-10-31) — lumpy rocks collide as their shape
+
+
+The newer rock art is not a ball, so rocks now cross the same narrow-phase seam hulls do
+(plans/NON_CIRCLE_COLLISION.md, the "lumpy rocks as an option-A composite" follow-up).
+
+- What the art actually paints (`.tools/measure-hull.py`, in units of the rock's `Radius`): the three
+  original variants of each size fill **2.4-3.2 R²** of the 3.14 R² collision circle, so they stay discs and
+  keep the one-test circle path. The newer ones — `large-asteroid-4..7` and `small-4/5` — fill **1.7-2.3 R²**,
+  so their disc sat on 0.9-1.5 R² of empty space: bullets stopped by nothing, and the player's hull pushed by
+  nothing.
+- One entry per `Asteroid.Variant` in `Domain/Stats/AsteroidShapes.cs`: a disc for the round art, **two
+  capsules across the lobes** for the lumpy. Fitted by hill-climbing against `measure-hull.py`'s coverage and
+  air metrics and re-scored by hand at two decimals: 96-98% of the paint covered, 0.02-0.06 R² of the shape
+  on visible air, reach ≤ 0.96 R. `AsteroidShapesTest` pins the thickness and reach invariants, that the round
+  variants are discs and the lumpy ones are not, and that every variant the factory can roll has an entry.
+- The rock's `Radius` did not move: the grid still indexes and culls by it, the circle is still the
+  conservative reject in front of every shape test, and mass, inertia and impact damage still read the radius.
+  Rocks go through it everywhere they are a body: rock-vs-player, ship-vs-rock, rock-vs-rock, rock-vs-mine,
+  swept rounds (the same two steps as a hull: reject on the circle, then ask the shape) and beams, whose stop
+  length and glow now sit on the lump that was actually hit. A rock's shape turns with its `Rotation`.
+- `Asteroid.SmallVariantCount`/`LargeVariantCount` went 3/3 → **5/7** so the new art is picked at all —
+  with them at 3 the new sprites and shapes were dead data. One asset was silently missing: the depth map was
+  named `large-aseroid-6-depth.png`, so `large-asteroid-6` had no complete lit set and the loader skipped it;
+  renamed, and all 5 small and 7 large sets now load.
+- Diagnostics draws rock colliders as cyan capsules over the art (the same colour rule as hulls) instead of
+  the red bounding circle, so the fit is looked at rather than argued about.
+- Cost (`--sim --iters 3`, medians, same worlds before and after): `ammo-spray` **1.35-1.42 vs 1.35**,
+  `impact-storm` **2.20-2.23 vs 2.17**, `hull-stream` **0.85 vs 0.83**, `hull-crowding` **0.38-0.45 vs 0.39**,
+  `baseline-idle` **0.28-0.38 vs 0.28** — inside the run-to-run spread, because in those worlds the rocks the
+  stream shoots at are still discs. Worst case, measured on a scratch world where the seeded stream's target
+  rock *is* lumpy: `ammo-spray` **1.49**, `impact-storm` **2.33-2.39**, i.e. **+7-8%** for every round that
+  reaches a rock, still 3.5× inside the 8.33 ms budget. Keep, and leave the scenarios pricing the common case.
+

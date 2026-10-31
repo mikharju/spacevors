@@ -447,3 +447,45 @@ Order matters twice: the damageable-missile commit (4) lands **before** the enem
 23. **How many player missile guns in v1?** → **Three** (SeekerPod, HavocTorpedo, Swarmlet). Swarmlet has to be there: without it no weapon in the game has the growing-salvo fantasy the growth rule is written around — and it is the only one allowed to have it.
 24. **Should the Interceptor's missile variant change behaviour (stand-off kiter) or keep the hull's chase AI?** → **Keep the AI.** Same hull, same flight, different weapon is what makes the ladder legible in one sentence — and the reach difference comes from the missile's own range, not from the hull flying differently.
 25. **Model the variants as armament rows on the hull, or as extra `EnemyShipType` entries (one per hull+armament pair)?** → **Armament rows.** Extra types would triple the type list, duplicate every hull stat, and force graphics ids and difficulty tests to cover combinations the table already expresses.
+
+## Shipped — missiles (verified 2026-10-31)
+
+
+Guided rounds on both sides (plans/MISSILES.md; the rules are R15-R22 in plans/WEAPON_BALANCE.md and
+plans/DIFFICULTY_SCALING.md R2.12).
+
+- A missile is a round with a lock, not a hull: `Ammo` plus `Missile` plus `Health`, spawned like a
+  bullet and steered by `MissileGuidanceSystem` (first in the Intent phase). Its turn radius is
+  `Speed / TurnRate`, which is what keeps a lock dodgeable.
+- Three player guns, one per size and tier rung: SeekerPod (small, quick, unlock 5), Swarmlet (small,
+  three-round volley, unlock 5), HavocTorpedo (large, slow, unlock 10). Orange is the guided colour, and a
+  rack on the hull is drawn as a square that does not turn.
+- A guided round carries 1-3 hp and only the **other side's** fire can hit it: point defence is free,
+  because every gun and beam already on the hull is the answer. `MissileHealth` is the one card that buys
+  tougher rounds, and it is withdrawn at the ceiling rather than offered as a lie.
+- Enemy missiles are an **armament ladder over the three existing hulls**, not a fourth species: the
+  Interceptor starts carrying a few at 3 minutes and an even mix at 5, the HeavyCannon adds guns+missiles
+  at 8 and mostly carries them from 10. Guided rounds allowed in the air: 0 → 3 → 4 → 5 → 6 → 7 at
+  composition tiers 3 / 8 / 10 / 14 / 20, printed in the `[THREAT]` row as `missiles=n/cap`.
+- A rack launches from 1.4× the hull's own gun ring (capped at 1450 px) while the hull still brakes at its
+  old range, and its rounds stay at 165-250 px/s: far, slow and shootable is the whole design.
+- **A guided round builds to its speed.** It leaves at 0.7 × its card speed (`MissileLaunchFraction`) and
+  accelerates at 200 px/s² to that speed, so the card speed is a ceiling: SeekerPod 294 → 420, Swarmlet
+  343 → 490, HavocTorpedo 196 → 280 px/s, and an enemy rack's round 116 → 165 at tier 0 up to 175 → 250 at
+  tier 10 (still capped by the enemy ammo-speed ceiling). A guided round's speed is never rolled, so its turn
+  radius is a fact rather than a range: tightest just after launch (112 / 116 / 250 px for the player's three
+  guns) and widest at cruise, which is why R16 is measured at the launch end.
+- **A player rack is gated by range alone and does not aim:** its round leaves along the hull's nose and
+  steers onto the lock, so a forward mount covers what is behind the hull, and the price is the whole way
+  round at a slow launch. The enemy rack keeps its cone and keeps aiming, because a round launched backwards
+  from a 980-1330 px ring could not cross that ring inside its fuse.
+- **The dart is drawn 7.5 × the collision radius** — a fixed 5 px nose over a 3× longer shaft, ~45 px for the
+  torpedo and ~30 px for the pod rounds. At 2.5 it drew ~15 px and read as a bright dot. The body is painted
+  light grey for both sides, so the **flame** is the colour channel: Orange for the player's racks, Red for an
+  enemy's. It answers both the turn and the throttle still running, keeps its full colour at cruise, washes
+  toward white only in a hard turn, and has floors on length and brightness either way.
+- Sim cost: the pinned scenarios run unarmed, so they prove no regression only — `ammo-spray` sim median
+  **1.30-1.34 ms** and `impact-storm` **2.16-2.19 ms**, against 1.33 / 2.12 before any missile code (this
+  host's p99 band is ±0.3 ms, so all of it sits inside noise). A missile-carrying scenario is the missing
+  measurement.
+

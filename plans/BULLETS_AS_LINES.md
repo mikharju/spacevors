@@ -208,3 +208,19 @@ Also free: bump **RailGun** `AmmoSpeed` 900 → ~2500 so it reads as a proper ra
   pay more, and they are rare by design (slow fire rate).
 - **Line rendering**: `DrawLineEx` has flat caps; very thick short lines (Flak Curtain) may
   look square-ish — acceptable, tune radius/width by screenshot.
+
+## Shipped — bullets as lines, lasers, particle accelerators (verified 2026-10-31)
+
+
+Bullets are swept capsules instead of points: a bullet that jumps over a target between ticks still hits it, wide shots score grazing hits, and instant lasers plus streak-fast particle guns joined the arsenal.
+
+Implementation (plan: plans/BULLETS_AS_LINES.md):
+- Swept collision: every ammo entity is treated as the segment `[Position − Velocity·dt, Position]` (exact — ammo velocity is constant) inflated by `Ammo.Radius` (now the capsule half-thickness); hit test is segment-vs-circle and the **earliest hit along travel** wins, so no tunneling and grazing width fall out of the same code. Enemy shots can no longer skip over the player either
+- `SpatialGrid.GetQueryItemsInBox` serves the swept segment's AABB; `Vector2.ClosestPointOnSegment` (with projection parameter t) is the shared hit math
+- Lasers: `LaserBeam` component (static segment Start→Start+Dir·Length, `DamagePending` flag) — `TurretFiringSystem` fires it instantly at `turret.Range` when `WeaponStats.Hitscan`, `CollisionSystem` damages the **first thing hit only, exactly once**, `EffectSystem` fades the 0.12 s flash, renderer draws the fading line
+- Rendering: ammo draws as the swept line (`DrawLineEx`, thickness = 2·radius) — fast bullets as streaks; when the swept length is no longer than the bullet is wide the line would read as a bar across it, so those draw as a round dot instead
+- New weapons: **Laser Lance** (hitscan sniper), **Prism Lance** (3 parallel beams via `BeamSpacing`), **Ripple Cutter** (short 32-px-wide panic beam), **Cyclotron** (4200 px/s particle stream), **Graviton Burst** (5-pellet accelerator volley), **Flak Curtain** (slow wide flak disc — grazing does the aiming); RailGun sped up 900→2500 px/s
+- Ship loadouts: Scout = Cyclotron, Fighter = Laser Lance + Cyclotron, Heavy = machinegun + side shotguns + Flak Curtain, Shadow = Graviton Burst; old weapons remain in the milestone upgrade pool
+- Milestone (every 5th) level-ups now offer 5 random choices instead of 3
+- 24 new tests (box query, closest-point math, tunneling, grazing, earliest-hit order, laser once-only/first-hit/blocking, hitscan firing, milestone choice count); ammo-heavy benchmark stays inside the 8.3 ms budget (CollisionSystem ≈ 7.3 ms at ~15k bullets)
+
