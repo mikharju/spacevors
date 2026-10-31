@@ -1,8 +1,8 @@
 # DOC_LAYOUT.md — documentation reorganization
 
-Status: active (implementing 2026-10-31)
+Status: shipped (2026-10-31)
 
-Status: active (implementing 2026-10-31)
+Status: shipped (2026-10-31)
 
 ## Goal
 
@@ -15,7 +15,7 @@ the single store of feature detail: one file per feature, carrying its full life
 |---|---|---|
 | `AGENTS.md` | Rules + doc-routing workflow (below) | ~80 lines |
 | `PLAN.md` | Vision, core gameplay, gameplay controls, feature index, roadmap (one-liners), done criteria | ≤ 150 lines |
-| `ARCHITECTURE.md` | Stack, layers, ECS, phases, determinism, perf budgets, **current invariants** incl. capsules; pointer per subsystem to its plan file | ≤ 200 lines |
+| `ARCHITECTURE.md` | Stack, layers, ECS, phases, determinism, perf budgets, **current invariants** incl. capsules; pointer per subsystem to its plan file | ~310 lines (project-layout tree kept for LLM navigation) |
 | `DIAGNOSTICS.md` (new) | `SPACEVORS_DIAGNOSTIC` / `SPACEVORS_DIAG_UPGRADES`: what the keys and env vars do. Usage only — no implementation, no history | ≤ 60 lines |
 | `TROUBLE_SHOOTING.md` | unchanged | — |
 | `plans/*.md` | All feature detail, lifecycle in one file | — |
@@ -132,3 +132,17 @@ Other files: `PARALLEL_SIM.md`, `POP_AND_SWAP.md`, `LOOT_DROPS.md` → proposed;
 - New `DIAGNOSTICS.md`, brief, usage only.
 - AGENTS.md updated in the same change.
 - Index format: one dated line per feature, linking the plan file.
+
+## Shipped (2026-10-31)
+
+- All steps 1–7 executed as committed above; docs-only, no code or test changes.
+- Every plans/*.md now carries a truthful `Status:` header; the lying "not implemented"
+  lines in PERF_SCENARIOS.md and MISSILES.md were corrected.
+- All PLAN.md "— done" sections moved verbatim to their plan files (mapping table above
+  held; only addition: ScatterCannon pointer note in WEAPON_BALANCE.md).
+- WAVES_AND_BREATHERS.md verified shipped against `WaveSchedule` in EnemyShipSpawnSystem.
+- New files: plans/MINOR.md, plans/DAMAGE_PERFORMANCE.md, DIAGNOSTICS.md (29 lines).
+- Sizes after migration: PLAN.md 139, AGENTS.md 145, ARCHITECTURE.md 309 (layout tree
+  kept), DIAGNOSTICS.md 29.
+- AGENTS.md gained the requested rule: read a plan's `Status:` header before trusting its
+  contents; below the header the body is frozen intent and may be stale.

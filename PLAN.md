@@ -92,7 +92,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md
 - Minor shipped features (camera-follows-mouse, rocks-as-cover, aim-line volley, ...) — record — plans/MINOR.md
-- Documentation layout and migration — active — plans/DOC_LAYOUT.md
+- Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
 - Parallel sim — plans/PARALLEL_SIM.md
