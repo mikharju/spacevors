@@ -129,6 +129,7 @@ plans/functional-ecs.md.
 - Perf gate in CI: `.tools/scenario.sh --check-baseline` on every push
 - Balance fuzzing: random upgrade sequences assert no card is ever a lie
 - Portability: Windows CI leg or a documented cross-platform run matrix
+
 ## Done criteria
 
 The game is considered complete when:
