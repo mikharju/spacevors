@@ -184,8 +184,8 @@ Two passes and one seam. `SpatialGrid` (broad phase) indexes and culls every col
 **bounding radius**. `NarrowPhase` answers "did they touch, how deep, which way" and always
 returns one `Contact(Normal, Depth, Point)`.
 
-- Every overlap in the game goes through that seam; the eight call sites in `CollisionSystem`
-  hold no circle math of their own.
+- Every overlap in the game goes through that seam; no call site in `CollisionSystem` holds circle
+  math of its own.
 - A body enters as `CollisionBody(Position, Angle, Shape, Scale)`: circles (one-test fast path)
   for every round, mine and pickup; a hull is 1-4 capsules, a rock is a disc or two capsules by
   art variant — authored in `Stats/HullShapes.cs`, `Stats/PlayerHullShapes.cs`,
@@ -241,6 +241,7 @@ src/
         TargetingRenderer.cs     -- targeting brackets + hp bars
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
+        MountMenuRenderer.cs     -- turret-mount / cargo screen (hull, arcs, take down / fit)
         StatsScreenRenderer.cs   -- ship stats screen (Tab)
         ShipSelectScreen.cs      -- ship selection screen (scrollable list + input)
         RenderHelpers.cs         -- shared world→screen transform + screen-space culling helpers
@@ -260,7 +261,7 @@ src/
         AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI, drift
         Combat/                -- firing, click-target priority, auto-aim lead, collisions (the seam: swept capsules, beam first-hit), impact damage, effects, death explosions, threat readout (ThreatMeter, off the hot path)
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
-        Stats/                 -- all tuning data, code-first: PlayerShipStats, WeaponStats (weapons with tier unlock, loadouts), EnemyShipStats (per-tier drifts, spawn weights, tier curves, ceilings), HullShapes / PlayerHullShapes / AsteroidShapes (collision primitives per art id), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats. Balance rules asserted by Tests/WeaponBalanceTest.cs and Tests/EnemyDifficultyTest.cs; plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
+        Stats/                 -- all tuning data, code-first: PlayerShipStats, WeaponStats (weapons with tier unlock, loadouts), EnemyShipStats (per-tier drifts, spawn weights, tier curves, ceilings), HullShapes / PlayerHullShapes / AsteroidShapes (collision primitives per art id), TurretLayout (per-hull mount slots and sizes), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats, WaveStats + WaveSchedule (wave/lull timing). Balance rules asserted by Tests/WeaponBalanceTest.cs and Tests/EnemyDifficultyTest.cs; plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)
@@ -273,8 +274,10 @@ src/
         CommandProcessor.cs    -- applies a CommandBuffer to the EntityManager
         SpatialGrid.cs         -- broad-phase spatial hash
         Vector2.cs             -- 2D math
+        Angle.cs               -- rotation convention helpers (a faces (sin a, -cos a))
+        TurretMount.cs         -- mount slots as entities: fit/mount rules + SyncWorldTransforms
         CoolDownHelper.cs      -- FireCooldown read helper
-        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging; EnvVar is the single gate source (exceptions documented here)
+        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging; EnvVar is the single gate source (the other SPACEVORS_* seams are listed in DIAGNOSTICS.md)
         WorldFactory.cs        -- starting world: player, camera, hull turret mounts, asteroids, mines, enemy ships (seeded, no Raylib)
         Scenarios/             -- ScenarioSpec + the named perf scenarios + ScenarioWorld (seeded start states)
 

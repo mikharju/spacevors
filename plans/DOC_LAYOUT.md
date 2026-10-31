@@ -2,8 +2,6 @@
 
 Status: shipped (2026-10-31)
 
-Status: shipped (2026-10-31)
-
 ## Goal
 
 PLAN.md, ARCHITECTURE.md and AGENTS.md stay brief and never lie. `plans/` becomes

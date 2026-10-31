@@ -1,6 +1,6 @@
 # Plan: Pop/Swap Compact ECS Storage
 
-Status: proposed (2026-10-31, not implemented)
+Status: shipped (landed 2026-07-21 in 86ef7f7; this header was wrong until 2026-10-31 — see Shipped)
 
 ## Problem
 
@@ -142,3 +142,30 @@ Either approach is clean — the enumerator version is slightly cleaner since it
 | 3 long-lived entities (player, camera, turret) | Never destroyed, always at slot 0 — unaffected by compaction of other entities |
 | `_slotMap` dictionary overhead on every add/remove | Acceptable for 10k-100k objects; O(1) lookup. Could switch to `Dictionary<int,int>` later if measured as bottleneck. |
 | Iteration order changes | No code depends on iteration order (systems are commutative over entities) |
+
+## Shipped (2026-10-31):
+
+Landed 2026-07-21 in `86ef7f7` ("pop and swap"); the `Status:` header above sat wrong until this
+date. What landed: `_data`/`_entityIds` compact at slot `0..count-1`, swap-pop `Remove`, entity IDs
+stable across compaction, and slot-walking enumerators in `ComponentQuery<T1..T4>` — so no
+`.OrderBy()` and no `yield`/boxing per enumeration. All three planned tests are in
+`Tests/EcsTests.cs`, plus last/destroy-all/multi-component variants.
+
+Deviations from this plan:
+
+- **Slot map is `int[]`, not `Dictionary<int,int>`** — `_entityIdToSlot`, direct-indexed by entity id
+  with `-1` = absent, doubling from `InitialSlotMapCapacity` (20 000). Faster than the plan's
+  dictionary, but the map is still sized by the highest entity id ever created and ids are never
+  recycled (`EntityManager.CreateEntity`), so the plan's "memory bounded by active entity count" is
+  true only for the value arrays: ~4 bytes per id per component type for the map.
+- **Slot accessors were added** although the plan said "no new public methods": `TryGetSlot`,
+  `GetBySlot`, `GetComponent(slot)`, `GetEntity(slot)`, `GetComponentRef(entity)`. Queries iterate the
+  smallest storage by index and probe the rest with `TryGetSlot`; `PositionIntegrationSystem`,
+  `AmmoLifetimeSystem` and `PickupMagnetSystem` mutate through those refs (ARCHITECTURE.md, "Write
+  patterns" — the invariant, not the plan body, now governs that).
+- **No `GetEntityIds()`** — `ComponentStorageBase` exposes `GetEntity(int slot)` instead, and
+  `FindSmallest` shipped as fixed-arity overloads (`a1c31e7`) rather than the single `params` loop
+  sketched above: a `params` array allocated per multi-component `foreach`.
+- **Perf verdict: none on record.** The change predates the `.tools` scenario harness (shipped
+  2026-10-31), so `.tools/run/index.tsv` has no before/after row for it; today's baselines already
+  include it.

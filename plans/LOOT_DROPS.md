@@ -1,6 +1,6 @@
 # Plan: Enemy Loot Drops & Player XP/Leveling
 
-Status: proposed (2026-10-31, not implemented)
+Status: shipped (landed 2026-07-22 in 8b78646 "xp loot systems"; header corrected 2026-10-31 — see Shipped)
 
 ## Problem
 
@@ -173,3 +173,35 @@ Upgrades apply to main weapon AND all turrets:
 | Particles on collect | Blue sparks homing to player | XP: none. Health orb: green explosion + homing sparks |
 | Upgrade source | Random enemy drops | Level-up choices (3 options) |
 | PendingChoice | Used for upgrade pickups | Reused for level-up choices |
+
+## Shipped (2026-10-31):
+
+Landed 2026-07-22 in `8b78646` ("xp loot systems"); the `Status:` header above had been left saying
+"proposed, not implemented" through the 2026-10-31 doc reorganization. What shipped matches this
+plan: mines and enemy ships drop an `XpPickup` and, on `LootStats.HealthOrbChance`, a `HealthOrb`;
+`Player` carries `Xp`, `Level`, `PickupRadius`; `PickupMagnetSystem` pulls them in and collects on
+contact; `LevelUpSystem` spends the XP on `PendingChoice` + `PendingUpgradeOptions`; the old upgrade
+pickups (`UpgradePickupSystem`, `Upgrade`) are gone.
+
+Deviations from this plan:
+
+- **No `LootDropSystem.cs`** — the plan's own fallback won: spawning is inline in `CollisionSystem`
+  (`SpawnLootOnDeath` for mines, `SpawnShipLootOnDeath` for ships), next to the death event.
+- **Numbers moved and changed.** All tuning constants live in `Stats/LootStats.cs` (added by the
+  `STATS_DIRECTORY` move), not inline: ship XP 3, health-orb chance 0.05 and heal 3 HP as planned,
+  but pickup **lifetime is 90 s, not the 30 s** sketched here, magnet is `800 px/s²` capped at
+  **350 px/s** (the plan said ~300), and orb radii are relative to the mine's own pickup radius
+  (`HealthOrbRadiusOffset`) instead of a fixed 8.
+- **File layout moved twice since writing.** Components are grouped per category in
+  `Components/EffectComponents.cs` (no `XpPickup.cs`/`HealthOrb.cs`), and systems live under
+  `Domain/Progression/`, not `Domain/Systems/`.
+- **`Player.Xp` is a direct ref write, not a command.** `PickupMagnetSystem` writes through
+  `WorldView.GetComponentRef` so `LevelUpSystem` (same Resolution phase, later) sees the fresh XP in
+  the same tick — see ARCHITECTURE.md "Write patterns".
+- **The upgrade offer outgrew this plan's 3-options sketch.** Up to 5 cards (keys 1-5), `UpgradeCounts`
+  records how often each was taken, and a new-weapon card opens the mount/cargo screen —
+  plans/TURRET_LAYOUTS.md, not this file.
+- **Perf verdict: none on record.** The feature predates the `.tools` scenario harness (shipped
+  2026-10-31); current baselines already include it.
+- **Not shipped from here:** the salvage-currency / reroll loop that PLAN.md's roadmap pointed at.
+  It was never written up in this file; it now stands as a roadmap line only.

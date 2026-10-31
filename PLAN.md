@@ -78,11 +78,13 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 
 ### Enemies and difficulty
 - Waves and lulls — shipped — plans/WAVES_AND_BREATHERS.md
+- Loot drops: XP pickups, health orbs, magnet, XP/level-up — shipped — plans/LOOT_DROPS.md
 - Difficulty scaling and threat readout; open items remain — active — plans/DIFFICULTY_SCALING.md
 
 ### Physics and sim
 - Capsule collision: hulls and lumpy rocks as their shape — shipped — plans/NON_CIRCLE_COLLISION.md
 - Stats directory (Domain/Stats) — shipped — plans/STATS_DIRECTORY.md
+- Pop/swap compact ECS storage (slot arrays, O(1) delete, no per-enumeration sort) — shipped — plans/POP_AND_SWAP.md
 
 ### Graphics and UI
 - Damage graphics (smoke, sparks) — shipped — plans/DAMAGE_GRAPHICS.md
@@ -97,8 +99,6 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 
 ### Proposed, not implemented
 - Parallel sim — plans/PARALLEL_SIM.md
-- Pop/swap compact ECS storage — plans/POP_AND_SWAP.md
-- Loot drops — plans/LOOT_DROPS.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
 
 Frozen reviews/design notes: plans/CODE_REVIEW.md, plans/GRAPHICS_REVIEW.md,
@@ -110,7 +110,7 @@ plans/functional-ecs.md.
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
 - Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
-- Loot/reward loop: salvage buys rerolls, free mount swaps, cargo space (plans/LOOT_DROPS.md)
+- Loot/reward loop: salvage currency buys rerolls (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
 - Off-screen threat indicators for enemy racks and missiles
 - Run modifiers / seed flags: spawn-table toggles
 
