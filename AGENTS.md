@@ -58,7 +58,12 @@ For every task:
 2. Make the smallest useful change.
 3. Keep the project compiling.
 4. Verify behavior.
-5. Update PLAN.md and ARCHITECTURE.md if needed.
+5. Update documentation per the Documentation routing below.
+
+When a feature is completed: append `## Shipped (YYYY-MM-DD):` to its plan file (what landed,
+deviations from the plan, dated perf verdict), set its header to `Status: shipped`, and add or
+update its one-line entry in the PLAN.md feature index. Never paste feature detail sections
+into PLAN.md.
 
 After changing simulation systems or rendering, measure instead of assuming:
 
@@ -93,11 +98,30 @@ When proposing changes:
 
 Prefer bullet lists.
 
-## Planning
+## Documentation
+
+Root docs: AGENTS.md (rules) → ARCHITECTURE.md (invariants) → PLAN.md (roadmap + feature
+index) → DIAGNOSTICS.md (debug helpers) → TROUBLE_SHOOTING.md (past problems).
+
+plans/ holds one file per feature with all feature detail.
+
+- **Before trusting a plans/*.md file, read its `Status:` header** (proposed / active /
+  shipped / record). Below the header the file is frozen intent and **may be stale**.
+  Trust order: code + tests + ARCHITECTURE.md > `## Shipped` / `## Follow-up` sections >
+  plan body.
+- Headers must be true: when a feature lands, is superseded or abandoned, update its plan
+  header and its PLAN.md index line in the same commit.
+- Never rewrite a shipped plan's body or Shipped sections; append a dated
+  `## Follow-up (YYYY-MM-DD):` section.
+- Routing for new detail: feature decisions → that feature's plan file; cross-cutting
+  invariant → ARCHITECTURE.md; debug keys/env vars → DIAGNOSTICS.md; roadmap idea → one line
+  in PLAN.md; perf verdicts → dated records, live numbers in `.tools/run/index.tsv`.
+- Keep root docs brief: PLAN.md ~150 lines; ARCHITECTURE.md keeps overview + invariants +
+  project layout. When a section outgrows that, move it to a plan file and leave a pointer.
 
 Save plan files under plans.
-- Plan files may become stale later
 - When user asks for plan, only make plan file, do not implement, change code, run tests.
+- Start every new plan file with a `Status:` header line under the title.
 - Web search is ok when planning
 - If web search fails, report to user in reply which sites were not reachable
 
