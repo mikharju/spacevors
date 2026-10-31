@@ -1,5 +1,7 @@
 # WEAPON_BALANCE.md
 
+Status: active (reviewed 2026-10-31; open knobs marked below)
+
 Plan for a weapon balance pass: per-weapon identity, a DPS ordering rule (hitscan weakest), a
 lifted range ladder, and a two-tier split — starter guns at level 1, slightly stronger guns only
 on level-5 cards.

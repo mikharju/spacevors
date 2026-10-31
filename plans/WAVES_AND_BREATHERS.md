@@ -1,5 +1,7 @@
 # WAVES_AND_BREATHERS.md
 
+Status: shipped (verified 2026-10-31; WaveSchedule in EnemyShipSpawnSystem)
+
 Plan: discrete enemy waves + scheduled breather windows for loot/health collection, and how to
 *show* the pause instead of printing "Wave 4". 2026-10-19.
 

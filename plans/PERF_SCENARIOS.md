@@ -1,9 +1,10 @@
 # PERF_SCENARIOS.md — scripted perf scenarios with fixed start states + trace capture
 
-Status: **plan only — nothing in this file is implemented.** The `[SIM]` / `[APPLY]` / `[RENDER]`
-lines this plan builds on *are* implemented (added 2026-10-14, still uncommitted in
-`DiagnosticLogger.cs` + `GameSession.cs`); that is the only perf code that exists so far.
-Companion to `plans/PARALLEL_SIM.md` (it supplies the measurement that plan's Stage 0/3/4 gates need).
+Status: shipped (verified 2026-10-31)
+
+Written while unimplemented; everything in this file has since shipped — see the Shipped
+sections below. Companion to `plans/PARALLEL_SIM.md` (it supplies the measurement that plan's
+Stage 0/3/4 gates need).
 
 ## 1. Verdict: feasible, and closer than it looks
 

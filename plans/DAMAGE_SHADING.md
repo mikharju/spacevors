@@ -1,5 +1,7 @@
 # DAMAGE_SHADING.md
 
+Status: shipped (verified 2026-10-31)
+
 Plan for procedural hull-damage shading (2026-09-16). Complements the done smoke/spark
 plan (`DAMAGE_GRAPHICS.md`); this changes the hull itself, not particles.
 

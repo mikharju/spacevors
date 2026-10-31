@@ -1,5 +1,7 @@
 # NON_CIRCLE_COLLISION.md
 
+Status: shipped (verified 2026-10-31)
+
 Proposal: replace the circle-vs-circle narrow phase with shape-aware collision so hulls can
 collide as hulls and not as discs (2026-10-24).
 

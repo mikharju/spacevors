@@ -1,5 +1,7 @@
 # BULLETS_AS_LINES.md
 
+Status: shipped (verified 2026-10-31)
+
 Plan for turning bullets from points into swept lines, adding lasers and particle
 accelerators, and giving projectiles a width that scores grazing hits (2026-10-11).
 

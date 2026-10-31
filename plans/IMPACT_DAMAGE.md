@@ -1,5 +1,7 @@
 # IMPACT_DAMAGE.md
 
+Status: shipped (verified 2026-10-31)
+
 Proposal: impact damage rules for ship↔ship and ship↔asteroid collisions (2026-09-16).
 
 ## Status: done (2026-09-16)

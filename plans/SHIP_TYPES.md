@@ -1,5 +1,7 @@
 # Ship types
 
+Status: shipped (verified 2026-10-31)
+
 Ship types have:
 - One engine layout
 - Set of initial turrets

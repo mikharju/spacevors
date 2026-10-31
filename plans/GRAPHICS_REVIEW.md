@@ -1,5 +1,7 @@
 # GRAPHICS_REVIEW.md
 
+Status: record (frozen review)
+
 Review of all graphics-related code (2026-08-18).
 
 Scope: `src/Game/Renderer.cs`, `Lighting.cs`, `LitSprite.cs`, `LitSpriteMatcher.cs`, `ImageLoader.cs`, `ThrusterFlameRenderer.cs`, plus graphics-relevant parts of `SpaceVorsApp.cs` and `GameInitializer.cs`.

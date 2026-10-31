@@ -1,5 +1,7 @@
 # STATS_DIRECTORY.md
 
+Status: shipped (verified 2026-10-31)
+
 Plan for a central `Domain/Stats/` directory holding all ship, weapon, mine and related stat data (2026-09-19).
 
 **Status: implemented.** All three phases are done (commits "move … stats to Domain/Stats", "consolidate scattered stats into Domain/Stats", "add SpawningStats for difficulty tuning"). File names use the `…Stats` suffix per user request, and Phase 3 shipped as `SpawningStats.cs`. See "Implementation notes" at the bottom for deviations.

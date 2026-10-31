@@ -1,5 +1,7 @@
 # CODE_REVIEW.md
 
+Status: record (frozen review)
+
 Full codebase review, split into chunks to fit a 100k context window.
 
 ## Size estimate

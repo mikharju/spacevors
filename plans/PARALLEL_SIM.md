@@ -1,6 +1,7 @@
 # PARALLEL_SIM.md — parallel computing in the ECS hot path
 
-Status: **plan only, not implemented** (AGENTS.md: plan request → plan file only).
+Status: proposed (2026-10-31, not implemented)
+
 Scope: the fixed-timestep simulation tick (Domain). Rendering/audio/input untouched.
 
 ## 1. Why this is hard here (the three constraints)

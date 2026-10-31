@@ -1,5 +1,7 @@
 # TARGETING_HP_BARS.md
 
+Status: shipped (verified 2026-10-31)
+
 Plan for the PLAN.md section "Enemy hp bar visible on targeting graphic" (2026-09-14).
 
 ## Status: not started

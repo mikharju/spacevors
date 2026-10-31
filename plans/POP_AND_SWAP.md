@@ -1,5 +1,7 @@
 # Plan: Pop/Swap Compact ECS Storage
 
+Status: proposed (2026-10-31, not implemented)
+
 ## Problem
 
 Current `ComponentStorage<T>` uses entity ID as direct array index into a sparse `List<T>`. This causes:

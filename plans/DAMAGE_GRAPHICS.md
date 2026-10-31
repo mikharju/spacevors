@@ -1,5 +1,7 @@
 # DAMAGE_GRAPHICS.md
 
+Status: shipped (verified 2026-10-31)
+
 Plan for the PLAN.md section "Graphical damage indicators" (2026-09-15).
 
 ## Status: done

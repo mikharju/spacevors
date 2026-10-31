@@ -1,5 +1,7 @@
 # Turret layouts — implementation plan
 
+Status: shipped (verified 2026-10-31)
+
 Implements PLAN.md "Turret layouts". Plan only: no code changed here.
 
 Confirmed decisions:

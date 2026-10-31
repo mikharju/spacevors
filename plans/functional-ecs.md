@@ -1,5 +1,7 @@
 # PLAN: Functional Command-Based ECS
 
+Status: record (frozen design note)
+
 ## Goal
 
 Transform systems from direct mutators into read-only functions that receive a `CommandBuffer` parameter and add commands to it. Commands are batched and applied at end-of-phase, enabling parallel system execution within a phase while preserving correct ordering across phases.

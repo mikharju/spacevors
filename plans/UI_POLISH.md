@@ -1,5 +1,7 @@
 # UI_POLISH.md
 
+Status: shipped (verified 2026-10-31)
+
 Proposal: make the UI plain, elegant, pleasant — no new bitmaps, no fancy effects.
 All techniques are raylib immediate-mode primitives (rects, circles, gradients, alpha).
 

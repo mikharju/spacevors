@@ -1,5 +1,7 @@
 # DIFFICULTY_SCALING.md
 
+Status: active (reviewed 2026-10-31; open items marked below)
+
 Plan for fixing the inverted difficulty curve (2026-09-12).
 
 ## Status: P1–P6 implemented (P6 as the armament ladder — see R2.12)

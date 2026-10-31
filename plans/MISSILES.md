@@ -1,6 +1,8 @@
 # MISSILES.md — plan for guided missile weapons
 
-Plan only: no code changed here. This is the first item under PLAN.md "Near future".
+Status: shipped (verified 2026-10-31)
+
+Written while unimplemented; it shipped later — see the Shipped section below.
 
 ## Status: implemented (2026-10-17), 8 commits, 22 new tests
 

@@ -1,5 +1,7 @@
 # Plan: Enemy Loot Drops & Player XP/Leveling
 
+Status: proposed (2026-10-31, not implemented)
+
 ## Problem
 
 Dying enemies currently just disappear with no reward. Need a loot drop system where destroyed enemies leave behind collectible pickups that give XP and occasionally health. Players need an XP/level progression system with a pickup radius to magnetize nearby items.
