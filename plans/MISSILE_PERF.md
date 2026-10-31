@@ -126,3 +126,28 @@ Numbers (`--sim --iters 3`, host=sim, this host; medians):
   450/500 KB per tick; all 18 perf assertions pass.
 - Verdict for PLAN.md: **keep** — guidance, cross-fire PD and detonation are linear-ish and
   cheap at play counts; the pre-condition for parallel-sim gate decisions now exists.
+
+## Follow-up (2026-10-31) — a real-GPU missile-384 run looked slow: it was the HUD, not the missiles
+
+User's window baseline came back at **183.8 / 184.8 ms** median. The render-pass split localised
+it in one line: `hud.health` was **181 ms — 96-99% of the whole frame** (its real-GPU baseline is
+0.043 ms), while `world.missiles` was under 0.3 ms and sim sat at 1.71 ms.
+
+Cause: `HudRenderer.DrawHealthBar` drew **one rounded pip per hp point** — six raylib primitives
+each — and `SeedMissileWorld` sets the player's hp to 40,000 so detonations can't end the window.
+40,000 × 6 ≈ 240,000 draw primitives per frame in the HUD. The same 40,000-hp worlds
+(`hull-crowding` included) would have shown it the moment anyone ran them in a window.
+
+Fix: the bar is now a fixed-length track with a proportional fill, eased and still green→amber→red,
+plus the exact numbers beside it — constant cost for any hp, and ~10 lines shorter than the pip
+loop. Verified by a re-run: **frame median 183.8 → 20.3 ms**, and `hud.health` is gone from the
+render passes entirely.
+
+Decision recorded: the missile counts stay at 384 / 1024. There is nothing to optimise — at
+play-relevant counts missiles cost microseconds, and the only scaling note is that the 384→1024
+superlinearity lives in the *effects spawned by point-defence kills*, not in guidance. If that ever
+matters the lever is an effects-per-tick budget, not the missile code.
+
+Baselines for the missile scenarios still need writing on real hardware
+(`.tools/scenario.sh missile-384 --iters 5 --check-baseline --update-baseline`); the sandbox runs
+are llvmpipe and must not become baselines (TROUBLE_SHOOTING #25/#31).

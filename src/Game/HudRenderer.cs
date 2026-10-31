@@ -11,8 +11,10 @@ public static class HudRenderer
     private static float _displayHp = -1f;
     private static float _gameOverStartedAt = -1f;
 
-    // Segmented hp bar: one rounded pip per hp point (hp is a small integer), eased on
-    // loss, green→amber→red by ratio, muted numeric readout beside it.
+    // Proportional hp bar: a fixed-length track, a colored fill gliding to the current ratio
+    // (eased on loss), green→amber→red, and the exact numbers beside it. One constant-cost bar
+    // for any max hp — the old pip-per-hp loop drew 40,000 pips in the missile test worlds and
+    // put 180ms into the hud.health render pass.
     public static void DrawHealthBar(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight)
     {
         var playerHealth = em.GetComponent<Health>(playerEntity);
@@ -25,21 +27,13 @@ public static class HudRenderer
         if (_displayHp < 0f || _displayHp > max) _displayHp = playerHealth.Current;
         _displayHp = Ui.EaseToward(_displayHp, playerHealth.Current, 8f, (float)Raylib.GetFrameTime());
 
-        Ui.DrawRoundedRect(paddingX, paddingY, barWidth, barHeight, 3, Palette.TrackDark);
-
-        const float SegmentGap = 2f;
-        float segmentWidth = (barWidth - SegmentGap * (max - 1)) / max;
+        float displayRatio = Math.Clamp(_displayHp / max, 0f, 1f);
         Color healthColor = Palette.HealthColor(Math.Clamp((float)playerHealth.Current / max, 0f, 1f));
 
-        for (int i = 0; i < max; i++)
-        {
-            float alpha = Math.Clamp(_displayHp - i, 0f, 1f); // lost segments fade out
-            if (alpha <= 0.01f) continue;
-
-            int x = paddingX + (int)(i * (segmentWidth + SegmentGap));
-            Ui.DrawRoundedRect(x, paddingY, (int)MathF.Ceiling(segmentWidth), barHeight, 3,
-                Ui.WithAlpha(healthColor, alpha));
-        }
+        Ui.DrawRoundedRect(paddingX, paddingY, barWidth, barHeight, 3, Palette.TrackDark);
+        int fillWidth = (int)(barWidth * displayRatio);
+        if (fillWidth > 0)
+            Ui.DrawRoundedRect(paddingX, paddingY, fillWidth, barHeight, 3, healthColor);
 
         string text = $"{playerHealth.Current}/{playerHealth.Max}";
         Raylib.DrawText(text, paddingX + barWidth + 10, paddingY, 14, Palette.TextMuted);
