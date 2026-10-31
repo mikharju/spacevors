@@ -151,3 +151,13 @@ matters the lever is an effects-per-tick budget, not the missile code.
 Baselines for the missile scenarios still need writing on real hardware
 (`.tools/scenario.sh missile-384 --iters 5 --check-baseline --update-baseline`); the sandbox runs
 are llvmpipe and must not become baselines (TROUBLE_SHOOTING #25/#31).
+
+## Follow-up (2026-10-31) — real-GPU baselines recorded
+
+Baselines now exist for both scenarios on user hardware (`--iters 5`): missile-384 frame median
+**3.59 ms** (ammo-spray twin 3.01, so the missile price is **+0.57 ms ≈ 2.2 µs per live missile**,
+of which `world.missiles` render is only 0.055 ms); missile-1024 **5.11 ms**, marginal
+384→1024 ≈ 3.2 µs/missile, superlinear again from PD-kill effects, not guidance. `hud.health`
+0.01 ms everywhere confirms the HUD fix. Only watch item: at 1024 (≈100× play counts) the p99
+tail (10.3 ms) crosses the 8.33 ms budget on 22/592 frames; irrelevant at play counts, lever is
+an effects budget if missile-heavy content ever ships.
