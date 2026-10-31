@@ -57,6 +57,35 @@ public static class HullShapes
             new Capsule(new Vector2(-0.60f, -0.30f), new Vector2(-0.60f, 0.30f), 0.30f),
             new Capsule(new Vector2(0.60f, -0.30f), new Vector2(0.60f, 0.30f), 0.30f),
         ]),
+
+        // Streak: a dart — 0.84 R² painted, the least of any hull, and 0.98 R wide across at its widest.
+        // A tapered spine from the long nose to the tail, side fins across the waist, and the aft
+        // engine block as a bar with a pod capsule hanging off each end.
+        // Covers 89% of the paint, 20% of it over air — the price of thin swept wings.
+        new(
+        [
+            new Capsule(new Vector2(0f, -0.78f), new Vector2(0f, -0.45f), 0.11f),
+            new Capsule(new Vector2(0f, -0.45f), new Vector2(0f, 0.28f), 0.19f),
+            new Capsule(new Vector2(-0.31f, -0.02f), new Vector2(0.31f, -0.02f), 0.15f),
+            new Capsule(new Vector2(-0.44f, 0.36f), new Vector2(0.44f, 0.36f), 0.16f),
+            new Capsule(new Vector2(-0.37f, 0.45f), new Vector2(-0.37f, 0.58f), 0.08f),
+            new Capsule(new Vector2(0.37f, 0.45f), new Vector2(0.37f, 0.58f), 0.08f),
+            new Capsule(new Vector2(0f, 0.52f), new Vector2(0f, 0.74f), 0.06f),
+        ]),
+
+        // Carmine: an arrowhead — 1.33 R² painted, the body a diamond widest at the waist (|u| = 0.79
+        // at v = 0) tapering fore to the needle and aft to the tail. Spine through it, a bar across the
+        // waist and one across the fore wings, one across the aft taper. The needle tip past v = -0.6
+        // is too thin to reach without swimming in air.
+        // Covers 92% of the paint, 17% of it over air.
+        new(
+        [
+            new Capsule(new Vector2(0f, -0.78f), new Vector2(0f, 0.52f), 0.19f),
+            new Capsule(new Vector2(-0.44f, -0.34f), new Vector2(0.44f, -0.34f), 0.15f),
+            new Capsule(new Vector2(-0.58f, -0.02f), new Vector2(0.58f, -0.02f), 0.21f),
+            new Capsule(new Vector2(-0.38f, 0.25f), new Vector2(0.38f, 0.25f), 0.17f),
+            new Capsule(new Vector2(-0.22f, 0.50f), new Vector2(0.22f, 0.50f), 0.13f),
+        ]),
     ];
 
     public static HullShape ForEnemy(byte graphicsId) =>

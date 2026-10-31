@@ -18,6 +18,10 @@ public readonly record struct EngineLayout(
     public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f, 1.33f);
     public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f, 1.2f);
     public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f, 0.67f);
+
+    // Crab: the strafing engine. Sideways thrust nearly matches forward — the hull slides out of the
+    // line of fire without turning, which is the whole point of the mounts bolted to its wings.
+    public static EngineLayout Crab { get; } = new("Crab", 260f, 210f, 90f, 1.1f);
 }
 
 public readonly record struct ShipType(
@@ -118,7 +122,64 @@ public readonly record struct ShipType(
         DrawB: 96,
         PickupRadius: 205f);
 
-    public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow, Falcon];
+    // Eagle (R 66): the wide-delta gunship. 1.85 R of wingspan, so a diameter of 122 px against the
+    // Fighter's 116 — clearly a big hull without the Heavy's 165 px of target. It carries the slow
+    // engine and the only hull-filling aft mount: it answers from every direction and gives up turning
+    // and retreat speed for it. 27 starter DPS sits between the mediums' 22.5 and the Heavy's 45.
+    public static ShipType Eagle { get; } = new(
+        Name: "Eagle",
+        TextureKey: "eagle",
+        Description: "Slow engines, a scatter cannon, 150° flanks and a full aft arc",
+        Engine: EngineLayout.Slow,
+        Loadout: WeaponLoadout.ScatterCannonFlank,
+        Slots: TurretLayouts.Eagle,
+        MaxHealth: 16,
+        Radius: 66f,
+        Shape: PlayerHullShapes.Eagle,
+        DrawR: 235,
+        DrawG: 205,
+        DrawB: 140,
+        PickupRadius: 185f);
+
+    // Manta (R 74): the crab. 1.57 R across against 1.13 R long — as wide as the Fighter is long —
+    // and every mount points ahead: the hull aims by sliding sideways on the Crab engine, so its guns
+    // never have to slew across the ship. The lightest starter firepower of the big hulls, paid for
+    // with the game's best lateral dodge.
+    public static ShipType Manta { get; } = new(
+        Name: "Manta",
+        TextureKey: "manta-ray",
+        Description: "Crab engines that strafe, a machine gun and narrow forward mounts",
+        Engine: EngineLayout.Crab,
+        Loadout: WeaponLoadout.MachineGunRepeater,
+        Slots: TurretLayouts.Manta,
+        MaxHealth: 12,
+        Radius: 74f,
+        Shape: PlayerHullShapes.Manta,
+        DrawR: 110,
+        DrawG: 220,
+        DrawB: 205,
+        PickupRadius: 205f);
+
+    // Raptor (R 78): the broadside hull. A body between two detached wing pods, and a heavy mount on
+    // each pod sweeping 160° — 78 px radius, 88 × 100 px of paint, a medium hull that wants to be
+    // beside you, not above you. It starts with one heavy mount empty on purpose: the second big gun
+    // is the build.
+    public static ShipType Raptor { get; } = new(
+        Name: "Raptor",
+        TextureKey: "raptor",
+        Description: "Balanced engines, a machine gun, twin 160° broadside mounts — one empty",
+        Engine: EngineLayout.Balanced,
+        Loadout: WeaponLoadout.MachineGunBroadside,
+        Slots: TurretLayouts.Raptor,
+        MaxHealth: 14,
+        Radius: 78f,
+        Shape: PlayerHullShapes.Raptor,
+        DrawR: 190,
+        DrawG: 150,
+        DrawB: 255,
+        PickupRadius: 215f);
+
+    public static ShipType[] All { get; } = [Scout, Fighter, Heavy, Shadow, Falcon, Eagle, Manta, Raptor];
 
     // Extra ships on the select screen in diagnostics mode (SPACEVORS_DIAGNOSTIC=1): the Shadow
     // hull, engines and graphics with one weapon each, so any weapon can be play-tested from a
@@ -133,6 +194,7 @@ public readonly record struct ShipType(
         ShadowCarrying(WeaponType.GravitonBurst),
         ShadowCarrying(WeaponType.FlakCurtain),
         ShadowCarrying(WeaponType.MachineGun),
+        ShadowCarrying(WeaponType.ScatterCannon),
         ShadowCarrying(WeaponType.Shotgun),
         ShadowCarrying(WeaponType.RailGun),
         ShadowCarrying(WeaponType.AcidBubbleSpray),

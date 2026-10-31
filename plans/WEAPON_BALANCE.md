@@ -146,6 +146,7 @@ DPS premium that short-range guns used to need shrinks with it (§3 R2).
 |---|---|---|---|---|---|---|
 | Cyclotron | 1 | S | long (1600) | fast projectile (4200) | stream | needle (1.5 px), longest *auto* reach, no kick |
 | MachineGun | 1 | L | mid (1350) | medium projectile (600) | stream | chunky chewer, kick you can lean on |
+| ScatterCannon | 1 | L | close (1000) | slow projectile (400) | burst ×3 | the big shotgun: a cone of fat slugs that only holds together up close |
 | InterceptorTurret (ex-PointDefence) | 1 | S | close (900) | medium projectile (1200) | burst ×2 | fastest mount 360°/s — tracks what circles you |
 | Shotgun | 1 | S | close (900) | slow projectile (400) | burst ×3 | real cone, point-and-hold, no precision |
 | FlakCurtain | 1 | S | aura (600) | slow projectile (500) | stream | 18-px disc aura that reaches into the enemy ring |

@@ -24,7 +24,8 @@ public class ShipRosterTest
         [
             WeaponType.LaserLance.Name, WeaponType.PrismLance.Name, WeaponType.RippleCutter.Name,
             WeaponType.Cyclotron.Name, WeaponType.GravitonBurst.Name, WeaponType.FlakCurtain.Name,
-            WeaponType.MachineGun.Name, WeaponType.Shotgun.Name, WeaponType.RailGun.Name,
+            WeaponType.MachineGun.Name, WeaponType.ScatterCannon.Name, WeaponType.Shotgun.Name,
+            WeaponType.RailGun.Name,
             WeaponType.AcidBubbleSpray.Name, WeaponType.InterceptorTurret.Name,
             WeaponType.SeekerPod.Name, WeaponType.Swarmlet.Name, WeaponType.HavocTorpedo.Name,
             WeaponType.LoadTestWeapon.Name,

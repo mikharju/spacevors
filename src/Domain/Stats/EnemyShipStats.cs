@@ -80,7 +80,22 @@ public readonly record struct EnemyShipType(
             new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f)],
         Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 3, DamageBonus: 1));
 
-    public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon];
+    // Streak: the dart. The fastest and flimsiest gunner in the fleet — it trades all its reach (the
+    // shortest firing ring, so it must cross the whole no-man's land to shoot) for closing speed and a
+    // spray rate that punishes standing still. It survives by out-flying shots, never by eating them.
+    public static EnemyShipType Streak { get; } = new(3, "streak", 36f, 115f, 1.15f, 520f, 2.0f, 170f, 110f, 5,
+        RangePerTier: 12f, SpeedPerTier: 3f, AmmoSpeedPerTier: 3f,
+        SpawnWeight: 0.8f);
+
+    // Carmine: the line-breaker. A wide gunship that trades the HeavyCannon's reach and bulk for a
+    // faster hull and a busier gun: it marches the firing line inward to just past the point-blank
+    // band and wins the exchange on volume, escorting the slower heavies that hold the long line.
+    // Gun-only — the missile ladder stays with the two hulls that introduced it (plans/MISSILES.md R20).
+    public static EnemyShipType Carmine { get; } = new(4, "carmine", 62f, 55f, 0.8f, 640f, 1.3f, 160f, 40f, 22,
+        RangePerTier: 18f, AmmoSpeedPerTier: 2f,
+        SpawnWeight: 0.6f);
+
+    public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon, Streak, Carmine];
 
     public static EnemyShipType? FromGraphicsId(byte graphicsId) => graphicsId < All.Length ? All[graphicsId] : null;
 }

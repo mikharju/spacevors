@@ -70,6 +70,37 @@ public static class TurretLayouts
         Slot(TurretSlotName.SmallRight, TurretSize.Small, 18f, 6f, 90f, 120f),
     ];
 
+    // Eagle: the big-wings hull. One heavy gun ahead, a mount on each wing (painted out to ±0.93 R)
+    // sweeping 150° down the flank, and an aft mount sweeping the whole 180° behind: the slow hull
+    // that trades retreat speed for never having to turn to shoot backwards.
+    public static TurretSlotDefinition[] Eagle { get; } =
+    [
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -20f, 0f, 60f),
+        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -45f, 0f, -90f, 150f),
+        Slot(TurretSlotName.SmallRight, TurretSize.Small, 45f, 0f, 90f, 150f),
+        Slot(TurretSlotName.SmallBack, TurretSize.Small, 0f, 26f, 180f, 180f),
+    ];
+
+    // Manta: the crab. Every mount points ahead — the main gun at 60° and two narrow 60° mounts
+    // angled 30° off the nose — because this hull aims by sliding sideways, not by turning. The
+    // offsets sit on the painted wing roots at ±0.54 R.
+    public static TurretSlotDefinition[] Manta { get; } =
+    [
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -30f, 0f, 60f),
+        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -40f, 4f, -30f, 60f),
+        Slot(TurretSlotName.SmallRight, TurretSize.Small, 40f, 4f, 30f, 60f),
+    ];
+
+    // Raptor: the broadside hull. One gun ahead and a heavy mount on each wing pod, each sweeping
+    // 160° along its flank — the two together leave only a sliver dead astern. Both big mounts take
+    // any large gun; the hull starts with one of them empty on purpose.
+    public static TurretSlotDefinition[] Raptor { get; } =
+    [
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -26f, 0f, 60f),
+        Slot(TurretSlotName.HeavyLeft, TurretSize.Large, -33f, 20f, -90f, 160f),
+        Slot(TurretSlotName.HeavyRight, TurretSize.Large, 33f, 20f, 90f, 160f),
+    ];
+
     public static TurretSlotDefinition[] Heavy { get; } =
     [
         Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -22f, 0f, 60f),

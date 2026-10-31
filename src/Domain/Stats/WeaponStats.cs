@@ -99,6 +99,12 @@ public readonly record struct WeaponType(
     // travel, sits under the projectile gun of its own band. Rules in plans/WEAPON_BALANCE.md.
     public static WeaponType MachineGun { get; } = new("MachineGun", new(4f, 600f, 8f, 1, Scatter: 0.033f, Damage: 3, TurnSpeed: TurnDeg(180f)), TurretSize.Large, 1350f, AmmoRadius: 3f);
 
+    // The big brother of the Shotgun: three fat slugs in a real cone, one volley every third second.
+    // Its reach stops short of the MachineGun's because the cone spreads — at range a lone hull walks
+    // out between the slugs — so close-in it out-damages every other tier-1 large gun and far out it
+    // out-deals nothing. The large-mount answer to a hull that fights at one range: point and hold.
+    public static WeaponType ScatterCannon { get; } = new("ScatterCannon", new(3f, 400f, 6f, 3, Scatter: 0.18f, ShotLifetime: 3f, Damage: 2, TurnSpeed: TurnDeg(120f)), TurretSize.Large, 1000f, AmmoRadius: 3.5f);
+
     // Three slugs in a cone: pointing close enough is enough, and a fire-rate card adds a fourth.
     public static WeaponType Shotgun { get; } = new("Shotgun", new(3.5f, 400f, 2.5f, 3, Scatter: 0.12f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 900f);
 
@@ -155,7 +161,7 @@ public readonly record struct WeaponType(
     // Perf scenarios only: it must aim instantly so seeded volleys keep looking like fired ones.
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1), TurretSize.Large, 580f);
 
-    public static readonly WeaponType[] All = [MachineGun, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, SeekerPod, Swarmlet, HavocTorpedo, LoadTestWeapon];
+    public static readonly WeaponType[] All = [MachineGun, ScatterCannon, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, SeekerPod, Swarmlet, HavocTorpedo, LoadTestWeapon];
 
     // Weapons a level-up new-weapon card may offer at `level`: never the load-test spray, and never
     // a gun whose tier has not unlocked yet.
@@ -198,6 +204,23 @@ public readonly record struct WeaponLoadout(string Name, IReadOnlyList<WeaponMou
         new(TurretSlotName.SmallLeft, WeaponType.Shotgun),
         new(TurretSlotName.SmallRight, WeaponType.Shotgun),
         new(TurretSlotName.SmallBack, WeaponType.FlakCurtain)]);
+
+    // Eagle: the scatter cannon answers what gets close, the fast flank turret answers what circles.
+    public static WeaponLoadout ScatterCannonFlank { get; } = new("ScatterCannonFlank", [
+        new(TurretSlotName.MainGun, WeaponType.ScatterCannon),
+        new(TurretSlotName.SmallLeft, WeaponType.InterceptorTurret)]);
+
+    // Manta: the gun stays ahead while the hull slides sideways — a heavy chewer and a turret that
+    // covers the near flank without ever having to cross to the other side.
+    public static WeaponLoadout MachineGunRepeater { get; } = new("MachineGunRepeater", [
+        new(TurretSlotName.MainGun, WeaponType.MachineGun),
+        new(TurretSlotName.SmallLeft, WeaponType.InterceptorTurret)]);
+
+    // Raptor: one gun ahead and a cone of slugs on one broadside — the other heavy mount starts
+    // empty, because this hull is built to be handed a second big gun.
+    public static WeaponLoadout MachineGunBroadside { get; } = new("MachineGunBroadside", [
+        new(TurretSlotName.MainGun, WeaponType.MachineGun),
+        new(TurretSlotName.HeavyLeft, WeaponType.Shotgun)]);
 
     public static WeaponLoadout LoadTestWeapon { get; } = new("LoadTestWeapon", [
         new(TurretSlotName.MainGun, WeaponType.LoadTestWeapon)]);

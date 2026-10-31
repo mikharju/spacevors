@@ -13,6 +13,8 @@ public class HullShapesTest
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
     public void HullShape_FitsInsideTheBoundingRadiusThatIndexesIt(byte graphicsId)
     {
         foreach (var capsule in HullShapes.ForEnemy(graphicsId).Capsules)
@@ -42,6 +44,8 @@ public class HullShapesTest
 
         Assert.False(HullShapes.ForEnemy(1).IsCircle, "the interceptor's disc is 60% air — it needs the cross");
         Assert.False(HullShapes.ForEnemy(2).IsCircle);
+        Assert.False(HullShapes.ForEnemy(3).IsCircle, "the streak paints barely a quarter of its disc");
+        Assert.False(HullShapes.ForEnemy(4).IsCircle, "the carmine is an arrowhead, not a ball");
     }
 
     // Every enemy art id in play must have a deliberate entry, or a new hull silently collides as a
@@ -52,6 +56,6 @@ public class HullShapesTest
         for (byte id = 0; id < EnemyShipType.All.Length; id++)
             Assert.NotNull(HullShapes.ForEnemy(id));
 
-        Assert.Equal(3, EnemyShipType.All.Length); // a fourth hull means a fourth shape to author
+        Assert.Equal(5, EnemyShipType.All.Length); // a sixth hull means a sixth shape to author
     }
 }

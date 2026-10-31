@@ -77,4 +77,47 @@ public static class PlayerHullShapes
         new Capsule(new Vector2(-0.44f, -0.26f), new Vector2(-0.53f, 0.54f), 0.08f),
         new Capsule(new Vector2(0.47f, -0.26f), new Vector2(0.56f, 0.54f), 0.08f),
     ]);
+
+    // Eagle (R 66): the wide-delta hull — 1.11 R² of paint, wings painted out to ±0.93 R at the waist.
+    // A thin spine, one capsule per swept leading wing edge, a bar across the full span, and the aft
+    // wing/pod slab as its own bar. The 1.85 R wing span is what the bounding circle can never
+    // over-reach: it is nearly two radii, exactly what the disc always indexed.
+    // Covers 87% of the paint, 23% of it over air — thin swept wings, the same tax the dart pays.
+    public static HullShape Eagle { get; } = new(
+    [
+        new Capsule(new Vector2(0f, -0.83f), new Vector2(0f, 0.52f), 0.15f),
+        new Capsule(new Vector2(-0.86f, 0f), new Vector2(0.86f, 0f), 0.10f),
+        new Capsule(new Vector2(-0.28f, -0.16f), new Vector2(-0.86f, 0.02f), 0.11f),
+        new Capsule(new Vector2(0.28f, -0.16f), new Vector2(0.86f, 0.02f), 0.11f),
+        new Capsule(new Vector2(-0.45f, 0.28f), new Vector2(0.45f, 0.28f), 0.15f),
+        new Capsule(new Vector2(-0.19f, 0.72f), new Vector2(0.19f, 0.72f), 0.08f),
+    ]);
+
+    // Manta (R 74): the wide, stubby hull — 1.57 R across against only 1.13 R long, and 0.77 R² of
+    // paint, the least in the game. A bar across the wing slab, a capsule down each swept leading
+    // edge, a bar across the trailing wing and engine pods, and the nose-to-tail spine. This is the
+    // hull where the bounding circle over-reaches most on purpose: the disc is 3.14 R² of broad phase
+    // against 0.77 of paint, and what gets hit stays inside the wings.
+    // Covers 94% of the paint, 27% of the shape over air — the see-through panel slots in the wings.
+    public static HullShape Manta { get; } = new(
+    [
+        new Capsule(new Vector2(0f, -0.56f), new Vector2(0f, 0.40f), 0.14f),
+        new Capsule(new Vector2(-0.64f, 0.02f), new Vector2(0.64f, 0.02f), 0.15f),
+        new Capsule(new Vector2(-0.34f, -0.24f), new Vector2(-0.66f, -0.10f), 0.12f),
+        new Capsule(new Vector2(0.34f, -0.24f), new Vector2(0.66f, -0.10f), 0.12f),
+        new Capsule(new Vector2(-0.58f, 0.18f), new Vector2(0.58f, 0.18f), 0.10f),
+    ]);
+
+    // Raptor (R 78): the twin-pod hull — a body flanked by two big detached pods joined by a wing root
+    // across v = 0. The body is a spine with a split nose; each pod is one swept capsule running from
+    // the wing root out past the aft tip. 0.97 R² of paint against the disc's 3.14.
+    // Covers 85% of the paint, 21% of it over air.
+    public static HullShape Raptor { get; } = new(
+    [
+        new Capsule(new Vector2(0f, -0.58f), new Vector2(0f, -0.42f), 0.09f),
+        new Capsule(new Vector2(0f, -0.42f), new Vector2(0f, 0.42f), 0.16f),
+        new Capsule(new Vector2(-0.46f, -0.05f), new Vector2(0.46f, -0.05f), 0.20f),
+        new Capsule(new Vector2(-0.55f, -0.02f), new Vector2(-0.37f, 0.58f), 0.13f),
+        new Capsule(new Vector2(0.55f, -0.02f), new Vector2(0.37f, 0.58f), 0.13f),
+    ]);
 }

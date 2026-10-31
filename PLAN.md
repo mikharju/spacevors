@@ -41,7 +41,7 @@ Goal:
 
 ### Ship selection (start)
 - Arrows/WASD or mouse wheel: browse the scrollable ship list
-- Click, Enter, or 1/2/3/4: choose ship
+- Click, Enter, or 1-8: choose ship
 
 ### In-game
 - W: forward thrust
@@ -651,14 +651,52 @@ The newer rock art is not a ball, so rocks now cross the same narrow-phase seam 
   `small_back` is simply gone. These are the widest small mounts in the game: a 400 px/s round in one can
   lead 400 px/s of cross-line drift where the Fighter's 45° side mounts manage 153 (plans/WEAPON_BALANCE.md
   open knob).
-- Starts alone with `WeaponLoadout.InMainGun(MachineGun)` — `MachineGun` is the only tier-1 Large gun in the
-  table (`RailGun`, `GravitonBurst` and the two lances are tier 2, `HavocTorpedo` tier 3), so the Falcon's
-  single big gun is the one Fighter and Heavy already carry. 12 DPS at the start against Fighter 22.5 and
-  Heavy 45, paid for with the smallest hurtbox in the game and two free 180° mounts for the first pickup.
+- Starts alone with `WeaponLoadout.InMainGun(MachineGun)` — `MachineGun` was the only tier-1 Large gun in the
+  table when the hull landed (`RailGun`, `GravitonBurst` and the two lances are tier 2, `HavocTorpedo` tier
+  3), so the Falcon's single big gun is the one Fighter and Heavy already carry. 12 DPS at the start against
+  Fighter 22.5 and Heavy 45, paid for with the smallest hurtbox in the game and two free 180° mounts for the
+  first pickup. (ScatterCannon, added below, is the second tier-1 Large gun.)
+
+## Eagle, Manta and Raptor hulls, and the Streak/Carmine fleet — done
+
+- Three player hulls and two enemy hulls, all pure data on the existing machinery: lit 1024² sets in
+  `assets/{player,enemy}-ships/`, `ShipType` entries (cards 6-8), `TurretLayouts`, `PlayerHullShapes`,
+  `EnemyShipType` entries (graphics ids 3-4) and `HullShapes` entries.
+- New engine layout `EngineLayout.Crab` (side thrust ≈ forward): the PLAN's "crab with better side ways
+  acceleration", carried by the Manta.
+- **Eagle** (R 66, 16 hp, Slow): the wide-delta gunship. 4 mounts — scatter cannon main, 150° mounts on
+  the wings (±45 px, painted to ±0.93 R), and a 180° `small_back`: it trades turning and retreat for
+  never having to aim past itself. Shape 87% covered / 23% air, reach 0.98 R — the swept-wing tax.
+- **Manta** (R 74, 12 hp, Crab): the strafing hull — 1.57 R across, 1.13 R long, all three mounts
+  pointing ahead (main 60°, two 60° mounts at ±30°): it aims by sliding sideways. Least paint in the
+  game (0.77 R² against the 3.14 disc), so the bounding circle over-reaches hardest here; the shape
+  covers 94% with one bar across the wing slab and a capsule down each swept leading edge.
+- **Raptor** (R 78, 14 hp, Balanced): the broadside hull — two `heavy_left/heavy_right` mounts on the
+  detached wing pods, 160° each; the main gun ahead covers the fore gap, ~nothing but a 20° sliver
+  astern is dead. Starts with one heavy mount deliberately empty: the second big gun is the build.
+- **Streak** (id 3, R 36, 5 hp, 115 px/s, ring 520, 2.0/s): the dart — fastest and flimsiest gunner,
+  must cross the whole no-man's land to shoot, survives by out-flying shots. Shape 89/20, reach 0.89 R.
+  Spawn weight 0.8.
+- **Carmine** (id 4, R 62, 22 hp, 55 px/s, ring 640, 1.3/s): the line-breaker — marches the firing line
+  inward and wins on volume, escorting the long-line heavies. Gun-only (R20: the missile ladder stays
+  with the hulls that introduced it). Shape 92/17, reach 0.97 R. Spawn weight 0.6.
+- New tier-1 large gun **ScatterCannon** (range 1000, 3 slugs × 2 dmg at 3/s, ±0.18 cone, 400 px/s):
+  the Shotgun's big brother, the second starter main besides MachineGun. At range a lone hull walks
+  between the spread slugs, so it pays for close-range DPS 18 (R3: ≥ 1.25 × FlakCurtain's 12) with reach
+  the cone cannot keep — the (close, slow, burst, 3-pellet, Large) identity cell. Eagle carries it; the
+  level-1 card pool gets a real main-gun choice. No tier-2 gun was demoted for this.
+- R12 check (starter firepower by hull size): Scout 17 < Manta 21 ≈ Fighter 22.5 ≈ Raptor 22.5 < Eagle
+  27 < Heavy 45. `AtMostOneHullStartsFullyBooked` still holds (only Shadow books all mounts).
+- `HullShapesTest` / `PlayerHullShapesTest` / `ShipRosterTest` widened to the 8 hulls / 5 enemy art ids;
+  `WeaponBalanceTest` passes the new gun through R1-R13 unchanged.
+- Cost (`--sim --iters 3/5` medians, host=sim): `baseline-idle` 0.27 vs 0.28, `hull-stream` 0.81 vs
+  0.85, `hull-crowding` 0.39 vs 0.38-0.39, `ammo-spray` 1.33 vs 1.35-1.42, `impact-storm` 2.18 vs
+  2.21-2.23 — the scenarios pin `LoadTestWeapon` and the crowding ring hulls, so a roster change
+  cannot move them; the one hot row re-ran at baseline. Keep.
 
 ## Near future
 
-- New ships and engines (crab with better side ways acceleration, broadside with heavy slot pointing to one side, what else?)
+- New ships and engines (crab and broadside landed as Manta/Raptor; what else?)
 - New mines (Turns into missile, fires a delayed beam)
 - Difficulty scaling: pellet volleys and concurrency; mines and the reward side (the type/composition
   drift landed as the armament ladder)
