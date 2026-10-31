@@ -226,23 +226,16 @@ public class CollisionSystem : GameSystem
                 MathF.Max(sweepFrom.X, sweepTo.X) + ammoRadius,
                 MathF.Max(sweepFrom.Y, sweepTo.Y) + ammoRadius);
 
-            Entity? earliestAsteroidHit = null;
-            Contact asteroidHit = default;
-            float asteroidT = float.MaxValue;
-
-            Entity? earliestMineHit = null;
-            MineSize? mineHitSize = null;
-            Vector2 mineHitPos = default;
-            Contact mineHit = default;
-            float mineT = float.MaxValue;
-
-            Entity? earliestShipHit = null;
-            Vector2 shipHitPos = default;
-            float shipT = float.MaxValue;
-
-            Entity? earliestMissileHit = null;
-            Contact missileHit = default;
-            float missileT = float.MaxValue;
+            // One round, one touch: it is spent on the earliest thing its swept capsule met, so the tracker
+            // is the earliest hit along the path rather than the earliest of each kind. A round that shot a
+            // missile down does not carry on into the hull that missile was covering, and a round stopped by
+            // a rock never reaches the player behind it.
+            Entity? firstHit = null;
+            SpatialGrid.CollisionKind firstKind = default;
+            Contact firstContact = default;
+            Vector2 firstCandidatePos = default;
+            MineSize? firstMineSize = null;
+            float firstT = float.MaxValue;
 
             int count = QueryBox(boxMin, boxMax);
             var queryBuffer = _queryBuffer;
@@ -270,106 +263,88 @@ public class CollisionSystem : GameSystem
                         AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)), out hit, out t))
                     continue;
 
-                switch (candidate.Kind)
+                // Who is allowed to be hit: the enemy's own mines and hulls are skipped, and a guided
+                // round counts only for the other side's fire — that check is what stops the player's
+                // bullets from being eaten by the player's own missiles, and it stops a round from
+                // colliding with itself.
+                if (candidate.Kind == SpatialGrid.CollisionKind.Missile)
+                {
+                    if (!view.TryGetComponent<Ammo>(candidate.Id, out var candidateRound)
+                        || candidateRound.IsEnemy == ammo.IsEnemy) continue;
+                }
+                else if (ammo.IsEnemy && candidate.Kind is SpatialGrid.CollisionKind.EnemyMine
+                    or SpatialGrid.CollisionKind.EnemyShip)
+                {
+                    continue;
+                }
+
+                if (t >= firstT) continue;
+
+                firstHit = candidate.Id;
+                firstKind = candidate.Kind;
+                firstContact = hit;
+                firstCandidatePos = candidate.Position;
+                firstMineSize = candidate.Size;
+                firstT = t;
+            }
+
+            if (firstHit.HasValue)
+            {
+                var hitEntity = firstHit.Value;
+
+                switch (firstKind)
                 {
                     case SpatialGrid.CollisionKind.Asteroid:
-                        if (t < asteroidT)
+                        var asteroid = view.GetComponent<Asteroid>(hitEntity);
+                        ResolveAmmoVsAsteroid(view, ammo, hitEntity, asteroid, firstContact, commands);
+                        if (DamageAsteroid(view, hitEntity, ammo.Damage))
+                            _effectsToSpawn.Add((firstContact.Point, MineType.Small));
+                        _entitiesToDestroy.Add(ammoEntity);
+                        break;
+
+                    case SpatialGrid.CollisionKind.EnemyMine:
+                        if (view.TryGetComponent<Health>(hitEntity, out var mineHealth))
                         {
-                            earliestAsteroidHit = candidate.Id;
-                            asteroidHit = hit;
-                            asteroidT = t;
+                            int mineRemaining = _frameRemainingHealth.TryGetValue(hitEntity, out var mineSeeded)
+                                ? mineSeeded : mineHealth.Current;
+                            _frameRemainingHealth[hitEntity] = mineRemaining - ammo.Damage;
+                            _hitMines.Add(hitEntity);
+                            _ammoToMineHits.Add((ammoEntity, hitEntity, firstContact, firstCandidatePos, firstMineSize!.Value, ammo.Damage, ammo.Velocity));
+                            _effectsToSpawn.Add((firstCandidatePos, MineType.FromSize(firstMineSize!.Value)));
                         }
                         break;
 
-                    case SpatialGrid.CollisionKind.EnemyMine when !ammo.IsEnemy:
-                        if (t < mineT)
+                    case SpatialGrid.CollisionKind.EnemyShip:
+                        if (view.TryGetComponent<Health>(hitEntity, out var shipHealth))
                         {
-                            earliestMineHit = candidate.Id;
-                            mineHitPos = candidate.Position;
-                            mineHit = hit;
-                            mineHitSize = candidate.Size!;
-                            mineT = t;
+                            int shipRemaining = _frameRemainingHealth.TryGetValue(hitEntity, out var shipSeeded)
+                                ? shipSeeded : shipHealth.Current;
+                            _frameRemainingHealth[hitEntity] = shipRemaining - ammo.Damage;
+                            var enemyShip = view.GetComponent<EnemyShip>(hitEntity);
+                            var shipPos = view.GetComponent<Position>(hitEntity);
+                            // The hit point is the hull surface facing the touch — where the spark, the
+                            // explosion and the wreck placement all go.
+                            _ammoToShipHits.Add((ammoEntity, hitEntity, shipPos.Value + firstContact.Normal * enemyShip.Radius,
+                                shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                            // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
+                            _entitiesToDestroy.Add(ammoEntity);
                         }
                         break;
 
-                    case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
-                        // The hit point is the hull surface facing the touch — where the spark, the
-                        // explosion and the wreck placement all go.
-                        if (t < shipT)
-                        {
-                            earliestShipHit = candidate.Id;
-                            shipHitPos = candidate.Position + hit.Normal * candidate.Radius;
-                            shipT = t;
-                        }
-                        break;
-
-                    // A guided round is a body with hit points, and only the other side's fire counts:
-                    // that check is what stops the player's bullets from being eaten by the player's own
-                    // missiles, and it stops a round from colliding with itself.
                     case SpatialGrid.CollisionKind.Missile:
-                        if (!view.TryGetComponent<Ammo>(candidate.Id, out var candidateRound)
-                            || candidateRound.IsEnemy == ammo.IsEnemy) break;
-                        if (t < missileT)
+                        if (view.TryGetComponent<Health>(hitEntity, out var missileHealth))
                         {
-                            earliestMissileHit = candidate.Id;
-                            missileHit = hit;
-                            missileT = t;
+                            int missileRemaining = _frameRemainingHealth.TryGetValue(hitEntity, out var missileSeeded)
+                                ? missileSeeded : missileHealth.Current;
+                            _frameRemainingHealth[hitEntity] = missileRemaining - ammo.Damage;
+                            _hitMissiles.Add(hitEntity);
+                            _effectsToSpawn.Add((firstContact.Point, MineType.Small));
+                            // The round that shot it down is spent, exactly as against a hull: a bullet that
+                            // kills a missile does not carry on into whatever the missile was covering.
+                            _entitiesToDestroy.Add(ammoEntity);
                         }
                         break;
                 }
-            }
-
-            if (earliestAsteroidHit.HasValue)
-            {
-                var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
-                ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidHit, commands);
-                if (DamageAsteroid(view, earliestAsteroidHit.Value, ammo.Damage))
-                    _effectsToSpawn.Add((asteroidHit.Point, MineType.Small));
-                _entitiesToDestroy.Add(ammoEntity);
-            }
-
-            if (earliestMineHit.HasValue && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
-            {
-                if (!_frameRemainingHealth.TryGetValue(earliestMineHit.Value, out var health))
-                {
-                    health = healthComp.Current;
-                    _frameRemainingHealth[earliestMineHit.Value] = health;
-                }
-                _frameRemainingHealth[earliestMineHit.Value] -= ammo.Damage;
-                _hitMines.Add(earliestMineHit.Value);
-                _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineHit, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
-                _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
-            }
-
-            if (earliestShipHit.HasValue && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
-            {
-                var shipHealth = shipHealthComp.Current;
-                if (!_frameRemainingHealth.TryGetValue(earliestShipHit.Value, out var h))
-                {
-                    h = shipHealth;
-                    _frameRemainingHealth[earliestShipHit.Value] = h;
-                }
-                _frameRemainingHealth[earliestShipHit.Value] -= ammo.Damage;
-                var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
-                var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
-                // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
-                _entitiesToDestroy.Add(ammoEntity);
-            }
-
-            if (earliestMissileHit.HasValue && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
-            {
-                if (!_frameRemainingHealth.TryGetValue(earliestMissileHit.Value, out var mHealth))
-                {
-                    mHealth = missileHealthComp.Current;
-                    _frameRemainingHealth[earliestMissileHit.Value] = mHealth;
-                }
-                _frameRemainingHealth[earliestMissileHit.Value] -= ammo.Damage;
-                _hitMissiles.Add(earliestMissileHit.Value);
-                _effectsToSpawn.Add((missileHit.Point, MineType.Small));
-                // The round that shot it down is spent, exactly as against a hull: a bullet that kills
-                // a missile does not carry on into whatever the missile was covering.
-                _entitiesToDestroy.Add(ammoEntity);
             }
 
             if (!ammo.IsEnemy) continue;
@@ -382,8 +357,12 @@ public class CollisionSystem : GameSystem
             // and only a round inside it is tested against the hull's shape.
             if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerPos.Value, playerTuple.Value1.Radius, out _, out _))
                 continue;
-            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out _))
+            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out float playerT))
                 continue;
+
+            // The player is a body along the path like any other: a round the player's own rock or a shot-down
+            // missile stopped this tick never reaches them.
+            if (playerT > firstT) continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))

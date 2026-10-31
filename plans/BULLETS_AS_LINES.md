@@ -255,3 +255,16 @@ milestone hands still offer 5 (`LevelUpSystem.cs:9`). What moved:
   **0.456 ms** (54% of sim) — `.tools/baselines/ammo-spray.json`. The "8.3 ms budget with CollisionSystem
   ≈ 7.3 ms" sentence describes the pre-swept build; do not use it as a budget.
 
+
+## Follow-up (2026-10-31): a round is spent on its first contact, not one per kind
+
+The ammo sweep kept four independent "earliest" trackers — rock, mine, hull, guided round — plus the
+player test, so one round resolved up to five contacts in the same tick: a bullet that shot a missile
+down still damaged the hull that missile was covering, and an enemy round a rock stopped still hit the
+player standing behind the rock. `ARCHITECTURE.md` ("a swept round takes the **earliest** contact along
+its path") and the beam first-hit pass already had it right; the ammo pass now keeps one earliest hit
+across every kind, the same shape the beam pass uses, and the player is only another body along the
+path. Regression tests: `MissileCollisionTests.ARoundSpentOnAMissile_DoesNotPunchThroughToTheHullBehindIt`
+and `.ARoundStoppedByARock_DoesNotReachThePlayerBehindIt`. Perf verdict (`--sim --iters 3`): missile-1024
+3.10 ms median with the fix against 3.07/3.20 ms without it, ammo-spray 1.4 ms against 1.35 ms — noise,
+keep.
