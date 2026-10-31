@@ -1,5 +1,8 @@
 # ARCHITECTURE.md
 
+Stable structure and invariants. Feature rationale, history and measurements live in the
+`plans/` file for that feature (trust its `Status:` header first).
+
 ## Stack
 
 Language:
@@ -90,9 +93,9 @@ Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
 ```
 
-Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an entity damageable, so the large asteroids that are pure scenery have none and a hit on them stays an obstacle hit.
-
-A beam never penetrates what it hits: the first-hit pass shortens its length to the target's exact first contact (the ray entry into the body primitives inflated by the beam's width) and puts one round glow — the beam's own colour, opaque at a broad core so it swallows the beam's square cap, an added white-hot centre, fading to a dark perimeter — exactly on the shortened beam's end; it lingers half a flash past the beam and fades only once the beam is gone. Nothing else flashes on a beam hit.
+Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an
+entity damageable, so the large asteroids that are pure scenery have none and a hit on them
+stays an obstacle hit.
 
 ## Write patterns
 
@@ -124,24 +127,12 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
 
-`MissileGuidanceSystem` is deliberately **first** in Intent: it turns a guided round's heading, builds its speed toward `MaxSpeed`, and rewrites both `Velocity` (what Movement integrates) and the round's own `Ammo.Velocity` (what the swept collision reads and the renderer draws the streak from), so the round's position next tick, its collision segment and its drawn direction all agree on the heading guidance just chose. It never gives a round an `Acceleration` component: the speed is rewritten at the tick boundary as it climbs, so the collision pass still reads one constant velocity between ticks and the turn radius stays `Speed / TurnRate`.
+`MissileGuidanceSystem` is deliberately **first** in Intent: it rewrites both `Velocity` and the round's own `Ammo.Velocity` so the position next tick, the collision segment and the drawn direction all agree on the heading it just chose. A round keeps one constant velocity between ticks, so its turn radius stays `Speed / TurnRate`.
 
 ## Main loop
 
 ```
-Ship selection (before game starts)
-
-↓
-
-Input
-
-↓
-
-Simulation
-
-↓
-
-Rendering
+Ship selection (before game starts) → Input → Simulation (fixed timestep) → Rendering
 ```
 
 Ship selection is shown before the game loop begins.
@@ -149,8 +140,6 @@ Ship selection is shown before the game loop begins.
 Player chooses one of the defined ship types (`ShipType.All`: Scout, Fighter, Heavy, Shadow, Falcon, Eagle, Manta, Raptor). In diagnostics mode the list also carries `ShipType.DiagnosticShips`: Shadow copies with one weapon each.
 
 Game pauses during upgrade choice; resumes after selection.
-
-Simulation uses a fixed timestep.
 
 Rendering draws the latest simulated state; no interpolation between ticks.
 
@@ -169,106 +158,53 @@ Movement uses forces instead of directly setting velocity.
 
 ## Guided rounds
 
-A missile is a round, not a hull: it is spawned exactly like a bullet (`Position` + `Velocity` + `Ammo`)
-with three components added, and it is destroyed exactly like one.
+A missile is a round, not a hull: spawned and destroyed exactly like a bullet (`Position` +
+`Velocity` + `Ammo`) plus `Missile(LockedTarget, Speed, MaxSpeed, Acceleration, TurnRate,
+Steering)` and `Health` (1-3 hp). On the launcher only: `MissileWeapon(Weapon, Range)` and
+`MissileCooldown(Timer)`; a hull carries guns, a rack, or both.
 
-Components:
-- `Missile(LockedTarget, Speed, MaxSpeed, Acceleration, TurnRate, Steering)` — the lock taken at launch, the
-  flight numbers, and how hard the round turned last tick (0..1), which is one of the two numbers the exhaust
-  is drawn from. Self-contained: nothing downstream looks back up at the gun that fired it.
-  `Speed` is the round's own flight speed and `MissileGuidanceSystem` is its only writer: it climbs by
-  `Acceleration` toward `MaxSpeed`, so a round leaves its rack at `WeaponStats.MissileLaunchFraction` of its
-  card speed and builds to that speed. The turn radius is `Speed / TurnRate`, which makes it tightest just
-  after launch and widest at cruise — the balance rules are measured at the launch end for that reason.
-- `Health` — a guided round is a body with 1-3 hp, so the other side can shoot it down. Dumb ammo has none.
-- On the launcher only: `MissileWeapon(Weapon, Range)` (a rack's own stats and its own, wider launch ring)
-  and `MissileCooldown(Timer)`. A hull may carry guns, a rack, or both, each on its own cooldown; a
-  missile-only hull has no `Turret` component at all.
-
-Who may launch: **range only**. A guided mount is not gated by its slot's arc and does not slew — a rack is a
-square that does not turn — so its round leaves along the hull's nose and guidance picks the lock up from
-there, which lets a forward rack cover what is behind the hull. The price is geometry, not a rule: the round
-has to fly all the way around, from a slow launch, at the target's speed. The enemy rack keeps its firing
-cone, because an enemy round that launched backwards could not cross its own launch ring inside its fuse
-(R21 reach honesty in plans/WEAPON_BALANCE.md), while the player chose the weapon and pays for the long way.
-
-Two passes produce them — `TurretFiringSystem` for the player's homing guns, which lock instead of
-computing lead, and `EnemyMissileFiringSystem` for enemy racks — and one pass steers them. The enemy rack
-is a second gun on the same hull rather than a new enemy kind: the escalation is an armament ladder over
-the existing hulls (plans/DIFFICULTY_SCALING.md R2.12). A guided round's speed is never rolled: the gun's
-±15 % speed variation applies to dumb ammo only, because on a guided round the speed *is* the turn radius and
-the fuse reach.
-
-Faction rule: a missile sits in the collision grid (`CollisionKind.Missile`) and the cross-fire pass
-counts only hits from the **opposing** side. Same-side rounds and beams pass through it, which is what
-keeps a player's missiles from eating their own DPS and what makes a round never collide with itself. A
-missile shot down breaks up in smoke; its warhead never detonates.
-
-Rendering: `world.missiles` is its own pass (`WorldRenderer.DrawMissiles`), drawing tip + shaft + plume
-from two generated sprites. The body is drawn `MissileBodyStretch` (7.5) times the collision radius long with
-a fixed-size nose: at 2.5 a round drew a 10 px dart and read as a bright dot at the ranges missiles are
-fired across. The plume answers two numbers — the rudder (`Steering`) and the throttle (how far the round is
-still from its top speed) — and both have floors, so a guided round is never invisible mid-flight. The plume
-is anchored on the body's **tail**, not part-way between the centre and the tail, so it stays aft as it grows
-with boost and turn. Both draws use the renderer-wide sprite convention: the dest rect's **position is the
-point the sprite is centred and rotated about** (`RenderHelpers.CenterOrigin` supplies the half-size origin),
-so building the dest rect as `centre - size/2` instead shifts a sprite up-left by half its own extent — a
-45 px body slides 22 px while its plume slides 10, and the two visibly come apart. `ShapeSprites.PlumeAnchor`
-computes that anchor, and the diagnostic overlay (V key) marks the same point it returns, so a screenshot
-shows the intended anchor under the drawn flame. The B key adds a static bench: the same `ShapeSprites.DrawMissile`
-call repeated over eight headings and both plume sizes at fixed screen positions, so one screenshot measures
-every orientation at once against numbers the renderer itself publishes. The
-player's guided rounds are Orange (the guided colour) and the enemy's stay
-Red, because colour is the threat channel and the shape is what says "guided". Both bodies are painted the
-same light grey (`MissileBodyColor`) — a missile is a piece of hardware, not a faction badge — so the
-**flame** is the colour channel: the round's own ammo colour, Orange for the player's racks and Red for an
-enemy's, washing toward white only while the round is turning hard. A rack's mount marker is a
-square that does not turn, against the round empty mounts and the aiming triangles of gun mounts.
+- `MissileGuidanceSystem` is the only writer of `Speed`: it climbs by `Acceleration` toward
+  `MaxSpeed` from a launch fraction of the card speed. The turn radius `Speed / TurnRate` is
+  tightest just after launch and widest at cruise; balance rules are measured at the launch end.
+- A guided round's speed is never rolled (it *is* the turn radius and fuse reach); the ±15 % ammo
+  speed variation applies to dumb ammo only.
+- A player rack is gated by **range only** and does not aim or slew — the price is flying all the
+  way around from a slow launch. The enemy rack keeps its cone, because its round must cross its
+  own launch ring inside its fuse (R21, plans/WEAPON_BALANCE.md). Enemy missiles are an armament
+  ladder over existing hulls, not new enemy kinds (plans/DIFFICULTY_SCALING.md R2.12).
+- Faction rule: only the **opposing** side's fire hits a missile (`CollisionKind.Missile`);
+  same-side rounds and beams pass through. A shot-down missile breaks up in smoke; its warhead
+  never detonates.
+- Rendering (dart proportions, flame-as-colour-channel, plume anchor, bench keys):
+  plans/MISSILES.md.
 
 ## Collision
 
-Two passes and one seam between them. `SpatialGrid` is the broad phase: it indexes every collider by its
-**bounding radius** and answers "what could touch this box or circle". `NarrowPhase` answers "did they
-touch, how deep, and which way", and always answers it with one `Contact(Normal, Depth, Point)`.
+Two passes and one seam. `SpatialGrid` (broad phase) indexes and culls every collider by its
+**bounding radius**. `NarrowPhase` answers "did they touch, how deep, which way" and always
+returns one `Contact(Normal, Depth, Point)`.
 
-- Every overlap in the game goes through that seam; the eight call sites in `CollisionSystem` hold no
-  circle math of their own.
-- A body enters the narrow phase as a `CollisionBody(Position, Angle, Shape, Scale)`. Mines, pickups and
-  every round are `CollisionBody.Circle`; a hull and a rock bring the capsules their art was authored
-  with — an enemy by art id (`Stats/HullShapes.cs`), a player per hull type on `ShipType.Shape`, carried into
-  the `Player` component (`Stats/PlayerHullShapes.cs`), a rock by art variant (`Stats/AsteroidShapes.cs`) —
-  all in the sprite's own frame and in units of `Radius`. Shapes are committed data reviewed as a diff, never
-  derived from pixels at run time — the sim must not depend on the art. A `Player` built without one collides
-  as the disc its `Radius` describes: that is what test worlds do, and the game always sets it
-  (`PlayerHullShapesTest` pins the wire-up).
-- Circles keep a one-test fast path, and the bounding circle is kept as a **conservative reject** in
-  front of the shape test: a shape never reaches past the radius the grid indexed it by (pinned by
-  `HullShapesTest` and `AsteroidShapesTest`), so anything that misses the circle cannot touch the shape
-  either. A volley through empty space pays nothing new. Round art stays a disc — the first three variants of
-  each rock size paint 2.4-3.2 of the 3.14 R² their circle covers, so a disc is the honest fit and the pair
-  stays one test; the lumpy later variants paint 1.7-2.3 R² and are two capsules across their lobes instead,
-  which takes the collider's air from ~1 R² down to ~0.05.
-- The player is one more body, built once a tick and queued behind the same circle reject for everything it
-  meets: a grinding hull, a rock, a mine, an enemy round, an enemy beam. Because its shape lies inside the
-  bounding radius, a player's hurtbox can only be smaller than the disc it replaced — never hit where the disc
-  could not have been. `PlayerHullShapesTest` states that as the reach invariant;
-  `PlayerHullCollisionTest` pairs every pass-through with the same geometry against a shape-less player,
-  because a pass-through on its own proves only that the setup was wrong.
-- `CapsuleGeometry` is the whole shape math. A capsule is a segment inflated by a disc, so a disc is a
-  capsule with no axis and every pair of round primitives is one of point/point, point/segment,
-  segment/segment — the normal, the depth and the touch point all fall out of the closest points,
-  uniquely, with no "which feature touched which" case to specialise.
-- Ordering differs by caller and is not interchangeable: a swept round takes the **earliest** contact
-  along its path, a resting pair takes the **deepest** (which way to push). Either way a body pair yields
-  exactly one contact per tick, which is what the impulse, the position correction and the
-  impact-damage accumulator assume.
-- Mass and inertia still come from the bounding radius, not from the shape: weight following silhouette
-  is a balance change and has to be measured as one.
-- Diagnostics (`SPACEVORS_DIAGNOSTIC=1`) draws a collider in cyan over its art — enemy hulls, the player and
-  every rock in play, and every ship preview on the select screen — as the exact capsule silhouette, round
-  caps included, because an overlay that ends flat blames the fit on a corner nothing can hit. A collider is
-  never drawn as its bounding circle: that is the broad phase's business, and drawing it over the art hides
-  the mismatch the overlay exists to show.
+- Every overlap in the game goes through that seam; the eight call sites in `CollisionSystem`
+  hold no circle math of their own.
+- A body enters as `CollisionBody(Position, Angle, Shape, Scale)`: circles (one-test fast path)
+  for every round, mine and pickup; a hull is 1-4 capsules, a rock is a disc or two capsules by
+  art variant — authored in `Stats/HullShapes.cs`, `Stats/PlayerHullShapes.cs`,
+  `Stats/AsteroidShapes.cs`, in the sprite's frame and in units of `Radius`, never derived from
+  pixels at run time.
+- The bounding disc stays the **conservative reject** in front of every shape test, and a shape
+  never reaches past it (pinned by `HullShapesTest`, `PlayerHullShapesTest`,
+  `AsteroidShapesTest`). A player's hurtbox can only be smaller than the disc it replaced.
+- A capsule is a segment inflated by a disc; a disc is a capsule with no axis. A swept round
+  takes the **earliest** contact along its path, a resting pair the **deepest**; exactly one
+  contact per body pair per tick.
+- Beams never penetrate: the first-hit pass shortens the beam to the exact first contact and puts
+  one glow on the shortened end.
+- Mass and inertia still come from the bounding radius, not from the shape: weight following
+  silhouette is a balance change and has to be measured as one.
+- Diagnostics (`SPACEVORS_DIAGNOSTIC=1`) draws colliders in cyan as the exact capsule
+  silhouette, never as the bounding circle.
+- Why capsules and not polygons or pixels, silhouette fitting, and measured cost:
+  plans/NON_CIRCLE_COLLISION.md.
 
 ## Cross-system signaling
 
@@ -302,7 +238,7 @@ src/
         EnemyShipRenderer.cs     -- enemy ship sprites + fallbacks
         ShipSpriteRenderer.cs    -- player ship sprite (lit/flat) + shared ship placeholder shape
         ThrusterFlameRenderer.cs -- thruster flames
-        TargetingRenderer.cs     -- targeting brackets + hp bars: red for the locked target, blue-grey for auto-targeted enemies
+        TargetingRenderer.cs     -- targeting brackets + hp bars
         HudRenderer.cs           -- health bar + game over text
         UpgradeMenuRenderer.cs   -- upgrade choice cards
         StatsScreenRenderer.cs   -- ship stats screen (Tab)
@@ -311,7 +247,7 @@ src/
         Ui.cs                    -- shared UI primitives: rounded rects, soft-depth panels, easing/fade
         Palette.cs               -- colours shared by more than one renderer
         ImageLoader.cs           -- texture loading (flat + lit sprite sets)
-        Lighting.cs              -- lighting shader: directional light + point lights + procedural hull damage (vertex color B)
+        Lighting.cs              -- lighting shader: directional + point lights + procedural hull damage
         DamageShading.cs         -- hp ratio -> hull damage scalar [0,1] for the shader
         LightGatherer.cs         -- per-frame point-light collection for the shader
         LitSprite.cs             -- lit sprite data (base/normal/depth textures)
@@ -321,10 +257,10 @@ src/
         AsteroidSprite.cs        -- asteroid graphics variants
 
     Domain/                  -- pure game logic, no Raylib
-        AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI (player-speed-scaled cap, stale-ship cull), drift
-        Combat/                -- firing (incl. click-target priority — a rock is a target only when clicked, never auto-targeted; auto-aim solves the intercept in the hull's frame and re-solves it per round at the speed and from the muzzle that round really has; a lead the mount cannot point at inside its arc makes the target unselectable rather than being fired unled; hitscan laser beams), collisions (swept-capsule ammo, beam first-hit pass, small-asteroid health; narrow phase behind one seam — circles for rounds and mines, capsule composites for hulls and for the lumpy rock art), impact damage rule (never asteroids), effects, damage emission, death explosions, asteroid factory (spawn, and break-up smoke where a small rock's end is puffs rather than a fireball), threat readout (`ThreatMeter.Measure`: one read a second of who can hit the hull right now, never called from the hot path)
+        AI/                    -- enemy ship + mine spawning (incl. SpawnPlacement), factories, chase AI, drift
+        Combat/                -- firing, click-target priority, auto-aim lead, collisions (the seam: swept capsules, beam first-hit), impact damage, effects, death explosions, threat readout (ThreatMeter, off the hot path)
         Components/            -- runtime per-entity components only (entity, physics, combat, effect, gameplay); static definitions live in Stats/
-        Stats/                 -- tuning data, code-first: PlayerShipStats (engines, ships), WeaponStats (weapons with the level their tier unlocks at, loadouts), EnemyShipStats (types with their per-tier drifts — reach, closing speed, ammo speed — plus spawn weights, tier curves, enemy weapon and the ceilings those drifts obey), HullShapes (each hull art id's collision primitives: capsules in the sprite's frame, in units of the hull's Radius), AsteroidShapes (the same for each rock art variant — a disc where the art is round, two capsules where it is lumpy), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats (initial world, spawn ramps, chase/cull). The balance rules the weapon table obeys (range ladder, hitscan priced below slower ammo, tier ceiling, mount-size floor, round-rate budget) are asserted by Tests/WeaponBalanceTest.cs; the difficulty ceilings (the firing ring stays inside the player's mid band, enemy ammo stays dodgeable, the toughest hull dies inside a TTK budget) by Tests/EnemyDifficultyTest.cs. plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
+        Stats/                 -- all tuning data, code-first: PlayerShipStats, WeaponStats (weapons with tier unlock, loadouts), EnemyShipStats (per-tier drifts, spawn weights, tier curves, ceilings), HullShapes / PlayerHullShapes / AsteroidShapes (collision primitives per art id), MineStats, UpgradeStats (+ XP curve), LootStats, SpawningStats. Balance rules asserted by Tests/WeaponBalanceTest.cs and Tests/EnemyDifficultyTest.cs; plans/WEAPON_BALANCE.md and plans/DIFFICULTY_SCALING.md state why.
         Physics/               -- force integration + position integration
         Progression/           -- XP/level-up, pickups, camera
         Support/               -- SimulationRunner (phase ordering + RunTick: the four phases with a command flush after each)
@@ -338,7 +274,7 @@ src/
         SpatialGrid.cs         -- broad-phase spatial hash
         Vector2.cs             -- 2D math
         CoolDownHelper.cs      -- FireCooldown read helper
-        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging (fps, per-system timings, per-tick sim total, render total, per-phase command-flush total, events); EnvVar is the single source for the gate. `LogThreat` is the one exception to the gate: the `[THREAT]` row is a tuning record and prints in every run.
+        DiagnosticLogger.cs    -- SPACEVORS_DIAGNOSTIC=1 logging; EnvVar is the single gate source (exceptions documented here)
         WorldFactory.cs        -- starting world: player, camera, hull turret mounts, asteroids, mines, enemy ships (seeded, no Raylib)
         Scenarios/             -- ScenarioSpec + the named perf scenarios + ScenarioWorld (seeded start states)
 
@@ -363,14 +299,10 @@ For example: All ship related data in record structs related to ship, no ship co
 
 - ComponentStorage<T>: compact arrays + entity→slot direct-index map (O(1) lookup), swap-pop deletion for O(1) removal; entity IDs stay stable across compaction. Iteration order is not insertion order — do not rely on it.
 - Multi-component queries iterate the smallest participating storage and probe the rest with O(1) slot lookups, so iteration cost scales with the smallest set instead of N log N.
-- Frame-cost split: with `SPACEVORS_DIAGNOSTIC=1` each tick logs `[SIM] tick: Xms` (all four phases plus their command flushes), each flush logs `[APPLY] <phase>: Xms`, and each frame logs `[RENDER] frame: Xms` around the draw call. `[RENDER]` includes raylib's `SetTargetFPS` pacing wait, which happens inside `EndDraw`, so it floors at ~1000/MaxFps ms whenever the game is fast enough to hit the cap — read it against `[FRAME] dt=` to tell whether a frame is sim-bound or render-bound. Never sum `[SYSTEM]` system totals together with their sub-stage lines (`CollisionSystem` and `Collision: *` overlap).
-- Threat readout: `GameSession` calls `ThreatMeter.Measure` once a second of game time and prints `[THREAT] t=… tier=… ships=… ring=… rounds=… in=…/s out=…/s hp=… lvl=… mines=… rocks=…`. `ring` counts the ships standing inside their own gun range plus the player's hull radius — the ones that can hit the hull this instant — `in` is their summed fire rate × pellets × damage, `out` the same sum for the guns mounted on the player's hull. It prints in every run, not only under the diagnostics gate, because it is what the difficulty knobs are tuned against; the same row is drawn along the bottom edge when `SPACEVORS_DIAGNOSTIC=1` (`hud.threat` render pass). It is a read-only aggregate, called once a second, never from a system.
-- Perf scenarios: `SPACEVORS_SCENARIO=<name>` opens a seeded scenario in a real window instead of ship select — pinned 1920×1024 viewport, centred mouse, exactly one tick per frame, upgrades applied without pausing, uncapped frame rate (`SPACEVORS_SCENARIO_CAP=<fps>` restores pacing), then `SPACEVORS_SCENARIO_HOLD` seconds of unmeasured aftermath. Each measured frame prints one `[PERF]` row (dt/sim/apply/render/other ms + entity counts by kind + GC collections and allocated bytes for the frame); `.tools/scenario.sh` pools runs into `frames.jsonl` + `summary.json`. Runs stay on disk under `.tools/run/` for a day (older runs are cleared by the next one): `.tools/run/latest` symlinks the newest run and `.tools/run/index.tsv` lists every run kept with its headline numbers, so a log is findable by someone who was not watching the terminal. `--sim` uses `ScenarioBench`, which drives the same `WorldFactory` + `ScenarioWorld` + `SimulationRunner.RunTick` with no renderer at all. The scenario start state is built in code (`Domain/Scenarios`), never reached by playing, and there is no warm-up phase.
-- Shape batching: the five many-small-entities passes (`ammo`, `sparks`, `healSparks`, `explosions`, `smoke`) draw through `ShapeSprites`, not `Raylib.DrawCircle`/`DrawLineEx`. Shape draws flush raylib's 2D batch and issue one GL draw per shape — ~1.1 µs each on a real GPU, 58-78% of the render in the ammo scenarios. `ShapeSprites` draws a generated white disc with `DrawTexturePro`, which stays inside raylib's batched 2D path (the sprites' path), so thousands of particles become a handful of draws. A moving bullet's streak is that disc stretched along its travel. The disc texture (radius 384) is larger than the biggest circle ever drawn from it (the player's scaled death blast on a 84 px hull reaches ~330 px), so every draw downscales it and a texel is never wider than a screen pixel; the per-draw cost does not care about the source size.
-- Scenario frames: `SPACEVORS_SCENARIO_SHOTS=start,mid,end` (or 1-based frame numbers) makes the game write PNGs of those measured frames into the run dir; `scenario.sh` sets it by default. Shot rows carry `shot=1` and are excluded from the statistics along with the frame that pays for the encode.
-- Sim attribution: the `[SYSTEM]` lines `DiagnosticLogger` already emits per tick are aggregated by `scenario.py` into `systemMs` (worst first, share of sim) and `spikeFrames` (the systems behind the slowest distinct frame indices). System totals such as `CollisionSystem` are kept apart from the phases nested inside them such as `Collision: detection`, which is where the answer usually is. In `ammo-spray`, `CollisionSystem` is 76.4% of sim mean and the frame-9 tail is `Collision: detection` at 10.6 ms.
-- Render-pass split: with diagnostics on, `RenderTimings` brackets each draw pass with one reused stopwatch and logs `[RENDER-PASS] <pass>: Xms` — the frame passes (`clear`, `lighting.begin`, `lights.collect`, `background`, `hud.*`, `present`) and every `WorldRenderer` pass (`world.ammo`, `world.sparks`, …). There is no aggregate `world` line: the `world.*` passes sum to it. `present` covers `EndDrawing`, which is also where raylib's `SetTargetFPS` wait lands. `summary.json` lists the passes worst-first with their share of the render total.
-- Current status: `Tests/ScenarioPerformanceTest.cs` drives the scenario specs headless (simulation only, no GL) against characterized ceilings, and CI runs the suite, so a sim regression fails the build instead of waiting for a manual run. Render cost is measured on real hardware by `.tools/scenario.sh`: every scenario carries a 1000/120 ms budget, an unmarked breach exits non-zero, and `perShapeNs` tracks the cost of one drawn shape (~1.1 µs before shape batching, ~0.1 µs after). `impact-storm` is knowingly over budget (23,876 entities, ~15k sparks) and marked `ExpectedOverBudget`. The open question is the sim tail: repeatable spikes at fixed tick indices, with no GC involved.
+- Frame-cost split: with `SPACEVORS_DIAGNOSTIC=1` each tick logs `[SIM] tick: Xms`, each flush `[APPLY] <phase>: Xms`, each frame `[RENDER] frame: Xms`. `[RENDER]` includes raylib's `SetTargetFPS` pacing wait — read it against `[FRAME] dt=` to tell sim-bound from render-bound. Never sum `[SYSTEM]` totals together with their sub-stage lines.
+- Threat readout: `[THREAT]` prints once a second in every run (it is what the difficulty knobs are tuned against); `ThreatMeter.Measure` is a read-only aggregate, never called from the hot path.
+- Perf scenarios: `SPACEVORS_SCENARIO=<name>` runs a seeded scenario (pinned viewport/mouse, one tick per frame, uncapped); one `[PERF]` row per measured frame; `.tools/scenario.sh` pools runs, `.tools/run/index.tsv` is the perf record; budgets and `--check-baseline` exit non-zero. Design, decisions and current numbers: plans/PERF_SCENARIOS.md.
+- Shape batching: the many-small passes (ammo, sparks, explosions, smoke) draw through `ShapeSprites` — a generated disc quad inside raylib's batched 2D path — not `DrawCircle`/`DrawLineEx`, so thousands of particles become a handful of draws.
 
 ## Troubleshooting
 

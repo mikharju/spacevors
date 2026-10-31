@@ -358,3 +358,16 @@ Implements plans/PERF_SCENARIOS.md: scripted scenarios that start from a seeded 
 - The remaining tail after all of this is particle generation, not broadphase: `Effects: explosion` 2.09 ms at tick 33 and `Effects: damage spark` 2.06 ms at tick 76, against 0.37 ms of detection. That is the deferred spark-generation design change (≈7 particles per impact), and it is now the biggest game-side lever.
 - `impact-storm` met the 120 fps budget after shape batching (4.76 ms), so its `ExpectedOverBudget` mark was removed. `hull-damage`'s per-shape canary was a false alarm (fixed pass overhead divided by a handful of sparks), so `perShapeNs` now needs ≥100 drawn shapes.
 
+
+## Follow-up (record, 2026-10-31) — perf current status, lifted from ARCHITECTURE.md
+
+- `Tests/ScenarioPerformanceTest.cs` drives the scenario specs headless (sim only, no GL)
+  against characterized ceilings, and CI runs the suite, so a sim regression fails the build.
+- Render cost is measured on real hardware by `.tools/scenario.sh`: every scenario carries a
+  1000/120 ms budget, an unmarked breach exits non-zero, and `perShapeNs` tracks the cost of
+  one drawn shape (~1.1 µs before shape batching, ~0.1 µs after).
+- `impact-storm` is knowingly over budget (23,876 entities, ~15k sparks) and marked
+  `ExpectedOverBudget`.
+- Open question: the sim tail — repeatable spikes at fixed tick indices, with no GC involved.
+- Attribution as of 2026-10: in `ammo-spray`, `CollisionSystem` is 76.4% of sim mean and the
+  frame-9 tail is `Collision: detection` at 10.6 ms.
