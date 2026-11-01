@@ -319,7 +319,30 @@ public class CollisionSystem : GameSystem
                 }
             }
 
-            if (earliestAsteroidHit.HasValue)
+            // The player is not in the grid, so its touch is found here, beside the grid's
+            // candidates, so it orders against them the same way. The same two steps as against a
+            // hull: the bounding circle rejects a round that cannot reach the player, and only a
+            // round inside it is tested against the hull's shape, which says where it stops.
+            bool playerHit = false;
+            float playerT = float.MaxValue;
+            if (ammo.IsEnemy && hasPlayer
+                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerTuple.Value2.Value, playerTuple.Value1.Radius, out _, out _)
+                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out float playerTouchedAt))
+            {
+                playerHit = true;
+                playerT = playerTouchedAt;
+            }
+
+            // One round, one hit: each kind used to keep its own earliest `t`, so a single round
+            // chipped a rock, a mine, a hull and a downed round in the same tick, and an enemy round
+            // could clip a rock on its way into the player. The round is spent at the earliest touch
+            // along its segment — bodies met at exactly that distance all take it, nothing met later
+            // does, so a round that shot a missile down never carries on into the hull that missile
+            // was covering. A body the round cannot damage (a wreck past its Health) still spends
+            // the tick's hit: the round survives and reaches what is behind it one tick later.
+            float spentT = MathF.Min(MathF.Min(MathF.Min(asteroidT, mineT), MathF.Min(shipT, missileT)), playerT);
+
+            if (earliestAsteroidHit.HasValue && asteroidT == spentT)
             {
                 var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
                 ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidHit, commands);
@@ -328,7 +351,7 @@ public class CollisionSystem : GameSystem
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
-            if (earliestMineHit.HasValue && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
+            if (earliestMineHit.HasValue && mineT == spentT && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
             {
                 if (!_frameRemainingHealth.TryGetValue(earliestMineHit.Value, out var health))
                 {
@@ -341,7 +364,7 @@ public class CollisionSystem : GameSystem
                 _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
             }
 
-            if (earliestShipHit.HasValue && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
+            if (earliestShipHit.HasValue && shipT == spentT && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
             {
                 var shipHealth = shipHealthComp.Current;
                 if (!_frameRemainingHealth.TryGetValue(earliestShipHit.Value, out var h))
@@ -357,7 +380,7 @@ public class CollisionSystem : GameSystem
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
-            if (earliestMissileHit.HasValue && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
+            if (earliestMissileHit.HasValue && missileT == spentT && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
             {
                 if (!_frameRemainingHealth.TryGetValue(earliestMissileHit.Value, out var mHealth))
                 {
@@ -372,18 +395,9 @@ public class CollisionSystem : GameSystem
                 _entitiesToDestroy.Add(ammoEntity);
             }
 
-            if (!ammo.IsEnemy) continue;
-
-            if (!hasPlayer) continue;
+            if (!playerHit || playerT != spentT) continue;
 
             var playerPos = playerTuple.Value2;
-
-            // The same two steps as against a hull: the circle rejects a round that cannot reach the player,
-            // and only a round inside it is tested against the hull's shape.
-            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerPos.Value, playerTuple.Value1.Radius, out _, out _))
-                continue;
-            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out _))
-                continue;
 
             var playerHealth = view.GetComponent<Health>(playerEntity);
             if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))

@@ -255,3 +255,38 @@ milestone hands still offer 5 (`LevelUpSystem.cs:9`). What moved:
   **0.456 ms** (54% of sim) — `.tools/baselines/ammo-spray.json`. The "8.3 ms budget with CollisionSystem
   ≈ 7.3 ms" sentence describes the pre-swept build; do not use it as a budget.
 
+## Follow-up (2026-10-31): one round, one hit — the first-hit rule now holds across kinds
+
+§1's "pick the one with the smallest `t` along the segment" shipped as **one earliest touch per
+candidate kind**, not one per round: `asteroidT`, `mineT`, `shipT` and `missileT` each kept their own
+winner, and the player was tested at the end of the round's pass with no `t` at all. So a single round
+could chip a rock, a mine, a hull and a downed guided round inside one tick, and an enemy round could
+spend itself on a rock and damage the player as well. The rule in §1 — and the code comment on the
+missile branch, "does not carry on into whatever the missile was covering" — describes one winner; only
+the implementation had four.
+
+- Fix: the four per-kind trackers stay (each still carries its own payload), but one
+  `spentT = min(asteroidT, mineT, shipT, missileT, playerT)` decides where the round is spent, and every
+  handler — the player's included — runs only at that distance (`Combat/CollisionSystem.cs:322-398`).
+  The player's two-step test moved up beside the grid candidates so its `t` orders against theirs; the
+  bounding-circle → hull-shape steps themselves are unchanged.
+- Exact ties (two bodies touched at the same distance) both take the hit. §1's tie-break by distance
+  then entity id would need a second ordering key carried per candidate; a tie is geometric, so this
+  stays deterministic without it.
+- A body the round cannot damage — a wreck past its `Health` — still wins the tick and spends nothing;
+  the round survives and reaches what was behind it one tick later.
+  `AmmoVsHealthlessMine_ShipHitNotSkipped` still passes, because its hull is met earlier along the
+  segment regardless.
+- Balance: this is a real DPS nerf where bodies stack up — a round no longer chips everything its
+  capsule brushed past. That is what "first thing hit only" always said here (§1) and in the laser rule
+  (§3), so the code now matches the weapons' design intent: a rock screens what is behind it.
+- Tests: `CollisionSystemTests.ARoundSpentOnARock_DoesNotChipTheHullBehindIt`,
+  `CollisionSystemTests.ARoundSpentOnARock_DoesNotReachThePlayerBehindIt`,
+  `MissileCollisionTests.ABulletThatShootsDownAMissile_DoesNotReachTheHullBehindIt` (all three fail
+  without the fix).
+- Perf: back-to-back `ammo-spray --sim --iters 3` on this host — **1.36 ms median without the fix,
+  1.39 ms with it** (the first run of each batch reads 2.0-2.6 ms cold on both sides, and same-code runs
+  today spanned 1.33-1.40 ms); `missile-384 --sim` spans 2.56-2.88 ms either side of the change.
+  Nothing measurable, and the frame budget passes with 0 of 357 frames over.
+
+

@@ -547,9 +547,11 @@ beam never touched, and never looked at whether the beam itself had been consume
   geometry test (`Combat/CollisionSystem.cs:452-461`) — the ammo pass's own rule, same wording.
 - Regression test: `MissileCollisionTests.APlayersBeam_IsNotSpentOnItsOwnMissile` — the hull behind the
   player's round now takes the beam's damage and the beam's tip stays past the round.
-- Left alone: the ammo pass still lets one round damage a hull *and* a round it shot down in the same
-  tick (each kind keeps its own earliest `t`). That is a wider question about what "the round is spent"
-  means and it moves balance, so it does not belong in this fix.
+- Same day, second follow-up: the wider half of that rule is fixed too. The ammo pass now spends a
+  round on the single earliest touch along its segment instead of keeping one per candidate kind, so a
+  round that shoots a missile down no longer chips the hull behind it. See
+  `plans/BULLETS_AS_LINES.md` Follow-up (2026-10-31); the regression test
+  `MissileCollisionTests.ABulletThatShootsDownAMissile_DoesNotReachTheHullBehindIt` lives here.
 - Perf: the added lookup runs only for missile candidates inside a beam's box, and no scenario seeds
   beams. A/B on `missile-384 --sim --iters 3`: 2.56 ms median with the fix, 2.88 ms without it — the
   host's own run-to-run spread is larger than the change, so this costs nothing measurable.

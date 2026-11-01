@@ -754,4 +754,71 @@ public class CollisionSystemTests
 
         Assert.Equal(mines.Count, corrected);
     }
+
+    // One round, one hit. A swept capsule can brush a rock and a hull inside a single tick, and each
+    // candidate kind used to keep its own earliest touch along the segment, so one round chipped both.
+    // The rock is met first, so the rock spends the round.
+    [Fact]
+    public void ARoundSpentOnARock_DoesNotChipTheHullBehindIt()
+    {
+        var (em, view, system) = Setup();
+
+        var rock = em.CreateEntity();
+        em.AddComponent(rock, new Position(new Vector2(5f, 0f)));
+        em.AddComponent(rock, new Asteroid(IsSmall: true, Radius: 6f));
+        em.AddComponent(rock, new Health(10, 10));
+
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(25f, 0f)));
+        em.AddComponent(ship, new Velocity(Vector2.Zero));
+        em.AddComponent(ship, new EnemyShip(Radius: 10f, Speed: 0f, TurnRate: 0f, FiringRange: 0f, TurretFireRate: 0f, TurretAmmoSpeed: 0f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
+        em.AddComponent(ship, new Health(10, 10));
+
+        // 3600 px/s at 1/120 s = 30 px per tick: the segment runs (0,0) → (30,0), so the rock at
+        // t≈0.17 is met well before the hull.
+        var bullet = em.CreateEntity();
+        em.AddComponent(bullet, new Position(new Vector2(30f, 0f)));
+        em.AddComponent(bullet, new Ammo(Velocity: new Vector2(3600f, 0f), Radius: 3f, Lifetime: 10f, Damage: 1));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.Equal(9, em.GetComponent<Health>(rock).Current);
+        Assert.Equal(10, em.GetComponent<Health>(ship).Current);
+    }
+
+    // The same rule against the player: a round spent on a rock in front of the hull never reaches
+    // the hull, even though one tick's segment covers both.
+    [Fact]
+    public void ARoundSpentOnARock_DoesNotReachThePlayerBehindIt()
+    {
+        var (em, view, system) = Setup();
+
+        var rock = em.CreateEntity();
+        em.AddComponent(rock, new Position(new Vector2(-40f, 0f)));
+        em.AddComponent(rock, new Asteroid(IsSmall: true, Radius: 6f));
+        em.AddComponent(rock, new Health(10, 10));
+
+        var player = em.CreateEntity();
+        em.AddComponent(player, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(player, new Velocity(Vector2.Zero));
+        em.AddComponent(player, new Rotation(0f));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10, Radius: 20f));
+        em.AddComponent(player, new Health(10, 10));
+
+        // 3600 px/s at 1/120 s: the segment runs (-45,0) → (-15,0), so the rock is met at t≈0.17 while
+        // the round is only inside the player's hull at t = 1.
+        var bullet = em.CreateEntity();
+        em.AddComponent(bullet, new Position(new Vector2(-15f, 0f)));
+        em.AddComponent(bullet, new Ammo(Velocity: new Vector2(3600f, 0f), Radius: 3f, Lifetime: 10f, IsEnemy: true, Damage: 3));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.Equal(7, em.GetComponent<Health>(rock).Current);   // the round's 3 damage went into the rock
+        Assert.Equal(10, em.GetComponent<Health>(player).Current);
+    }
 }

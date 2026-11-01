@@ -168,4 +168,35 @@ public class MissileCollisionTests
         Assert.Equal(8, em.GetComponent<Health>(ship).Current);
         Assert.Equal(3, em.GetComponent<Health>(missile).Current);
     }
+
+    // The round that shoots a missile down is spent on it and stops there: its swept capsule touches
+    // the missile and the hull behind it inside one tick, and the hull must not take the overkill.
+    [Fact]
+    public void ABulletThatShootsDownAMissile_DoesNotReachTheHullBehindIt()
+    {
+        var (em, view, system) = Setup();
+        var missile = AddMissile(em, new Vector2(3f, 0f), new Vector2(0f, -100f), isEnemy: true, health: 1);
+
+        // The hull the bullet was aimed at, further along the same line of travel.
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(25f, 0f)));
+        em.AddComponent(ship, new Velocity(Vector2.Zero));
+        em.AddComponent(ship, new EnemyShip(Radius: 10f, Speed: 0f, TurnRate: 0f, FiringRange: 0f, TurretFireRate: 0f, TurretAmmoSpeed: 0f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
+        em.AddComponent(ship, new Health(10, 10));
+
+        // 1800 px/s at 1/60 s: the swept segment runs (0,1) → (30,1), so the missile is met at t≈0.1
+        // and the hull well after it.
+        var bullet = AddBullet(em, new Vector2(30f, 1f), new Vector2(1800f, 0f), isEnemy: false, damage: 1);
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 60f, commands);
+        bool missileDown = WasDestroyed(commands, missile);
+        bool bulletSpent = WasDestroyed(commands, bullet);
+        commands.Apply(em);
+
+        Assert.True(missileDown, "the bullet should still shoot the missile down");
+        Assert.True(bulletSpent, "and be spent on it");
+        Assert.Equal(10, em.GetComponent<Health>(ship).Current);
+    }
 }
