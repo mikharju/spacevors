@@ -36,16 +36,18 @@ public static class StatsScreenRenderer
     public readonly record struct StatsLayout(StatRow[] ShipRows, StatsSection[] WeaponSections);
 
     // Stats layout + window scale for one paused frame. Prepared once and used for both hover
-    // hit-testing and drawing, so the two can never disagree and the work is not repeated.
-    public sealed record Prepared(StatsLayout Layout, float Scale);
+    // hit-testing and drawing, so the two can never disagree and the work is not repeated. The reroll
+    // charge count rides along for the same reason: the salvage panel's box depends on it.
+    public sealed record Prepared(StatsLayout Layout, float Scale, int RerollCount);
 
     public static Prepared Prepare(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight, bool hasCards)
     {
         var layout = BuildStats(em, playerEntity);
-        return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards));
+        int rerollCount = em.TryGetComponent<RerollStock>(playerEntity, out var stock) ? stock.Count : 0;
+        return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards), rerollCount);
     }
 
-    public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex, bool canManageMounts, bool hoveredManage)
+    public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex, bool canManageMounts, bool hoveredManage, bool hoveredReroll)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, Palette.ScreenDim);
 
@@ -55,7 +57,7 @@ public static class StatsScreenRenderer
 
         if (hasCards)
         {
-            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale);
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale, prepared.RerollCount, hoveredReroll);
             return;
         }
 
@@ -99,6 +101,14 @@ public static class StatsScreenRenderer
         }
 
         return -1;
+    }
+
+    // Whether the pointer is over the salvage panel — the same rect the panel is drawn with, so the box
+    // clicked is the box shown. A panel with nothing to spend is still drawn, just dim.
+    public static bool IsRerollHovered(Prepared prepared, int mouseX, int mouseY, int windowWidth, int windowHeight)
+    {
+        var (x, y, w, h) = UpgradeMenuRenderer.RerollPanelRect(windowWidth, windowHeight, prepared.Scale, prepared.RerollCount);
+        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
     }
 
     // UI scale from the window width, before the vertical shrink-to-fit. Shared with the slot-picking

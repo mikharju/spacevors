@@ -59,6 +59,36 @@ internal static class RenderHelpers
     const float MarkerTailHalfWidth = 0.9f;
     const float MarkerTailInset = 0.25f;
 
+    // Ship salvage (a reroll charge): a short capsule — a rotated body, a cap at each end, a bright core
+    // along the axis. Three batched draws, and shared by the world (a capsule tumbling where it fell,
+    // drawn at its own simulated spin) and the HUD (the same shape, held still, beside the count) so the
+    // pickup and what it buys are visibly the same object.
+    public static void DrawSalvageCapsule(float cx, float cy, float radius, float spin)
+    {
+        float halfLength = radius;
+        float halfThickness = radius * CapsuleThicknessFraction;
+        var axis = new System.Numerics.Vector2(MathF.Cos(spin), MathF.Sin(spin));
+        var body = new Rectangle(cx, cy, halfLength * 2f, halfThickness * 2f);
+
+        Raylib.DrawRectanglePro(body, CenterOrigin(body), Angle.ToDeg(spin), Palette.SalvageBody);
+
+        ShapeSprites.DrawCircle(cx + axis.X * halfLength, cy + axis.Y * halfLength, halfThickness, Palette.SalvageCap);
+        ShapeSprites.DrawCircle(cx - axis.X * halfLength, cy - axis.Y * halfLength, halfThickness, Palette.SalvageCap);
+
+        float coreLength = halfLength * CapsuleCoreFraction;
+        ShapeSprites.DrawStreak(
+            new System.Numerics.Vector2(cx - axis.X * coreLength, cy - axis.Y * coreLength),
+            new System.Numerics.Vector2(cx + axis.X * coreLength, cy + axis.Y * coreLength),
+            halfThickness * 1.2f,
+            Palette.SalvageCore);
+    }
+
+    const float CapsuleThicknessFraction = 0.38f;
+    const float CapsuleCoreFraction = 0.55f;
+
+    // How wide a salvage capsule reads, so the HUD icon and the world pickup are the same size.
+    public static float SalvageIconRadius(float scale) => 7f * scale;
+
     // A missile rack: a square riding in the hull frame instead of a point toward the target. A guided
     // round picks its own bearing once it is away from the mount, so a marker that swung to aim would
     // claim the mount is steering something it does not. The arc sector is still drawn underneath:

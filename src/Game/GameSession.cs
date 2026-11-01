@@ -27,6 +27,11 @@ public sealed class GameSession
     // Diagnostics: player health set by key H so test enemies cannot end the run during visual tests.
     private const int DiagnosticTestPlayerHealth = 10000;
 
+    // Diagnostics: salvage (reroll) charges. A capsule is a 6 % ship drop, so the env var lets a headless
+    // run reach the reroll without farming a kill, and `G` tops it up mid-run.
+    private const string DiagnosticSalvageEnvVar = "SPACEVORS_DIAG_REROLLS";
+    private const int DiagnosticSalvageGrant = 2;
+
     private readonly EntityManager _em;
     private readonly WorldView _worldView;
     private readonly CommandBuffer _commands = new();
@@ -78,6 +83,13 @@ public sealed class GameSession
     // The mount screen was opened from the stats screen instead of from a card.
     bool _mountsFromStats;
 
+    // Salvage (reroll) spend is edge-triggered: raylib's IsKeyPressed reports X11 auto-repeat as fresh
+    // presses, so a held `R` — or one of `.tools/input.sh`'s deliberately long 0.4 s holds — would drain
+    // the whole stock inside a second (TROUBLE_SHOOTING #49). The pair of flags below means one spend per
+    // physical press, release included.
+    bool _rerollKeyWasDown;
+    bool _rerollJustPressed;
+
     // raylib closes the window on its exit key (Escape by default); key 0 is no key at all, which is
     // how the mount screen gets Escape back for "back".
     const KeyboardKey DefaultExitKey = KeyboardKey.Escape;
@@ -121,6 +133,7 @@ public sealed class GameSession
         _clutter = clutter;
         _ship = ship;
         _diagnostics = Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
+        if (_diagnostics) GrantDiagnosticSalvage();
 
         if (scenario is not null)
         {
@@ -143,6 +156,12 @@ public sealed class GameSession
 
         float frameTime = (float)Raylib.GetFrameTime();
         DiagnosticLogger.UpdateFps(frameTime);
+
+        // Tracked on every frame, not only on the card screen: a key already held when the hand appears
+        // must not spend a charge the moment it does.
+        bool rerollKeyDown = Raylib.IsKeyDown(KeyboardKey.R);
+        _rerollJustPressed = rerollKeyDown && !_rerollKeyWasDown;
+        _rerollKeyWasDown = rerollKeyDown;
 
         bool hasPendingChoice = _em.GetEntitiesWithComponents<PendingChoice>().Any();
 
@@ -326,6 +345,10 @@ public sealed class GameSession
         // Diagnostic only: force level-up to test the upgrade screen
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.L))
             _em.AddComponent(_playerEntity, playerStats with { Xp = playerStats.Level * 10 });
+
+        // Diagnostic only: grant salvage charges so the reroll can be tested without farming a ship kill.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.G))
+            GrantSalvage(DiagnosticSalvageGrant);
 
         // Diagnostic only: spawn a test explosion on the fixed test asteroid to verify lighting
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.M))
@@ -698,7 +721,7 @@ public sealed class GameSession
 
         var statsCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderPaused(_em, statsCam.Target.X, statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
-            new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1, canManageMounts, buttonHovered));
+            new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1, canManageMounts, buttonHovered, false));
         _renderSw.Stop();
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
@@ -717,27 +740,76 @@ public sealed class GameSession
 
     private void HandleCardStep(int windowWidth, int windowHeight)
     {
+        var screen = PrepareCardScreen(windowWidth, windowHeight);
+
+        // A salvage capsule buys a fresh hand. The panel rides the hint row and the cards own the row
+        // above it, so a click here can never double as a card pick.
+        if (_rerollJustPressed || RerollPanelClicked(screen, windowWidth, windowHeight))
+        {
+            SpendRerollCharge();
+            // Read the screen again: this frame must draw the hand that was just bought, and the count
+            // that paid for it.
+            screen = PrepareCardScreen(windowWidth, windowHeight);
+        }
+
         bool hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
         PendingUpgradeOptions? upgradeOptions = hasPending ? pendingTuple.Value2 : null;
 
         bool hasCards = upgradeOptions is { Options.Length: > 0 };
-        var screen = StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight, hasCards);
+        int mouseX = Raylib.GetMouseX(), mouseY = Raylib.GetMouseY();
 
         int hoveredIndex = hasCards
-            ? StatsScreenRenderer.GetHoveredCardIndex(screen, upgradeOptions!.Value, Raylib.GetMouseX(), Raylib.GetMouseY(), windowWidth, windowHeight)
+            ? StatsScreenRenderer.GetHoveredCardIndex(screen, upgradeOptions!.Value, mouseX, mouseY, windowWidth, windowHeight)
             : -1;
+        bool hoveredReroll = hasCards && StatsScreenRenderer.IsRerollHovered(screen, mouseX, mouseY, windowWidth, windowHeight);
 
         int selectedIndex = ReadChoiceSelection(hoveredIndex);
         if (selectedIndex >= 0) ChooseUpgrade(selectedIndex, autoMountInSlot: _scenario is not null);
 
-        RenderCardScreen(screen, upgradeOptions, hoveredIndex, windowWidth, windowHeight);
+        RenderCardScreen(screen, upgradeOptions, hoveredIndex, hoveredReroll, windowWidth, windowHeight);
     }
 
-    void RenderCardScreen(StatsScreenRenderer.Prepared screen, PendingUpgradeOptions? options, int hoveredIndex, int windowWidth, int windowHeight)
+    private StatsScreenRenderer.Prepared PrepareCardScreen(int windowWidth, int windowHeight) =>
+        StatsScreenRenderer.Prepare(_em, _playerEntity, windowWidth, windowHeight,
+            hasCards: _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out _));
+
+    private bool RerollPanelClicked(StatsScreenRenderer.Prepared screen, int windowWidth, int windowHeight) =>
+        Raylib.IsMouseButtonPressed(MouseButton.Left)
+        && StatsScreenRenderer.IsRerollHovered(screen, Raylib.GetMouseX(), Raylib.GetMouseY(), windowWidth, windowHeight);
+
+    // The spend itself is a domain call (`UpgradeOffer.TryReroll`), so the rules a re-deal must obey are
+    // tested without a window; this is the app half of it, on the sanctioned paused direct-write path.
+    private void SpendRerollCharge()
+    {
+        if (!UpgradeOffer.TryReroll(_em, _playerEntity)) return;
+
+        int left = _em.TryGetComponent<RerollStock>(_playerEntity, out var stock) ? stock.Count : 0;
+        DiagnosticLogger.LogEvent("UPGRADE", $"salvage spent: {left} charges left");
+    }
+
+    // Adds salvage charges to whatever capsules the player has already picked up.
+    private void GrantSalvage(int charges)
+    {
+        var held = _em.TryGetComponent<RerollStock>(_playerEntity, out var stock) ? stock : RerollStock.Empty;
+        _em.AddComponent(_playerEntity, held.With(held.Count + charges));
+    }
+
+    // Diagnostics: SPACEVORS_DIAG_REROLLS=<n> starts the run with n charges, so the card screen's reroll
+    // is testable headless (key timing is fragile there — TROUBLE_SHOOTING #27).
+    private void GrantDiagnosticSalvage()
+    {
+        string raw = Environment.GetEnvironmentVariable(DiagnosticSalvageEnvVar) ?? "";
+        if (!int.TryParse(raw, out int charges) || charges <= 0) return;
+
+        GrantSalvage(charges);
+        DiagnosticLogger.LogEvent("diag", $"{DiagnosticSalvageEnvVar}: {charges} salvage charges");
+    }
+
+    void RenderCardScreen(StatsScreenRenderer.Prepared screen, PendingUpgradeOptions? options, int hoveredIndex, bool hoveredReroll, int windowWidth, int windowHeight)
     {
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderPaused(_em, upgradeCam.Target.X, upgradeCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
-            new Renderer.StatsOverlay(screen, options, GetPlayerLevel(), hoveredIndex, false, false));
+            new Renderer.StatsOverlay(screen, options, GetPlayerLevel(), hoveredIndex, false, false, hoveredReroll));
     }
 
     // The mount/cargo screen: put what is in hand into a mount, take a gun down into cargo, or leave

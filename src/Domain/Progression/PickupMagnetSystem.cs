@@ -14,6 +14,7 @@ public class PickupMagnetSystem : GameSystem
 
         ProcessXpPickups(view, playerEntity, playerPos.Value, deltaTime, commands);
         ProcessHealthOrbs(view, playerEntity, playerPos.Value, deltaTime, commands);
+        ProcessRerollTokens(view, playerEntity, playerPos.Value, deltaTime, commands);
     }
 
     private void ProcessXpPickups(WorldView view, Entity playerEntity, Vector2 playerPos, float deltaTime, CommandBuffer commands)
@@ -87,29 +88,9 @@ public class PickupMagnetSystem : GameSystem
                 continue;
             }
 
-            var diff = playerPos - pos.Value;
-            float distSq = diff.X * diff.X + diff.Y * diff.Y;
-            float dist = (float)Math.Sqrt(distSq);
+            float dist = PullTowardsPlayer(view, commands, orbEntity, playerPos, playerStats.PickupRadius, deltaTime);
 
-            if (dist < playerStats.PickupRadius)
-            {
-                Vector2 currentVel = view.TryGetComponent<Velocity>(orbEntity, out var vel) ? vel.Value : Vector2.Zero;
-                var accel = (diff / dist) * LootStats.MagnetAcceleration;
-                var newVel = currentVel + accel * deltaTime;
-                float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
-
-                if (speed > LootStats.MaxMagnetSpeed)
-                {
-                    newVel = newVel / speed * LootStats.MaxMagnetSpeed;
-                }
-
-                var newPos = pos.Value + newVel * deltaTime;
-                commands.Add(new AddComponentCommand<Position>(orbEntity, new Position(newPos)));
-                commands.Add(new AddComponentCommand<Velocity>(orbEntity, new Velocity(newVel)));
-            }
-
-            float collectionDist = playerStats.Radius + orb.Radius;
-            if (dist < collectionDist)
+            if (dist < playerStats.Radius + orb.Radius)
             {
                 totalHeal += LootStats.HealthOrbHealAmount;
                 SpawnHealSparks(position: pos.Value, commands);
@@ -126,6 +107,69 @@ public class PickupMagnetSystem : GameSystem
             int healed = Math.Min(health.Current + totalHeal, health.Max);
             commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(healed, health.Max)));
         }
+    }
+
+    // Ship salvage: the same accelerating pull as a health orb, and one charge per capsule collected.
+    // The stock is a component of its own rather than a `Player` field — `ProcessXpPickups` ref-writes
+    // `Player.Xp` in this phase, so a queued `Player` write built from a pre-phase copy would drop it.
+    private void ProcessRerollTokens(WorldView view, Entity playerEntity, Vector2 playerPos, float deltaTime, CommandBuffer commands)
+    {
+        var playerStats = view.GetComponent<Player>(playerEntity);
+        int collected = 0;
+
+        foreach (var (tokenEntity, token, _) in view.GetEntitiesWithComponents<RerollToken, Position>())
+        {
+            float newLifetime = token.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(tokenEntity));
+                continue;
+            }
+
+            float dist = PullTowardsPlayer(view, commands, tokenEntity, playerPos, playerStats.PickupRadius, deltaTime);
+
+            if (dist < playerStats.Radius + token.Radius)
+            {
+                collected++;
+                commands.Add(new DestroyEntityCommand(tokenEntity));
+                continue;
+            }
+
+            // The capsule tumbles where it lies. The angle is simulated, not read off a clock, so a
+            // seeded run draws the same pose in a screenshot twice; a capsule that fell on a later tick
+            // starts turning later, so capsules never sit parallel.
+            commands.Add(new AddComponentCommand<RerollToken>(
+                tokenEntity, new RerollToken(newLifetime, token.Radius, token.Spin + LootStats.RerollTokenSpinRate * deltaTime)));
+        }
+
+        if (collected > 0)
+        {
+            var stock = view.TryGetComponent<RerollStock>(playerEntity, out var held) ? held : RerollStock.Empty;
+            commands.Add(new AddComponentCommand<RerollStock>(playerEntity, stock.With(stock.Count + collected)));
+        }
+    }
+
+    // Accelerates one pickup toward the hull while it is inside the magnet radius, and reports the
+    // distance so the caller can decide whether it has been collected. The health orb and the salvage
+    // capsule share this pull; XP orbs do not — they are the many-entity loop and move at a constant
+    // magnet speed instead, which is what makes them grabbable at any ship speed.
+    private static float PullTowardsPlayer(WorldView view, CommandBuffer commands, Entity pickup, Vector2 playerPos, float magnetRadius, float deltaTime)
+    {
+        var pos = view.GetComponent<Position>(pickup);
+        var diff = playerPos - pos.Value;
+        float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
+
+        if (dist <= 0f || dist >= magnetRadius) return dist;
+
+        Vector2 currentVel = view.TryGetComponent<Velocity>(pickup, out var vel) ? vel.Value : Vector2.Zero;
+        var newVel = currentVel + (diff / dist) * LootStats.MagnetAcceleration * deltaTime;
+
+        float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
+        if (speed > LootStats.MaxMagnetSpeed) newVel = newVel / speed * LootStats.MaxMagnetSpeed;
+
+        commands.Add(new AddComponentCommand<Position>(pickup, new Position(pos.Value + newVel * deltaTime)));
+        commands.Add(new AddComponentCommand<Velocity>(pickup, new Velocity(newVel)));
+        return dist;
     }
 
     private void SpawnHealSparks(Vector2 position, CommandBuffer commands)

@@ -31,6 +31,11 @@ public readonly record struct HealthOrb(float Lifetime = 90f, float Radius = 8f)
 
 public readonly record struct XpPickup(int XpAmount, float Lifetime = 90f, float Radius = 6f, bool Chased = false);
 
+// Salvage that buys a re-deal of the upgrade hand: a short grey capsule tumbling slowly in place.
+// Its `Spin` is what the renderer draws and what PickupMagnetSystem turns each tick, so the look is
+// simulated rather than derived from wall-clock time (a seeded run screenshots the same way twice).
+public readonly record struct RerollToken(float Lifetime = 90f, float Radius = 8f, float Spin = 0f);
+
 public readonly record struct DebugMarker(float Lifetime, float InitialLifetime = 0.5f);
 
 public readonly record struct ShipDeathExplosion(

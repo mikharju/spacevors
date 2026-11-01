@@ -33,7 +33,7 @@ public static class UpgradeMenuRenderer
 
     public static int GetHintY(int windowHeight, float scale) => (int)(windowHeight - (BottomMargin + HintFontSize) * scale);
 
-    public static void DrawCards(int windowWidth, int windowHeight, PendingUpgradeOptions options, int hoveredIndex, float scale)
+    public static void DrawCards(int windowWidth, int windowHeight, PendingUpgradeOptions options, int hoveredIndex, float scale, int rerollCharges, bool hoveredReroll)
     {
         if (options.Options.Length == 0) return;
 
@@ -55,7 +55,49 @@ public static class UpgradeMenuRenderer
         int font = (int)(HintFontSize * scale);
         Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font,
             Ui.WithAlpha(Palette.TextMuted, fade));
+
+        DrawRerollPanel(windowWidth, windowHeight, scale, rerollCharges, hoveredReroll, fade);
     }
+
+    // The salvage panel: how many reroll charges the player holds, and the key that spends one. It rides
+    // at the right end of the hint row because the card row owns everything above it — the manage-mounts
+    // button's slot would land on the card bottoms (a card's bottom edge is `GetHintY - HintGap`).
+    // Rect and label come from one place, so the box clicked is the box drawn.
+    public static (int X, int Y, int Width, int Height) RerollPanelRect(int windowWidth, int windowHeight, float scale, int charges)
+    {
+        int font = (int)(HintFontSize * scale);
+        int padding = (int)(RerollPanelPadding * scale);
+        int icon = (int)(RenderHelpers.SalvageIconRadius(scale) * 2f);
+        int width = icon + padding + Raylib.MeasureText(RerollLabel(charges), font) + 2 * padding;
+        int height = font + 2 * padding;
+        int x = windowWidth - (int)(UpgradeCardSideMargin * scale) - width;
+        int y = GetHintY(windowHeight, scale) - padding;
+        return (x, y, width, height);
+    }
+
+    public static string RerollLabel(int charges) => charges > 0 ? $"R reroll x{charges}" : "no salvage";
+
+    public static void DrawRerollPanel(int windowWidth, int windowHeight, float scale, int charges, bool hovered, float fade)
+    {
+        var (x, y, w, h) = RerollPanelRect(windowWidth, windowHeight, scale, charges);
+        bool spendable = charges > 0;
+        int font = (int)(HintFontSize * scale);
+        int padding = (int)(RerollPanelPadding * scale);
+
+        Color fill = hovered && spendable ? Palette.PanelFillHover : Palette.PanelFill;
+        Color border = hovered && spendable ? Palette.Accent : Palette.PanelEdge;
+        Ui.DrawPanel(x, y, w, h, (int)(6 * scale), Ui.WithAlpha(fill, fade), Ui.WithAlpha(border, fade));
+
+        float iconRadius = RenderHelpers.SalvageIconRadius(scale);
+        RenderHelpers.DrawSalvageCapsule(x + padding + iconRadius, y + h / 2f, iconRadius, spin: 0f);
+
+        string label = RerollLabel(charges);
+        Color text = spendable ? Palette.TextBright : Palette.TextMuted;
+        Raylib.DrawText(label, x + w - padding - Raylib.MeasureText(label, font), y + (h - font) / 2, font,
+            Ui.WithAlpha(text, fade));
+    }
+
+    const int RerollPanelPadding = 10;
 
     public static (Vector2 topLeft, int Width, int Height) GetUpgradeCardRect(int index, int optionCount, int windowWidth, int windowHeight, float scale)
     {

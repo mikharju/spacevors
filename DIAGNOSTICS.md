@@ -9,6 +9,7 @@ logs, and a fixed test asteroid at (0,-300).
 Keys (in-game):
 
 - L: force level-up
+- G: grant 2 salvage (reroll) charges
 - M: spawn a test explosion at the fixed asteroid
 - N: spawn a test enemy ship with huge health up-right of the player (click-targeting tests)
 - H: set player health to 10000
@@ -25,6 +26,8 @@ Environment variables:
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun"` — scripted upgrade choices, one
   entry per level-up; entry is a weapon name or `Stat:WeaponName`; falls back to the random
   pool when exhausted
+- `SPACEVORS_DIAG_REROLLS=<n>` — start the run holding n reroll charges, so the card screen's reroll is
+  testable without farming a ship kill (a capsule only drops from a dying ship, 6 % of them)
 - `SPACEVORS_SCENARIO_SHOTS=start,mid,end` (or frame numbers) — the game writes
   `scenario-<name>-frameNNN.png` into its working directory for those scenario frames; the harness
   collects them into the run dir. raylib's own F12 needs window focus, which a headless display

@@ -11,6 +11,13 @@ internal static class Palette
     public static readonly Color HealthLow = new(255, 60, 60, 255);
     public static readonly Color HealthMid = new(255, 190, 80, 255);
 
+    // Ship salvage — a capsule that buys a re-deal of the upgrade hand. Gunmetal greys, deliberately
+    // unlit: every other pickup is a glowing orb. Shared by the tumbling capsule in the world and the
+    // still icon beside the HUD count, so the pickup and what it buys read as one object.
+    public static readonly Color SalvageBody = new(126, 132, 142, 235);
+    public static readonly Color SalvageCap = new(178, 184, 194, 240);
+    public static readonly Color SalvageCore = new(226, 231, 240, 200);
+
     // Soft-depth UI language (plans/UI_POLISH.md): one accent used sparingly,
     // off-white text, translucent panels so stars faintly show through.
     public static readonly Color Accent = new(120, 200, 230, 255);

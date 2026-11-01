@@ -11,6 +11,16 @@ public readonly record struct UpgradableOption(string WeaponName, UpgradeOption 
 
 public readonly record struct PendingUpgradeOptions(UpgradableOption[] Options);
 
+// Charges spent to re-deal the upgrade hand, collected from ship salvage (`RerollToken`). It is a
+// component on the player rather than a `Player` field: `PickupMagnetSystem` ref-writes `Player.Xp`
+// mid-phase, so a queued `Player` write built from a pre-phase copy would drop this tick's XP.
+public readonly record struct RerollStock(int Count)
+{
+    public static RerollStock Empty { get; } = new(0);
+
+    public RerollStock With(int count) => new(Math.Max(0, count));
+}
+
 // Turrets the ship carries but does not mount: inactive, and never offered upgrades. A gun taken off
 // the hull comes back here with its upgraded stats intact, ready to be mounted into a fitting mount.
 public readonly record struct WeaponCargo(IReadOnlyList<Turret> Weapons)

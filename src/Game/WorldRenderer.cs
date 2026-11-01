@@ -64,6 +64,8 @@ public static class WorldRenderer
         RenderTimings.Pass("world.xpPickups");
         DrawHealthOrbs(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.healthOrbs");
+        DrawRerollTokens(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.rerollTokens");
         DrawTurrets(em, playerEntity, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.turrets");
 
@@ -553,6 +555,22 @@ public static class WorldRenderer
 
             // Bright mint at full alpha: health must never be mistaken for the acid spray's dark bubbles.
             Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, new Color(150, 255, 190, 255));
+        }
+    }
+
+    // Ship salvage: a short grey capsule tumbling slowly where it fell. Grey and unlit on purpose —
+    // every other pickup is a glowing orb, so the shape alone tells the player this one buys something
+    // instead of healing or levelling them. The angle is the token's own simulated `Spin`, not a clock,
+    // so a seeded run renders the same pose twice.
+    private static void DrawRerollTokens(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, token, pos) in em.GetEntitiesWithComponents<RerollToken, Position>())
+        {
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+
+            if (RenderHelpers.IsOffScreen(cx, cy, token.Radius, windowWidth, windowHeight)) continue;
+
+            RenderHelpers.DrawSalvageCapsule(cx, cy, token.Radius, token.Spin);
         }
     }
 

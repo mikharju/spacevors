@@ -89,8 +89,8 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
 Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim WeaponCargo PrimaryTarget AutoTargetMark
-Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup ShipDeathExplosion SmokePuff DebugMarker
-Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts Dead
+Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup RerollToken ShipDeathExplosion SmokePuff DebugMarker
+Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts RerollStock Dead
 ```
 
 Health rides the player, enemy ships, mines and small asteroids: carrying it is what makes an
@@ -105,7 +105,7 @@ Three ways systems write components, plus direct app-layer writes:
 2. Direct ref mutation (speed exceptions): three systems mutate a single component in place via slot refs instead of queuing a command per entity — this avoids thousands of command allocations per tick on hot paths:
    - PositionIntegrationSystem integrates Position in place; it reads the pre-phase Velocity (PhysicsSystem's new-velocity commands are not applied yet), so position advances with last tick's velocity.
    - AmmoLifetimeSystem decrements Ammo.Lifetime in place; only destructions go through commands.
-   - PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick.
+   - PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick. Everything else it collects goes through commands: a collected RerollToken adds one RerollStock (its own component, counted once per tick from the pickups collected) — a second Player field would have been a stale-copy write that silently drops this tick's XP.
 3. Local accumulation + single flush: CollisionSystem accumulates per-entity velocity/position-correction/angular-velocity/health deltas in per-frame dictionaries and emits one command per entity at the end of Update — otherwise last-write-wins would drop all but the final hit on an entity struck several times in one frame.
 
 Direct writes (app layer): GameSession writes straight to the EntityManager before the simulation step or while paused, never mid-phase:
@@ -215,7 +215,7 @@ Examples:
 - CollisionSystem adds Dead; ShipDeathExplosionSystem reacts with staged explosions; Dead entities are not auto-targeted, so weapons retarget instead of firing into a wreck. An enemy entity is destroyed under the final blast; the player becomes a husk instead - Position, Rotation and the sequence component come off and the turret mounts are destroyed, while Player/Health/Dead stay for the HUD bars, stats and game-over detection (the sequence component must never outlive its sequence: a leftover re-fires the final stage every frame).
 - TurretFiringSystem / EnemyMissileFiringSystem put `Missile` + `Health` on a round at launch; MissileGuidanceSystem steers it each tick; CollisionSystem reads the same round's `Ammo` to shoot it down
 - PickupMagnetSystem raises Player.Xp (direct ref write, see Write patterns); LevelUpSystem spawns PendingChoice + PendingUpgradeOptions
-- GameSession reads PendingChoice to pause and show the upgrade menu
+- GameSession reads PendingChoice to pause and show the upgrade menu; spending a salvage charge re-deals that hand through `UpgradeOffer.Roll` — the same code a level-up deals from, so the offer rules live in exactly one place and a re-deal cannot invent its own
 
 ## Determinism
 

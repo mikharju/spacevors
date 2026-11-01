@@ -54,6 +54,7 @@ Goal:
 - Tab: toggle ship stats screen (pauses the game; also works while picking an upgrade — cards are hidden behind it). Shows every upgradeable stat with its current value and how many times it was upgraded, how many hull mounts of each size are filled, and per weapon its hull mount with firing arc and turret turn speed. Layout: ship/engine stats top-left, weapon stats top-right, upgrade cards in a bottom row. UI text scales with window width (1x at 1920px, capped at 2x) and shrinks to fit vertically on short windows
 - Upgrade choice: 1-5 or click a card. A new-weapon card marks the weapon's size in its prominent line (large / small) and lists its base numbers: range, damage (with pellet count when it fires several), attack speed and projectile speed — "beam instant" for hitscan guns. Choosing one opens the turret-mount screen — the hull drawn large, every mount shown as a circle with its firing arc and a number that never changes, mounts that can take the weapon ringed in green, and the cargo of inactive weapons listed at the left. With a weapon in hand: click a mount or press its number to fit it (a filled mount swaps, the displaced gun going into cargo and into hand), C stores the weapon in cargo, right-click puts it down, Esc leaves the screen (back to the same cards if the weapon was never placed)
 - Turret mounts and cargo from the stats screen: Tab, then click "Manage mounts and cargo". With nothing in hand, click a mounted turret or press its number to take it down into cargo (it stops firing and stops being offered upgrades); click a cargo weapon to pick it up, then click a mount to fit it. Esc returns to the stats screen. Everything is free and unlimited — rearranging is not a choice the game charges for
+- Salvage capsule (a grey capsule a killed ship drops, 6% of kills): magnetised to the hull like a health orb, stocks one reroll charge, shown as an icon and count under the level readout. While the upgrade cards are up, R or a click on the "R reroll ×n" panel spends one charge and re-deals the whole hand
 - R: restart from game over (back to ship selection)
 
 ## Diagnostics
@@ -79,6 +80,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 ### Enemies and difficulty
 - Waves and lulls — shipped — plans/WAVES_AND_BREATHERS.md
 - Loot drops: XP pickups, health orbs, magnet, XP/level-up — shipped — plans/LOOT_DROPS.md
+- Reroll-token loot: salvage capsules off killed ships stock charges that re-deal the upgrade hand — shipped — plans/REROLL_TOKENS.md
 - Difficulty scaling and threat readout; open items remain — active — plans/DIFFICULTY_SCALING.md
 
 ### Physics and sim
@@ -98,6 +100,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
+- Salvage field and ECM pulse: two deferred pickups, shapes and risks written down — plans/LOOT_ITEMS.md
 - Endless difficulty escalation: behaviour first, distance-driven clock, duty cycle, elites — plans/ENDLESS_DIFFICULTY.md
 - Parallel sim — plans/PARALLEL_SIM.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
@@ -111,7 +114,7 @@ plans/functional-ecs.md.
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
 - Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
-- Loot/reward loop: salvage currency buys rerolls (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
+- Loot/reward loop: reroll charges shipped; next candidates are the salvage field and the ECM pulse (plans/LOOT_ITEMS.md); a salvage *currency* only earns its keep once there is more than one thing to buy (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
 - Off-screen threat indicators for enemy racks and missiles
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)

@@ -45,7 +45,8 @@ public static class Renderer
         int PlayerLevel,
         int HoveredIndex,
         bool CanManageMounts,
-        bool HoveredManage);
+        bool HoveredManage,
+        bool HoveredReroll);
 
     public static void RenderPaused(
         EntityManager em,
@@ -60,7 +61,7 @@ public static class Renderer
     {
         Raylib.BeginDrawing();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
-        StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex, stats.CanManageMounts, stats.HoveredManage);
+        StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex, stats.CanManageMounts, stats.HoveredManage, stats.HoveredReroll);
         Raylib.EndDrawing();
     }
 
@@ -113,6 +114,8 @@ public static class Renderer
         RenderTimings.Pass("hud.health");
         HudRenderer.DrawXpBar(em, playerEntity, windowWidth, windowHeight);
         RenderTimings.Pass("hud.xp");
+        HudRenderer.DrawRerollStock(em, playerEntity, windowWidth, windowHeight);
+        RenderTimings.Pass("hud.reroll");
 
         // Empty when diagnostics mode is off: the caller owns the gate.
         if (threatLine.Length > 0)

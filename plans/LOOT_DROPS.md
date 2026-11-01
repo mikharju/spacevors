@@ -205,3 +205,12 @@ Deviations from this plan:
   2026-10-31); current baselines already include it.
 - **Not shipped from here:** the salvage-currency / reroll loop that PLAN.md's roadmap pointed at.
   It was never written up in this file; it now stands as a roadmap line only.
+
+## Follow-up (2026-11-01)
+
+The loot table grew again without changing the shape described here: a killed ship now rolls one of
+nothing / health orb / **salvage capsule** in a single `LootRoll.RollShipDrop` draw, so a death still costs
+one RNG number and the XP orb every ship drops is unchanged. The capsule stocks a reroll charge that
+re-deals the upgrade hand — decisions, drop rates and the survey of other possible drops:
+plans/REROLL_TOKENS.md. Two more pickups from that survey (salvage field, ECM pulse) are deferred in
+plans/LOOT_ITEMS.md. Mines and rocks still drop exactly what this plan gave them.

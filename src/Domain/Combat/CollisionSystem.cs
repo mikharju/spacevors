@@ -1210,9 +1210,15 @@ public class CollisionSystem : GameSystem
     {
         commands.AddEntity(new Position(position), new XpPickup(LootStats.ShipXpAmount, Radius: LootStats.ShipXpPickupRadius));
 
-        if (rng.NextDouble() < LootStats.HealthOrbChance)
+        // One band roll, one RNG number — the same number this call consumed before salvage existed.
+        switch (LootRoll.RollShipDrop(rng))
         {
-            commands.AddEntity(new Position(position), new HealthOrb(Radius: LootStats.HealthOrbRadius));
+            case ShipDrop.HealthOrb:
+                commands.AddEntity(new Position(position), new HealthOrb(Radius: LootStats.HealthOrbRadius));
+                break;
+            case ShipDrop.RerollToken:
+                commands.AddEntity(new Position(position), new RerollToken(Radius: LootStats.RerollTokenRadius));
+                break;
         }
     }
 }

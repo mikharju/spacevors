@@ -56,6 +56,29 @@ public static class HudRenderer
         Raylib.DrawText(level, windowWidth - Raylib.MeasureText(level, Font) - 10, 6, Font, Palette.TextMuted);
     }
 
+    // Salvage charges, drawn under the level readout as the same capsule that lies in the field — the
+    // icon is held still so the count stays legible, and nothing is drawn until the player has one, so a
+    // run that has never seen salvage has no unexplained widget on screen. Fixed draw count: one icon and
+    // one number whatever the count (TROUBLE_SHOOTING #61 — a per-unit HUD loop is a landmine).
+    public static void DrawRerollStock(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight)
+    {
+        if (!em.TryGetComponent<RerollStock>(playerEntity, out var stock) || stock.Count <= 0) return;
+
+        const int Font = 12;
+        const int RightMargin = 10;
+        const int RowY = 24;
+        const int IconGap = 6;
+
+        string text = $"x{stock.Count}";
+        int textWidth = Raylib.MeasureText(text, Font);
+        float iconRadius = RenderHelpers.SalvageIconRadius(1f);
+        float iconCx = windowWidth - RightMargin - textWidth - IconGap - iconRadius;
+        float iconCy = RowY + Font / 2f;
+
+        RenderHelpers.DrawSalvageCapsule(iconCx, iconCy, iconRadius, spin: 0f);
+        Raylib.DrawText(text, windowWidth - RightMargin - textWidth, RowY, Font, Palette.TextMuted);
+    }
+
     // The threat readout along the bottom edge: the same row the game logs once a second (ThreatMeter),
     // drawn only when diagnostics mode is on.
     public static void DrawThreatReadout(string line, int windowWidth, int windowHeight)
