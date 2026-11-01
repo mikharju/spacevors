@@ -13,6 +13,9 @@ public class MineDriftSystem : GameSystem
         foreach (var (mineEntity, mine, minePos) in view.GetEntitiesWithComponents<EnemyMine, Position>())
         {
             if (!hasPlayer) continue;
+            // A jammed mine stops hunting the hull. That is what lets a bounce off the hull actually
+            // separate the two instead of steering the mine straight back into it next tick.
+            if (view.TryGetComponent<EcmDisabled>(mineEntity, out _)) continue;
             var playerPos = view.GetComponent<Position>(playerEntity);
 
             var dir = playerPos.Value - minePos.Value;

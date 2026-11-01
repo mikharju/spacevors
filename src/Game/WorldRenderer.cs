@@ -58,6 +58,10 @@ public static class WorldRenderer
         RenderTimings.Pass("world.enemyShips");
         DrawMines(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.mines");
+        // The jam's arcs ride over the hull they belong to, and the wave sweeps over everything: both read
+        // as an event happening to the field rather than as part of a hull.
+        EcmRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.ecm");
         TargetingRenderer.Draw(em, playerEntity, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.targeting");
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);
@@ -66,6 +70,10 @@ public static class WorldRenderer
         RenderTimings.Pass("world.healthOrbs");
         DrawRerollTokens(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.rerollTokens");
+        DrawSalvageFields(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.salvageFields");
+        DrawEcmPulses(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.ecmPulses");
         DrawTurrets(em, playerEntity, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.turrets");
 
@@ -183,7 +191,7 @@ public static class WorldRenderer
     // the player cannot dodge.
     private static void DrawMissiles(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (_, missile, ammo, pos) in em.GetEntitiesWithComponents<Missile, Ammo, Position>())
+        foreach (var (entity, missile, ammo, pos) in em.GetEntitiesWithComponents<Missile, Ammo, Position>())
         {
             // Body length scales with the collision radius, so the 4 px pod round and the 6 px torpedo
             // read as the different objects their stats say they are.
@@ -197,6 +205,10 @@ public static class WorldRenderer
             float boost = missile.MaxSpeed > 0f ? 1f - Math.Clamp(ammo.Velocity.Magnitude / missile.MaxSpeed, 0f, 1f) : 0f;
             float angle = Angle.Of(ammo.Velocity);
             var (exhaustLength, flame) = PlumeLook(MathF.Max(steering, boost), bodyLength, ammo.Color);
+
+            // An ECM-stunned round keeps flying and keeps hurting, but its motor is off: no plume at all.
+            // The body still draws — an invisible round is a round the player cannot dodge.
+            if (em.HasComponent<MissileStunned>(entity)) exhaustLength = 0f;
 
             ShapeSprites.DrawMissile(cx, cy, angle,
                 bodyLength, ammo.Radius,
@@ -570,6 +582,43 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, token.Radius, windowWidth, windowHeight)) continue;
 
             RenderHelpers.DrawSalvageCapsule(cx, cy, token.Radius, token.Spin);
+        }
+    }
+
+    // A salvage field: the reroll capsule with a slow pulsing ring. The shape says salvage and the ring says
+    // this one acts on the field instead of buying something, so the two grey capsules are never mistaken
+    // for each other — let alone for the flashing ECM capsule next door.
+    private static void DrawSalvageFields(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, capsule, pos) in em.GetEntitiesWithComponents<SalvageField, Position>())
+        {
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+
+            if (RenderHelpers.IsOffScreen(cx, cy, capsule.Radius, windowWidth, windowHeight)) continue;
+
+            RenderHelpers.DrawFieldRing(cx, cy, capsule.Radius, capsule.Spin);
+            RenderHelpers.DrawSalvageCapsule(cx, cy, capsule.Radius, capsule.Spin,
+                Palette.SalvageBody, Palette.SalvageCap, Palette.SalvageCore);
+        }
+    }
+
+    // The ECM capsule: the same capsule silhouette flashing between blue-grey and white, off the flash phase
+    // the sim advances each tick. It never expires, so this is the one pickup that waits on the field for the
+    // whole run — the flash is what keeps it reading as a live object rather than as wreckage.
+    private static void DrawEcmPulses(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
+    {
+        foreach (var (entity, capsule, pos) in em.GetEntitiesWithComponents<EcmPulse, Position>())
+        {
+            var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
+
+            if (RenderHelpers.IsOffScreen(cx, cy, capsule.Radius, windowWidth, windowHeight)) continue;
+
+            float flash = 0.5f + 0.5f * MathF.Cos(capsule.Flash);
+
+            RenderHelpers.DrawSalvageCapsule(cx, cy, capsule.Radius, capsule.Spin,
+                Palette.Lerp(Palette.EcmBodyDim, Palette.EcmBodyLit, flash),
+                Palette.Lerp(Palette.EcmCapDim, Palette.EcmCapLit, flash),
+                Palette.EcmCore);
         }
     }
 

@@ -10,6 +10,8 @@ Keys (in-game):
 
 - L: force level-up
 - G: grant 2 salvage (reroll) charges
+- E: drop an ECM capsule just outside arm's reach (jams every ship, mine and enemy round when touched)
+- F: drop a salvage-field capsule just outside arm's reach (sweeps the field when touched)
 - M: spawn a test explosion at the fixed asteroid
 - N: spawn a test enemy ship with huge health up-right of the player (click-targeting tests)
 - H: set player health to 10000

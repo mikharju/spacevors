@@ -21,6 +21,11 @@ public sealed class GameSession
     // Diagnostics: world offset where the test enemy ship spawns. To the side of the fixed test asteroid at (0, -300) so collisions do not push it away.
     private static readonly Vector2 DiagnosticEnemySpawnOffset = new(250f, -250f);
 
+    // Diagnostics: where a field capsule spawns on the E / F keys. Closer than the test enemy — just past
+    // the magnet edge for most hulls, so the capsule visibly comes in and is collected rather than sitting
+    // where nothing can reach it.
+    private static readonly Vector2 DiagnosticCapsuleSpawnOffset = new(140f, -140f);
+
     // Diagnostics: health of the spawned test enemy (high enough to survive auto-targeting fire until a manual click is tested).
     private const int DiagnosticTestEnemyHealth = 100000;
 
@@ -349,6 +354,14 @@ public sealed class GameSession
         // Diagnostic only: grant salvage charges so the reroll can be tested without farming a ship kill.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.G))
             GrantSalvage(DiagnosticSalvageGrant);
+
+        // Diagnostic only: drop a field capsule just outside arm's reach, so the jam and the sweep can be
+        // watched without farming a 2.5 % / 3 % ship drop. E is the ECM capsule, F the salvage field.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.E))
+            SpawnDiagnosticCapsule(new EcmPulse(Radius: LootStats.EcmCapsuleRadius), "ECM");
+
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.F))
+            SpawnDiagnosticCapsule(new SalvageField(Radius: LootStats.FieldCapsuleRadius), "salvage field");
 
         // Diagnostic only: spawn a test explosion on the fixed test asteroid to verify lighting
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.M))
@@ -792,6 +805,18 @@ public sealed class GameSession
     {
         var held = _em.TryGetComponent<RerollStock>(_playerEntity, out var stock) ? stock : RerollStock.Empty;
         _em.AddComponent(_playerEntity, held.With(held.Count + charges));
+    }
+
+    // Diagnostics: drop a pickup capsule next to the hull. Written straight to the store before the step,
+    // like every other diagnostic key, so the capsule then runs the real magnet and collection path.
+    private void SpawnDiagnosticCapsule<T>(T capsule, string label)
+        where T : notnull
+    {
+        var pos = _em.GetComponent<Position>(_playerEntity);
+        var capsuleEntity = _em.CreateEntity();
+        _em.AddComponent(capsuleEntity, new Position(pos.Value + DiagnosticCapsuleSpawnOffset));
+        _em.AddComponent(capsuleEntity, capsule);
+        DiagnosticLogger.LogEvent("diag", $"{label} capsule {capsuleEntity} at ({pos.Value.X + DiagnosticCapsuleSpawnOffset.X}, {pos.Value.Y + DiagnosticCapsuleSpawnOffset.Y})");
     }
 
     // Diagnostics: SPACEVORS_DIAG_REROLLS=<n> starts the run with n charges, so the card screen's reroll

@@ -29,6 +29,9 @@ public sealed class SimulationRunner
         {
             new CollisionSystem(),
             new PickupMagnetSystem(),
+            // Right after the magnet, which is what applies an ECM jam: a phase reads pre-phase state, so
+            // a capsule collected this tick is jammed for its full duration (plans/ECM_PULSE_AND_SALVAGE_FIELD.md).
+            new EcmSystem(),
             new LevelUpSystem(),
             new ShipDeathExplosionSystem(),
             new EffectSystem()

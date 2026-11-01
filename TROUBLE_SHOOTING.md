@@ -502,3 +502,19 @@ test never depends on the model's eyes.
 - **Fix / Prevention**: use `--iters 1` as the minimum for any run you intend to read. If a run dir
   has an `iter-1.log` without `summary.json`, the numbers are still there: median the `[PERF]` rows
   (`dt=`/`render=`/`sim=`) and the `[RENDER-PASS]` lines from the log directly.
+
+## 63. `new HealthOrb()` gives zeros, not the declared defaults, when every parameter is optional
+
+- **Symptom**: a hand-built test world's health orb disappeared on the very first tick. The system was
+  not wrong: it read `Lifetime = 0`, decided the orb had expired, and destroyed it. The same component
+  built with any argument at all behaved with its declared 90 s lifetime.
+- **Cause**: the pickup components (`HealthOrb`, `XpPickup`, `RerollToken`, `SalvageField`, `EcmPulse`)
+  are record structs whose primary-constructor parameters **all** have defaults. `new HealthOrb()` binds
+  to the implicit parameterless *struct* constructor, which zero-initialises every field. The declared
+  defaults belong to the primary constructor, and only apply when it is actually called — one named
+  argument is enough: `new HealthOrb(Radius: 8f)` does get `Lifetime = 90f`. A struct has no "constructor
+  with defaults" to fall back to, so the bug is invisible until a test entity dies for no visible reason.
+- **Fix / Prevention**: in test worlds, name the values the test reasons about
+  (`new HealthOrb(Lifetime: 90f, Radius: 8f)`). Production code is unaffected because it always passes a
+  radius. When an entity in a test vanishes, dump `commands.Commands` before the `Apply`: the
+  `DestroyEntityCommand` names the component whose fields came out as zeros.

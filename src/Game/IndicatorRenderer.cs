@@ -17,7 +17,7 @@ public static class IndicatorRenderer
     // EnemyShipStats.MissileCapFor), but scenario worlds inflate every count, and a per-unit HUD
     // loop that scales with them is TROUBLE_SHOOTING #61. The nearest markers survive the cap —
     // the dropped ones are the far objects the taper was flattening to slivers anyway.
-    public const int EnemyCap = 24, MissileCap = 24, XpCap = 16, OrbCap = 8, SalvageCap = 8;
+    public const int EnemyCap = 24, MissileCap = 24, XpCap = 16, OrbCap = 8, SalvageCap = 8, EcmCap = 8;
 
     // How far inside the true edge the markers sit, and the taper's distance window: an object at
     // or within WideDistance gets the full aperture, one at or beyond FarDistance gets ThinHalfWidth.
@@ -33,9 +33,10 @@ public static class IndicatorRenderer
     public static readonly Vector2[] XpMarkers = new Vector2[XpCap];
     public static readonly Vector2[] OrbMarkers = new Vector2[OrbCap];
     public static readonly Vector2[] SalvageMarkers = new Vector2[SalvageCap];
+    public static readonly Vector2[] EcmMarkers = new Vector2[EcmCap];
 
     // Fields, not properties: AddNearest ref-writes them, and the tests read them.
-    public static int EnemyCount, MissileCount, XpCount, OrbCount, SalvageCount;
+    public static int EnemyCount, MissileCount, XpCount, OrbCount, SalvageCount, EcmCount;
 
     // One cheap pass per class. Origin is the camera centre, not the player: the edge is the
     // viewport's, and the camera carries the mouse drift.
@@ -46,6 +47,7 @@ public static class IndicatorRenderer
         XpCount = 0;
         OrbCount = 0;
         SalvageCount = 0;
+        EcmCount = 0;
 
         foreach (var (entity, _, pos) in em.GetEntitiesWithComponents<EnemyShip, Position>())
         {
@@ -65,8 +67,18 @@ public static class IndicatorRenderer
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<HealthOrb, Position>())
             AddNearest(OrbMarkers, ref OrbCount, OrbCap, pos.Value, cameraCenter, viewport);
 
+        // Both grey capsules point the same way, in the same grey: a salvage capsule and a salvage-field
+        // capsule are both salvage to fly back out to, and the world already tells them apart by the ring.
         foreach (var (_, _, pos) in em.GetEntitiesWithComponents<RerollToken, Position>())
             AddNearest(SalvageMarkers, ref SalvageCount, SalvageCap, pos.Value, cameraCenter, viewport);
+
+        foreach (var (_, _, pos) in em.GetEntitiesWithComponents<SalvageField, Position>())
+            AddNearest(SalvageMarkers, ref SalvageCount, SalvageCap, pos.Value, cameraCenter, viewport);
+
+        // An ECM capsule never expires and is never swept in, so it can be waiting on the far side of the
+        // field when the player wants it. Pointing at it is what makes saving one for later possible.
+        foreach (var (_, _, pos) in em.GetEntitiesWithComponents<EcmPulse, Position>())
+            AddNearest(EcmMarkers, ref EcmCount, EcmCap, pos.Value, cameraCenter, viewport);
     }
 
     public static void Draw(Vector2 cameraCenter, Vector2 viewport)
@@ -76,6 +88,7 @@ public static class IndicatorRenderer
         DrawMarkers(XpMarkers, XpCount, cameraCenter, viewport, Palette.XpPickup);
         DrawMarkers(OrbMarkers, OrbCount, cameraCenter, viewport, Palette.HealthOrb);
         DrawMarkers(SalvageMarkers, SalvageCount, cameraCenter, viewport, Palette.SalvageCap);
+        DrawMarkers(EcmMarkers, EcmCount, cameraCenter, viewport, Palette.EcmIndicator);
     }
 
     // Keeps the cap nearest off-screen positions. Selection is purely by distance, so it is

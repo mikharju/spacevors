@@ -1174,6 +1174,15 @@ public class CollisionSystem : GameSystem
 
         if (!NarrowPhase.TryCollide(CircleBody(minePos.Value, mine.Radius), playerBody, out Contact contact)) return;
 
+        // A jammed mine does not detonate: it rebounds off the hull and costs the player nothing. It keeps
+        // its hp and stays a body in the way, so a pulse turns a mine field into something the player can
+        // shoot clear while the field cannot answer.
+        if (view.TryGetComponent<EcmDisabled>(mineEntity, out _))
+        {
+            BounceJammedMine(commands, mineEntity, mine, minePos.Value, contact);
+            return;
+        }
+
         commands.Add(new DestroyEntityCommand(mineEntity));
 
         var playerHealth = view.GetComponent<Health>(playerEntity);
@@ -1194,6 +1203,16 @@ public class CollisionSystem : GameSystem
         {
             SpawnSpark(commands, minePos.Value, view.Rng);
         }
+    }
+
+    // The bounce of a jammed mine off the hull. `TryCollide`'s normal runs a → b, mine → player here, so
+    // the mine leaves along its opposite; `Depth` is how deep the two were, which is the push that gets it
+    // clear of the hull in the same tick. `MineDriftSystem` skips a jammed mine, so nothing steers it back.
+    private static void BounceJammedMine(CommandBuffer commands, Entity mineEntity, EnemyMine mine, Vector2 minePos, Contact contact)
+    {
+        Vector2 away = Vector2.Zero - contact.Normal;
+        commands.Add(new AddComponentCommand<Velocity>(mineEntity, new Velocity(away * mine.Speed)));
+        commands.Add(new AddComponentCommand<Position>(mineEntity, new Position(minePos + away * contact.Depth)));
     }
 
     private void SpawnLootOnDeath(CommandBuffer commands, Vector2 position, MineType mineType, Random rng)
@@ -1218,6 +1237,14 @@ public class CollisionSystem : GameSystem
                 break;
             case ShipDrop.RerollToken:
                 commands.AddEntity(new Position(position), new RerollToken(Radius: LootStats.RerollTokenRadius));
+                break;
+            case ShipDrop.SalvageField:
+                commands.AddEntity(new Position(position), new SalvageField(Radius: LootStats.FieldCapsuleRadius));
+                break;
+            case ShipDrop.EcmPulse:
+                // No lifetime: an ECM capsule waits on the field until the hull comes for it
+                // (plans/ECM_PULSE_AND_SALVAGE_FIELD.md D2).
+                commands.AddEntity(new Position(position), new EcmPulse(Radius: LootStats.EcmCapsuleRadius));
                 break;
         }
     }

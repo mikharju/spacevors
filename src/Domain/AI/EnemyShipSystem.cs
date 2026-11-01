@@ -42,6 +42,15 @@ public class EnemyShipSystem : GameSystem
                 continue;
             }
 
+            // An ECM-jammed hull: no thrust, no turn toward the player, a slow turn to a heading picked
+            // when the pulse fired. Velocity is left alone, so the hull coasts on the momentum it already
+            // had — that is what reads as a ship that has lost control rather than one that has stopped.
+            if (view.TryGetComponent<EcmDisabled>(shipEntity, out var jam))
+            {
+                ApplyJamWander(shipEntity, jam.WanderHeading, currentRot.Angle, deltaTime, commands);
+                continue;
+            }
+
             if (distSq < 0.01f)
             {
                 commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
@@ -118,6 +127,28 @@ public class EnemyShipSystem : GameSystem
                 commands.Add(new AddComponentCommand<Velocity>(shipEntity, new Velocity(newVel)));
             }
         }
+    }
+
+    // The jammed hull's slow turn. It writes AngularVelocity so `PhysicsSystem` integrates the heading the
+    // way it does for every other hull, and lands on the heading instead of drifting past it: the turn is
+    // re-aimed every tick, so arrival stops the spin with nothing left to bleed off.
+    private static void ApplyJamWander(
+        Entity shipEntity, float targetHeading, float currentAngle, float deltaTime, CommandBuffer commands)
+    {
+        commands.Add(new AddComponentCommand<Acceleration>(shipEntity, new Acceleration(Vector2.Zero)));
+
+        float angleDiff = NormalizeAngle(targetHeading - currentAngle);
+        if (float.IsNaN(angleDiff)) return;
+
+        float maxTurn = EcmStats.WanderTurnRate * deltaTime;
+        if (Math.Abs(angleDiff) <= maxTurn)
+        {
+            commands.Add(new AddComponentCommand<Rotation>(shipEntity, new Rotation(targetHeading)));
+            commands.Add(new AddComponentCommand<AngularVelocity>(shipEntity, new AngularVelocity(0f)));
+            return;
+        }
+
+        commands.Add(new AddComponentCommand<AngularVelocity>(shipEntity, new AngularVelocity(MathF.Sign(angleDiff) * EcmStats.WanderTurnRate)));
     }
 
     private static void ApplySpinStop(

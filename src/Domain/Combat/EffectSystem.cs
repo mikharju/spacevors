@@ -63,6 +63,26 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
+        // The ECM pulse's ring: it grows out to its max radius as it fades, the inverse of the explosion
+        // above, so the component holds the far radius and the renderer reads `CurrentRadius`.
+        foreach (var (entity, wave) in view.GetEntitiesWithComponents<EcmWave>())
+        {
+            var newLifetime = wave.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(entity));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<EcmWave>(entity, wave with { Lifetime = newLifetime }));
+            }
+        }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Effects: ecm wave", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, spark) in view.GetEntitiesWithComponents<HealSpark>())
         {
             var newLifetime = spark.Lifetime - deltaTime;

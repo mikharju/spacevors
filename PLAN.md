@@ -81,6 +81,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Waves and lulls — shipped — plans/WAVES_AND_BREATHERS.md
 - Loot drops: XP pickups, health orbs, magnet, XP/level-up — shipped — plans/LOOT_DROPS.md
 - Reroll-token loot: salvage capsules off killed ships stock charges that re-deal the upgrade hand — shipped — plans/REROLL_TOKENS.md
+- Salvage field and ECM pulse drops: one-shot field sweep (all XP, all currency, nearest health up to full hp) and a 5 s world-wide jam of ships, mines and missiles; the ECM capsule never expires — shipped — plans/ECM_PULSE_AND_SALVAGE_FIELD.md
 - Difficulty scaling and threat readout; open items remain — active — plans/DIFFICULTY_SCALING.md
 
 ### Physics and sim
@@ -101,7 +102,6 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
-- Salvage field and ECM pulse: two deferred pickups, shapes and risks written down — plans/LOOT_ITEMS.md
 - Endless difficulty escalation: behaviour first, distance-driven clock, duty cycle, elites — plans/ENDLESS_DIFFICULTY.md
 - Parallel sim — plans/PARALLEL_SIM.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
@@ -115,9 +115,13 @@ plans/functional-ecs.md.
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
 - Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
-- Loot/reward loop: reroll charges shipped; next candidates are the salvage field and the ECM pulse (plans/LOOT_ITEMS.md); a salvage *currency* only earns its keep once there is more than one thing to buy (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
+- Loot/reward loop: reroll charges and the salvage field / ECM pulse drops shipped
+  (plans/ECM_PULSE_AND_SALVAGE_FIELD.md covers currency-by-pickup rather than a counter); a salvage
+  *currency* only earns its keep once there is more than one thing to buy (free mount swaps and cargo
+  already shipped — plans/TURRET_LAYOUTS.md)
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
+- Armor and armor piercing bullets: Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage.
 
 ## Roadmap — future (new systems)
 

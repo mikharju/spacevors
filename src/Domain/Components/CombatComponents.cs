@@ -35,6 +35,18 @@ public readonly record struct MissileWeapon(WeaponStats Weapon, float Range);
 // rather than the round, because the limit that matters is how often a launcher can reload.
 public readonly record struct MissileCooldown(float Timer);
 
+// The jam one ECM capsule puts on an enemy hull or mine (plans/ECM_PULSE_AND_SALVAGE_FIELD.md): no
+// thrust, no shot, no homing, and for a mine no contact detonation either. A ship turns toward
+// `WanderHeading`, drawn from the world RNG once per hull when the pulse fired so the AI systems never
+// touch the RNG; a mine ignores that field. `EcmSystem` counts the timer down and removes the component.
+public readonly record struct EcmDisabled(float TimeRemaining, float WanderHeading);
+
+// An enemy round whose seeker the ECM pulse knocked out. It keeps the heading it had — guidance is the
+// only writer of its velocity, so skipping it leaves a round flying straight and still dangerous — draws
+// no plume, and detonates where it is at `DetonateIn`. That timer is the round's own, staggered per
+// round when the pulse fired, so a volley pops in a chain instead of in one flash.
+public readonly record struct MissileStunned(float DetonateIn);
+
 // A weapon a turret entity carries. ArcAngle is only read for enemy turrets, which are aimed by
 // their hull; a player turret's arc comes from the TurretSlot it is mounted in.
 public readonly record struct Turret(

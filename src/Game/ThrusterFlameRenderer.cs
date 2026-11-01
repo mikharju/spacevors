@@ -31,12 +31,18 @@ public static class ThrusterFlameRenderer
         foreach (var (entity, ship, pos, rot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
+            // An ECM-jammed hull shows no fire at all — not the thrust plume, not the turn pair. A ship
+            // drifting without light is the read that it has lost control, and the arcs say why.
+            if (em.HasComponent<EcmDisabled>(entity)) continue;
             DrawEnemyThrustFlame(em, entity, pos.Value, ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
             DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
         {
+            // A jammed mine coasts instead of thrusting, so it shows no flame either.
+            if (em.HasComponent<EcmDisabled>(entity)) continue;
+
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;

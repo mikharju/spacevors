@@ -25,7 +25,7 @@ public class RerollTokenTest
 
         var aged = em.GetComponent<RerollToken>(token);
         Assert.Equal(0.1f - dt, aged.Lifetime, precision: 5);
-        Assert.Equal(LootStats.RerollTokenSpinRate * dt, aged.Spin, precision: 5);
+        Assert.Equal(LootStats.CapsuleSpinRate * dt, aged.Spin, precision: 5);
 
         bool destroyed = false;
         for (int frame = 0; frame < 20 && !destroyed; frame++)

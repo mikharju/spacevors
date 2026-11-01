@@ -28,6 +28,10 @@ public class EnemyMissileFiringSystem : GameSystem
 
         foreach (var (hullEntity, rack, cooldown, pos, rotation) in view.GetEntitiesWithComponents<MissileWeapon, MissileCooldown, Position, Rotation>())
         {
+            // A jammed rack holds its loaded round: the cooldown is not ticked, so it launches as soon as
+            // the jam lifts rather than starting a fresh reload.
+            if (view.TryGetComponent<EcmDisabled>(hullEntity, out _)) continue;
+
             // A rack that is ready stays ready: it launches the moment the world-wide cap frees a slot
             // instead of waiting out another reload.
             float timer = cooldown.Timer - deltaTime;

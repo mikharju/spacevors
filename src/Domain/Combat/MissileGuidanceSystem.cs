@@ -27,6 +27,11 @@ public class MissileGuidanceSystem : GameSystem
 
         foreach (var (entity, missile, pos, vel, ammo) in view.GetEntitiesWithComponents<Missile, Position, Velocity, Ammo>())
         {
+            // A seeker the ECM pulse knocked out is simply not steered: guidance is the only writer of a
+            // round's velocity, so skipping it leaves the round flying the heading it already had — still
+            // a hazard, just no longer a homing one — and the renderer draws no plume for it.
+            if (view.TryGetComponent<MissileStunned>(entity, out _)) continue;
+
             if (vel.Value.Magnitude < Epsilon) continue;
 
             // The round's own flight speed is the authority, not the velocity magnitude: the hull that

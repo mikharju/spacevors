@@ -88,8 +88,8 @@ Examples (all in Domain/Components/, except Dead which lives in Combat/Collision
 ```
 Position Velocity Acceleration Rotation AngularVelocity
 Player EnemyShip EnemyMine Asteroid Camera
-Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim WeaponCargo PrimaryTarget AutoTargetMark
-Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup RerollToken ShipDeathExplosion SmokePuff DebugMarker
+Ammo LaserBeam FireCooldown Turret TurretSlot TurretAim WeaponCargo PrimaryTarget AutoTargetMark EcmDisabled MissileStunned
+Explosion BeamImpact DamageSpark HealSpark HealthOrb XpPickup RerollToken SalvageField EcmPulse EcmWave ShipDeathExplosion SmokePuff DebugMarker
 Health (Current, Max) PendingChoice PendingUpgradeOptions UpgradeCounts RerollStock Dead
 ```
 
@@ -105,7 +105,7 @@ Three ways systems write components, plus direct app-layer writes:
 2. Direct ref mutation (speed exceptions): three systems mutate a single component in place via slot refs instead of queuing a command per entity — this avoids thousands of command allocations per tick on hot paths:
    - PositionIntegrationSystem integrates Position in place; it reads the pre-phase Velocity (PhysicsSystem's new-velocity commands are not applied yet), so position advances with last tick's velocity.
    - AmmoLifetimeSystem decrements Ammo.Lifetime in place; only destructions go through commands.
-   - PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick. Everything else it collects goes through commands: a collected RerollToken adds one RerollStock (its own component, counted once per tick from the pickups collected) — a second Player field would have been a stale-copy write that silently drops this tick's XP.
+   - PickupMagnetSystem writes Player.Xp straight through WorldView.GetComponentRef so LevelUpSystem (same phase, runs later) reads the fresh value in the same tick. Everything else it collects goes through commands: a collected RerollToken adds one RerollStock (its own component, counted once per tick from the pickups collected) — a second Player field would have been a stale-copy write that silently drops this tick's XP. A collected SalvageField likewise expresses its sweep as radii handed to the passes below, never as marker components written onto the swept pickups: the passes each write their pickup's component once from a pre-phase copy, and a marker written earlier in the same phase would lose to it (TROUBLE_SHOOTING #58).
 3. Local accumulation + single flush: CollisionSystem accumulates per-entity velocity/position-correction/angular-velocity/health deltas in per-frame dictionaries and emits one command per entity at the end of Update — otherwise last-write-wins would drop all but the final hit on an entity struck several times in one frame.
 
 Direct writes (app layer): GameSession writes straight to the EntityManager before the simulation step or while paused, never mid-phase:
@@ -122,7 +122,7 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 
 1. Movement: PhysicsSystem → PositionIntegrationSystem → AmmoLifetimeSystem
 2. Action: TurretFiringSystem → EnemyMissileFiringSystem → EnemyShipSpawnSystem
-3. Resolution: CollisionSystem → PickupMagnetSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
+3. Resolution: CollisionSystem → PickupMagnetSystem → EcmSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
 4. Intent: MissileGuidanceSystem → MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).

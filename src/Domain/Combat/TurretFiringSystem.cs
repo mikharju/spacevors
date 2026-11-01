@@ -48,6 +48,9 @@ public class TurretFiringSystem : GameSystem
         foreach (var (turretEntity, turret, turretPos, turretRot) in view.GetEntitiesWithComponents<Turret, Position, Rotation>())
         {
             if (turret.IsEnemy && view.TryGetComponent<Dead>(turretEntity, out _)) continue;
+            // An ECM-jammed hull holds its fire. Its cooldown is left as it was rather than ticked, so
+            // the guns are ready the moment the jam lifts instead of reloading from nothing.
+            if (turret.IsEnemy && view.TryGetComponent<EcmDisabled>(turretEntity, out _)) continue;
             if (!turret.IsEnemy && playerDead) continue;
 
             // A player turret is bolted to a hull slot and slewed inside its arc; an enemy turret is

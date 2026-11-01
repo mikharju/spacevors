@@ -1,6 +1,10 @@
 # Plan: Salvage Field and ECM Pulse
 
-Status: proposed (2026-11-01)
+Status: superseded (2026-11-01) by plans/ECM_PULSE_AND_SALVAGE_FIELD.md — the design below is the original
+survey and is **stale**: the salvage field is now a one-shot sweep of XP, currency and just enough health
+to top the hull off (not a `PickupRadius` buff), and the ECM pulse is a 5 s world-wide jam of ships, mines
+and missiles (not a ~300 px round delete). The W3 lull-magnet overlap question below is moot for that
+reason. Only the closing "Still deferred, ranked after these two" list still stands as the loot menu.
 
 Two pickups that were surveyed while designing reroll tokens and left out of that feature on purpose
 (plans/REROLL_TOKENS.md, "What else could drop"). They are written down here so the shape is not lost,

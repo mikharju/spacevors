@@ -18,6 +18,27 @@ internal static class Palette
     public static readonly Color SalvageCap = new(178, 184, 194, 240);
     public static readonly Color SalvageCore = new(226, 231, 240, 200);
 
+    // The salvage field — the same grey capsule with a slow pulsing ring (plans/
+    // ECM_PULSE_AND_SALVAGE_FIELD.md). The capsule body says "salvage", the ring says "this one acts on
+    // the field instead of buying something", and the ring's colour is the UI accent so it reads as a
+    // mechanism rather than as another orb.
+    public static readonly Color SalvageFieldRing = new(120, 200, 230, 150);
+
+    // The ECM capsule: a blue-grey capsule flashing to white. Two levels of body and cap so the flash is a
+    // lerp between them rather than an alpha fade — a charged object getting brighter, not a dim one
+    // flickering. Distinct from the reroll capsule's steady grey and from the salvage field's ring.
+    public static readonly Color EcmBodyDim = new(96, 110, 132, 235);
+    public static readonly Color EcmBodyLit = new(188, 206, 234, 245);
+    public static readonly Color EcmCapDim = new(146, 162, 186, 240);
+    public static readonly Color EcmCapLit = new(238, 245, 255, 250);
+    public static readonly Color EcmCore = new(225, 240, 255, 235);
+
+    // Everything the jam itself looks like: the ring that fires out of a picked capsule, the arcs on a
+    // jammed hull, and the edge marker pointing at a capsule waiting on the field.
+    public static readonly Color EcmWave = new(120, 180, 255, 90);
+    public static readonly Color EcmArc = new(170, 215, 255, 215);
+    public static readonly Color EcmIndicator = new(160, 200, 250, 255);
+
     // Soft-depth UI language (plans/UI_POLISH.md): one accent used sparingly,
     // off-white text, translucent panels so stars faintly show through.
     public static readonly Color Accent = new(120, 200, 230, 255);

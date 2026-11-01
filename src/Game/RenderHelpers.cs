@@ -63,25 +63,54 @@ internal static class RenderHelpers
     // along the axis. Three batched draws, and shared by the world (a capsule tumbling where it fell,
     // drawn at its own simulated spin) and the HUD (the same shape, held still, beside the count) so the
     // pickup and what it buys are visibly the same object.
-    public static void DrawSalvageCapsule(float cx, float cy, float radius, float spin)
+    //
+    // The three colours are arguments because the field capsules share the silhouette and differ only in
+    // colour and motion: steady grey buys a reroll, grey with a pulsing ring sweeps the field, a flashing
+    // blue-grey-white capsule jams the fleet.
+    public static void DrawSalvageCapsule(float cx, float cy, float radius, float spin, Color body, Color cap, Color core)
     {
         float halfLength = radius;
         float halfThickness = radius * CapsuleThicknessFraction;
         var axis = new System.Numerics.Vector2(MathF.Cos(spin), MathF.Sin(spin));
-        var body = new Rectangle(cx, cy, halfLength * 2f, halfThickness * 2f);
+        var bodyRect = new Rectangle(cx, cy, halfLength * 2f, halfThickness * 2f);
 
-        Raylib.DrawRectanglePro(body, CenterOrigin(body), Angle.ToDeg(spin), Palette.SalvageBody);
+        Raylib.DrawRectanglePro(bodyRect, CenterOrigin(bodyRect), Angle.ToDeg(spin), body);
 
-        ShapeSprites.DrawCircle(cx + axis.X * halfLength, cy + axis.Y * halfLength, halfThickness, Palette.SalvageCap);
-        ShapeSprites.DrawCircle(cx - axis.X * halfLength, cy - axis.Y * halfLength, halfThickness, Palette.SalvageCap);
+        ShapeSprites.DrawCircle(cx + axis.X * halfLength, cy + axis.Y * halfLength, halfThickness, cap);
+        ShapeSprites.DrawCircle(cx - axis.X * halfLength, cy - axis.Y * halfLength, halfThickness, cap);
 
         float coreLength = halfLength * CapsuleCoreFraction;
         ShapeSprites.DrawStreak(
             new System.Numerics.Vector2(cx - axis.X * coreLength, cy - axis.Y * coreLength),
             new System.Numerics.Vector2(cx + axis.X * coreLength, cy + axis.Y * coreLength),
             halfThickness * 1.2f,
-            Palette.SalvageCore);
+            core);
     }
+
+    public static void DrawSalvageCapsule(float cx, float cy, float radius, float spin) =>
+        DrawSalvageCapsule(cx, cy, radius, spin, Palette.SalvageBody, Palette.SalvageCap, Palette.SalvageCore);
+
+    // The ring on a salvage-field capsule: the field it is about to release, drawn on the capsule itself so
+    // the shape that says "salvage" also says "this one acts on everything lying out there". The pulse runs
+    // off the capsule's own simulated spin, so — like the capsule's pose — a seeded run draws it twice.
+    public static void DrawFieldRing(float cx, float cy, float radius, float spin)
+    {
+        float pulse = 0.5f + 0.5f * MathF.Cos(spin * FieldRingPulsePerSpin);
+        float outer = radius * (1f + FieldRingGrowFraction * pulse);
+        float thickness = MathF.Max(MinFieldRingThickness, radius * FieldRingThicknessFraction);
+        var color = Ui.WithAlpha(Palette.SalvageFieldRing, FieldRingAlphaMin + FieldRingAlphaRange * pulse);
+
+        Raylib.DrawRing(new System.Numerics.Vector2(cx, cy), outer - thickness, outer, 0f, 0f, FieldRingSegments, color);
+    }
+
+    const int FieldRingSegments = 24;
+
+    const float FieldRingPulsePerSpin = 2f;
+    const float FieldRingGrowFraction = 0.35f;
+    const float FieldRingThicknessFraction = 0.12f;
+    const float MinFieldRingThickness = 1.5f;
+    const float FieldRingAlphaMin = 0.25f;
+    const float FieldRingAlphaRange = 0.75f;
 
     const float CapsuleThicknessFraction = 0.38f;
     const float CapsuleCoreFraction = 0.55f;
