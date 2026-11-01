@@ -532,3 +532,24 @@ Numbers and names in the plan body that are **not** what the code says:
 - The §3 component sketch `Missile(LockedTarget, Speed, TurnRate, Steering)` is short three fields —
   today it is `(LockedTarget, Speed, MaxSpeed, Acceleration, TurnRate, Steering)` (`:20-26`); the
   revision-2 note above documents the growth, so only the body is stale.
+
+## Follow-up (2026-10-31): a round on the player's own side no longer eats their beam
+
+R19's "its own side's fire walks straight through it" was only half-implemented. The ammo pass skips a
+same-side round; the beam pass did not — it took a player round as the beam's `firstHit`, found no
+faction match inside the `Missile` case, damaged nothing, and then still shortened the beam to that
+round's near side and flashed a `BeamImpact` there. A beam applies its damage exactly once, so the whole
+shot was spent on the player's own missile and the hull behind it was untouched. The existing
+`APlayersBeam_PassesThroughItsOwnMissile` could not see this: it asserts the round's `Health`, which the
+beam never touched, and never looked at whether the beam itself had been consumed.
+
+- Fix: the beam's candidate loop drops a `Missile` whose `Ammo.IsEnemy` equals the beam's, before the
+  geometry test (`Combat/CollisionSystem.cs:452-461`) — the ammo pass's own rule, same wording.
+- Regression test: `MissileCollisionTests.APlayersBeam_IsNotSpentOnItsOwnMissile` — the hull behind the
+  player's round now takes the beam's damage and the beam's tip stays past the round.
+- Left alone: the ammo pass still lets one round damage a hull *and* a round it shot down in the same
+  tick (each kind keeps its own earliest `t`). That is a wider question about what "the round is spent"
+  means and it moves balance, so it does not belong in this fix.
+- Perf: the added lookup runs only for missile candidates inside a beam's box, and no scenario seeds
+  beams. A/B on `missile-384 --sim --iters 3`: 2.56 ms median with the fix, 2.88 ms without it — the
+  host's own run-to-run spread is larger than the change, so this costs nothing measurable.

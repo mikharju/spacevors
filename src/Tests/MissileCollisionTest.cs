@@ -137,4 +137,35 @@ public class MissileCollisionTests
 
         Assert.Equal(3, em.GetComponent<Health>(missile).Current);
     }
+
+    // "Passes through" is only proven when the beam's own consumption is checked too: the beam applies
+    // its damage exactly once, so a friendly round it stopped on spent the whole shot on nothing while
+    // the round itself stayed untouched — which is all the health-only test above could see.
+    [Fact]
+    public void APlayersBeam_IsNotSpentOnItsOwnMissile()
+    {
+        var (em, view, system) = Setup();
+        var missile = AddMissile(em, new Vector2(0f, 0f), new Vector2(0f, -100f), isEnemy: false, health: 3);
+
+        // The hull the beam was aimed at, on the beam line behind the player's own round.
+        var ship = em.CreateEntity();
+        em.AddComponent(ship, new Position(new Vector2(60f, 0f)));
+        em.AddComponent(ship, new Velocity(Vector2.Zero));
+        em.AddComponent(ship, new EnemyShip(Radius: 20f, Speed: 0f, TurnRate: 0f, FiringRange: 0f, TurretFireRate: 0f, TurretAmmoSpeed: 0f, Acceleration: 0f, GraphicsId: 0));
+        em.AddComponent(ship, new Rotation(0f));
+        em.AddComponent(ship, new Health(10, 10));
+
+        var beam = em.CreateEntity();
+        em.AddComponent(beam, new LaserBeam(new Vector2(-100f, 0f), new Vector2(1f, 0f), Length: 200f, Width: 3f,
+            Damage: 2, IsEnemy: false, AmmoColor.Blue, Lifetime: 0.2f, InitialLifetime: 0.2f));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 60f, commands);
+        commands.Apply(em);
+
+        var fired = em.GetComponent<LaserBeam>(beam);
+        Assert.True(fired.End.X > 0f, $"the beam stopped on the round the player fired itself (tip at {fired.End})");
+        Assert.Equal(8, em.GetComponent<Health>(ship).Current);
+        Assert.Equal(3, em.GetComponent<Health>(missile).Current);
+    }
 }

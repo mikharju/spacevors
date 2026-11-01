@@ -452,6 +452,15 @@ public class CollisionSystem : GameSystem
                 for (int i = 0; i < beamCount; i++)
                 {
                     ref readonly var candidate = ref queryBuffer[i];
+
+                    // A round on the beam's own side is not in the way, exactly as in the ammo pass:
+                    // without this a friendly missile is picked as the first hit, so the beam stops on it
+                    // and spends its one damage application on nothing — the round the player fired would
+                    // eat the beam that was aimed past it.
+                    if (candidate.Kind == SpatialGrid.CollisionKind.Missile
+                        && (!view.TryGetComponent<Ammo>(candidate.Id, out var ownRound)
+                            || ownRound.IsEnemy == beam.IsEnemy)) continue;
+
                     if (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, candidate.Position, candidate.Radius, out Contact hit, out float t)
                         || t >= firstT) continue;
 
