@@ -55,12 +55,12 @@ public static class TurretLayouts
 
     // Falcon: one heavy gun ahead and a small mount on each flank pod, each sweeping 180°. The two
     // flanks together cover the whole circle, which is why this hull has no aft mount at all. The offsets
-    // sit on the painted pods, which are at ±0.50 R — ±37 px of this 74 px hull.
+    // sit on the painted pods, which are at ±0.50 R — ±55 px of this 111 px hull.
     public static TurretSlotDefinition[] Falcon { get; } =
     [
-        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -18f, 0f, 60f),
-        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -37f, 10f, -90f, 180f),
-        Slot(TurretSlotName.SmallRight, TurretSize.Small, 37f, 10f, 90f, 180f),
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -27f, 0f, 60f),
+        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -55f, 15f, -90f, 180f),
+        Slot(TurretSlotName.SmallRight, TurretSize.Small, 55f, 15f, 90f, 180f),
     ];
 
     public static TurretSlotDefinition[] Shadow { get; } =
@@ -83,12 +83,12 @@ public static class TurretLayouts
 
     // Manta: the crab. Every mount points ahead — the main gun at 60° and two narrow 60° mounts
     // angled 30° off the nose — because this hull aims by sliding sideways, not by turning. The
-    // offsets sit on the painted wing roots at ±0.54 R.
+    // offsets sit on the painted wing roots at ±0.54 R — ±60 px of this 111 px hull.
     public static TurretSlotDefinition[] Manta { get; } =
     [
-        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -30f, 0f, 60f),
-        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -40f, 4f, -30f, 60f),
-        Slot(TurretSlotName.SmallRight, TurretSize.Small, 40f, 4f, 30f, 60f),
+        Slot(TurretSlotName.MainGun, TurretSize.Large, 0f, -45f, 0f, 60f),
+        Slot(TurretSlotName.SmallLeft, TurretSize.Small, -60f, 6f, -30f, 60f),
+        Slot(TurretSlotName.SmallRight, TurretSize.Small, 60f, 6f, 30f, 60f),
     ];
 
     // Raptor: the broadside hull. One gun ahead and a heavy mount on each wing pod, each sweeping

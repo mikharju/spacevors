@@ -41,6 +41,18 @@ public static class ShipSpriteRenderer
         DrawFlat(texture, dest, angleDeg);
     }
 
+    // The widest a ship's sprite can be drawn and still fit inside a box. The sprite is drawn at its
+    // texture's aspect, so a tall hull is capped by the box's height and a wide hull by its width; a ship
+    // with no sprite (the fallback triangle) is capped by width alone.
+    public static float FittedWidth(ShipType ship, float maxWidth, float maxHeight)
+    {
+        if (ImageLoader.PlayerShipLitSprites != null && ImageLoader.PlayerShipLitSprites.TryGetValue(ship.TextureKey, out var lit) && lit.Base.Id != 0)
+            return MathF.Min(maxWidth, maxHeight * lit.Base.Width / lit.Base.Height);
+        if (ImageLoader.PlayerShipTextures != null && ImageLoader.PlayerShipTextures.TryGetValue(ship.TextureKey, out var flat) && flat.Id != 0)
+            return MathF.Min(maxWidth, maxHeight * flat.Width / flat.Height);
+        return maxWidth;
+    }
+
     // Placeholder for any ship with no usable sprite (player or enemy), so a missing or failed
     // texture never hides a ship. angleDeg matches DrawTexturePro's clockwise rotation, so the
     // placeholder faces the same way the sprite would.

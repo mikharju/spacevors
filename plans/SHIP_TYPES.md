@@ -184,3 +184,17 @@ and no aft mount (`Stats/TurretLayout.cs:59-64`), the Streak/Carmine numbers abo
 (`Stats/EnemyShipStats.cs:86-98`), ScatterCannon's numbers (`Stats/WeaponStats.cs:106`), the R12 DPS
 ladder, and the named tests.
 
+## Follow-up (shipped, 2026-11-01): Falcon and Manta scaled x1.5
+
+- `Radius` 74 -> **111** on both hulls (`PlayerShipStats`), with their turret mount offsets scaled by the
+  same 1.5 so the mounts still sit on the painted pods and wing roots (Falcon main -18 -> -27 px, flanks
+  37/10 -> 55/15; Manta main -30 -> -45, wing roots 40/4 -> 60/6). `PlayerHullShapes` is authored in R
+  units, so both hurtboxes grew with the hull and their coverage/air shares are unchanged.
+- Supersedes the R 74 numbers above for these two hulls. Paint now measures 137 x 190 px (Falcon) and
+  174 x 125 px (Manta) — both past the Heavy's 165 x 155. `PickupRadius` is untouched: `WorldFactory`
+  adds the hull `Radius` to it, so the magnet grew with the hull on its own (279 -> 316 px).
+- Select-screen previews are capped to the card by the new `ShipSpriteRenderer.FittedWidth`: at R 111 a
+  1.6x preview box was 355 px against a 300 px card, so the paint bled over the frame. The cap binds only
+  where the box exceeds the card, so every other card draws exactly as before.
+- Cost: `ammo-spray --sim --iters 3` median 1.4 ms against the previous 1.38-1.42 — the scenarios pin
+  Shadow/Heavy, so neither hull is in a measured hot path. 494 tests pass.

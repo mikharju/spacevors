@@ -67,7 +67,7 @@ Trust each plan file's `Status:` header and its Shipped/Follow-up sections; the 
 below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 
 ### Ships, hulls, mounts
-- Ship types; all 8 player hulls, 5 enemy ships; follow-ups: Falcon, Eagle/Manta/Raptor, Streak/Carmine — shipped — plans/SHIP_TYPES.md
+- Ship types; all 8 player hulls, 5 enemy ships; follow-ups: Falcon, Eagle/Manta/Raptor, Streak/Carmine, Falcon+Manta resized ×1.5 — shipped — plans/SHIP_TYPES.md
 - Turret layouts, mount management, cargo — shipped — plans/TURRET_LAYOUTS.md
 
 ### Weapons and combat

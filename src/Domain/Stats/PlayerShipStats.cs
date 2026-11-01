@@ -103,10 +103,10 @@ public readonly record struct ShipType(
         DrawB: 170,
         PickupRadius: 160f);
 
-    // The slim hull: 1.22 R of paint across against the others' ~2 R, so its `Radius` is raised to 74 to
-    // bring the painted length in line with the Fighter's (124 px against 123). A hurtbox of 1.11 R² at that
-    // radius is still smaller in px than the Fighter's 2.67 — the big bounding circle is what tells the broad
-    // phase where to look, not what gets hit — and it starts as the lightest shooter in the game.
+    // The slim hull (R 111): 1.22 R of paint across against the others' ~2 R, so 137 px across against a
+    // painted length of 190 px — the longest hull in the game, past the Heavy's 155. A hurtbox of 1.11 R² at
+    // that radius is still a thin target behind a wide bounding circle — the big circle is what tells the
+    // broad phase where to look, not what gets hit — and it starts as the lightest shooter in the game.
     public static ShipType Falcon { get; } = new(
         Name: "Falcon",
         TextureKey: "falcon",
@@ -115,7 +115,7 @@ public readonly record struct ShipType(
         Loadout: WeaponLoadout.InMainGun(WeaponType.MachineGun),
         Slots: TurretLayouts.Falcon,
         MaxHealth: 10,
-        Radius: 74f,
+        Radius: 111f,
         Shape: PlayerHullShapes.Falcon,
         DrawR: 255,
         DrawG: 176,
@@ -141,8 +141,8 @@ public readonly record struct ShipType(
         DrawB: 140,
         PickupRadius: 185f);
 
-    // Manta (R 74): the crab. 1.57 R across against 1.13 R long — as wide as the Fighter is long —
-    // and every mount points ahead: the hull aims by sliding sideways on the Crab engine, so its guns
+    // Manta (R 111): the crab. 1.57 R across against 1.13 R long — 174 px of wing, wider than the Heavy is
+    // long — and every mount points ahead: the hull aims by sliding sideways on the Crab engine, so its guns
     // never have to slew across the ship. The lightest starter firepower of the big hulls, paid for
     // with the game's best lateral dodge.
     public static ShipType Manta { get; } = new(
@@ -153,7 +153,7 @@ public readonly record struct ShipType(
         Loadout: WeaponLoadout.MachineGunRepeater,
         Slots: TurretLayouts.Manta,
         MaxHealth: 12,
-        Radius: 74f,
+        Radius: 111f,
         Shape: PlayerHullShapes.Manta,
         DrawR: 110,
         DrawG: 220,

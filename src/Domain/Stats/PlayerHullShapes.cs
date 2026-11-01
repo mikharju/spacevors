@@ -64,7 +64,7 @@ public static class PlayerHullShapes
         new Capsule(new Vector2(-0.42f, 0.55f), new Vector2(0.42f, 0.55f), 0.25f),
     ]);
 
-    // Falcon (R 74): the slim hull — 1.01 R² of paint, and the widest thing about it is 1.22 R across.
+    // Falcon (R 111): the slim hull — 1.01 R² of paint, and the widest thing about it is 1.22 R across.
     // Its two flank pods are detached from the body by see-through gaps, so the one bar that joins them
     // is where the hurtbox sits on air; the body is a spine tapered fore to aft, each pod a thin capsule.
     // Covers 90% of the paint, 18% of it over air.
@@ -93,7 +93,7 @@ public static class PlayerHullShapes
         new Capsule(new Vector2(-0.19f, 0.72f), new Vector2(0.19f, 0.72f), 0.08f),
     ]);
 
-    // Manta (R 74): the wide, stubby hull — 1.57 R across against only 1.13 R long, and 0.77 R² of
+    // Manta (R 111): the wide, stubby hull — 1.57 R across against only 1.13 R long, and 0.77 R² of
     // paint, the least in the game. A bar across the wing slab, a capsule down each swept leading
     // edge, a bar across the trailing wing and engine pods, and the nose-to-tail spine. This is the
     // hull where the bounding circle over-reaches most on purpose: the disc is 3.14 R² of broad phase

@@ -189,12 +189,14 @@ public sealed class ShipSelectScreen
     void DrawShipPreview(float cx, float cy, ShipType ship)
     {
         const float PreviewZoom = 1.6f;
-        ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, ship.Radius * 2f * PreviewZoom, 0f);
+        // Capped to the card: the widest hulls (Manta, Falcon) draw a box taller than a card at 1.6x.
+        float width = ShipSpriteRenderer.FittedWidth(ship, ship.Radius * 2f * PreviewZoom, CardHeight);
+        ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, width, 0f);
 
         // The same cyan collider the game draws over a hull, so the fit between paint and hitbox can be
         // judged before a run starts.
         if (_diagnostics)
-            ShipSpriteRenderer.DrawHullShape(ship.Shape, ship.Radius * PreviewZoom, cx, cy, 0f);
+            ShipSpriteRenderer.DrawHullShape(ship.Shape, width / 2f, cx, cy, 0f);
     }
 
     void DrawShipCard(int x, int y, int width, int height, string title, string details, Color borderColor, string keyLabel, bool highlighted)
