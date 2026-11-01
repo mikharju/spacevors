@@ -9,12 +9,32 @@ using Xunit;
 // on the select screen.
 public class ShipRosterTest
 {
+    // The brawler hull stays a brawler: everything it starts with reaches at most 1000 px, and R23 means
+    // no two of its mounts hold the same type — it used to carry a Ripple Cutter in each of three mounts.
     [Fact]
-    public void Shadow_CarriesARealWeaponNotTheLoadTestSpray()
+    public void Shadow_CarriesDistinctCloseGunsNotTheLoadTestSpray()
     {
         Assert.NotEmpty(ShipType.Shadow.Loadout.Mounts);
-        Assert.All(ShipType.Shadow.Loadout.Mounts, m => Assert.Equal(WeaponType.RippleCutter.Name, m.Weapon.Name));
         Assert.DoesNotContain(ShipType.Shadow.Loadout.Mounts, m => m.Weapon.Name == WeaponType.LoadTestWeapon.Name);
+
+        Assert.All(ShipType.Shadow.Loadout.Mounts,
+            m => Assert.True(m.Weapon.Range <= 1000f, $"{m.Weapon.Name} reaches {m.Weapon.Range:0} px, past the brawler band"));
+
+        var names = ShipType.Shadow.Loadout.Mounts.Select(m => m.Weapon.Name).ToList();
+        Assert.Equal(names.Count, names.Distinct().Count());
+    }
+
+    // R23: the ship holds one gun of each type, on the hull or in cargo, so a starting loadout may never
+    // deal two copies. The rule is a balance rule, not tidiness: an upgrade card is applied to every
+    // turret that names its gun, so a duplicate doubled the value of every card that gun was offered.
+    [Fact]
+    public void NoHullStartsWithTwoOfTheSameWeaponType()
+    {
+        foreach (var ship in ShipType.All.Concat(ShipType.DiagnosticShips))
+        {
+            var names = ship.Loadout.Mounts.Select(m => m.Weapon.Name).ToList();
+            Assert.Equal(names.Count, names.Distinct().Count());
+        }
     }
 
     [Fact]
@@ -23,12 +43,13 @@ public class ShipRosterTest
         string[] expectedWeapons =
         [
             WeaponType.LaserLance.Name, WeaponType.PrismLance.Name, WeaponType.RippleCutter.Name,
+            WeaponType.Stiletto.Name,
             WeaponType.Cyclotron.Name, WeaponType.GravitonBurst.Name, WeaponType.FlakCurtain.Name,
-            WeaponType.MachineGun.Name, WeaponType.ScatterCannon.Name, WeaponType.Shotgun.Name,
-            WeaponType.RailGun.Name,
-            WeaponType.AcidBubbleSpray.Name, WeaponType.InterceptorTurret.Name,
+            WeaponType.MachineGun.Name, WeaponType.ScatterCannon.Name, WeaponType.SiegeSalvo.Name,
+            WeaponType.Shotgun.Name, WeaponType.RailGun.Name,
+            WeaponType.AcidBubbleSpray.Name, WeaponType.InterceptorTurret.Name, WeaponType.FlechetteFan.Name,
             WeaponType.SeekerPod.Name, WeaponType.Swarmlet.Name, WeaponType.HavocTorpedo.Name,
-            WeaponType.LoadTestWeapon.Name,
+            WeaponType.FarlockSalvo.Name, WeaponType.LoadTestWeapon.Name,
         ];
 
         Assert.Equal(expectedWeapons, ShipType.DiagnosticShips.Select(s => Assert.Single(s.Loadout.Mounts).Weapon.Name));
@@ -85,8 +106,9 @@ public class ShipRosterTest
     public void AtMostOneHullStartsFullyBooked()
     {
         // A new weapon card is never a dead pick: a booked mount can be freed for free through the
-        // cargo. Even so, only the brawler hull may fill every mount, so most hulls can take a new
-        // gun straight into a slot.
+        // cargo. Even so, at most one hull may fill every mount, so most hulls can take a new gun
+        // straight into a slot. Shadow was that one hull until R23 — three mounts then meant three
+        // different guns, and it gave its third gun up instead.
         int fullyBooked = ShipType.All.Count(s => s.Loadout.Mounts.Count >= s.Slots.Count);
 
         Assert.True(fullyBooked <= 1, $"{fullyBooked} hulls start with every mount filled");

@@ -105,6 +105,13 @@ public readonly record struct WeaponType(
     // out-deals nothing. The large-mount answer to a hull that fights at one range: point and hold.
     public static WeaponType ScatterCannon { get; } = new("ScatterCannon", new(3f, 400f, 6f, 3, Scatter: 0.18f, ShotLifetime: 3f, Damage: 2, TurnSpeed: TurnDeg(120f)), TurretSize.Large, 1000f, AmmoRadius: 3.5f);
 
+    // ScatterCannon's cone thrown out to the line: three fat slugs still at 400 px/s, but a 4.2 s fuse
+    // buys the mid band. The cone only holds together inside ~700 px, so the gun pays for its 1350 px
+    // reach by missing what it leads — and it buys the biggest number in the band to do so (R3: it must
+    // out-DPS AcidBubbleSpray by 25%). The most live rounds per mount in the table (≈18), which is the
+    // number R7 guards.
+    public static WeaponType SiegeSalvo { get; } = new("SiegeSalvo", new(1.4f, 400f, 10f, 3, Scatter: 0.22f, ShotLifetime: 4.2f, Damage: 4, TurnSpeed: TurnDeg(110f)), TurretSize.Large, 1350f, AmmoRadius: 4.5f, UnlockLevel: 5);
+
     // Three slugs in a cone: pointing close enough is enough, and a fire-rate card adds a fourth.
     public static WeaponType Shotgun { get; } = new("Shotgun", new(3.5f, 400f, 2.5f, 3, Scatter: 0.12f, Damage: 1, TurnSpeed: TurnDeg(140f)), TurretSize.Small, 900f);
 
@@ -121,6 +128,13 @@ public readonly record struct WeaponType(
     // circling the hull instead of the one it locked at the start.
     public static WeaponType InterceptorTurret { get; } = new("InterceptorTurret", new(4.5f, 1200f, 2f, 2, Scatter: 0.2f, Damage: 1, TurnSpeed: TurnDeg(360f)), TurretSize.Small, 900f);
 
+    // Three needle-fast slivers in a tight fan: the close gun that needs neither lead nor luck. R2 pays
+    // for penalties, and this one has almost none to be paid for — the round is fast, the cone is tight,
+    // the reach is its band's — so it is the cheapest travelling gun in the game. Its 0.6 s fuse keeps it
+    // at 3.6 live rounds per mount, the cheapest answer a slow hull can put on a flank it cannot turn to.
+    // Being the close band's cheapest gun is also what prices SeekerPod's R15 ceiling.
+    public static WeaponType FlechetteFan { get; } = new("FlechetteFan", new(2f, 2200f, 2f, 3, Scatter: 0.1f, ShotLifetime: 0.6f, Damage: 1, TurnSpeed: TurnDeg(200f)), TurretSize.Small, 900f, AmmoRadius: 2f);
+
     // Lasers (hitscan): instant beams out to turret range, damaging the first thing hit only. Instant
     // delivery is the cheapest delivery in the game, so beams buy the least damage per volley.
     public static WeaponType LaserLance { get; } = new("LaserLance", new(FireRate: 2.4f, AmmoSpeed: 0f, KickbackForce: 12f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(90f), Hitscan: true), TurretSize.Large, 1650f, AmmoRadius: 3f, Color: AmmoColor.Blue, UnlockLevel: 5);
@@ -130,6 +144,15 @@ public readonly record struct WeaponType(
 
     // Point-blank blade: 16 px wide, reaching into the enemy's firing ring, and never needing lead.
     public static WeaponType RippleCutter { get; } = new("RippleCutter", new(FireRate: 2f, AmmoSpeed: 0f, KickbackForce: 10f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(200f), Hitscan: true), TurretSize.Small, 600f, AmmoRadius: 8f, Color: AmmoColor.Violet);
+
+    // The reach a small mount never had: an instant 1350 px needle. Every other small gun reaches at most
+    // 900 px, and R23 — one gun of each type aboard — means a hull with three or four small mounts can no
+    // longer solve that by carrying several copies of the one long small gun. Its 8 DPS is set from both
+    // sides: under PrismLance's 8.4 so the large mount still buys more (three beams across a formation,
+    // which this needle cannot do), and above 7.5 because R15 prices every missile in a band against the
+    // band's *cheapest* gun — a cheaper mid-band beam would push HavocTorpedo's 6 DPS out of its ceiling.
+    // It pays twice over by dying to the first rock in the line, which is what every beam does.
+    public static WeaponType Stiletto { get; } = new("Stiletto", new(FireRate: 2f, AmmoSpeed: 0f, KickbackForce: 6f, PelletCount: 1, Scatter: 0f, Damage: 4, TurnSpeed: TurnDeg(160f), Hitscan: true), TurretSize.Small, 1350f, AmmoRadius: 2f, Color: AmmoColor.Violet);
 
     // Particle accelerators: bullets fast enough to draw streaks; swept collision keeps them honest.
     // Cyclotron has the most forgiving delivery and the longest auto reach, so it pays the least DPS.
@@ -150,7 +173,18 @@ public readonly record struct WeaponType(
 
     // Swarmlet: the swarm missile, and the only homing gun allowed to grow its volley. Three cheap
     // locked rounds at once is the point; the growth stops at the R17 ceiling.
-    public static WeaponType Swarmlet { get; } = new("Swarmlet", new(FireRate: 0.8f, AmmoSpeed: 490f, KickbackForce: 3f, PelletCount: 3, Scatter: 0.25f, ShotLifetime: 2.5f, Damage: 2, TurnSpeed: TurnDeg(200f), Homing: true, HomingTurnRate: TurnDeg(170f)), TurretSize.Small, 600f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+    // Its rate is 0.7, not 0.8, so the guided *large* guns have a legal home: R3 floors a tier-2 guided
+    // large at 1.25 × the best guided small while R15 caps it at 0.8 × the long band's cheapest gun. At 4.8
+    // DPS that window was 6.0-6.4 for FarlockSalvo — a knife-edge; at 4.2 it is 5.25-6.4.
+    public static WeaponType Swarmlet { get; } = new("Swarmlet", new(FireRate: 0.7f, AmmoSpeed: 490f, KickbackForce: 3f, PelletCount: 3, Scatter: 0.25f, ShotLifetime: 2.5f, Damage: 2, TurnSpeed: TurnDeg(200f), Homing: true, HomingTurnRate: TurnDeg(170f)), TurretSize.Small, 600f, AmmoRadius: 4f, Color: AmmoColor.Orange, UnlockLevel: 5);
+
+    // FarlockSalvo: the long-reach lock, and the long band's only guided round. Two rounds leave at
+    // 560 × MissileLaunchFraction = 392 px/s and build to 560, so the turn radius runs from 187 px at
+    // launch to 267 px at cruise — far outside the 38 px a tier-10 hull turns at, which is what keeps a
+    // lock at this range breakable (R16). It buys something the long band cannot otherwise deliver: a
+    // round needing no lead, no travel time and no clear line — and it pays the band's floor for that
+    // (R15: 0.8 × Cyclotron's 8 DPS). Its FireRate card is a faster rate, never a bigger salvo (R18).
+    public static WeaponType FarlockSalvo { get; } = new("FarlockSalvo", new(FireRate: 0.9f, AmmoSpeed: 560f, KickbackForce: 8f, PelletCount: 2, Scatter: 0.08f, ShotLifetime: 4.5f, Damage: 3, TurnSpeed: TurnDeg(120f), Homing: true, HomingTurnRate: TurnDeg(120f), SalvoGrows: false, MissileHealth: 2), TurretSize.Large, 1650f, AmmoRadius: 5f, Color: AmmoColor.Orange, UnlockLevel: 10);
 
     // HavocTorpedo: the big slow hull-killer. 10 damage per shot breaks R5's per-shot cap the way
     // RailGun does — at 0.6/s nothing else in the game can carry a round that big — and it pays for
@@ -161,7 +195,7 @@ public readonly record struct WeaponType(
     // Perf scenarios only: it must aim instantly so seeded volleys keep looking like fired ones.
     public static WeaponType LoadTestWeapon { get; } = new("LoadTestWeapon", new(0.5f, 200f, 100f, 8000, ShotLifetime: 1.9f, Scatter: 0.15f, Damage: 1), TurretSize.Large, 580f);
 
-    public static readonly WeaponType[] All = [MachineGun, ScatterCannon, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, LaserLance, PrismLance, RippleCutter, Cyclotron, GravitonBurst, FlakCurtain, SeekerPod, Swarmlet, HavocTorpedo, LoadTestWeapon];
+    public static readonly WeaponType[] All = [MachineGun, ScatterCannon, SiegeSalvo, Shotgun, RailGun, AcidBubbleSpray, InterceptorTurret, FlechetteFan, LaserLance, PrismLance, RippleCutter, Stiletto, Cyclotron, GravitonBurst, FlakCurtain, SeekerPod, Swarmlet, HavocTorpedo, FarlockSalvo, LoadTestWeapon];
 
     // Weapons a level-up new-weapon card may offer at `level`: never the load-test spray, and never
     // a gun whose tier has not unlocked yet.
@@ -192,17 +226,22 @@ public readonly record struct WeaponLoadout(string Name, IReadOnlyList<WeaponMou
         new(TurretSlotName.MainGun, WeaponType.MachineGun),
         new(TurretSlotName.SmallLeft, WeaponType.Shotgun)]);
 
-    // Shadow: every mount holds a 600 px blade, so the hull has to fly into the fight to be armed.
-    public static WeaponLoadout RippleCutterTrio { get; } = new("RippleCutterTrio", [
-        new(TurretSlotName.MainGun, WeaponType.RippleCutter),
-        new(TurretSlotName.SmallLeft, WeaponType.RippleCutter),
-        new(TurretSlotName.SmallRight, WeaponType.RippleCutter)]);
+    // Shadow: a cone of slugs ahead and a blade on one flank, so the hull still has to fly into the
+    // fight to be armed — everything it carries reaches at most 1000 px. It used to carry a Ripple
+    // Cutter in each of its three mounts; R23 means three mounts now need three different guns, and the
+    // cheapest third gun that keeps this 58 px hull below the 66 px Eagle's firepower is no third gun at
+    // all — the right flank starts empty and is filled from the first milestone hand.
+    public static WeaponLoadout ShadowCloseSuite { get; } = new("ShadowCloseSuite", [
+        new(TurretSlotName.MainGun, WeaponType.ScatterCannon),
+        new(TurretSlotName.SmallLeft, WeaponType.RippleCutter)]);
 
-    // Four mounts, three distinct weapons: machinegun + twin side shotguns + close-in flak disc.
+    // Four mounts, four distinct weapons: machinegun + a side shotgun + the fast fan on the other flank
+    // + the close-in flak disc. Both flanks used to hold a shotgun; R23 allows one, and the other took
+    // the delivery class this slow hull had none of — a round that needs no lead to be fired sideways.
     public static WeaponLoadout HeavyFlak { get; } = new("HeavyFlak", [
         new(TurretSlotName.MainGun, WeaponType.MachineGun),
         new(TurretSlotName.SmallLeft, WeaponType.Shotgun),
-        new(TurretSlotName.SmallRight, WeaponType.Shotgun),
+        new(TurretSlotName.SmallRight, WeaponType.FlechetteFan),
         new(TurretSlotName.SmallBack, WeaponType.FlakCurtain)]);
 
     // Eagle: the scatter cannon answers what gets close, the fast flank turret answers what circles.

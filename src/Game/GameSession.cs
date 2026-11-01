@@ -894,6 +894,16 @@ public sealed class GameSession
     private void ApplyMountClick(MountMenuRenderer.SlotMarker marker)
     {
         string placingName = _heldWeapon;
+
+        // R23: one gun of each type aboard, mounted or in cargo. A gun coming out of cargo is a move,
+        // not a copy, so only a fresh one can break the rule — and only a scripted hand can deal a gun
+        // the ship already has. The click is refused and the weapon stays in hand.
+        if (placingName.Length > 0 && FreshCopyAlreadyAboard(placingName))
+        {
+            DiagnosticLogger.LogEvent("MOUNT", $"{placingName} is already aboard — the ship holds one gun of each type");
+            return;
+        }
+
         var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
         float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
 
@@ -958,6 +968,14 @@ public sealed class GameSession
         string stored = _heldWeapon;
         var cargo = ReadCargo();
 
+        // R23: cargo counts as aboard too, so a fresh copy of a type the ship already holds may not
+        // join it. The weapon stays in hand, the same refusal a mount click gets.
+        if (FreshCopyAlreadyAboard(stored))
+        {
+            DiagnosticLogger.LogEvent("MOUNT", $"{stored} is already aboard — the ship holds one gun of each type");
+            return;
+        }
+
         // A weapon from a card has never been on the hull, so it enters cargo as a fresh turret; one
         // taken off the hull is already there with its upgrades.
         if (!cargo.Holds(stored) && WeaponType.FromName(stored) is { } fresh)
@@ -997,6 +1015,14 @@ public sealed class GameSession
         _em.TryGetComponent<WeaponCargo>(_playerEntity, out var cargo) ? cargo : WeaponCargo.Empty;
 
     private void WriteCargo(WeaponCargo cargo) => _em.AddComponent(_playerEntity, cargo);
+
+    // R23: only a fresh weapon — neither in cargo nor on the hull — can add a second copy of a type.
+    // Cargo↔mount moves relocate the one copy, and a real upgrade hand never names a gun the ship owns,
+    // so this only ever bites for a scripted bench hand.
+    private bool FreshCopyAlreadyAboard(string weaponName) =>
+        !ReadCargo().Holds(weaponName)
+        && WeaponType.FromName(weaponName) is { } weapon
+        && TurretMount.AlreadyAboard(_worldView, weapon.Name);
 
     private static int ReadChoiceSelection(int hoveredIndex)
     {
@@ -1076,6 +1102,13 @@ public sealed class GameSession
     // full let it ride in cargo until the player makes room.
     private void MountIntoFirstFit(WeaponType weapon)
     {
+        // R23: neither a mount nor cargo may take a second copy of a type the ship already holds.
+        if (TurretMount.AlreadyAboard(_worldView, weapon.Name))
+        {
+            DiagnosticLogger.LogEvent("MOUNT", $"{weapon.Name} is already aboard — the ship holds one gun of each type");
+            return;
+        }
+
         var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
         float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
 

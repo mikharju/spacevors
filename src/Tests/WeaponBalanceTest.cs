@@ -128,6 +128,10 @@ public class WeaponBalanceTest
     // R1: instant delivery is the cheapest delivery, so a beam buys less damage than the slowest
     // travelling round that covers the same band. Guided rounds are excluded from the peer set: they
     // are the delivery class *above* beams in certainty, and R15 prices them against it.
+    // Several guns can share a band's slowest ammo speed — ScatterCannon, Shotgun and AcidBubbleSpray
+    // all throw 400 px/s rounds across the close band — so the benchmark is the *weakest* of them: a
+    // beam must lose to every gun whose round travels less surely than its own, and the answer cannot
+    // depend on the order the guns happen to be listed in `WeaponType.All`.
     [Fact]
     public void BeamGunDpsStaysUnderItsOwnBand()
     {
@@ -136,12 +140,11 @@ public class WeaponBalanceTest
             var peers = Guns.Where(w => !w.Stats.Hitscan && !w.Stats.Homing && MathF.Abs(w.Range - beam.Range) <= 0.15f * beam.Range).ToList();
             Assert.NotEmpty(peers);
 
-            var slowest = peers[0];
-            foreach (var peer in peers)
-                if (peer.Stats.AmmoSpeed < slowest.Stats.AmmoSpeed) slowest = peer;
+            float slowestAmmo = peers.Min(peer => peer.Stats.AmmoSpeed);
+            var benchmark = peers.Where(peer => peer.Stats.AmmoSpeed <= slowestAmmo).OrderBy(Dps).First();
 
-            Assert.True(Dps(beam) <= 0.8f * Dps(slowest),
-                $"{beam.Name} at {Dps(beam):0.#} dps is too strong beside {slowest.Name} ({Dps(slowest):0.#} dps with {slowest.Stats.AmmoSpeed:0} px/s ammo)");
+            Assert.True(Dps(beam) <= 0.8f * Dps(benchmark),
+                $"{beam.Name} at {Dps(beam):0.#} dps is too strong beside {benchmark.Name} ({Dps(benchmark):0.#} dps with {benchmark.Stats.AmmoSpeed:0} px/s ammo)");
         }
     }
 
@@ -206,6 +209,20 @@ public class WeaponBalanceTest
             w.Size)).ToList();
 
         Assert.Equal(cells.Count, cells.Distinct().Count());
+    }
+
+    // R5: a gun that acquires its own targets stays at ≤ 4 damage per shot. Mines are 2 hp and the
+    // smallest enemy hull 5, so a fatter round throws the rest of it away on whatever the targeter
+    // happened to grab. Two guns are licensed above the cap — RailGun's 14 and HavocTorpedo's 10 — and
+    // both fire so slowly that nothing else in the game could carry a round that big. `AutoTarget: false`
+    // is not the licence: it only turns lead prediction off, so the rule is written around damage.
+    [Fact]
+    public void OnlyTwoGunsMayCarryABigRound()
+    {
+        string[] bigRoundLicence = [WeaponType.RailGun.Name, WeaponType.HavocTorpedo.Name];
+
+        foreach (var w in Guns.Where(w => !bigRoundLicence.Contains(w.Name)))
+            Assert.True(w.Stats.Damage <= 4, $"{w.Name} deals {w.Stats.Damage} damage per shot without a licence");
     }
 
     // R12: a bigger hull is a worse dodge, so the big ship may carry more firepower from the start

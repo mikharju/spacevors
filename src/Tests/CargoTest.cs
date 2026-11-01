@@ -48,4 +48,29 @@ public class CargoTest
         Assert.Equal(WeaponType.RailGun.Range, carried.Range);
         Assert.Equal(WeaponType.RailGun.AutoTarget, carried.AutoTarget);
     }
+
+    // R23 — one gun of each type aboard — has to see both halves of the ship: the turrets bolted to the
+    // hull and the guns riding in cargo. A cargo↔mount move is a relocation, so it never reads as a
+    // second copy; only a fresh weapon from a card can add one.
+    [Fact]
+    public void AlreadyAboard_SeesMountedGunsAndCargoAlike()
+    {
+        var (em, player, _) = WorldFactory.Create(ShipType.Fighter, WorldView.DefaultViewportSize, seed: 5);
+        var view = new WorldView(em);
+
+        string mounted = TurretMount.MountedSlots(view)[0].WeaponName;
+        Assert.True(TurretMount.AlreadyAboard(view, mounted));
+        Assert.False(TurretMount.AlreadyAboard(view, WeaponType.RailGun.Name));
+
+        em.AddComponent(player, WeaponCargo.Empty.With(TurretMount.CarriedTurret(WeaponType.RailGun)));
+        Assert.True(TurretMount.AlreadyAboard(view, WeaponType.RailGun.Name));
+
+        // Relocating the cargo gun onto the hull keeps the ship holding exactly one of it.
+        Assert.True(TurretMount.TryFindSlot(view, TurretSlotName.MainGun, out var mainGun));
+        Assert.True(view.GetComponent<WeaponCargo>(player).TryFind(WeaponType.RailGun.Name, out var rail));
+        TurretMount.Mount(em, mainGun, view.GetComponent<TurretSlot>(mainGun).Definition, rail, Vector2.Zero, hullRotation: 0f);
+
+        Assert.True(TurretMount.AlreadyAboard(view, WeaponType.RailGun.Name));
+        Assert.Single(TurretMount.MountedSlots(view), m => m.WeaponName == WeaponType.RailGun.Name);
+    }
 }

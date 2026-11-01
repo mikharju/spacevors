@@ -76,6 +76,27 @@ public class LevelUpSlotOfferTest
         Assert.DoesNotContain(NewWeaponCards(em), name => name == WeaponType.RailGun.Name);
     }
 
+    // R23 — the ship holds one gun of each type, mounted or in cargo — is the two tests above: a card may
+    // never name a gun already on board. This is the other half of the same rule: a hand may hold up to
+    // three new-weapon cards, but never two cards naming the same weapon.
+    [Fact]
+    public void AHand_NeverDealsTheSameWeaponTwice()
+    {
+        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4);
+
+        var hands = new List<List<string>>();
+        for (int levelUp = 0; levelUp < 20; levelUp++)
+        {
+            RunLevelUp(em);
+            var offered = TakeNewWeaponCards(em);
+            if (offered.Count > 0) hands.Add(offered);
+        }
+
+        Assert.NotEmpty(hands);
+        foreach (var hand in hands)
+            Assert.Equal(hand.Count, hand.Distinct().Count());
+    }
+
     // Cargo weapons are inactive: they are not upgraded either, so no card may name one.
     [Fact]
     public void CargoWeaponsGetNoStatUpgradeCards()

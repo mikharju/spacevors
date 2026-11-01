@@ -73,7 +73,8 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 ### Weapons and combat
 - Bullets as lines, lasers, particle accelerators — shipped — plans/BULLETS_AS_LINES.md
 - Missiles and guided rounds — shipped — plans/MISSILES.md
-- Weapon balance pass; rules R1-R13, open knobs — active — plans/WEAPON_BALANCE.md
+- Weapon balance pass; rules R1-R23, open knobs — active — plans/WEAPON_BALANCE.md
+- Weapon identity cells; R23 one gun of each type aboard, FlechetteFan/Stiletto/SiegeSalvo/FarlockSalvo, deduped Shadow and Heavy loadouts — shipped — plans/WEAPON_IDENTITY_CELLS.md
 - Impact damage — shipped — plans/IMPACT_DAMAGE.md
 - Primary target lock and enemy hp bars — shipped — plans/TARGETING_HP_BARS.md
 
@@ -113,7 +114,8 @@ plans/functional-ecs.md.
 
 - New enemy archetypes: kamikaze, sniper, minelayer, shielded hull
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
-- Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
+- Weapon identity cells still empty on purpose (aura × fast/medium, close × hitscan, mid × fast,
+  long × medium/slow) and the playtest knobs left open — plans/WEAPON_IDENTITY_CELLS.md §8
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
 - Loot/reward loop: reroll charges and the salvage field / ECM pulse drops shipped
   (plans/ECM_PULSE_AND_SALVAGE_FIELD.md covers currency-by-pickup rather than a counter); a salvage

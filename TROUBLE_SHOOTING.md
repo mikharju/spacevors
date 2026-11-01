@@ -134,6 +134,9 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Cause**: The sandbox makes the default HOME read-only, and /tmp is a per-command overlay — writes there do not persist between commands. dotnet needs a writable HOME for its first-run sentinel files.
 - **Fix / Prevention**: Do it all in one command: `mkdir -p /tmp/dotnet-home && export HOME=/tmp/dotnet-home NUGET_PACKAGES=/tmp/nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 && dotnet test src/Tests/Tests.csproj`. NuGet packages (xunit, Test.Sdk, Raylib-cs) are not preinstalled and re-download from nuget.org on each invocation (network required); bin/obj outputs inside the workspace do persist.
 - **Addendum**: `.tools/scenario.sh` publishes in a child process that does not see an exported `HOME` alone — publish then dies with "The user's home directory could not be determined." and `scenario.sh` reports only "publish failed; see .tools/run/publish.log". Also export `DOTNET_CLI_HOME=/tmp/dotnet-home` when driving `scenario.sh` in the sandbox.
+- **Addendum (2026-11-02)**: when /tmp is a per-command overlay, put the sentinel dir in the workspace instead and restore offline from the repo's own cache — `DOTNET_CLI_HOME` alone is enough, `HOME` may stay read-only, and no network is needed:
+  `mkdir -p .tools/run/dotnet-home && DOTNET_CLI_HOME=$PWD/.tools/run/dotnet-home NUGET_PACKAGES=$PWD/.nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet test src/Tests/Tests.csproj`.
+  `.tools/run/` is gitignored, so the sentinel files stay out of the tree.
 
 ## 24. `new Color(...)` is ambiguous when mixing byte and int arguments
 

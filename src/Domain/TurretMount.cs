@@ -13,6 +13,25 @@ public static class TurretMount
 
     public static bool Fits(TurretSlotDefinition slot, WeaponType weapon) => Fits(slot.Size, weapon.Size);
 
+    // R23 — the ship holds at most one gun of each type, on the hull or in cargo. Only a *fresh* weapon
+    // can break that: taking a turret down and bolting it back somewhere else moves the single copy, it
+    // does not clone it. The upgrade hand already refuses to name a gun the ship owns, so this guards the
+    // paths that bypass the hand — a scripted bench hand above all.
+    public static bool AlreadyAboard(WorldView view, string weaponName)
+    {
+        foreach (var turret in view.GetEntitiesWithComponents<Turret>())
+        {
+            if (!turret.Value1.IsEnemy && turret.Value1.WeaponName == weaponName) return true;
+        }
+
+        foreach (var (_, cargo) in view.GetEntitiesWithComponents<WeaponCargo>())
+        {
+            if (cargo.Holds(weaponName)) return true;
+        }
+
+        return false;
+    }
+
     // Empty slots, in layout order. Optionally only the ones a given weapon size could use.
     public static List<TurretSlotDefinition> FreeSlots(WorldView view, TurretSize? forSize = null)
     {

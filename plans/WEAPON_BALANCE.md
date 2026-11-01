@@ -429,3 +429,62 @@ Still unimplemented from §8: mine hp scaling (both sizes fixed at 2 hp with an 
 apply" comment, `Stats/MineStats.cs:25-28`) and viewport-gated auto-fire (no viewport check in
 `TurretFiringSystem`/`PrimaryTargetPicker`). §8's "prefer weapons that fit a free mount" was resolved
 differently — cargo shipped instead (`Components/GameplayComponents.cs:16`).
+
+## Follow-up (2026-11-02): R1's benchmark is the weakest of the band's slowest-round guns
+
+`BeamGunDpsStaysUnderItsOwnBand` picked the peer with the lowest `AmmoSpeed` and, on ties, kept
+whichever came first in `WeaponType.All`. Three close-band guns all throw 400 px/s rounds, so the
+close-band beam cap was priced against **ScatterCannon** (18 DPS → 14.4) rather than **Shotgun**
+(10.5 → 8.4) for no reason but table order. The test now takes the **weakest DPS among the guns
+sharing the band's slowest ammo speed**: the close-band cap is 8.4, and reordering the weapon table
+cannot move any cap. No weapon data changed — the close band has no beam today, so the stricter
+reading costs nothing now and only constrains the `close × hitscan` gun someone adds later
+(526 tests pass; the change is inside a pure-data test, so no scenario needed re-measuring).
+
+What R1 still deliberately does *not* claim, written down so a later pass does not "fix" it:
+
+- **The benchmark is the slowest-round peer, not the weakest peer in the band.** A beam is taxed
+  against the gun whose round is most likely never to arrive, not against everything in the band. So
+  adding SiegeSalvo (planned: mid, 400 px/s, 16.8 DPS — `plans/WEAPON_IDENTITY_CELLS.md`) lifts the
+  mid-band cap from 9.6 to 13.44, which would let a mid-band beam out-DPS MachineGun's 12.
+- The stricter alternative — cap against the weakest travelling peer *whatever* its ammo speed — is
+  not available. It puts the long-band cap at 0.8 × Cyclotron's 8 = 6.4, under LaserLance's 9.6,
+  because Cyclotron is the cheapest delivery in the game and R2 prices it to the floor on purpose.
+
+`GuidedGunDpsStaysUnderItsOwnBand` (R15) needed no change: it already takes the *cheapest* peer, so
+it never depended on table order.
+
+## Follow-up (2026-11-02): R23 and four new guns landed
+
+The identity-cell pass shipped — **R23** plus four guns, with the two duplicate starting loadouts
+re-armed. The design reasoning and the full numbers are in `plans/WEAPON_IDENTITY_CELLS.md`
+(`Status: shipped`); this is the rule-side summary.
+
+- **R23 — the ship holds at most one gun of each type, mounted or in cargo.** The upgrade hand already
+  refused to name an owned gun (`UpgradeOffer.Roll`'s `ownedNames`, both halves tested). What was added
+  is `TurretMount.AlreadyAboard` and the mount screen's refusal of a fresh second copy, which is what
+  makes the rule true for a scripted bench hand too. Why it is a balance rule and not tidiness:
+  `GameSession.ApplyUpgrade` applies a weapon card to **every** turret of that name, so a duplicate
+  doubled the value of every card that gun was offered. The assertion is
+  `ShipRosterTest.NoHullStartsWithTwoOfTheSameWeaponType`.
+- **The table went 15 → 19 guns**: **FlechetteFan** (close, fast, burst, 3 pellets, S, 6.0 DPS),
+  **Stiletto** (mid, hitscan, burst, single, S, 8.0), **SiegeSalvo** (mid, slow, volley, 3 pellets, L,
+  16.8), **FarlockSalvo** (long, guided, volley, 2 pellets, L, 5.4). `Swarmlet`'s rate went 0.8 → 0.7
+  (4.8 → 4.2 DPS) so the tier-2 guided *large* guns have a legal home between R3's floor (5.25) and
+  R15's cap. Bar `aura × fast`, `aura × medium`, `close × hitscan`, `mid × fast`, `long × medium` and
+  `long × slow`, every band × delivery intersection is now filled.
+- **R15 counts beams as peers.** The test filters out *homing* guns only, so a missile is priced
+  against the cheapest anything in its band — including a beam that R1 has already taxed. That chained
+  tax bites, and it is what set Stiletto's price: a mid-band beam below 7.5 DPS would have pushed
+  HavocTorpedo's 6 DPS under its ceiling (it did exactly that at 7.2, and the test said so). Stiletto
+  sits at 8.0 — above that line, and under PrismLance's 8.4 so the large mount still buys more. Expect
+  this test to move a band's missile budget first whenever a cheap gun joins a band that has one.
+- **Caps after the pass.** Beam: aura 9.6 (FlakCurtain 12), close 8.4 (Shotgun 10.5 — the weakest of
+  the three 400 px/s guns, per the follow-up above), mid 13.44 (SiegeSalvo 16.8), long 11.2 (RailGun 14).
+  Guided: SeekerPod 4.8 (FlechetteFan is the close band's cheapest gun now), Swarmlet 6.4 (RippleCutter),
+  HavocTorpedo 6.4 (Stiletto), FarlockSalvo 6.4 (Cyclotron).
+- **R5 is finally asserted**, closing the gap §9 claimed and §12 admitted: `OnlyTwoGunsMayCarryABigRound`
+  holds per-shot damage at 4, with RailGun (14) and HavocTorpedo (10) named as the only licences.
+- **Starter firepower** (R12): Scout 17 < Manta 21 ≈ Fighter 22.5 ≈ Raptor 22.5 < Shadow 26 < Eagle 27 <
+  Heavy 40.5, and no hull starts with every mount filled — Shadow gave its third gun up to R23 rather
+  than out-gun the bigger Eagle.
