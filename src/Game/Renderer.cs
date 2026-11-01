@@ -110,6 +110,14 @@ public static class Renderer
         // aggregate "world" line: summing those passes gives it.
         WorldRenderer.Draw(em, playerEntity, shipType, diagnostics, camX, camY, windowWidth, windowHeight);
 
+        // Edge indicators draw before the HUD bars, so a health/XP/reroll widget that overlaps a
+        // marker paints over it instead of the marker puncturing the widget.
+        var camCenter = new Vector2(camX, camY);
+        var viewport = new Vector2(windowWidth, windowHeight);
+        IndicatorRenderer.Collect(em, camCenter, viewport);
+        IndicatorRenderer.Draw(camCenter, viewport);
+        RenderTimings.Pass("hud.indicators");
+
         HudRenderer.DrawHealthBar(em, playerEntity, windowWidth, windowHeight);
         RenderTimings.Pass("hud.health");
         HudRenderer.DrawXpBar(em, playerEntity, windowWidth, windowHeight);

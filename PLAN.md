@@ -92,6 +92,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Damage graphics (smoke, sparks) — shipped — plans/DAMAGE_GRAPHICS.md
 - Hull damage shading — shipped — plans/DAMAGE_SHADING.md
 - UI polish — shipped — plans/UI_POLISH.md
+- Off-screen edge indicators: distance-tapered chevrons, enemies red, pickups in their world colours — shipped — plans/OFF_SCREEN_INDICATORS.md
 
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md
@@ -115,7 +116,6 @@ plans/functional-ecs.md.
 - Fill empty weapon identity cells (plans/WEAPON_BALANCE.md)
 - Difficulty scaling open items: pellet volleys, concurrency, mines, reward side (plans/DIFFICULTY_SCALING.md)
 - Loot/reward loop: reroll charges shipped; next candidates are the salvage field and the ECM pulse (plans/LOOT_ITEMS.md); a salvage *currency* only earns its keep once there is more than one thing to buy (free mount swaps and cargo already shipped — plans/TURRET_LAYOUTS.md)
-- Off-screen threat indicators for enemy racks and missiles
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
 

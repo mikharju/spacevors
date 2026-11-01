@@ -540,8 +540,7 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
 
-            int alpha = pickup.Chased ? 255 : 180;
-            Raylib.DrawCircle((int)cx, (int)cy, pickup.Radius, new Color(50, 150, 255, alpha));
+            Raylib.DrawCircle((int)cx, (int)cy, pickup.Radius, Ui.WithAlpha(Palette.XpPickup, pickup.Chased ? 1f : 0.7f));
         }
     }
 
@@ -554,7 +553,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
             // Bright mint at full alpha: health must never be mistaken for the acid spray's dark bubbles.
-            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, new Color(150, 255, 190, 255));
+            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, Palette.HealthOrb);
         }
     }
 

@@ -32,6 +32,14 @@ internal static class Palette
     // The dim wash behind the paused screens (stats, upgrades, slot picking).
     public static readonly Color ScreenDim = new(15, 15, 25, 215);
 
+    // Edge indicators (plans/OFF_SCREEN_INDICATORS.md): enemies point in threat red, and every
+    // pickup indicator carries the exact colour its pickup draws with in the world, so the marker
+    // reads as "that blue thing is XP" straight off the colour. The guided round's orange comes
+    // from WorldRenderer.AmmoColorOf(Orange) directly.
+    public static readonly Color EnemyIndicator = new(255, 60, 60, 255);
+    public static readonly Color XpPickup = new(50, 150, 255, 255);
+    public static readonly Color HealthOrb = new(150, 255, 190, 255);
+
     // Turret mounts: an empty one is a greyish-blue circle, a mounted gun a greyish-red triangle
     // pointing where it aims, and its firing arc a green sector around the mount.
     public static readonly Color RowHover = new(255, 255, 255, 18);

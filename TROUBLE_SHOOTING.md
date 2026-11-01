@@ -491,3 +491,14 @@ test never depends on the model's eyes.
 - **Symptom**: `missile-384` window runs at 183 ms median while its `--sim` median was 1.8 ms, so sim was fine and render was pathological — but nothing about missiles was being changed.
 - **Cause**: `HudRenderer.DrawHealthBar` drew one rounded pip per hp point (six primitives each); the scenario set the player's hp to 40,000, so the HUD emitted ~240,000 draw primitives per frame. Any scenario that inflates a "small integer" stat can trip a per-unit loop written for play-scale values.
 - **Fix / Prevention**: With `SPACEVORS_DIAGNOSTIC=1` every window run carries a `renderPasses` worst-first table — read it before touching the feature under test; one pass at 96% of the frame names the culprit outright. Keep HUD/per-unit renderers bounded (fixed draw counts) when the stat can be inflated by tests or upgrades.
+
+## 62. `scenario.sh --iters 0` measures nothing and then reports "no [PERF] frames found"
+
+- **Symptom**: a windowed scenario run prints `iteration 1: 120 frames` and the run dir holds a full
+  `iter-1.log` (all 120 `[PERF]` rows) plus shots — yet the script ends with "no [PERF] frames found,
+  no summary.json produced; baseline left untouched", reading like the run itself failed.
+- **Cause**: `--iters N` means N *measured* runs **plus one discarded cold run**, so `--iters 0`
+  leaves zero measured runs; the aggregator parses an empty set. The log is fine — only the summary is missing.
+- **Fix / Prevention**: use `--iters 1` as the minimum for any run you intend to read. If a run dir
+  has an `iter-1.log` without `summary.json`, the numbers are still there: median the `[PERF]` rows
+  (`dt=`/`render=`/`sim=`) and the `[RENDER-PASS]` lines from the log directly.
