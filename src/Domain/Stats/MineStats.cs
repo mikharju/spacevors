@@ -11,6 +11,23 @@ public static class MineStats
 
     // Damage dealt to the player on contact (CollisionSystem).
     public const int ContactDamage = 3;
+
+    // The field thins out as the run goes on (SpawningStats.Mines), so what is left of it grows rather
+    // than gets tougher: the large share drifts up with the difficulty tier — the same enemy stat clock
+    // that mines deliberately stay outside for hp. A large mine is easier to see and to dodge, worth 2 xp
+    // instead of 1 and shoves harder, but it still dies in the same two hits
+    // (plans/DIFFICULTY_SCALING.md R2.6 item 6: scarcer, not a chore to clear). The real threat step comes
+    // later from new mine kinds, not from bigger ones: plans/ENDLESS_DIFFICULTY.md P6.
+    public const float LargeShareStart = 0.5f;
+    public const float LargeShareAtTierCap = 0.7f;
+
+    // Chance that a spawned mine is the large one. One rng draw per spawn, exactly as the flat coin flip
+    // this replaces, so seeded runs stay comparable. Clamped, so a tier past the cap cannot inflate it.
+    public static float LargeChanceFor(int tier)
+    {
+        float progress = Math.Clamp((float)tier / EnemyShipStats.MaxTier, 0f, 1f);
+        return LargeShareStart + (LargeShareAtTierCap - LargeShareStart) * progress;
+    }
 }
 
 public readonly record struct MineType(

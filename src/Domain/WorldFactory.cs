@@ -78,7 +78,8 @@ public static class WorldFactory
             var mine = em.CreateEntity();
             Vector2 dir = SpawnPlacement.AnyDirection(rand);
             Vector2 minePos = SpawnPlacement.OutsideScreen(Vector2.Zero, viewportSize, dir);
-            MineSize mSize = rand.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
+            // The opening field is tier 0, so this is the flat even mix it has always been.
+            MineSize mSize = rand.NextDouble() < MineStats.LargeChanceFor(0) ? MineSize.Large : MineSize.Small;
             var mineType = MineType.FromSize(mSize);
             em.AddComponent(mine, new Position(minePos));
             em.AddComponent(mine, new Velocity(Vector2.Zero));

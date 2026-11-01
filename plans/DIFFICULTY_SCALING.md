@@ -460,3 +460,38 @@ Left open on purpose (a retune, not an inversion): whether the opening interval 
 that the ramp runs as documented. R2.6 item 6 wanted mines scarcer rather than weaker and named
 `MaxMines` 23 → 30 or a flatter late interval as the knobs; the test is written against the constants, so
 it moves with them.
+
+## Follow-up (2026-11-01): the speed term moved from the spawn interval onto the wave quota
+
+Three more problems from the same review landed with it, plus one deliberate non-change.
+
+- **P3 changed axes, so R2.1's "spawn rate vs speed" row is superseded.** The interval used to be
+  `÷SpeedFactor(playerSpeed)` *and* the wave was a fixed count, so a fast player met the same ships
+  sooner — a burst, then dead air until the window closed. Threat per unit of ground went up and then
+  fell back to zero. Now `EnemyShipSpawnSystem.WaveQuota(waveIndex, playerSpeed)` multiplies the wave's
+  ship count (1× at ≤100 px/s → 3× at ≥300 px/s, `MaxSpeedFactor`) and the in-wave interval is
+  speed-independent. A wave still reads as a wave. `SpawnSpeedScalingTest` replaced
+  `SpawnIntervalScalingTest` (it pinned the divided interval).
+- **A stationary player no longer eats a wave (R2.12's spawner half of P4).**
+  `EnemyShipSpawnSystem` used to `return` when `playerVel.Magnitude < MinDirectionalSpeed`, so a player
+  who stopped took none of the wave — the opposite failure from the mine spawner, which falls back to
+  `AnyDirection`. The spawner now uses that same fallback; one rng draw either way.
+- **The opening band leaves cull slack (fixes the P4 note this plan recorded as unresolved).** Initial
+  ships spawn 2400–3800 px out, down from 2400–5000. The cull is a distance from the player re-checked
+  every tick, so a ship placed 5000 px out — 500 px inside the 5500 px cull — died as soon as the player
+  ran the other way: never fought, XP never earned. `InitialSpawnBandTest` asserts the slack (≥1500 px,
+  a few seconds of running at 300 px/s) and that the near edge stays outside the widest firing ring.
+- **Mine size mix drifts; mine hp does not.** `MineStats.LargeChanceFor(tier)` takes the large share from
+  0.5 at tier 0 to 0.7 at the tier cap, because the field is thinning (R2.6 item 6 asked for scarcer, not
+  a chore to clear): bigger, easier to see and dodge, worth 2 xp, still a two-shot pop. `MineSizeMixTest`
+  pins the endpoints, that it only grows, that hp is identical for both sizes, and — through the system —
+  that the late field really does come out larger. New *kinds* of mine are the threat step; they are in
+  plans/ENDLESS_DIFFICULTY.md P6.
+- **Not done: a player top speed or drag.** It changes core feel, and it could not work as balance — any
+  cap high enough to be unreachable sits far above the ~290 px/s escape threshold, so the escape
+  survives. Distance-driven escalation (plans/ENDLESS_DIFFICULTY.md P2) is the way to close that hole.
+- **Found while testing: quota is not the only bound on arrivals.** Spawns land in the ±45° cone ahead of
+  the player — one screen edge — and `MinSpawnDistance = 300` keeps ships apart. With the world frozen
+  (a unit test), that placement rule caps a wave near 5 ships on a 1920×1024 screen whatever the quota
+  says. In a real run the ring travels with the player, so it is a rate limit rather than a wall; measured
+  before raising anything, and tracked in plans/ENDLESS_DIFFICULTY.md.

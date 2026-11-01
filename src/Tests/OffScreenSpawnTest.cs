@@ -137,6 +137,30 @@ public class OffScreenSpawnTest
     }
 
     [Fact]
+    public void ShipSpawn_StationaryPlayer_StillSpendsTheWave()
+    {
+        // There is no "ahead" to spawn in front of while the player is not moving, so the direction falls
+        // back to any side — the rule MineRespawnSystem already uses. Refusing to spawn instead would
+        // silently spend none of the wave's quota on a player who simply stopped.
+        var em = new EntityManager();
+        var view = new WorldView(em);
+
+        AddPlayer(em, velocity: Vector2.Zero);
+
+        var spawner = new EnemyShipSpawnSystem();
+        var commands = new CommandBuffer();
+        em.AddElapsedTime(WaveStats.OpeningLull); // wave 1 is underway once the opening lull ends
+        spawner.Update(view, 1f, commands);
+        commands.Apply(em);
+
+        var ships = em.GetEntitiesWithComponents<EnemyShip>().ToList();
+        Assert.Single(ships);
+
+        var pos = em.GetComponent<Position>(ships[0].Entity).Value;
+        Assert.False(IsInsideDefaultViewport(pos), $"spawned ship at {pos} is inside the screen");
+    }
+
+    [Fact]
     public void InitialSpawns_AreJustOutsideScreen()
     {
         var viewport = new Vector2(800f, 600f);

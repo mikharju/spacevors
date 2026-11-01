@@ -23,7 +23,8 @@ public static class WaveStats
     public const int WaveGrowth = 2;
     public const int WaveMaxSize = 40;
 
-    // Random interval between spawns within a wave, divided by SpeedFactor(playerSpeed) (P3).
+    // Random interval between spawns within a wave. Speed-independent: player speed scales the wave's
+    // quota instead (EnemyShipSpawnSystem.WaveQuota), so a wave keeps its rhythm at any speed.
     public const float InWaveMinInterval = 0.6f;
     public const float InWaveMaxInterval = 1.5f;
 }

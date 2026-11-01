@@ -36,7 +36,10 @@ public class MineRespawnSystem : GameSystem
         Vector2 minePos = SpawnPlacement.OutsideScreen(playerPos.Value, view.ViewportSize, spawnDir);
         float mineAngle = (float)(rng.NextDouble() * Math.PI * 2);
 
-        MineSize mSize = rng.NextDouble() < 0.5f ? MineSize.Large : MineSize.Small;
+        // Bigger mines later as the field thins (MineStats.LargeChanceFor); the draw count is unchanged.
+        MineSize mSize = rng.NextDouble() < MineStats.LargeChanceFor(EnemyShipStats.TierFor(view.ElapsedTime))
+            ? MineSize.Large
+            : MineSize.Small;
         var mineType = MineType.FromSize(mSize);
 
         commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), mineAngle), new Health(mineType.Health, mineType.Health));

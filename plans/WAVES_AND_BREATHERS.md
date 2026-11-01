@@ -213,3 +213,17 @@ what is recorded above. Fixed to ramp forward: no constant moved, `MinesPaused` 
 lives only in the clock and not in a secretly slower mine interval. Asserted by
 `Tests/MineRespawnIntervalTest.cs` (both clamps, the exact mid-ramp point, a never-narrows sweep, and a
 respawn count over the same 60 s window one `PairDuration` later: 7 → 5).
+
+## Follow-up (2026-11-01): player speed buys wave size, not wave speed
+
+- The in-wave interval this plan documents as "0.6–1.5 s, still divided by `SpeedFactor`" is **no longer
+  divided**: `EnemyShipSpawnSystem.NextInterval(rng)` is speed-independent, and the factor moved to the
+  quota — `WaveQuota(waveIndex, playerSpeed) = WaveSize × 1…3`, sampled once when the wave opens. Same
+  intent (P3: threat density per unit distance), different axis: a fast player meets more ships per wave
+  instead of the same ships in a burst followed by a dead window.
+- A stationary player now gets the wave from *any* direction (`AnyDirection`, the mine spawner's rule)
+  instead of the spawner refusing to spawn at all.
+- `WaveSize` itself is unchanged, and so is the cap: a 40-ship wave at the factor cap is a 120 quota
+  against `MaxEnemyShips = 100`, and W3's rule still applies — quota left when the window closes is lost.
+  Arrivals are also throttled by placement (the forward cone plus `MinSpawnDistance`), which is what the
+  tests had to work around to measure the quota at all: plans/ENDLESS_DIFFICULTY.md.

@@ -98,6 +98,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
+- Endless difficulty escalation: behaviour first, distance-driven clock, duty cycle, elites — plans/ENDLESS_DIFFICULTY.md
 - Parallel sim — plans/PARALLEL_SIM.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
 
