@@ -417,3 +417,46 @@ cooldown is added at spawn); difficulty selection (no such code); P7 surges.
 Stale detail: the example `[THREAT]` row above predates ff58b55 — the line now carries `tier=T/C` and
 `missiles=/cap` columns (`GameSession.cs:230-233`).
 
+
+## Follow-up (2026-11-01): the mine respawn ramp ran backwards — fixed
+
+R2.1 says mines are the one content the ladder makes *weaker*: respawn every 4–8 s at tier 0, every
+10–20 s from `RampDuration = 180 s`. That row described the constants and not the code —
+`MineRespawnSystem` interpolated the window with `1 - progress`, so the **late** interval applied at the
+opening and the **start** interval applied from 180 s on: respawns every 9–19 s through the first waves,
+then every 4–8 s for the rest of the run. A decay written as a growth.
+
+Both halves of that curve point the wrong way:
+
+- **The late game got easier.** Mines are the XP clock (1–2 xp each against level *n* wanting 10·n) and
+  a heal-orb source. From 3 minutes on — where the stat ladder has frozen at `MaxTier = 10` and the wave
+  quota caps at `WaveMaxSize = 40` — the run paid out *more* XP and more heals per second than the opening
+  did. "The difficulty ratio trends to zero" is the failure this whole file was written against, and this
+  was the one knob still moving it in that direction after everything else stopped.
+- **The opening got an unearned second grace period** (9–19 s between respawns across the opening lull and
+  wave 1) stacked on the grace the wave clock already gives. P4's mine cut (15 → 9) was meant to be the
+  only early mine concession.
+- **Code and docs disagreed**: this file's R2.1 row and the shipped note in plans/WAVES_AND_BREATHERS.md
+  both state 4–8 → 10–20, so any retune read from that table was being applied to a curve running the
+  other way.
+
+**Fix, direction only — no constant moved:** the window interpolates start → late with `progress`, clamped
+at both ends, behind pure `MineRespawnSystem.IntervalRange(elapsed)` + `NextInterval(elapsed, rng)` (same
+shape as `EnemyShipSpawnSystem.SpeedFactor` / `NextInterval`). The rng call order per spawn is unchanged,
+so seeded runs stay reproducible (`WorldRngTest` green); the interval *values* change, which is the point.
+
+Pinned by `Tests/MineRespawnIntervalTest.cs`: the window at t = −1 / 0 / 90 / 180 / 540 s (both clamps and
+the exact mid-ramp point), a 12-minute sweep asserting the window never narrows and never crosses over,
+"the fastest late respawn still waits longer than the slowest opening one" — the direction asserted as
+data, so it cannot be honoured by swapping the constants — 200 draws inside the window at both anchors,
+same seed → same interval, and one system-level run through the system itself: the same 60 s window
+exactly one `WaveSchedule.PairDuration` later respawns *fewer* mines (7 → 5 fixed, 5 → 8 before; the two
+windows are a pair apart, so the clock shape is identical and only the ramp differs). 462 tests passing.
+Measured: `ammo-spray` sim medians 1.43 / 1.45 / 1.49 ms against 1.36–1.49 ms for identical code on this
+host — ~0%, keep. The scenarios step ~6 s of sim and hold their seeded `mines=9` either way, so they can
+only show that the ramp costs nothing, which it does.
+
+Left open on purpose (a retune, not an inversion): whether the opening interval should still be 4–8 s now
+that the ramp runs as documented. R2.6 item 6 wanted mines scarcer rather than weaker and named
+`MaxMines` 23 → 30 or a flatter late interval as the knobs; the test is written against the constants, so
+it moves with them.

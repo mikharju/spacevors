@@ -203,3 +203,13 @@ pressure bar (5) carries it non-verbally.
   telegraph, tint lerp, camera breath, pressure bar), the last-of-wave health orb, and the magnet
   bonus — `WaveSchedule` has no other consumers in `src/`. Boundary/growth/cap/determinism are pinned
   by `Tests/WaveScheduleTest.cs`.
+
+## Follow-up (2026-11-01): the ramp this plan left alive ran backwards
+
+Of the two interval ramps this plan deleted, the mine one (`Stats/SpawningStats.cs:41-49`, 4–8 s → 10–20 s
+over 180 s) stayed — and `MineRespawnSystem` interpolated it with `1 - progress`, so respawns were
+*slowest* during the opening this plan exists to protect and fastest from `RampDuration` on, the reverse of
+what is recorded above. Fixed to ramp forward: no constant moved, `MinesPaused` untouched, so grace still
+lives only in the clock and not in a secretly slower mine interval. Asserted by
+`Tests/MineRespawnIntervalTest.cs` (both clamps, the exact mid-ramp point, a never-narrows sweep, and a
+respawn count over the same 60 s window one `PairDuration` later: 7 → 5).

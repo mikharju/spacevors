@@ -41,11 +41,28 @@ public class MineRespawnSystem : GameSystem
 
         commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), mineAngle), new Health(mineType.Health, mineType.Health));
 
-        float elapsed = view.ElapsedTime;
-        float progress = MathF.Min(elapsed / SpawningStats.Mines.RampDuration, 1f);
-        float currentMinInterval = SpawningStats.Mines.StartMinInterval + (SpawningStats.Mines.LateMinInterval - SpawningStats.Mines.StartMinInterval) * (1f - progress);
-        float currentMaxInterval = SpawningStats.Mines.StartMaxInterval + (SpawningStats.Mines.LateMaxInterval - SpawningStats.Mines.StartMaxInterval) * (1f - progress);
-
-        _timer = currentMinInterval + (float)rng.NextDouble() * (currentMaxInterval - currentMinInterval);
+        _timer = NextInterval(view.ElapsedTime, rng);
     }
+
+    // The mine field thins out as the run goes on: the respawn window widens from the start interval at
+    // the opening to the late interval at RampDuration and stays there. Mines are the one content the
+    // difficulty ladder makes weaker (plans/DIFFICULTY_SCALING.md R2.1) — they are the XP clock and the
+    // heal-orb source, so refilling them faster over time would hand the player more of both exactly
+    // where every other knob is trying to raise pressure. Pure: elapsed time and rng are the only inputs.
+    public static float NextInterval(float elapsed, Random rng)
+    {
+        var (min, max) = IntervalRange(elapsed);
+        return min + (float)rng.NextDouble() * (max - min);
+    }
+
+    // Random within this window, interpolated linearly over RampDuration and clamped at both ends.
+    public static (float Min, float Max) IntervalRange(float elapsed)
+    {
+        float progress = Math.Clamp(elapsed / SpawningStats.Mines.RampDuration, 0f, 1f);
+        return (
+            Interpolate(SpawningStats.Mines.StartMinInterval, SpawningStats.Mines.LateMinInterval, progress),
+            Interpolate(SpawningStats.Mines.StartMaxInterval, SpawningStats.Mines.LateMaxInterval, progress));
+    }
+
+    private static float Interpolate(float from, float to, float progress) => from + (to - from) * progress;
 }

@@ -39,7 +39,9 @@ public static class SpawningStats
     public static class Mines
     {
         // Respawn interval ramps from random [StartMinInterval, StartMaxInterval] s up to random
-        // [LateMinInterval, LateMaxInterval] s over RampDuration.
+        // [LateMinInterval, LateMaxInterval] s over RampDuration, then stays at the late interval: the
+        // interval grows, so mine pressure falls over the ramp rather than rising. The direction is
+        // pinned by MineRespawnIntervalTest.
         public const float StartMinInterval = 4f;
         public const float StartMaxInterval = 8f;
         public const float LateMinInterval = 10f;
