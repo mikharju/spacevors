@@ -185,6 +185,81 @@ public class LevelUpSlotOfferTest
         Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(5), w => w.Name == WeaponType.LoadTestWeapon.Name);
     }
 
+    // R29: `Damage` is a kill-gun card. The card is a flat +1 (`UpgradeStats.cs:21`), so on a 1-damage
+    // support chip it acts as a multiplier — one card would lift a support mount over the class line the
+    // weapon table draws (R24/R25). The same milestone hand still deals the card to the kill gun on the
+    // same hull, which is what makes the refusal a rule rather than an accident of the shuffle.
+    [Fact]
+    public void SupportGun_IsNeverOfferedADamageCard()
+    {
+        WeaponMount[] supportOnly = [new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain)];
+        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, supportOnly);
+
+        RunLevelUp(em); // level 5: the milestone hand, which is the only hand that carries Damage cards
+
+        // A new-weapon card reuses the Damage stat with `IsNewWeapon` set: it hands over a gun, it does not
+        // upgrade one. Only the upgrade card is the one R29 withdraws from a support gun.
+        foreach (var (_, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
+            Assert.DoesNotContain(options.Options, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon);
+
+        WeaponMount[] mixed =
+        [
+            new(TurretSlotName.MainGun, WeaponType.MachineGun),
+            new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain),
+        ];
+        var (mixedEm, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, mixed);
+
+        RunLevelUp(mixedEm);
+
+        var offered = new List<UpgradableOption>();
+        foreach (var (_, _, options) in mixedEm.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
+            offered.AddRange(options.Options);
+
+        Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.MachineGun.Name);
+        Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.FlakCurtain.Name);
+    }
+
+    // R29: the Range card stops at the support class's roof (R24/R26). A chip at 1350 px has nothing left
+    // to buy, and the card stretches the shot's lifetime as well as its range — so withdrawing it at the
+    // roof caps the support mount's live rounds too. A chip below the roof still takes the card, which is
+    // what makes the withdrawal a ceiling rather than a ban.
+    [Fact]
+    public void SupportGunAtItsRangeRoof_IsNotOfferedARangeCard()
+    {
+        WeaponMount[] longChip = [new(TurretSlotName.SmallLeft, WeaponType.Stiletto)];
+        var (em, _) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1, longChip);
+
+        for (int levelUp = 0; levelUp < 12; levelUp++)
+        {
+            RunLevelUp(em);
+
+            foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
+            {
+                Assert.DoesNotContain(options.Options,
+                    o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.Stiletto.Name);
+                em.DestroyEntity(entity);
+            }
+        }
+
+        WeaponMount[] shortChip = [new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain)];
+        var (shortEm, _) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1, shortChip);
+
+        bool offered = false;
+        for (int levelUp = 0; levelUp < 12; levelUp++)
+        {
+            RunLevelUp(shortEm);
+
+            foreach (var (entity, _, options) in shortEm.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
+            {
+                if (options.Options.Any(o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.FlakCurtain.Name))
+                    offered = true;
+                shortEm.DestroyEntity(entity);
+            }
+        }
+
+        Assert.True(offered, "a chip below the class roof should still be dealt its Range card");
+    }
+
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null)
     {
         var em = new EntityManager();

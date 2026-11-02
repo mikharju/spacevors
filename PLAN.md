@@ -73,7 +73,9 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 ### Weapons and combat
 - Bullets as lines, lasers, particle accelerators — shipped — plans/BULLETS_AS_LINES.md
 - Missiles and guided rounds — shipped — plans/MISSILES.md
-- Weapon balance pass; rules R1-R23, open knobs — active — plans/WEAPON_BALANCE.md
+- Weapon balance passes 1-2; rules R1-R31, open knobs — shipped — plans/WEAPON_BALANCE.md
+  (pass 2 split the roster into a kill class that owns the top DPS and the long band and a support class of
+  chips + missile screens; support guns lost the `Damage` card and their range roof is 1350 px)
 - Weapon identity cells; R23 one gun of each type aboard, FlechetteFan/Stiletto/SiegeSalvo/FarlockSalvo, deduped Shadow and Heavy loadouts — shipped — plans/WEAPON_IDENTITY_CELLS.md
 - Impact damage — shipped — plans/IMPACT_DAMAGE.md
 - Primary target lock and enemy hp bars — shipped — plans/TARGETING_HP_BARS.md
@@ -123,7 +125,7 @@ plans/functional-ecs.md.
   already shipped — plans/TURRET_LAYOUTS.md)
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
-- Armor and armor piercing bullets: Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage.
+- Armor and armor piercing bullets: Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage. Enemy weapons update to account for armor: Heavy is armored so light enemies do not hurt it at start, but mix in enemies with slower more powerful shots that are a threat to heavy armored player ships but easy to dodge for fast small ships. — not built; how it would be priced (flat subtraction, pierce as a `Damage`-shaped card, corrosion as the support answer, no pre-charge for a bonus that does not exist yet) is settled in plans/WEAPON_BALANCE.md §6.
 
 ## Roadmap — future (new systems)
 

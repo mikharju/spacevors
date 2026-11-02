@@ -49,13 +49,18 @@ public readonly record struct MissileStunned(float DetonateIn);
 
 // A weapon a turret entity carries. ArcAngle is only read for enemy turrets, which are aimed by
 // their hull; a player turret's arc comes from the TurretSlot it is mounted in.
+// The two class flags are copied from the WeaponType when a gun is mounted or picked up (R24/R28): a
+// support gun is the hull's missile defence and never takes the clicked-reach premium. Both default to
+// the kill class, which is what a hand-built test turret is.
 public readonly record struct Turret(
     WeaponStats Weapon,
     string WeaponName,
     float ArcAngle = MathF.PI / 2f,
     float Range = 360f,
     bool AutoTarget = true,
-    bool IsEnemy = false);
+    bool IsEnemy = false,
+    bool IsSupport = false,
+    bool InterceptsRounds = false);
 
 // One turret mount point on the player hull. A slot holding a weapon also carries
 // Turret, TurretAim, Position and Rotation; an empty slot carries only this.

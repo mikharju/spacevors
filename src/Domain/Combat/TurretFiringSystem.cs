@@ -181,10 +181,19 @@ public class TurretFiringSystem : GameSystem
         target = primary.Target;
         bool targetable = view.TryGetComponent<EnemyShip>(target, out _)
             || view.TryGetComponent<EnemyMine>(target, out _)
-            || view.TryGetComponent<Asteroid>(target, out _);
+            || view.TryGetComponent<Asteroid>(target, out _)
+            || IsHostileRound(view, target);
         if (!targetable) return false;
         return !view.TryGetComponent<Dead>(target, out _);
     }
+
+    // A guided round the enemy fired. It is clickable even though no kill mount would ever volunteer for
+    // one: a click is an order, and this is how a player tells their sniper to delete a missile instead of
+    // leaving it to the support mounts (R28).
+    private static bool IsHostileRound(WorldView view, Entity entity) =>
+        view.TryGetComponent<Missile>(entity, out _)
+        && view.TryGetComponent<Ammo>(entity, out var round)
+        && round.IsEnemy;
 
     // Lead-predicts a single moving target (enemy ship or mine); shared by the priority-target check and the auto-targeting search.
     private static TargetSelection? EvaluateMovingTarget(
@@ -236,9 +245,12 @@ public class TurretFiringSystem : GameSystem
         view.TryGetComponent<EnemyShip>(targetEntity, out var ship) ? ship.Radius
         : view.TryGetComponent<EnemyMine>(targetEntity, out var mine) ? mine.Radius
         : view.TryGetComponent<Asteroid>(targetEntity, out var rock) ? rock.Radius
+        // A guided round is what a support mount shoots down (R28); it is 4-6 px across.
+        : view.TryGetComponent<Ammo>(targetEntity, out var round) ? round.Radius
         : 0f;
 
-    // Only enemy ships and mines get auto brackets; asteroid selections are never marked.
+    // Only enemy ships and mines get auto brackets; asteroid selections are never marked. A hostile round
+    // is not marked either — a bracket says "this is the thing you chose", and nobody chose the missile.
     private static bool IsMarkableTarget(WorldView view, Entity target) =>
         view.TryGetComponent<EnemyShip>(target, out _) || view.TryGetComponent<EnemyMine>(target, out _);
 
@@ -279,7 +291,11 @@ public class TurretFiringSystem : GameSystem
                 }
                 else
                 {
-                    float targetedRange = Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
+                    // Only the kill class buys the extended reach of a clicked target (R26): a chip stream
+                    // aimed past its own band would be the long band bought with the wrong currency.
+                    float targetedRange = turret.IsSupport
+                        ? turret.Range
+                        : Math.Min(turret.Range * TargetedRangeMultiplier, turret.Weapon.AmmoSpeed * turret.Weapon.ShotLifetime);
 
                     // A guided round steers instead of being led, so its lock is taken where the target
                     // is; only the range cap is shared with the lead-predicted path.
@@ -288,6 +304,15 @@ public class TurretFiringSystem : GameSystem
                         : EvaluateMovingTarget(view, primaryTarget, turretPos, forwardDir, cosHalfArc, targetedRange * targetedRange, playerVelocity, ammoSpeed);
                 }
                 if (aimed.HasValue) return aimed;
+            }
+
+            // R28: a support mount is the hull's missile defence. A hostile guided round closing on the
+            // ship outranks any hull this mount would otherwise shoot at — that is the whole job of the
+            // support class. Kill mounts and racks are not here: they keep hammering the hull.
+            if (turret.InterceptsRounds)
+            {
+                var defence = FindClosingHostileRound(view, turret, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed);
+                if (defence.HasValue) return defence;
             }
 
             // Auto-targeting sees only what shoots back: enemy ships and mines. A rock is scenery
@@ -352,6 +377,41 @@ public class TurretFiringSystem : GameSystem
         }
 
         return nearestTarget;
+    }
+
+    // R28: the hull's own defence. Enemy racks may keep at most 7 rounds in the air (R22), so this is a
+    // short list scanned once per support mount per tick — not the per-round hunt that plans/MISSILES.md
+    // rejected for a missile seeker. Only a round with a closing counts: shooting at one that is already
+    // leaving wastes the chips and drags the mount's aim across the ship. A round the ECM has stunned is
+    // already spent, so it is not worth a shot either.
+    private static TargetSelection? FindClosingHostileRound(
+        WorldView view, Turret turret, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc,
+        float rangeSq, Vector2 playerVelocity, float ammoSpeed)
+    {
+        TargetSelection? nearest = null;
+        float nearestDistSq = float.MaxValue;
+
+        foreach (var (roundEntity, round, _, roundVel, roundPos) in view.GetEntitiesWithComponents<Ammo, Missile, Velocity, Position>())
+        {
+            if (!round.IsEnemy || view.HasComponent<MissileStunned>(roundEntity)) continue;
+
+            Vector2 relPos = roundPos.Value - turretPos;
+            float distSq = relPos.X * relPos.X + relPos.Y * relPos.Y;
+            if (Vector2.Dot(relPos, roundVel.Value - playerVelocity) >= 0f) continue;
+
+            var aimed = turret.Weapon.Hitscan
+                ? EvaluateStaticTarget(view, roundEntity, turretPos, forwardDir, cosHalfArc, rangeSq)
+                : EvaluateMovingTarget(view, roundEntity, turretPos, forwardDir, cosHalfArc, rangeSq, playerVelocity, ammoSpeed);
+            if (!aimed.HasValue) continue;
+
+            if (distSq < nearestDistSq)
+            {
+                nearest = aimed;
+                nearestDistSq = distSq;
+            }
+        }
+
+        return nearest;
     }
 
     private static void FindTargetWithPrediction(WorldView view, Vector2 turretPos, Vector2 forwardDir, float cosHalfArc, float rangeSq, Vector2 playerVelocity, float ammoSpeed, ref TargetSelection? nearestTarget, ref float nearestDistSq)

@@ -46,9 +46,9 @@ public readonly record struct ShipType(
     public static ShipType Scout { get; } = new(
         Name: "Scout",
         TextureKey: "scout",
-        Description: "Balanced engines, particle stream and a flank repeater",
+        Description: "Balanced engines, a machine gun ahead and a repeater on the flank",
         Engine: EngineLayout.Balanced,
-        Loadout: WeaponLoadout.CyclotronRepeater,
+        Loadout: WeaponLoadout.MachineGunRepeater,
         Slots: TurretLayouts.Scout,
         MaxHealth: 8,
         Radius: 46f,
@@ -76,7 +76,7 @@ public readonly record struct ShipType(
     public static ShipType Heavy { get; } = new(
         Name: "Heavy",
         TextureKey: "heavy",
-        Description: "Slow engines, machinegun, shotgun, flechette fan, flak curtain",
+        Description: "Slow engines, machinegun and a scatter cannon, shotgun and flak as support",
         Engine: EngineLayout.Slow,
         Loadout: WeaponLoadout.HeavyFlak,
         Slots: TurretLayouts.Heavy,

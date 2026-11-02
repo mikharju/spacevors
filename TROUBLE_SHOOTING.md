@@ -137,6 +137,13 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 - **Addendum (2026-11-02)**: when /tmp is a per-command overlay, put the sentinel dir in the workspace instead and restore offline from the repo's own cache — `DOTNET_CLI_HOME` alone is enough, `HOME` may stay read-only, and no network is needed:
   `mkdir -p .tools/run/dotnet-home && DOTNET_CLI_HOME=$PWD/.tools/run/dotnet-home NUGET_PACKAGES=$PWD/.nuget-packages DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet test src/Tests/Tests.csproj`.
   `.tools/run/` is gitignored, so the sentinel files stay out of the tree.
+- **Addendum (2026-11-02), two traps while A/B-ing a change against HEAD.** (1) A `git worktree add` copy has no
+  `.tools/pylibs` (it is gitignored), so every scenario run from the worktree needs
+  `PYTHONPATH=/absolute/path/to/main/workspace/.tools/pylibs`, or the analysis step dies with
+  `ModuleNotFoundError: No module named 'numpy'` after the run already succeeded. (2) `--out DIR` writes one
+  `summary.json` per directory, so looping several scenarios into the same `--out` silently keeps only the last
+  one — give each scenario its own dir (`.tools/run/ab2-mine-1-missile-384`). Both failures look like the run
+  was fine: the script exits 0, so check the files, not the exit code.
 
 ## 24. `new Color(...)` is ambiguous when mixing byte and int arguments
 

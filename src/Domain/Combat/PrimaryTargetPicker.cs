@@ -13,6 +13,11 @@ public static class PrimaryTargetPicker
     public const float SmallMineClickMultiplier = 4f;
     public const float LargeMineClickMultiplier = 2f;
 
+    // A guided round is 4-6 px across, so a click that had to land on it would never connect. This is the
+    // zone it can be picked in: a hostile round is worth forgiving, because shooting it down is the one
+    // order a player always wants to be able to give (R28).
+    public const float RoundClickZone = 26f;
+
     // Ships at or below this radius (Standard, Interceptor) count as small.
     private const float SmallShipRadiusThreshold = 45f;
 
@@ -43,6 +48,14 @@ public static class PrimaryTargetPicker
             // than the hull would steal clicks meant for the space beside it.
             var pos = em.GetComponent<Position>(entity);
             Consider(entity, pos.Value, point, asteroid.Radius, ref best, ref bestDistSq);
+        }
+
+        foreach (var (entity, round, pos) in em.GetEntitiesWithComponents<Ammo, Position>())
+        {
+            // Only the enemy's guided rounds, and only the guided ones: dumb ammo is not a target, it is
+            // what the shot is made of.
+            if (!round.IsEnemy || !em.HasComponent<Missile>(entity)) continue;
+            Consider(entity, pos.Value, point, RoundClickZone, ref best, ref bestDistSq);
         }
 
         return best;

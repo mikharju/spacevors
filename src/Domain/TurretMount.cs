@@ -75,9 +75,10 @@ public static class TurretMount
         MountTurret(em, slotEntity, slot, CarriedTurret(weapon) with { ArcAngle = slot.ArcAngle }, hullPosition, hullRotation);
 
     // The turret a weapon becomes when it is not on the hull — in cargo. The arc is irrelevant there:
-    // whatever mount it later sits in supplies it.
+    // whatever mount it later sits in supplies it. The class flags travel with the gun (R24/R28).
     public static Turret CarriedTurret(WeaponType weapon) =>
-        new(weapon.Stats, weapon.Name, 0f, weapon.Range, weapon.AutoTarget);
+        new(weapon.Stats, weapon.Name, 0f, weapon.Range, weapon.AutoTarget,
+            IsSupport: weapon.IsSupport, InterceptsRounds: weapon.InterceptsRounds);
 
     // Mount a turret that was carried in cargo: its upgraded stats come back with it, only the arc
     // changes because that belongs to the mount it now sits in.

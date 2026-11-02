@@ -67,13 +67,17 @@ public class WeaponBalanceTest
     }
 
     // R15: a guided round cannot lose its target on the way, which is the most certain delivery in the
-    // game — better than a beam's — so it must buy the least damage in its own reach band.
+    // game — better than a beam's — so it must buy less than the cheapest gun it competes with **for the
+    // same mount class**. The old version priced a missile against the band's cheapest *anything*, which
+    // chained taxes: nerfing a support chip re-priced every missile in that band, and a chip is already
+    // taxed by R1/R2. A missile competes with the guns of its own class, which is the comparison R3 makes.
     [Fact]
     public void GuidedGunDpsStaysUnderItsOwnBand()
     {
         foreach (var missile in Guns.Where(w => w.Stats.Homing))
         {
-            var peers = Guns.Where(w => !w.Stats.Homing && MathF.Abs(w.Range - missile.Range) <= 0.15f * missile.Range).ToList();
+            var peers = Guns.Where(w => !w.Stats.Homing && w.Size == missile.Size
+                && MathF.Abs(w.Range - missile.Range) <= 0.15f * missile.Range).ToList();
             Assert.NotEmpty(peers);
 
             var cheapest = peers[0];
@@ -213,7 +217,7 @@ public class WeaponBalanceTest
 
     // R5: a gun that acquires its own targets stays at ≤ 4 damage per shot. Mines are 2 hp and the
     // smallest enemy hull 5, so a fatter round throws the rest of it away on whatever the targeter
-    // happened to grab. Two guns are licensed above the cap — RailGun's 14 and HavocTorpedo's 10 — and
+    // happened to grab. Two guns are licensed above the cap — RailGun's 15 and HavocTorpedo's 10 — and
     // both fire so slowly that nothing else in the game could carry a round that big. `AutoTarget: false`
     // is not the licence: it only turns lead prediction off, so the rule is written around damage.
     [Fact]
@@ -239,5 +243,85 @@ public class WeaponBalanceTest
 
         Assert.True(scout < fighter && scout < shadow, $"the 46 px Scout ({scout:0.#}) should start behind the 58 px hulls ({fighter:0.#}, {shadow:0.#})");
         Assert.True(heavy > fighter && heavy > shadow, $"the 84 px Heavy ({heavy:0.#}) should start ahead of the mediums ({fighter:0.#}, {shadow:0.#})");
+    }
+
+    // R24: the support envelope. A Small mount's gun is chips, screens and area denial — it gets medium
+    // DPS *or* medium reach, never both. The ceiling is 8 dps in the aura and close bands and 6 in the mid
+    // band, where a chip already sees far enough to matter; the reach roof is the class roof, and the long
+    // band's beam cap (R1) keeps its own counsel from there up. A guided small gun is priced by R15.
+    [Fact]
+    public void SupportGunsStayInsideTheirClassEnvelope()
+    {
+        foreach (var w in Guns.Where(w => w.IsSupport && !w.Stats.Homing))
+        {
+            float ceiling = w.Range < 1100f ? 8f : 6f;
+            Assert.True(Dps(w) <= ceiling, $"{w.Name} is a support gun at {Dps(w):0.#} dps, over its {ceiling:0.#} dps band ceiling");
+            Assert.True(w.Range <= WeaponType.SupportRangeCeiling, $"{w.Name} reaches {w.Range:0} px from a small mount");
+        }
+    }
+
+    // R25: the step between the classes is what the player is meant to see. The best support mount tops out
+    // at 8 dps and the weakest kill gun starts at 10.4, so a large mount buys at least 1.25x the kill at its
+    // cheapest — and the top of the DPS table always belongs to a kill gun.
+    [Fact]
+    public void KillGunsHoldTheTopOfTheTable()
+    {
+        float bestSupport = Guns.Where(w => w.IsSupport && !w.Stats.Homing).Max(Dps);
+        float weakestKill = Guns.Where(w => !w.IsSupport && !w.Stats.Homing).Min(Dps);
+
+        Assert.True(weakestKill >= 1.25f * bestSupport,
+            $"the strongest support gun ({bestSupport:0.#} dps) sits too close to the weakest kill gun ({weakestKill:0.#} dps)");
+
+        var top = Guns[0];
+        foreach (var w in Guns)
+            if (Dps(w) > Dps(top)) top = w;
+
+        Assert.False(top.IsSupport, $"{top.Name} is a support gun on top of the DPS table at {Dps(top):0.#} dps");
+    }
+
+    // R26: the long band belongs to the kill class. Reach past the visible half-width is bought with a big
+    // round, not with a chip stream. (The other half of the rule — a small mount never takes the 3x clicked
+    // reach premium — is in TurretFiringSystem, where the click path is built.)
+    [Fact]
+    public void NoSupportGunReachesTheLongBand()
+    {
+        foreach (var w in Guns.Where(w => w.IsSupport))
+            Assert.True(w.Range < 1500f, $"{w.Name} reaches {w.Range:0} px from a small mount");
+    }
+
+    // R27: a support gun fires chips. One round of it cannot kill anything, so it can never be the round
+    // that "should have been" the kill. The cap is on a shot, not a volley: ScatterCannon's 2-damage slugs
+    // are kill fire because three of them arrive together at 18 dps, which R24 denies a support gun.
+    [Fact]
+    public void SupportGunsFireChips()
+    {
+        foreach (var w in Guns.Where(w => w.IsSupport))
+            Assert.True(w.Stats.Damage <= 2, $"{w.Name} deals {w.Stats.Damage} damage a shot from a support mount");
+    }
+
+    // R28: missile defence is the support class's job, keyed on the mount class rather than a per-gun list,
+    // so a chip bolted into a heavy mount screens too. A kill gun never swerves off the hull that is
+    // killing it to chase a pebble, and a rack does not slew, so it could not track one if it tried.
+    [Fact]
+    public void OnlySupportGunsAreMissileDefence()
+    {
+        foreach (var w in Guns)
+            Assert.Equal(w.IsSupport && !w.Stats.Homing, w.InterceptsRounds);
+    }
+
+    // R31: a kill comes mostly from the kill class. Against the same hull, the mounts a ship starts with
+    // that can kill must out-DPS its screens by 1.25x: the support half of a starter loadout is there to
+    // make the killing possible, not to do it.
+    [Fact]
+    public void StarterLoadoutsKillMostlyFromTheirKillGuns()
+    {
+        foreach (var ship in ShipType.All)
+        {
+            float kill = ship.Loadout.Mounts.Where(m => !m.Weapon.IsSupport).Sum(m => Dps(m.Weapon));
+            float support = ship.Loadout.Mounts.Where(m => m.Weapon.IsSupport).Sum(m => Dps(m.Weapon));
+            if (support == 0f) continue;
+
+            Assert.True(kill >= 1.25f * support, $"{ship.Name}: {kill:0.#} dps of kill fire against {support:0.#} dps of support");
+        }
     }
 }

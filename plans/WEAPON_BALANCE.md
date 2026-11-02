@@ -1,490 +1,388 @@
 # WEAPON_BALANCE.md
 
-Status: active (implemented 2026-10-16; rule set still asserted — but several anchors are stale, audited 2026-10-31, see the audit at the end)
+Status: shipped — pass 1 (delivery ladder, range ladder, identity cells) and pass 2 (the kill/support class
+split, R24-R31, missile screens, class card filters) are both in the code and asserted by `WeaponBalanceTest`.
+§6 (armour) is **future work, not implemented**.
 
-Plan for a weapon balance pass: per-weapon identity, a DPS ordering rule (hitscan weakest), a
-lifted range ladder, and a two-tier split — starter guns at level 1, slightly stronger guns only
-on level-5 cards.
+Source of truth is `src/Domain/Stats/WeaponStats.cs` + the tests; this file is the rule set. Firing and
+target acquisition: `src/Domain/Combat/TurretFiringSystem.cs`; damage: `src/Domain/Combat/CollisionSystem.cs`;
+cards: `src/Domain/Stats/UpgradeStats.cs`, `LevelUpSystem.cs`, `GameSession.ApplyUpgrade`. Rule numbers are
+stable identifiers — text gets revised, numbers are never renumbered, because `WeaponBalanceTest`,
+`plans/MISSILES.md` (R15-R22) and `plans/WEAPON_IDENTITY_CELLS.md` (R23) cite them by number. This file
+holds no stale anchors; superseded passes live in git history.
 
-**Status: implemented** (2026-10-16, six commits: cone scatter, dead-card fixes, level-gated pool,
-the ladder retune, InterceptorTurret + starter loadouts, `WeaponBalanceTest`). Deviations and the
-rules that turned out unwritable are in §12. Earlier decisions on record: full re-tier of the
-starter loadouts; PointDefenceTurret repurposed, not deleted; single-pellet `Scatter` made real;
-**the whole range ladder lifted** (aura 600 / close 900 / mid 1350 / long 1600–1700); RailGun's
-long-range identity carried by its 3× manual-target reach; ship firepower **scales with hull size**
-instead of being normalized.
+**Pass 2 in one line:** the large mount is how you kill things, the small mounts are how you make killing
+possible. Only a Large gun may hold the top of the DPS table or the long range band; a Small gun gets
+medium DPS *or* medium reach, never both, and it never carries a round big enough to matter on its own.
+Small guns are also the ship's missile defence.
 
-Source of truth: `src/Domain/Stats/WeaponStats.cs` (11 real weapons + `LoadTestWeapon`),
-firing/targeting in `src/Domain/Combat/TurretFiringSystem.cs`, damage in `CollisionSystem.cs`,
-cards in `LevelUpSystem.cs` + `UpgradeStats.cs`, upgrades applied in `GameSession.ApplyUpgrade`.
+## 1. Anchors (what a number here actually means)
 
-## 1. Spatial anchors (what a range number actually means here)
-
-There is no world zoom — 1 world px = 1 screen px (`WorldRenderer` draws a ship at
-`Radius * 2` px). So:
+No world zoom: 1 world px = 1 screen px.
 
 | Anchor | Value |
 |---|---|
-| Visible world half-extent (1920×1024 window) | 960 × 512 px, plus up to 480 px of mouse camera drift |
-| Player hull radius (drawn diameter) | Scout 46 (92 px), Fighter/Shadow 58 (116 px), **Heavy 84 (168 px)** |
-| Heavy turret offsets from hull centre | main 22 px, heavy sides 31 px, nose 38 px, back 34 px |
-| Enemy gun engagement ring | `FiringRange 700 + player.Radius` → 746 px against Scout, **784 px against Heavy** |
-| Enemy ammo speed | 160–200 px/s |
-| Mine / pickup radii | mine 7.5–15, pickup 6–9, player pickup 120–230 |
+| Visible half-extent (1920×1024) | 960 × 512 px, plus up to 480 px of mouse camera drift |
+| Hulls (radius / hp / mounts L+S) | Scout 46 / 8 / 1+2 · Fighter 58 / 10 / 1+3 · Shadow 58 / 10 / 1+2 · Falcon 111 / 10 / 1+2 · Eagle 66 / 16 / 1+3 · Manta 111 / 12 / 1+2 · Raptor 78 / 14 / 3+0 · Heavy 84 / 20 / 3+4 |
+| Enemy opening-fire ring | `FiringRange + your radius`: 700 Default/Interceptor/HeavyCannon, 640 Carmine, 520 Streak; +12…25 px per tier, capped at `MaxFiringRange` 1000 |
+| Enemy ammo | ≤ `MaxAmmoSpeed` 250 px/s |
+| Enemy hull hp | Streak 5 · Interceptor 7 · Default 15 · Carmine 22 · HeavyCannon 30, × `1 + 0.25·tier` ⇒ ×3.5 at `MaxTier` 10 → **105 hp** for a tier-10 HeavyCannon |
+| Mines | 2 hp, never scale |
+| Range bands | aura 600 · close 900-1000 · mid 1350 · long 1500-1700; RailGun's clicked reach is 3× base, capped by its own ammo (2500 px/s × 2 s = 5000 px) |
+| Guided rounds | leave at `MissileLaunchFraction` 0.7 of card speed, build at 200 px/s², health `MissileHealth` (player 1-3, enemy rack 2-3), ≤ 4 per mount per second |
 
-Why today's 260 px / 220 px guns read as unusable: they *do* clear the hull (RippleCutter at 260 px
-from the Heavy's main gun reaches ~198 px past its forward edge, 3.1× the hull radius) but they sit
-**inside the enemy's own 700 px firing ring**, so a 220–260 px gun cannot answer what is shooting it.
-The fix is a floor on range, not a DPS buff.
+Two floors already enforced and not to be renegotiated: no gun reaches under 600 px (it cannot answer
+what is shooting it), and `AmmoSpeed × 0.85 × ShotLifetime ≥ Range` — the range on a card is what the
+slowest round that gun fires can cross.
 
-## 2. Range ladder (revision 2)
+## 2. The two classes
 
-| Band | base range | what it buys |
+| | **Kill class** (Large) | **Support class** (Small) |
 |---|---|---|
-| Aura | **600** | just inside the enemy ring: answers what is on you; ~3.6 Heavy hull radii |
-| Close | **900** | just past the enemy ring; still inside the 960 px half-screen width |
-| Mid | **1350** | past the visible half-width: you shoot at things drifting in |
-| Long | **1600–1700** | clearly off the 512 px half-height; reach you pay DPS for |
-| Sniper | **1500 base / 4500 manual** | RailGun only (3× click reach, ammo-capped at 5000) |
+| Raw DPS | ≥ 10.4 (non-guided) | ≤ 8 in aura/close, ≤ 6 in mid |
+| Reach | any band; **only this class** may enter long (≥ 1500) or use the 3× clicked reach | ≤ 1350 px |
+| Damage per shot | 2-4, plus two licences (RailGun 15, HavocTorpedo 10) | ≤ 2 — chips |
+| Job | kills hulls | screens, cones, area denial, swarms, **missile defence** |
+| `Damage` card | yes | **never offered** (R29) |
+| Growth | damage + rate + range | rate + range (up to the class roof) + role |
 
-Shortest gun in the game goes from 220 px to 600 px, so the reach spread drops from 5.7×
-(220 → 1260) to 2.8× (600 → 1700). Because every gun now reaches at least to the enemy ring, the
-DPS premium that short-range guns used to need shrinks with it (§3 R2).
+The step between the classes is what the player is meant to *see*: 8 support DPS is the ceiling, 10.4 is
+the weakest kill gun, a ratio of **1.30**. One support mount needs 13.1 s to kill a tier-10 HeavyCannon
+(105 hp); the weakest kill mount needs 10.1 s. Support buys shape rather than damage — a cone that needs
+no aim, a disc that covers the aura, a needle that pokes from safety, a screen that peels missiles off
+the hull — and it is deliberately unable to win a fight by itself.
 
-## 3. Balance rules (proposed invariants, each checkable in a test)
+DPS is the kill currency; damage *per hit* is the armour currency (§6). Keeping them separate is what
+makes both rules readable.
 
-- **R1 — delivery ladder (the user's rule).** Inside one tier and slot size, raw DPS must rise as
-  delivery gets less certain: `hitscan < fast projectile < slow projectile`. Quantified: a hitscan
-  gun stays **≤ 0.8 ×** the raw DPS of the slowest-projectile peer in the same reach band, and
-  hitscan gets no `ProjectileSpeed` card. Its payment is delivery certainty, not damage.
-- **R2 — a penalty must be paid for.** Reach, travel time and cone inaccuracy are all penalties;
-  raw DPS must compensate for them. Consequence: the gun with the *best* delivery and the *longest*
-  reach in a tier must have the *lowest* raw DPS there (today it is Cyclotron: 4200 px/s ammo,
-  longest range, and tied for the highest DPS in the game).
-- **R3 — large mounts cost more** (projectile guns): ≥ 1.25 × a small-slot peer of the same tier and
-  delivery class (large mounts: 1 on Scout/Fighter/Shadow, 3 on Heavy). Hitscan guns are exempt —
-  R1 caps them from the other side.
-- **R4 — tier 2 is *slightly* stronger.** Ceiling: ≤ 1.40 × the strongest tier-1 gun of the same
-  slot class. Floor: it must beat its tier-1 peer by **+15% raw DPS** *or* by **+30% reach at equal
-  DPS** (AcidBubbleSpray is a reach upgrade, not a damage upgrade).
-- **R5 — per-shot damage is sized against target HP.** Mines are 2 HP and never scale, enemies are
-  7 / 15 / 30 (×3.5 at tier 10), so a 15-damage round throws most of itself away on whatever the
-  targeter happened to grab. Every gun that acquires targets on its own therefore stays at
-  **≤ 4 damage per shot**, and only RailGun carries a big round (14). The plan assumed
-  `AutoTarget = false` made a gun manual-only; it only turns **lead prediction** off, so the rule had
-  to be written around damage instead of the flag — see §12.
-- **R6 — the range on the card must be honest.**
-  `AmmoSpeed × (1 − AmmoSpeedVariation/2) × ShotLifetime ≥ Range` (worst-case bullet), hitscan
-  exempt (beam length = range). `ProjectileSpeed` cards then genuinely extend reach.
-- **R7 — entity budget.** `FireRate × PelletCount ≤ 12` rounds/s per mount (today's max), and
-  lifetime keeps live rounds bounded. Lifting ranges raises lifetimes, so this is the rule that
-  stops the retune turning into a big entity-count increase.
-- **R8 — kickback is one currency.** It is an instantaneous Δv in px/s. 25–30 px/s only on
-  single-shot big guns (RailGun, LaserLance: a movement tool), and sustained
-  `kick × FireRate ≤ ~0.12 × forward thrust` (~50 px/s²) so no stream becomes a thruster.
-- **R9 — only two guns may slew slower than the hull.** Hull turn rates are 76 / 69 / 38 °/s
-  (Balanced / Pursuit / Slow). RailGun 55°/s and PrismLance 70°/s stay below the Balanced hull as a
-  deliberate heavy-gun downside; everything else slews at or above it, and one gun (the interceptor)
-  owns the top of the table at 360°/s.
-- **R10 — upgrade cards should be comparable.** Keep `Damage` flat +1 (it is a *flat DPS* card: it
-  adds `FireRate` DPS), but design base damage so the relative jump lands at 15–35% — damage 1–4
-  for streams, 12–15 only on the manual snipers. Filter the dead hitscan `ProjectileSpeed` card.
-  Label multi-pellet `FireRate` cards honestly ("+1 shot", not "+15%").
-- **R11 — TTK budget against the enemy roster.** Starter loadout: mine (2 HP) in one hit,
-  Interceptor (7) in ≈1 s, Default (15) in 1.5–2.5 s, HeavyCannon (30) in 4–6 s. At tier 10 (HP
-  ×3.5) the same target should take ≈1.5–2× longer, not 3.5× — DPS from cards plus extra mounts must
-  slightly outrun `EnemyShipStats.HpMultiplier`.
-- **R12 — firepower scales with hull size; size is a handicap.** A bigger hull dodges worse: enemy
-  guns open fire at `700 + your radius` (784 px against Heavy vs 746 against Scout), enemy ammo at
-  160–200 px/s reaches a wide hull sooner, pickup radius (230 vs 120) drags mines in, and kickback
-  steering weakens with r³. HP (20 vs 8) only partly pays for that, so the big ship is *allowed* —
-  and expected — to carry more firepower from the start: **Scout (46) < Fighter = Shadow (58) <
-  Heavy (84)** in starter firepower, and Scout sits slightly below the medium hulls. Mount count
-  already follows size (3 / 4 / 3 / 7).
-- **R13 — one cell per gun.** Every weapon owns a unique combination of
-  (reach band, delivery, burst/stream, slot) plus one signature stat.
-- **R14 — colour is an identity channel.** Yellow = kinetic, Blue = precision energy, Violet =
-  laser, Green = chemical, Cyan = particle. A player should read a loadout from the tracers alone.
-  Orange is the guided channel (plans/MISSILES.md): an orange **plume** is one of yours steering at
-  something, a red plume is one hunting you. The body is light grey on both sides — the shape says guided,
-  the flame says whose.
+## 3. The roster as it stands
 
-### The guided-gun rules (added with missiles, plans/MISSILES.md)
+Kill class, raw DPS (fire rate × pellets × damage):
 
-- **R15 — certainty is paid for in damage.** A guided gun's DPS stays at or below 0.8× the cheapest
-  non-guided peer in its reach band. A lock spends the shot, so the compensation the rest of the ladder
-  gets — spread, lead, dodge — does not apply to it. (`GuidedGunDpsStaysUnderItsOwnBand`)
-- **R16 — a guided round must be out-turnable by what it hunts.** Its turn radius stays wider than the turn
-  radius of the tightest enemy hull at its max tier — measured at the speed it **launches** at
-  (`AmmoSpeed × MissileLaunchFraction / HomingTurnRate`), the tight end of a flight that ramps up to
-  `AmmoSpeed` and widens as it builds. Under that line a lock is a sentence rather than a weapon.
-  (`GuidedRoundTurnsWiderThanAnythingItHunts`)
-- **R17 — the guided-round budget.** One mount may put at most `WeaponStats.HomingRoundBudget` (4)
-  guided rounds in flight per second (`FireRate × PelletCount ≤ 4`). Guided rounds live for seconds and
-  cannot be dodged by luck, so they get a budget of their own instead of R7's 12 rounds/s.
-  (`GuidedGunStaysInsideTheGuidedRoundBudget`)
-- **R18 — volley growth is a privilege, not a default.** A `FireRate` card adds a shot only where the gun
-  can honour it: ordinary volley guns always grow; a growing guided volley stops at the R17 budget and
-  the card is withdrawn rather than relabelled; a gun with `SalvoGrows` off takes the card as a rate.
-  (`OnlySomeGunsMayGrowTheirVolley`, `GuidedVolleyAtItsCeiling_IsNotOfferedAnotherShot`)
-- **R19 — a guided round is a body, and a shootable one.** It carries 1-3 hp; one `MissileHealth` card
-  buys the whole mount +1 hp on the rounds it fires next, and the card is withdrawn at the ceiling. Only
-  the other side's fire can hit it, so a missile never eats its own side's DPS and never collides with
-  itself. (`MissileCollisionTests`, `WeaponStats.CanToughenRound`)
-- **R20 — the enemy armament ladder only adds.** A hull never loses an armament as the composition tier
-  climbs, its rack share never falls, and the small swarmer never carries a rack at all.
-  (`EveryRungOfTheLadderAddsToTheOneBelowIt`, `TheSwarmerNeverCarriesARack`)
-- **R21 — an enemy rack's reach stays honest.** It launches from farther than the hull's guns fire
-  (× 1.4), but no farther than 1450 px — under the player's longest gun (1700) — and its fuse must cross
-  its own launch ring at that tier. (`ARackOutreachesItsOwnGunsButNotThePlayersLongestGun`,
-  `ARoundsFuseCrossesItsOwnLaunchRing`)
-- **R22 — enemy guided rounds in the air are a ladder, not a flow.** 0 → 3 → 4 → 5 → 6 → 7 at
-  composition tiers 3 / 8 / 10 / 14 / 20: one round at a time, never two rungs within two minutes, and
-  none at all before three minutes of guns. (`TheRoundsAllowedInTheAirClimbOneStepAtATime`)
-
-## 4. Identity matrix
-
-| Gun | tier | slot | band (range) | delivery | rate | signature |
-|---|---|---|---|---|---|---|
-| Cyclotron | 1 | S | long (1600) | fast projectile (4200) | stream | needle (1.5 px), longest *auto* reach, no kick |
-| MachineGun | 1 | L | mid (1350) | medium projectile (600) | stream | chunky chewer, kick you can lean on |
-| ScatterCannon | 1 | L | close (1000) | slow projectile (400) | burst ×3 | the big shotgun: a cone of fat slugs that only holds together up close |
-| InterceptorTurret (ex-PointDefence) | 1 | S | close (900) | medium projectile (1200) | burst ×2 | fastest mount 360°/s — tracks what circles you |
-| Shotgun | 1 | S | close (900) | slow projectile (400) | burst ×3 | real cone, point-and-hold, no precision |
-| FlakCurtain | 1 | S | aura (600) | slow projectile (500) | stream | 18-px disc aura that reaches into the enemy ring |
-| RippleCutter | 1 | S | aura (600) | **hitscan** | burst | instant sweep, no lead, 32 px wide |
-| RailGun | 2 | L | sniper (1500 / 4500) | fast projectile (2500) | volley | manual-only 14-damage delete button, slow mount 55°/s |
-| LaserLance | 2 | L | long (1650) | **hitscan** | volley | instant beam, outranges every enemy gun |
-| PrismLance | 2 | L | mid (1350) | **hitscan** | volley ×3 | three beams fanned over 140 px — the multi-target gun |
-| GravitonBurst | 2 | L | long (1700) | fast projectile (3000) | volley ×5 | wall of 5; biggest number, best against big hulls |
-| AcidBubbleSpray | 2 | S | close (900) | slow projectile (400) | stream | ±26° corrosive cone that covers an area, not a target |
-
-Beams share the hitscan tax *and* an extra downside worth keeping: a beam damages the first thing it
-touches, once, so an asteroid field eats a much bigger share of a one-entity volley than of a
-12-round stream.
-
-## 5. Proposed stats (current → proposed)
-
-Tier 1 (starter guns; on hulls at level 1, still offerable on later cards):
-
-| Gun | change | raw DPS | reach (auto / click) | R-check |
+| Gun | band (range) | delivery | DPS | note |
 |---|---|---|---|---|
-| Cyclotron | FireRate 12 → **8**, Range 1360 → **1600** | 12 → **8** | 1600 / 2520 | R2: best delivery + longest reach ⇒ lowest DPS in its tier |
-| MachineGun | Damage 1 → **2**, FireRate 8 → **6**, AmmoSpeed 420 → **600**, Range 1260 → **1350**, kick 10 → **8**, AmmoRadius 2.5 → **3** | 8 → **12** | 1350 / 1800 | R3, R6, R8 |
-| InterceptorTurret | AmmoSpeed 300 → **1200**, FireRate 5 → **4.5**, PelletCount 1 → **2**, Scatter 0.05 → **0.2**, Range 680 → **900**, TurnSpeed 220 → **360°/s** | 5 → **9** | 900 / 2700 | R9 (fastest mount); multi-pellet so `FireRate` cards add a 3rd barrel |
-| Shotgun | FireRate 2 → **3.5**, AmmoSpeed 350 → **400**, Scatter 0.04 → **0.12**, Range 860 → **900** | 6 → **10.5** | 900 / 1200 | R1 (slow ammo pays least), R6 |
-| FlakCurtain | FireRate 10 → **12**, AmmoSpeed 220 → **500**, ShotLifetime 1 → **1.5**, Range 220 → **600**, Scatter 0.5 (now a real cone) | 10 → **12** | 600 / 750 | R6 (500 × 0.85 × 1.5 = 637 ≥ 600), R7 (=12 rounds/s) |
-| RippleCutter | Damage 6 → **4**, FireRate 1.5 → **2**, Range 260 → **600** | 9 → **8** | 600 (beam = range) | R1: 8 ≤ 0.8 × FlakCurtain's 12 = 9.6 |
+| ScatterCannon | close (1000) | slow ×3 | 18 | the biggest number in the game, and it only holds together inside ~700 px |
+| SiegeSalvo | mid (1350) | slow ×3 | 16.8 | |
+| GravitonBurst | long (1700) | fast ×5 | 16.5 | |
+| RailGun | long (1500 / 4500 click) | fast, single | **15** (was 14) | the big round hits harder, and it lifts the long band's beam cap from 11.2 to 12 so LaserLance stops sitting 7% under its own ceiling |
+| MachineGun | mid (1350) | medium, single | 12 | the loadout workhorse — see the coupling in §9 |
+| PrismLance | mid (1350) | hitscan ×3 | **10.8** (was 8.4) | 4 damage × 3 beams @ 0.9/s (cap 13.44) — this used to be weaker than a support gun, which is what the pass exists to fix |
+| LaserLance | long (1650) | hitscan, single | **10.4** (was 9.6) | 4 damage @ 2.6/s (cap 12 after RailGun, margin 13%) — the weakest kill gun, so it *is* the class floor R25 measures |
+| HavocTorpedo | mid (1350) | guided, 10 dmg | 6 | pays the certainty tax (R15); exempt from the class floor, never from the ceiling |
+| FarlockSalvo | long (1650) | guided ×2 | 5.4 | |
 
-Tier 2 (level-5 unlocks only):
+Support class:
 
-| Gun | change | raw DPS | reach (auto / click) | R-check |
+| Gun | band (range) | delivery | DPS | note |
 |---|---|---|---|---|
-| RailGun | Damage 15 → **14**, FireRate 0.667 → **1**, Range 1200 → **1500** | 10 → **14** | 1500 / **4500** | R4, R5 (manual-only); only gun whose ammo (2500 × 2 = 5000 px) can actually fly its click reach |
-| LaserLance | Range 1400 → **1650**, Damage 12 → **4**, FireRate 0.8 → **2.4**, kick 25 → **12** | 9.6 → **9.6** | 1650 (beam = range) | R1: 0.58 × GravitonBurst; R5: an auto-targeting gun stays at 4 per shot, so the lance became a fast cutter |
-| PrismLance | Damage 5 → **4**, FireRate 0.6 → **0.7**, BeamSpacing 14 → **70**, kick 30 → **12**, Range 1200 → **1350** | 9 → **8.4** | 1350 | identity fix: at 14 px the three beams land on one hull; at 70 px they hit a formation |
-| GravitonBurst | FireRate 1.2 → **1.1**, Range 1600 → **1700** | 18 → **16.5** | 1700 / 2400 | R4 ceiling: 1.375 × MachineGun; still the biggest number in the game |
-| AcidBubbleSpray | ShotLifetime 1.2 → **3**, AmmoSpeed 200 → **400**, Range 650 → **900**, Scatter 0.4 → **0.45**, **AutoTarget false → true** | 12 → **12** | 900 / 1200 | R6 (400 × 0.85 × 3 = 1020 ≥ 900), R4 floor (equal DPS, +50% reach over FlakCurtain), R5 (1 dmg needs no manual aiming) |
+| FlakCurtain | aura (600) | slow disc | **8** (was 12) | the class ceiling, and the cheapest missile screen: 1 dmg @ 8/s in a 9 px disc |
+| Shotgun | close (900) | slow ×3 | **7.5** (was 10.5) | 1 dmg × 3 @ 2.5/s |
+| AcidBubbleSpray | close (900) | slow spray | **6** (was 12) | 1 dmg @ 6/s — area denial, and the natural armour-strip carrier (§6) |
+| InterceptorTurret | close (900) | medium ×2 | **6** (was 9) | 1 dmg × 2 @ 3/s, still the fastest mount in the game (360°/s), which is what makes it a screen |
+| FlechetteFan | close (900) | fast ×3 | 6 | almost no penalties to be paid for (R2), so it stays the cheapest travelling gun |
+| RippleCutter | aura (600) | hitscan blade | **6** (was 8) | 2 dmg @ 3/s: chips, and it must stay under 0.8 × FlakCurtain (6.4) |
+| Stiletto | mid (1350) | hitscan needle | **6** (was 8) | 2 dmg @ 3/s — the mid-band support ceiling, and the best anti-missile fire in the game |
+| Cyclotron | **mid (1350)** (from long 1600) | fast needle | **5** (was 8) | 1 dmg @ 5/s, and it left the long band: that reservation belongs to the kill class |
+| Swarmlet | aura (600) | guided ×3 | 4.2 | |
+| SeekerPod | close (900) | guided | 3.6 | **2 dmg @ 1.8/s** (was 3 @ 1.2/s): same DPS, now a chip instead of a small bomb (R27) |
 
-Ladder check (R1 is per reach band, since the band is what the DPS pays for):
+Ladder per reach band (a beam is priced against the band's weakest slowest-round gun, a guided round
+against the cheapest kill gun of its own class): aura — FlakCurtain 8 (slow) over RippleCutter 6 (beam,
+cap 6.4), Swarmlet 4.2 (guided, cap 4.8). Close — ScatterCannon 18, Shotgun 7.5, Acid/Interceptor/
+Flechette 6, SeekerPod 3.6 (cap 4.8). Mid — SiegeSalvo 16.8, MachineGun 12, PrismLance 10.8, Stiletto 6,
+HavocTorpedo 6 (cap 8.6), Cyclotron 5. Long — GravitonBurst 16.5, RailGun 15, LaserLance 10.4,
+FarlockSalvo 5.4 (cap 8.3).
 
-- Aura 600: RippleCutter **8** (hitscan) under FlakCurtain **12** (slowest ammo).
-- Close 900: InterceptorTurret **9** (medium ammo) under Shotgun **10.5** (slow ammo).
-- Mid 1350: PrismLance **8.4** (hitscan) under MachineGun **12**.
-- Long: LaserLance **9.6** (hitscan) under GravitonBurst **16.5**; Cyclotron **8** is the cheapest
-  delivery in the game and now has the lowest raw DPS of its tier.
-- Sniper: RailGun **14** with 4500 px of click reach, nothing else comes close.
+Starter loadouts, and the *kill share* each one now carries (kill-gun DPS over total):
 
-Rounds/s stay ≤ 12 per mount (R7); live-round estimate for the Heavy's four starter guns ≈ 100,
-which is well inside the 10k-object goal but worth watching (the perf scenarios pin 5.5k bullets).
-
-## 6. Tiers: initial guns vs level-5 guns
-
-- Add `int UnlockLevel` to `WeaponType` (default `1`). Tier 1 guns = 1; RailGun, LaserLance,
-  PrismLance, GravitonBurst, AcidBubbleSpray = `5`. An `int` (not an enum) so a level-10 third wave
-  needs no new code later.
-- `WeaponType.NewWeaponPool` becomes a lookup by level: `w.UnlockLevel <= newLevel` (LoadTestWeapon
-  stays excluded). `LevelUpSystem.SpawnLevelUpChoice` already has `newLevel` at the call site, so
-  `NewWeaponOptions` just takes one more argument.
-- Level 5 is the first milestone (`MilestoneLevelInterval = 5`), and the hand offers 3 new-weapon
-  cards — so the first new weapon a player can ever pick is tier 2. At level 10 the pool also
-  re-offers tier-1 guns the ship never picked, which fills the empty small mounts.
-- `ShipType.DiagnosticShips` keeps **every** weapon regardless of tier: that is the A/B bench.
-
-Starter loadouts per R12 (firepower rises with hull size; mount geometry unchanged):
-
-| Ship | hull | today (raw DPS) | proposed (raw DPS) |
+| Hull | loadout | total DPS | kill share |
 |---|---|---|---|
-| Scout | 46, 8 HP, 3 mounts | Cyclotron (12) | Cyclotron **main** + InterceptorTurret **small_left** (**17**), one small free |
-| Fighter | 58, 10 HP, 4 mounts | LaserLance + Cyclotron (21.6) | MachineGun **main** + Shotgun **small_left** (**22.5**), two free |
-| Shadow | 58, 10 HP, 3 mounts | GravitonBurst (**18**) | RippleCutter **×3** — main + both flanks (**24**) close-in brawler, and the one hull that starts fully booked |
-| Heavy | 84, 20 HP, 7 mounts | MachineGun + 2× Shotgun + FlakCurtain (30) | same four guns (**45**), three mounts free |
+| Scout | **MachineGun (main) + InterceptorTurret** — was Cyclotron + InterceptorTurret | 18 (was 17) | 67% |
+| Fighter | MachineGun + Shotgun | 19.5 | 61% |
+| Shadow | ScatterCannon + RippleCutter | 24 | 75% |
+| Eagle | ScatterCannon + InterceptorTurret | 24 | 75% |
+| Manta | MachineGun + InterceptorTurret | 18 | 67% |
+| Raptor | MachineGun + Shotgun (heavy_left) | 19.5 | 61% |
+| Falcon | MachineGun | 12 | 100% |
+| Heavy | MachineGun + **ScatterCannon (heavy_left)** + Shotgun + FlakCurtain — FlechetteFan left | 45.5 (was 40.5) | 66% |
 
-Shadow loses the game's strongest gun and becomes a high-skill short-range hull (its guns now reach
-600 px instead of 260, so that is finally playable). The Heavy is allowed to start far ahead:
-45 raw DPS against a hull that cannot dodge, turns at 38°/s and gets engaged from 784 px.
+The Scout's change is not decoration: `EnemyDifficultyTest.ToughestTierHullDiesInsideTheTtkBudget` gives
+a 7 s budget, which pins the starter Scout at ≥ 15 DPS (105 hp ÷ 7 s). Two nerfed support guns would have
+given it 11 DPS and 9.5 s — a hard fail. A hull whose main mount holds a support gun cannot clear its own
+TTK floor once support is nerfed, which is the pass's thesis stated as a test. The Scout now shares
+`WeaponLoadout.MachineGunRepeater` with the Manta; `CyclotronRepeater` was deleted rather than rewritten.
 
-## 7. Small mechanics changes these identities need
+## 4. Rules
 
-1. **Real cone for one-pellet guns** (confirmed): in `TurretFiringSystem.FireAtTarget`, when
-   `PelletCount == 1 && Scatter > 0`, rotate the shot by a random angle in `±Scatter` using
-   `view.Rng` (already seeded per run, so still deterministic; the existing `AmmoSpeedVariation`
-   roll works the same way). Multi-pellet offsets stay exactly as they are. Cost: hit rate becomes
-   luck-dependent; perf scenarios are unaffected (they seed `LoadTestWeapon` and silence turrets).
-2. **Hitscan card filter**: `LevelUpSystem` must not offer `ProjectileSpeed` for a hitscan weapon
-   (`AmmoSpeed 0 × 1.3` is a dead card).
-3. **Honest `FireRate` card label**: `UpgradeMenuRenderer` prints "+15%" for multi-pellet guns that
-   actually receive +1 pellet — print "+1 shot" there.
-4. **Rename `PointDefenceTurret` → `InterceptorTurret`**: "point defence" promises anti-missile fire
-   the sim does not have. The rename touches the static, `All`, the diagnostic roster and two or
-   three test lines.
+Kept, with revised text where pass 2 changes the meaning. Numbers are unchanged; nothing is renumbered.
 
-## 8. Out of scope for this pass (follow-ups, in rough order of value)
+- **R1 — delivery ladder.** A beam stays ≤ 0.8 × the *weakest* of the band's slowest-round guns (`BeamGunDpsStaysUnderItsOwnBand`). Guided guns are not peers here; they are priced by R15. A beam pays twice more for dying to the first rock in its line.
+- **R2 — a penalty is paid for, and so is an advantage.** Reach, travel time and cone spread buy DPS. The ladder runs *inside* a class: an excellent-delivery support gun (FlechetteFan, Cyclotron) is meant to be cheap, and its cheapness is not a bug to compensate.
+- **R3 — a large mount earns its scarcity** within one tier and delivery class: ≥ 1.25 × the best small gun of that class. Beams exempt (R1 caps them), guided guns exempt (R15 caps them).
+- **R4 — tier 2 is a step, not a leap:** ≤ 1.40 × the strongest tier-1 gun of the same size, and (non-beam, non-guided) ≥ 1.15 × a tier-1 peer *or* equal DPS with 1.3× the reach.
+- **R5 — per-shot damage needs a licence.** ≤ 4 for everything that acquires its own targets; RailGun (15) and HavocTorpedo (10) are the only two, and both fire 0.6-1.0 rounds a second. `AutoTarget: false` turns off **lead prediction** only — it is not a licence and never was.
+- **R6 — honest reach**, **R7 — ≤ 12 rounds/s per mount**, **R8 — kickback is one currency** (sustained `kick × FireRate` ≤ ~0.12 × forward thrust), **R9 — only RailGun (55°/s) and PrismLance (70°/s) slew slower than a Balanced hull turns** (1.33 rad/s), **R10 — see R29** (the card rule is now a class rule), **R13 — one gun per identity cell** (band, delivery, rate class, pellets, size), **R14 — colour is identity** (yellow kinetic, blue precision, violet laser, green chemical, cyan particle, orange guided).
+- **R11 — TTK budget.** The enforced half of it: a tier-10 HeavyCannon (105 hp) dies inside 7 s of a starter Scout's fire. Raw-DPS TTK is optimistic in play (travel, arcs, misses, your own movement), so this is a floor, not a schedule: a starter set kills a tier-0 Default in 0.3-0.9 s and a tier-0 HeavyCannon
+in 0.7-1.8 s — the fast end is the Heavy's 45.5 DPS, the slow end the Scout's 18.
+- **R12 — firepower follows the hull** — hurtbox and mount capacity, not bounding radius. Falcon (12, two free 180° flanks) and Manta (18, the game's best strafe) sit below their painted size on purpose; Raptor (19.5, one heavy mount deliberately empty) and Heavy (45.5, two heavy mounts still empty) buy their growth with mounts.
+- **R15 — certainty is priced in damage, against its own class.** A guided gun stays ≤ 0.8 × the cheapest non-guided gun **of the same mount class** in its band (`GuidedGunDpsStaysUnderItsOwnBand` gains a `Size` filter). The old rule taxed a missile against the band's cheapest *anything*, so nerfing a support chip re-priced every missile in that band — a chained tax (the chip was itself already taxed by R1/R2). Pricing a missile against the kill guns it competes with is the same comparison R3/R12 make; margins after the pass: SeekerPod 3.6 ≤ 4.8, Swarmlet 4.2 ≤ 4.8, HavocTorpedo 6 ≤ 8.6, FarlockSalvo 5.4 ≤ 8.3.
+- **R16 — a guided round out-turns nothing**: launch turn radius `AmmoSpeed × 0.7 / HomingTurnRate` stays wider than the tightest tier-10 enemy hull's 38 px. **R17 — ≤ 4 guided rounds/s per mount.** **R18 — volley growth is a privilege** (`CanGrowSalvo`); **R19 — a guided round is a body with 1-3 hp** (`CanToughenRound`); **R20-R22 — the enemy rack ladder** (adds only, reaches 1.4× its hull's guns but ≤ 1450 px, and 0/3/4/5/6/7 rounds in the air at composition tiers 3/8/10/14/20).
+- **R23 — one gun of each type aboard**, mounted or in cargo (`TurretMount.AlreadyAboard`), because `GameSession.ApplyUpgrade` applies a card to *every* turret of that name.
 
-- **Mine HP does not scale** (`MineType.Health = 2`, fixed) while enemy HP grows ×3.5 — late runs
-  are full of 2-HP pebbles that punish exactly the high-damage tier-2 guns. Either scale mine HP with
-  the tier curve or accept snipers as anti-ship tools.
-- **Long-range auto-fire at off-screen targets.** With mid/long bands past the half-viewport, the
-  player will see kill effects they never saw the target of. Cheap knob if it feels wrong: only
-  bracket/auto-target targets inside the viewport, keeping click-to-target as the way to reach
-  farther. Not a stat change.
-- **New-weapon cards do not prefer weapons that fit a free mount** — planned in PLAN.md ("most
-  weapons offered must be of type fitting the free slot"), deliberately dropped in favour of cargo.
-  Worth revisiting now that tier 2 is mostly large and the small ships have one large mount each.
-- **No anti-projectile mechanic**, which is the only way `PointDefenceTurret` could have kept its
-  original name.
+New with pass 2 (shipped 2026-11-02):
 
-## 9. Verification
+- **R24 — the support envelope** (`SupportGunsStayInsideTheirClassEnvelope`). A non-guided Small gun's raw DPS ≤ 8 in aura/close and ≤ 6 in the mid band; its range ≤ `WeaponType.SupportRangeCeiling` (1350 px). Support may buy medium DPS *or* medium reach, never both. A guided Small gun is priced by R15 instead, because certainty is what it bought.
+- **R25 — the class step is visible** (`KillGunsHoldTheTopOfTheTable`). The strongest support gun × 1.25 ≤ the weakest non-guided Large gun (8 → 10.4 = 1.30), and the top of the DPS table is always a Large gun. Guided Large guns are exempt from the floor — they pay R15 — but never from the ceiling.
+- **R26 — the long band belongs to the kill class** (`NoSupportGunReachesTheLongBand`). No Small gun reaches ≥ 1500 px, and a Small mount never takes the 3× clicked-reach premium: `TurretFiringSystem` gates the premium on `Turret.IsSupport` (`AClickedTargetBuysReachOnlyForTheKillClass`). Reach past the visible half-width is bought with a big round, not with a chip stream.
+- **R27 — support guns fire chips** (`SupportGunsFireChips`): ≤ 2 damage per shot. A chip cannot kill a Default hull (15 hp) on its own and should never be the round that "should have been" the kill. The cap is on a *shot*, not on a volley: ScatterCannon's 2-damage slugs are kill-class fire because three of them arrive together at 18 DPS, which R24's ceiling already forbids a support gun from reaching.
+- **R28 — missile defence is the support class's job** (§5, `OnlySupportGunsAreMissileDefence` + `MissileDefenceTest`): Small non-guided mounts may acquire a hostile guided round; Large mounts and guided mounts may not.
+- **R29 — cards are class cards too** (`SupportGun_IsNeverOfferedADamageCard`, `SupportGunAtItsRangeRoof_IsNotOfferedARangeCard`). The `Damage` card is never offered to a support gun — the milestone hand's per-gun Damage loop skips `Turret.IsSupport`. The `Range` card is withdrawn from a support gun once its *live* range would pass 1350 px (the offer reads `mounted.Range × UpgradeDefinition.Range.Multiplier` against `WeaponType.SupportRangeCeiling`, the same "never a card the rules would refuse to honour" pattern as R18/R19; it stayed inline in `UpgradeOffer` because that loop is its only reader). `FireRate` stays open to both classes — it grows them at the same ×1.15, so it cannot invert the class line by itself. The reason is arithmetic, not tidiness: `Damage` is flat `+1` (`UpgradeStats.cs:21`), so on a 1-damage chip it is a *multiplier* — one card on FlakCurtain would take it from 8 DPS to 16, over the kill class's floor of 10.4. It also breaks R10's "15-35% relative jump" guidance, which no test asserts: on a 3-4 damage kill round the same card is the +25-33% card R10 asks for, and that is the only place it should live. (A new-weapon card reuses the `Damage` stat with `IsNewWeapon` set: it hands over a gun rather than upgrading one, so it stays open to both classes.) The Range card multiplies `ShotLifetime` as well as `Range` (`GameSession.cs:1181-1184`), so stopping a support gun at the roof also stops its live-round count from stretching with it — a free win on the class that keeps the most rounds in the air.
+- **R30 — a bonus is priced when it ships, not before** (§6, which is future work). Nothing in the table is charged for armour-pierce it does not have.
+- **R31 — a kill comes mostly from the kill class** (`StarterLoadoutsKillMostlyFromTheirKillGuns`). In every starter loadout the mounts that can kill out-DPS the screens by ≥ 1.25×: the weakest hulls are Fighter and Raptor at 1.60, the Heavy is 1.94, the Scout 2.0. In TTK terms against a tier-10 HeavyCannon (105 hp), one support mount needs 13.1 s where the weakest kill mount needs 10.1 s.
 
-- New deterministic test `WeaponBalanceTest` (pure data over `WeaponType.All`, no graphics):
-  R1 (hitscan ≤ 0.8 × slowest-projectile peer in the same band), R3 (large ≥ 1.25 × small of the
-  same tier and delivery class), R4 (tier-2 ceiling and floor), R5 (auto-target guns ≤ 4 damage per
-  pellet), R6 (honest reach at worst-case `AmmoSpeedVariation`), R7 (`FireRate × PelletCount ≤ 12`),
-  R13 (no duplicate identity cell). A test that reads the rules is what stops the next weapon from
-  quietly breaking them. `LoadTestWeapon` is exempt from every rule (it is the perf scenario's
-  8000-pellet spray, not a gun).
-- Guided guns: `WeaponBalanceTest` also asserts R15 (certainty priced in damage), R16 (turn radius, measured
-  at the launch end), R17 (guided-round budget) and R18 (volley growth), and `MissileGuidanceTest` covers
-  what a lock actually does — turns onto it, builds to its top speed and stops there, straightens out when
-  the lock dies, and leaves along the hull's nose at a target the slot's arc would have excluded. The enemy
-  side of
-  R19-R22 is asserted in `MissileCollisionTest`, `EnemyMissileFiringTest` and `EnemyMissileLadderTest`.
-- Cone-scatter gets its own small test: one shot, seeded RNG, direction stays inside ±Scatter, and
-  multi-pellet offsets are unchanged.
-- Existing tests to update: `ShipRosterTest` (Shadow's gun, diagnostic roster after the rename),
-  `LevelUpSlotOfferTest`, `CargoTest`, `TurretMountTest` (rename), `LaserTest` / `TurretFiringTest`
-  where damage or fire-rate numbers are asserted.
-- Perf: `Scenarios.cs` pins `LoadTestWeapon` with a fixed bullet count and silenced turrets, so the
-  retune cannot move the baselines — but this pass raises ammo lifetimes (Flak 1 → 1.5 s, Acid
-  1.2 → 3 s) and every gun fires for longer because ranges are bigger, so live round counts in real
-  play go up. Run `ammo-spray` and `impact-storm` once
-  (`.tools/scenario.sh ammo-spray --sim --iters 3`, host=sim) and report the median/p99 delta;
-  expect no change in the scenarios themselves, and treat any movement as a signal that something
-  other than data was touched.
-- Playtest loop: `SPACEVORS_DIAGNOSTIC=1` for the per-weapon Shadow copies plus
-  `SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun"` to force the builds worth comparing.
+## 5. Anti-missile fire (shipped 2026-11-02)
 
-## 10. Suggested commit sequence (small, one concern each)
+**What already works.** Dumb ammo shoots enemy rounds down across factions today
+(`CollisionSystem.cs:309-318` candidate rule, `:383-396` apply), and player beams stop on an enemy round and
+damage it (`:542-573`); enemy beams only ever test the player hull, so they pass through a player missile
+(`:428-446`). A shot-down round is destroyed in smoke and **does not detonate** (`:666-684`, "Shot down, not
+detonated") — interception near your own hull is therefore safe, not a way to bring a warhead closer. Enemy
+rounds carry `RoundHealth` 2 (Interceptor's rack) and 3 (HeavyCannon's rack) at `EnemyShipStats.cs:69,81`,
+closing at 165+4·tier and 200+5·tier px/s, capped at 250 px/s, from a rack that fires 0.33 rounds/s in
+salvos of one (`MissileFireRate`, `MissileSalvo`). R22 caps the pressure at **0 / 3 / 4 / 5 / 6 / 7 rounds in
+the air** for composition tiers 3 / 8 / 10 / 14 / 20 (`MissileCapFor`, `:204-210`).
 
-1. Cone scatter for one-pellet weapons + test.
-2. Honest-reach fixes (AcidBubbleSpray lifetime, Flak/MachineGun ammo speeds) + hitscan
-   `ProjectileSpeed` card filter + multi-pellet `FireRate` card label.
-3. `UnlockLevel` on `WeaponType` + level-gated `NewWeaponPool` + offer test.
-4. The range ladder and stat retune (§2, §5), data only.
-5. Rename `PointDefenceTurret` → `InterceptorTurret` with its new stats, new starter loadouts,
-   test updates.
-6. `WeaponBalanceTest` invariants; PLAN.md + ARCHITECTURE.md notes.
+The other anti-missile answer already shipped: the ECM pulse world-wide stuns every enemy round in flight
+(`EcmSystem.cs:42-56`) — bought as a pickup, not as a build. This rule is the *built* counter to the same
+threat, which is why it belongs to the support class and why it should not also get a damage bonus
+(`plans/MISSILES.md:436` already recorded point defence as "role only, no multiplier").
 
-## 11. Open knobs (playtest decides)
+`MissileCapFor`'s own comment is the argument for this whole section: *"Lifting the cap at all is only safe
+because gunfire shoots missiles down."* Until this pass that premise was half-true — a round died if a bullet
+happened to cross it, but nothing ever *aims* at one. `plans/MISSILES.md:445` rejected a round that *hunts*
+enemy rounds because a per-round target search was too expensive; this is not that — it is one extra candidate
+list per support mount per tick, scanned over at most 7 bodies, next to the hull-and-mine scan turrets already
+do. It also finally makes **InterceptorTurret's name** true: pass 1 renamed it away from "PointDefenceTurret"
+precisely because the sim had no anti-missile fire to promise.
 
-- Is the Scout too weak at 17 total DPS with 8 HP, or is that the correct price of a 46 px hull?
-- Does the Heavy at 45 raw DPS feel right against the 784 px engagement ring, or should its free
-  mounts be the place it earns the difference instead?
-- PrismLance BeamSpacing 70 px: does a three-beam fan read clearly at 1350 px, or should the beams
-  visibly diverge instead of staying parallel?
+**What was missing was acquisition, and that is all this changed.** `TurretFiringSystem.FindTarget` (`:247`)
+used to enumerate enemy hulls and mines only (`:296-303`); enemy turrets still look only at the player hull
+(`:305-352`). So the change is a candidate list and a priority, not physics.
 
-## 12. Implementation notes (what the code ended up doing differently)
+**Shipped: every Small non-guided mount screens; kill mounts and racks never do.** Not a per-gun allow-list —
+the class *is* the rule: `WeaponType.InterceptsRounds` (`Size == Small && !Homing`) is copied onto the turret
+when it is mounted or carried, so a chip bolted into a heavy mount screens too and a test reads the rule
+straight off the table.
 
-- **`AutoTarget` is not manual targeting.** Its only read site is `TurretFiringSystem.FindTarget`,
-  where it chooses `FindTargetWithoutPrediction` — the gun still auto-acquires, it just aims where
-  the target is instead of where it will be. So R5's "high damage must be manual-only" could not be
-  written; instead every self-targeting gun was cut to ≤ 4 damage per shot, which is why **LaserLance
-  became 4 damage at 2.4 shots/s** (same 9.6 DPS, and it reads as a fast cutter now) while RailGun
-  alone keeps a big round with prediction off. `AcidBubbleSpray` simply lost the flag, so its bubbles
-  lead their target again. If manual-only snipers are ever wanted, that is a separate behaviour
-  change in `FindTarget`, not a stat.
-- **Two numbers moved to leave slack under the beam cap**: RippleCutter 2.25 → **2** shots/s (8 DPS)
-  and PrismLance 0.75 → **0.7** (8.4 DPS). At the planned values both sat exactly on 0.8 × their
-  band's benchmark, which any later tweak would break.
-- **The identity cell needed a fifth axis.** RailGun and GravitonBurst both sit in (long, fast,
-  volley, Large); the cell only became unique once it also carried pellets-per-shot (single vs 5).
-- **Shadow starts fully booked**, which the old `EveryShipHasAtLeastOneFreeMountForANewWeapon` test
-  forbade. With cargo a booked mount is a free swap, not a dead pick, so the test became
-  `AtMostOneHullStartsFullyBooked` and Shadow is the one specialist that fills its three mounts.
-- **The diagnostics bench now carries every gun** (11 Shadow copies + the load-test spray), which is
-  how each retuned gun gets played in isolation regardless of its tier.
-- **Measured**: the pinned scenarios cannot move (they use `LoadTestWeapon` with silenced turrets) and
-  did not — `ammo-spray` sim median 1.33 ms against 1.31/1.33/1.36 on the previous commit,
-  `impact-storm` 2.14 ms against 2.14–2.19. Live rounds in real play do move: the Heavy's starter set
-  goes from ~52 to ~93 (rate × lifetime), which is the number R7 guards.
-- **Missiles landed with three deviations from plans/MISSILES.md.** (a) The plan drafted its rules as
-  R9-R16, which collided with the slew-rate, hull-size and identity rules already numbered here, so the
-  guided rules are **R15-R22**; the plan file was renumbered to match. (b) The large hull's
-  `GunsAndMissiles` rung reaches ~80 % of its spawns at composition tier 10 rather than the plan's
-  "~100 %", so a bare heavy stays a rare sight instead of vanishing. (c) A rack launch skips the gun
-  pass's ±15 % speed jitter, because on a guided round the speed *is* the turn radius and the fuse
-  reach — jittering it would launch a different missile than the one the player just read. The rest of
-  the launch plumbing (`AmmoSpawnOffset`, hull clearance, inherited velocity, `FiringArc`) is shared
-  with the gun pass rather than copied.
-- **Missiles got a throttle, an arc exemption and a longer body (2026-10-17).** A guided round now leaves at
-  `MissileLaunchFraction` (0.7) of its card speed and builds to it at `MissileLaunchAcceleration`
-  (200 px/s²) — so `AmmoSpeed` means the **top** speed, and the turn radius is tightest the moment the round
-  leaves the rack, which is the end R16 measures at. The card speeds rose with it: SeekerPod 300 → **420**,
-  Swarmlet 350 → **490**, HavocTorpedo 200 → **280** px/s, so a round that used to fly flat now finishes
-  faster than it started. Launch radii 112 / 116 / 250 px and cruise radii 160 / 165 / 357 px all stay
-  outside the ~92 px a tier-10 Interceptor turns at, and the guided round's speed is no longer rolled at all
-  (the ±15 % variation is dumb ammo only), so those radii are facts rather than ranges.
-  Guided mounts are gated by **range only** and do not slew: the round leaves along the hull's nose and
-  guidance picks the lock up from there, which is what a rack graphic already said. The enemy rack keeps its
-  cone and its aim, because a round launched backwards from a 980-1330 px ring cannot cross that ring inside
-  a 6 s fuse — reach honesty (R21) is why the exemption is one-sided. Enemy rounds ramp too (launch = 0.7 ×
-  the tier ladder, ceiling still D3's 250 px/s), and `EnemyShipStats.MissileReachFor` is the ramp-aware
-  distance a fuse actually buys, which is what R21's test asserts. On screen the body draws 7.5 × the
-  collision radius long with a fixed 5 px nose over a 25 px shaft: a torpedo dart measures ~45 px and ~240
-  exact-colour pixels in a live frame, against ~15 px and ~65 before — the round read as a bright dot at the
-  ranges missiles are fired across. Measured: `ammo-spray` 1.31-1.34 ms and `impact-storm` 2.19 ms against
-  1.30 / 2.16 before the change; both scenarios are unarmed, so that spread is this host's noise band and the
-  sim path for them is unchanged.
+Why every support gun qualifies (the maths holds at the nerfed DPS): a round closing at ≤ 250 px/s is
+inside a 900 px support mount for ~3.4 s and inside a 600 px aura for ~2.2 s, and each mount delivers
+2-3 damage early enough to matter — FlakCurtain 8 dmg/s in a 9 px disc with a 0.5 rad cone, InterceptorTurret
+2 per volley at 3/s on a 360°/s mount, Shotgun 3 slugs in a cone with no lead needed, Stiletto 2 damage
+instantly at 1350 px (the best interceptor in the game), FlechetteFan 3 per volley at 2200 px/s,
+AcidBubbleSpray 6 hits/s, RippleCutter 2 per sweep, Cyclotron 1 at 5/s. Against 2-3 hp that is one round
+down inside a second of aimed fire.
 
-## Shipped — first weapon balance pass (verified 2026-10-31)
+Why the kill class stays out of it: a 15-damage RailGun round on a 2 hp body is the overkill waste R5
+already refuses, and a big mount swerving off the hull that is killing you to chase a pebble is a loss the
+player cannot see coming. The split is also legible on screen — fat tracers keep hammering the hull while
+thin ones peel the missile off — which is worth more than a few points of optimised interception.
 
+Priority, three clauses and no more (as implemented):
+1. a hostile guided round **inside the mount's reach and closing** outranks an auto-acquired hull
+   (`MissileDefenceTest.ASupportMountEngagesAClosingRound`);
+2. a round with no closing component is ignored — no shooting at things that are leaving
+   (`ASupportMountIgnoresARoundThatIsLeaving`), and a round the ECM has already stunned is skipped because it
+   is spent (`MissileStunned`): a doomed round is not worth a chip;
+3. a clicked primary target outranks the screen, as it always has, **and hostile rounds are clickable now**
+   (`PrimaryTargetPicker.RoundClickZone` = 26 px — a 4-6 px round is otherwise unclickable; `IsHostileRound`
+   in the live-target check). A click is an order, so this is how a player tells the RailGun to delete a
+   missile even though it will never volunteer (`AHostileRoundCanBeClickedAndAnyMountFiresAtIt`,
+   `AClickedHullOutranksAClosingRound`). Guided mounts stay out entirely: they do not slew, their round leaves
+   along the nose, and a missile cannot re-lock mid-flight (`MissileGuidanceSystem.cs:41-45`).
 
-Plan: plans/WEAPON_BALANCE.md. Every gun now owns one cell of (range band, delivery class, fire rate, pellets per shot, mount size), and the DPS ladder prices delivery: a hitscan beam can never miss on the way, so it buys the least damage.
+The implementation is one helper, not a rewrite: `TurretFiringSystem.FindClosingHostileRound` runs before the
+auto-acquire branch for a mount with `InterceptsRounds`, reusing `EvaluateMovingTarget` (lead) or
+`EvaluateStaticTarget` (a beam) and taking the round's radius from `Ammo.Radius` in `GetTargetRadius`. A
+screened round gets **no `AutoTargetMark`** — a bracket means "the thing you chose", and nobody chose the
+missile. Own-side rounds are filtered on `Ammo.IsEnemy`, so a support mount never empties its chips into its
+own missile (`ASupportMountIgnoresItsOwnRounds`).
 
-Range ladder, base auto-target range in px: **aura 600 → close 900 → mid 1350 → long 1600–1700**, with RailGun the one sniper whose click reach (3× base, capped by its own ammo at 5000 px) really flies 4500 px. The 600 px floor is not taste: enemy guns open fire at `700 + your hull radius`, so a shorter gun cannot answer what is shooting it — the old 220 and 260 px guns sat inside that ring.
+What keeps missiles threatening after this: R22 allows **7** rounds in the air against a hull's 2-4 support
+mounts, so volume overruns the screen; and while a support mount is intercepting, its DPS is not on the
+hull. The Heavy, with four small mounts, becomes the anti-missile hull — which is exactly right for the
+hull that cannot dodge. Raptor (three large mounts, none small) has **no screen at all** until the player
+bolts a support gun into a heavy mount: that is the split working as intended, and an open knob.
 
-Rules the data obeys, each asserted in `WeaponBalanceTest`: the range on a card is crossable by the slowest round that gun fires (`AmmoSpeed × 0.85 × ShotLifetime ≥ Range`); ≤ 12 rounds a second from one mount; a beam stays under 0.8× the slowest projectile gun of its band; a large gun out-DPSes the best small gun of its tier and class by ≥ 25%; tier 2 is ≤ 1.4× tier 1 of its size and must beat it in DPS **or** in reach; at most two guns slew slower than a Balanced hull turns; one gun per identity cell; starter firepower follows hull size (Scout 17 < Fighter 22.5 ≈ Shadow 24 < Heavy 45 raw DPS — a 168 px hull dodges worse than a 92 px one and gets engaged from 784 px instead of 746, so the big ship is allowed to start ahead).
+Enemy side stays asymmetric on purpose: enemy turrets keep targeting only the hull, so they do not swat
+player missiles down — the player *buys* the counter with mount slots and support DPS, while the enemy's
+counters remain R16 (out-turn the lock) and hull hp. Player missiles still die incidentally to enemy fire.
+Revisit only if FarlockSalvo starts feeling free.
 
-Raw DPS (fire rate × pellets × damage). Tier 1: Cyclotron 8 (1600 px, 4200 px/s), RippleCutter 8, InterceptorTurret 9, Shotgun 10.5, MachineGun 12, FlakCurtain 12. Tier 2 (`UnlockLevel: 5`): PrismLance 8.4, LaserLance 9.6 at 1650 px instant, RailGun 14 (1500 / 4500 px), GravitonBurst 16.5, AcidBubbleSpray 12 (900 px cone).
+## 6. Future work — armour: should slow big rounds pay now for pierce they will get later?
 
-- `Scatter` is now the half-angle of the cone a shot pattern covers: several pellets spread evenly across it, a lone pellet rolls randomly inside it (`view.Rng`, seeded). Before that the offset for `PelletCount == 1` was always 0, so Flak Curtain's 0.5 and Acid Bubble's 0.4 did nothing at all.
-- New-weapon cards come from `WeaponType.NewWeaponPoolFor(level)`: tier-1 guns only until the first milestone hand, then the five tier-2 guns as well. `SPACEVORS_DIAG_UPGRADES` ignores tiers — a script is a bench — and so does `ShipType.DiagnosticShips`, which now carries one Shadow copy per gun.
-- Dead and misleading cards fixed: `ProjectileSpeed` is never offered to a hitscan gun (it multiplied `AmmoSpeed 0` by 1.3), and a `FireRate` card on a multi-pellet gun says "+1 shot", which is what `ApplyUpgrade` does, instead of the "+15%" it promised.
-- `PointDefenceTurret` became **InterceptorTurret**: a twin 2-pellet snap at 900 px on the fastest mount in the game (360°/s). "Point defence" promised anti-projectile fire the sim does not have, and the gun was dominated by two others.
-- Starter loadouts: Scout = Cyclotron + InterceptorTurret, Fighter = MachineGun + Shotgun, Shadow = a Ripple Cutter in each of its three mounts, Heavy unchanged (machine gun, two side shotguns, flak disc). Shadow is the only hull that starts fully booked — cargo makes that a free swap, not a dead end — guarded by `AtMostOneHullStartsFullyBooked`.
-- Naming trap found while writing the rules: `AutoTarget: false` (RailGun) turns off **lead prediction**, it does not make a gun manual-only. AcidBubbleSpray's flag is gone, so its bubbles lead their target again.
-- Perf: the scenarios pin `LoadTestWeapon` and silence player turrets, so a balance pass cannot move them — measured anyway: `ammo-spray` sim median 1.33 ms against 1.31/1.33/1.36 on the previous commit, `impact-storm` 2.14 ms against 2.14–2.19. Free. What the scenarios do not see is live round count in real play: the Heavy's starter set goes from ~52 to ~93 live rounds (rate × lifetime) — still two orders under the 10k-object goal, and the number to watch when the next gun is added.
+> **Not implemented, and deliberately not part of pass 2.** There is no armour, pierce, shield or
+> mitigation code anywhere in `src`, and pass 2 changed no stat for it: no gun was nerfed or buffed "for
+> armour". What follows is the answer to hold on to when armour is actually scheduled, plus the invariants to
+> write *then*. The one rule pass 2 did ship out of this section is R30 — a bonus is priced when it ships.
 
+The only armour-shaped card today is `MissileHealth` (`UpgradeStats.cs:29`). The answer to the section's
+question is **no: do not charge the slow gun today, and let the fast gun pay in cards later.**
 
-### Follow-up note (2026-10-31)
+The mechanic decides it. With flat per-hit subtraction, `max(1, damage − (armour − pierce))`, armour is a
+**tax on the support class and a bonus for the kill class**: a 15-damage RailGun round barely notices
+armour 3, while a 1-damage chip is floored to 1 and loses two thirds of its DPS. The slow big round has
+already been charged twice for its size — once in the DPS ladder, where a fat round is never the top of its
+band (RailGun's 15 sits under GravitonBurst's 16.5), and once in overkill waste (R5: mines are 2 hp, the
+smallest hull 5). Charging it a third time for a bonus that does not exist yet would be a nerf with no
+mechanic behind it, and R10's whole lesson is that a card, a stat or a penalty must never be a lie.
 
-ScatterCannon (tier-1 Large, 3 slugs x 2 dmg, range 1000) landed with the Eagle hull; details in plans/SHIP_TYPES.md. It fills the (close, slow, burst, 3-pellet, Large) identity cell.
+What to do instead, in the order the work will land:
 
-## Follow-up (2026-10-31): audit of this plan against code
+1. **Armour as flat subtraction per hit, with a floor of 1 damage.** A floor keeps a support gun useful
+   instead of zeroed, and it keeps the arithmetic readable on screen.
+2. **`ArmorPierce` priced as a `Damage` card** — `Additive: 1`, the same shape as `UpgradeStats.cs:21`.
+   Against armour, +1 pierce ≈ +1 damage; against unarmoured hulls it is worth nothing. That is the right
+   shape for a situational card: same slot cost, zero early value, and no multiplier to compound.
+3. **The fast gun pays in card slots, not in base DPS.** Its advantage (chips land on small, moving,
+   dodgeable bodies and waste nothing) is already taxed by R1/R2/R15, and armour taxes it again — and the
+   way it buys out of that tax is by spending hand slots on pierce. That is the price for "hits small
+   targets easily", and it is paid where the player can see it.
+4. **Magnitude guidance:** armour should stay under the damage a kill round lands, so the kill class always
+   puts something through — with kill rounds at 2-4 damage per shot early on that means **armour 1-2**, and
+   4-5 by tier 10 once `Damage` cards have stacked (a maxed MachineGun lands 8 per hit). ScatterCannon's
+   2-damage slugs are the edge case: at armour 2 they floor to 1 each, and its answer is that it fires three
+   of them per volley, which is the point of a support-class number on a kill gun.
+5. **The support class's answer to armour should be a job, not a bigger round: corrosion.** AcidBubbleSpray
+   is already an area gun whose 1 damage is symbolic; making its cone *strip* armour per hit gives support a
+   role armour cannot tax, which is how "small = support" survives the update instead of becoming dead
+   weight. Forward-looking only — no stat change in this pass.
 
-Still true and still enforced: the rule set is asserted as pure data — reach honesty
-(`CardRangeIsReachableByTheSlowestAmmoItFires`), the ≤12 rounds/s round-rate budget, the beam band
-(0.8×), large guns earning their mount (≥1.25×), tier 2 ≤ 1.4× tier 1, at most two guns slewing slower
-than a Balanced hull turns (1.33 rad/s = 76 °/s; only RailGun 55 °/s and PrismLance 70 °/s do,
-InterceptorTurret at 360 °/s on top), one gun per identity cell, starter firepower by hull size —
-`Tests/WeaponBalanceTest.cs:27-227`; the range ladder (600 / 900 / 1350 / 1600-1700, RailGun 1500 with
-`TargetedRangeMultiplier = 3` at `TurretFiringSystem.cs:29`); `AutoTarget: false` meaning
-lead-prediction-off (`:293`); the milestone hand (interval 5, 5 choices, ≤3 new-weapon cards, tier-gated
-pool — `LevelUpSystem.cs:8-12`); and R15-R22 for the guided trio under the exact cited names
-(`WeaponBalanceTest.cs:59,72,93,116`, `LevelUpSlotOfferTest.cs:118`, `EnemyMissileLadderTest.cs`).
+Invariants to assert the day armour ships (write them then, not now): (a) the kill class's DPS ordering
+does not invert by more than ~15% at the tier's armour; (b) every support gun still does ≥ 1 damage per
+hit; (c) a support gun holding every pierce card it can buy still does not cross the class line (R25) —
+pierce returns a chip toward its unarmoured DPS, never above it.
 
-**Anchors that drifted — do not quote them as current:**
+## 7. Verification
 
-- Weapon count: **15 real weapons + `LoadTestWeapon`**, not 11 (`Stats/WeaponStats.cs:164`), so the
-  identity matrix in §4 is incomplete: it omits SeekerPod, Swarmlet and HavocTorpedo even though R13
-  (`NoTwoGunsShareAnIdentityCell`) iterates all 15 (`WeaponBalanceTest.cs:199`).
-- The enemy engagement ring is per-hull now: 700 for Default/Interceptor/HeavyCannon, **520 Streak**,
-  **640 Carmine**, each drifting per tier and capped by `MaxFiringRange = 1000`
-  (`Stats/EnemyShipStats.cs:55-95,136-141`). "700 + your hull radius → 746/784" only holds at tier 0
-  and for those three hulls. Ammo speed likewise drifts up to `MaxAmmoSpeed = 250`, not 160-200.
-- Enemy hp tiers (R5/R11 "7 / 15 / 30") ignore the two new hulls: Streak **5 hp**, Carmine **22 hp**
-  (`:87,95`).
-- R12's ladder and `StarterFirepowerFollowsHullSize` still only read the original four hulls
-  (`WeaponBalanceTest.cs:214-227`) while `ShipType.All` has eight, radii 46/58/66/74/74/78/84
-  (`PlayerShipStats.cs:110-180`) — the guard is narrower than the roster.
-- MachineGun shipped at **FireRate 4 / Damage 3**, not "8 → 6 / 1 → 2" (`WeaponStats.cs:100`); DPS 12
-  is unchanged, so the ladder text stands but the knob history does not.
-- The level-5 pool is **seven** tier-2 guns (SeekerPod and Swarmlet unlock at 5 too), HavocTorpedo at
-  10 (`:149-159,168`); the bench is **15** Shadow copies + the load-test spray
-  (`PlayerShipStats.cs:188-205`).
-- RippleCutter's identity row says 32 px wide; it is **16 px** since c364664 (`WeaponStats.cs:132`).
-  Heavy's side mounts are offset 30 px, not 31 (`Stats/TurretLayout.cs:107-108`).
-- **§8 "No anti-projectile mechanic" is no longer true.** Since 38ec8ee the sim shoots guided rounds
-  down: round-vs-missile (`CollisionSystem.cs:309-368`) and beam-vs-missile (`:519-533`), cross-faction
-  only. Bullet-vs-bullet is still absent, as designed — that is the sentence worth keeping.
+Rules asserted on the table, all in `WeaponBalanceTest` unless stated: R1 `BeamGunDpsStaysUnderItsOwnBand`,
+R3 `LargeGunsEarnTheirMountWithDamage`, R4 `TierTwoIsSlightlyStrongerNotTwiceAsStrong`,
+R5 `OnlyTwoGunsMayCarryABigRound` (RailGun 15, HavocTorpedo 10), R6 card reach, R7 round-rate budget,
+R9 slew floor, R12 `StarterFirepowerFollowsHullSize`, R13 identity cells,
+R15 `GuidedGunDpsStaysUnderItsOwnBand` (**class-anchored**: a guided round is priced against the cheapest
+non-guided gun *of its own mount class*), R16 turn radius, R17 guided budget, R18/R19 card privileges,
+R23 one gun per type, and pass 2's `SupportGunsStayInsideTheirClassEnvelope` (R24),
+`KillGunsHoldTheTopOfTheTable` (R25), `NoSupportGunReachesTheLongBand` (R26), `SupportGunsFireChips` (R27),
+`OnlySupportGunsAreMissileDefence` (R28's data half), `StarterLoadoutsKillMostlyFromTheirKillGuns` (R31).
 
-**A real gap, not just stale text:** §9 says `WeaponBalanceTest` asserts R5 (auto-target guns ≤ 4 damage
-per pellet). **No such assertion exists** anywhere in `src/Tests` — RailGun at 14 and HavocTorpedo at 10
-are unguarded. Either write the assertion or drop the claim from §9.
+Behaviour, in `MissileDefenceTest` (R28) and `LevelUpSlotOfferTest` (R29): a support mount engages a closing
+round and ignores a leaving one, its own rounds, and rounds beyond its reach; a kill mount never volunteers;
+a clicked hull outranks the screen; a hostile round is clickable and any mount fires at a clicked round; a
+player round is not clickable; the clicked-reach premium is kill-class only; the `Damage` upgrade card is
+never dealt to a support gun while the same hand still deals it to the kill gun beside it; a chip at the range
+roof gets no `Range` card and a chip below it still does.
 
-**Open items re-checked:** all three §11 knobs are still genuinely open (Scout 17 DPS on 8 hp —
-Cyclotron 8 + InterceptorTurret 9, `PlayerShipStats.cs:51,53`; Heavy 45 DPS across four mounts,
-`WeaponStats.cs:202-207`; PrismLance still 70 px parallel beams, `:129` + `TurretFiringSystem.cs:505-509`).
-Still unimplemented from §8: mine hp scaling (both sizes fixed at 2 hp with an explicit "tiers do not
-apply" comment, `Stats/MineStats.cs:25-28`) and viewport-gated auto-fire (no viewport check in
-`TurretFiringSystem`/`PrimaryTargetPicker`). §8's "prefer weapons that fit a free mount" was resolved
-differently — cargo shipped instead (`Components/GameplayComponents.cs:16`).
+Existing tests that read the live table and had to be checked, all green: `ShipRosterTest`,
+`EnemyDifficultyTest` (the 7 s budget is what forced the Scout's main gun; the 1350 px mid-band and
+fastest-enemy-ammo assertions are untouched), `EnemyMissileLadderTest` (its longest-player-gun anchor is
+GravitonBurst 1700, unmoved by Cyclotron dropping to 1350), `LevelUpSlotOfferTest`/`RerollOfferTest`
+(Swarmlet's pellets). Tests that build their own `WeaponStats` — `ThreatMeterTest`, `AimLeadTest`,
+`CollisionSystemTest`, `DeathLevelUpTest`, `LaserTest`'s synthetic hitscan turret — cannot be moved by a
+table retune.
 
-## Follow-up (2026-11-02): R1's benchmark is the weakest of the band's slowest-round guns
+Still uncovered, and adjacent to this pass: the `MissileHealth` card and its 3-hp ceiling, missile-vs-missile
+collisions (they work, nothing tests them), and no scenario exercises the screen — every perf scenario
+silences the player's turrets (`WeaponFires: false`), so interception has never been measured at volume. If
+the screen ever needs measuring, seed a scenario with enemy rounds *and* player support mounts firing.
 
-`BeamGunDpsStaysUnderItsOwnBand` picked the peer with the lowest `AmmoSpeed` and, on ties, kept
-whichever came first in `WeaponType.All`. Three close-band guns all throw 400 px/s rounds, so the
-close-band beam cap was priced against **ScatterCannon** (18 DPS → 14.4) rather than **Shotgun**
-(10.5 → 8.4) for no reason but table order. The test now takes the **weakest DPS among the guns
-sharing the band's slowest ammo speed**: the close-band cap is 8.4, and reordering the weapon table
-cannot move any cap. No weapon data changed — the close band has no beam today, so the stricter
-reading costs nothing now and only constrains the `close × hitscan` gun someone adds later
-(526 tests pass; the change is inside a pure-data test, so no scenario needed re-measuring).
+Perf: the scenarios pin `LoadTestWeapon` and silence player turrets (`WeaponFires: false`), so a data retune
+cannot move them; the interception pass costs one extra candidate list per *support* mount per tick, and no
+scenario mounts one. The paired same-host A/B against HEAD is recorded under `## Shipped`, not against an old
+row — this host drifts by 40% between hours.
+What the scenarios do not see is live round count in real play, and there the support class went **down**:
+FlakCurtain 18 → 12, Shotgun 31.5 → 22.5, AcidBubbleSpray 36 → 18, InterceptorTurret 27 → 18,
+Cyclotron 4.8 → 3.0. The Heavy's shipped four guns sit at ~74 (MachineGun 12 + ScatterCannon 27 + Shotgun 22.5
++ FlakCurtain 12) — up from 65, because ScatterCannon carries the biggest live-round number on any mount in the
+game, and it is now bolted into a heavy mount. R7 is a per-mount budget so nothing breaks, but the Heavy is the
+hull to watch on that metric. Interception adds extra fire only at composition tier 3+, bounded by R22's ≤ 7
+hostile rounds.
+Playtest loop: `SPACEVORS_DIAGNOSTIC=1` gives one Shadow copy per gun;
+`SPACEVORS_DIAG_UPGRADES="MachineGun,Damage:MachineGun,FireRate:FlakCurtain"` puts a kill build next to a
+support build; a rack-carrying HeavyCannon from composition tier 8 is the interception bench.
 
-What R1 still deliberately does *not* claim, written down so a later pass does not "fix" it:
+## Shipped (2026-11-02): pass 2 — the kill/support class split
 
-- **The benchmark is the slowest-round peer, not the weakest peer in the band.** A beam is taxed
-  against the gun whose round is most likely never to arrive, not against everything in the band. So
-  adding SiegeSalvo (planned: mid, 400 px/s, 16.8 DPS — `plans/WEAPON_IDENTITY_CELLS.md`) lifts the
-  mid-band cap from 9.6 to 13.44, which would let a mid-band beam out-DPS MachineGun's 12.
-- The stricter alternative — cap against the weakest travelling peer *whatever* its ammo speed — is
-  not available. It puts the long-band cap at 0.8 × Cyclotron's 8 = 6.4, under LaserLance's 9.6,
-  because Cyclotron is the cheapest delivery in the game and R2 prices it to the floor on purpose.
+Landed in one pass, suite green at 547 tests:
 
-`GuidedGunDpsStaysUnderItsOwnBand` (R15) needed no change: it already takes the *cheapest* peer, so
-it never depended on table order.
+- **Weapon table** (`WeaponStats.cs`). Support: FlakCurtain 12→8, Shotgun 10.5→7.5, AcidBubbleSpray 12→6,
+  InterceptorTurret 9→6, RippleCutter 8→6 and Stiletto 8→6 (both now 2-damage chips), Cyclotron 8→5 and out of
+  the long band (1600→1350), SeekerPod 3 dmg @ 1.2/s → 2 dmg @ 1.8/s at the same 3.6 DPS. Kill, where a rule
+  left legal room: RailGun 14→15, PrismLance 8.4→10.8, LaserLance 9.6→10.4. MachineGun held at 12 (§9).
+- **Class helpers**: `WeaponType.SupportRangeCeiling` (1350), `IsSupport`, `InterceptsRounds`; the `Turret`
+  component carries `IsSupport`/`InterceptsRounds`, copied by `TurretMount.CarriedTurret`, so the class travels
+  through cargo and remounting. Enemy turrets default to the kill class, which keeps them out of the screen.
+- **R15 re-anchored to the gun's own class** in `GuidedGunDpsStaysUnderItsOwnBand`. Without it the Cyclotron
+  nerf dropped the mid band's cheapest-*anything* to 5 DPS and pushed HavocTorpedo out of a ceiling it had
+  never earned — the same chained tax that bit Stiletto in pass 1, closed.
+- **Loadouts**: the Scout starts `WeaponLoadout.MachineGunRepeater` (MachineGun + InterceptorTurret, 18 DPS,
+  5.8 s on a tier-10 HeavyCannon); `CyclotronRepeater` was deleted, not rewritten, because the Manta already
+  used the repeater loadout. The Heavy puts ScatterCannon in `heavy_left` and drops FlechetteFan
+  (40.5 → 45.5 DPS). Hull descriptions follow.
+- **R28 interception**: `TurretFiringSystem.FindClosingHostileRound` before the auto-acquire branch,
+  `PrimaryTargetPicker.RoundClickZone` (26 px) and `IsHostileRound` in the live-target check, `Ammo.Radius` in
+  `GetTargetRadius`, no `AutoTargetMark` on a screened round.
+- **R29 card filters** in `UpgradeOffer`: no `Damage` upgrade card for `IsSupport` guns, no `Range` card once
+  the next one would pass the class roof.
+- **Tests**: six rule tests in `WeaponBalanceTest`, nine behaviour tests in the new `MissileDefenceTest`, two
+  offer tests in `LevelUpSlotOfferTest`.
 
-## Follow-up (2026-11-02): R23 and four new guns landed
+Deviations from the plan, all small:
 
-The identity-cell pass shipped — **R23** plus four guns, with the two duplicate starting loadouts
-re-armed. The design reasoning and the full numbers are in `plans/WEAPON_IDENTITY_CELLS.md`
-(`Status: shipped`); this is the rule-side summary.
+- **R31 became a loadout rule, not a TTK ratio.** The planned wording (a support mount takes ≥ 1.25× as long
+  as a kill mount) is R25's step inverted, so it would have asserted the same arithmetic twice. What is
+  asserted instead is what the doctrine is about: in every starter loadout the kill mounts out-DPS the screens
+  by ≥ 1.25× — Fighter and Raptor at 1.60, Heavy 1.94, Scout 2.0, Falcon 1.00 of nothing to share.
+- **No `CanExtendRange` helper.** The roof check is one comparison in `UpgradeOffer`'s loop and that loop is
+  its only reader; a property would have been a rule with one caller.
+- **The `Damage` filter skips new-weapon cards.** They reuse `UpgradeOption.Damage` with `IsNewWeapon` set, so
+  R29 withdraws only *upgrade* cards — a fresh support gun may still arrive on a card, it just never gets a
+  Damage upgrade afterwards.
+- **ECM-stunned rounds are not screened**: `EcmSystem` already detonates them harmlessly, so a chip spent on
+  one is a chip wasted.
+- **The enemy side still does not intercept player missiles** — the asymmetry §5 documents. Player missiles
+  keep relying on R16 (out-turn the lock) and hull hp.
+- **Armour was left alone entirely** (§6 is future work), as instructed. No stat, card or rule in this pass
+  mentions armour-pierce; R30 exists to keep it that way.
 
-- **R23 — the ship holds at most one gun of each type, mounted or in cargo.** The upgrade hand already
-  refused to name an owned gun (`UpgradeOffer.Roll`'s `ownedNames`, both halves tested). What was added
-  is `TurretMount.AlreadyAboard` and the mount screen's refusal of a fresh second copy, which is what
-  makes the rule true for a scripted bench hand too. Why it is a balance rule and not tidiness:
-  `GameSession.ApplyUpgrade` applies a weapon card to **every** turret of that name, so a duplicate
-  doubled the value of every card that gun was offered. The assertion is
-  `ShipRosterTest.NoHullStartsWithTwoOfTheSameWeaponType`.
-- **The table went 15 → 19 guns**: **FlechetteFan** (close, fast, burst, 3 pellets, S, 6.0 DPS),
-  **Stiletto** (mid, hitscan, burst, single, S, 8.0), **SiegeSalvo** (mid, slow, volley, 3 pellets, L,
-  16.8), **FarlockSalvo** (long, guided, volley, 2 pellets, L, 5.4). `Swarmlet`'s rate went 0.8 → 0.7
-  (4.8 → 4.2 DPS) so the tier-2 guided *large* guns have a legal home between R3's floor (5.25) and
-  R15's cap. Bar `aura × fast`, `aura × medium`, `close × hitscan`, `mid × fast`, `long × medium` and
-  `long × slow`, every band × delivery intersection is now filled.
-- **R15 counts beams as peers.** The test filters out *homing* guns only, so a missile is priced
-  against the cheapest anything in its band — including a beam that R1 has already taxed. That chained
-  tax bites, and it is what set Stiletto's price: a mid-band beam below 7.5 DPS would have pushed
-  HavocTorpedo's 6 DPS under its ceiling (it did exactly that at 7.2, and the test said so). Stiletto
-  sits at 8.0 — above that line, and under PrismLance's 8.4 so the large mount still buys more. Expect
-  this test to move a band's missile budget first whenever a cheap gun joins a band that has one.
-- **Caps after the pass.** Beam: aura 9.6 (FlakCurtain 12), close 8.4 (Shotgun 10.5 — the weakest of
-  the three 400 px/s guns, per the follow-up above), mid 13.44 (SiegeSalvo 16.8), long 11.2 (RailGun 14).
-  Guided: SeekerPod 4.8 (FlechetteFan is the close band's cheapest gun now), Swarmlet 6.4 (RippleCutter),
-  HavocTorpedo 6.4 (Stiletto), FarlockSalvo 6.4 (Cyclotron).
-- **R5 is finally asserted**, closing the gap §9 claimed and §12 admitted: `OnlyTwoGunsMayCarryABigRound`
-  holds per-shot damage at 4, with RailGun (14) and HavocTorpedo (10) named as the only licences.
-- **Starter firepower** (R12): Scout 17 < Manta 21 ≈ Fighter 22.5 ≈ Raptor 22.5 < Shadow 26 < Eagle 27 <
-  Heavy 40.5, and no hull starts with every mount filled — Shadow gave its third gun up to R23 rather
-  than out-gun the bigger Eagle.
+**Perf verdict (2026-11-02, host=sim, `--iters 3`, paired same-host A/B against a HEAD worktree):** this
+change costs nothing measurable — keep. missile-384: 3.09 / 3.64 ms median on this tree against 3.27 / 3.13 ms
+on HEAD; ammo-spray: 2.49 / 3.00 against 2.52 / 2.19; impact-storm: 2.25 / 3.29 against 3.30 / 3.65. The
+round-to-round spread on one tree (2.49 vs 3.00, a 20% swing) is larger than any gap between the trees, so the
+difference is host drift, not code. Note honestly what the scenarios cannot see: none of them mounts a support
+gun (they pin `LoadTestWeapon` and set `WeaponFires: false`), so `FindClosingHostileRound` never runs there —
+the screen's cost is *unmeasured*, not proven zero. §7 says what to seed if it ever needs measuring.
+
+Playtest follow-ups worth doing before the next pass: watch whether the screen makes composition tier 8+
+feel fair (the screen is meant to thin a volley, not cancel it), and whether a support-only build now feels
+hopeless rather than specialised.
+
+## 8. Open knobs
+
+- **MachineGun cannot rise above 12 without dragging RailGun up**: R4's floor is 1.15 × a tier-1 peer, so at
+  MachineGun 13.5 RailGun needs ≥ 15.5. If kill power needs to grow, grow ScatterCannon, SiegeSalvo or
+  GravitonBurst — no rule blocks them. The class floor (R25) is set by LaserLance at 10.4, not by MachineGun.
+- **RippleCutter sits 6% under its R1 cap** (6 against FlakCurtain's 6.4 benchmark). If FlakCurtain is ever
+  nerfed below 7.5 DPS, the cutter has to fall to 5.
+- Shadow and Eagle both start at 24 DPS; the Eagle's edge is 16 hp and a full aft arc rather than firepower.
+  Deliberate, or does the Eagle want a third gun?
+- Raptor has no small mount and therefore no missile screen. Accept it as the broadside hull's price, or
+  give it a small mount in a layout pass.
+- The screen is **always on** — a support mount with a closing round on it takes no order. A key or handoff
+  that lets a player stop the screen eating their chip DPS during a hull fight is still unexplored: it is one
+  `Turret` flag and one control in the mount screen. The default is right because a support mount that is not
+  chipping a hull is nearly free anyway, and a missile that lands is not.
+- Five `FireRate` cards are ×2.01, which lifts FlakCurtain (8 → 16 DPS) above the kill class's floor of 10.4.
+  R29 blocks the `Damage` card but not the rate; whether support growth should be capped as well is a playtest
+  question, and a capped rate card on support guns is the blunt answer.
+- Mine hp is still 2 and never scales, and pass 2 makes kill rounds fatter: a 15-damage RailGun slug on a
+  2 hp mine wastes more than it did. Scaling mine hp with the tier curve is the fix, or accept snipers as
+  anti-ship tools only.

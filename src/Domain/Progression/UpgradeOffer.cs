@@ -10,8 +10,9 @@ namespace Spacevors.Domain.Systems;
 // re-deal that re-implemented the pool would drift the first time an offer rule was fixed, so a reroll
 // cannot invent a card a level-up would have withdrawn — no card naming a cargo gun, no projectile-speed
 // card on a hitscan beam, no "+1 shot" past the guided volley budget (R17/R18), no missile-health card
-// past its ceiling (R19), no weapon the ship already owns, at most three new-weapon cards in a milestone
-// hand. Balance rules R6/R10/R18/R19 all say a card must never be a lie; that applies to a re-deal too.
+// past its ceiling (R19), no damage card on a support gun and no range card past a support gun's class
+// roof (R29), no weapon the ship already owns, at most three new-weapon cards in a milestone
+// hand. Balance rules R6/R10/R18/R19/R29 all say a card must never be a lie; that applies to a re-deal too.
 public static class UpgradeOffer
 {
     const int HandSize = 5;
@@ -49,14 +50,19 @@ public static class UpgradeOffer
         {
             allOptions.AddRange(NewWeaponOptions(ownedNames, level, view.Rng));
 
-            foreach (var weapon in weaponNames)
-                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Damage));
+            // R29: `Damage` is a kill-gun card. It is a flat +1 (`UpgradeStats.cs:21`), so on a 1-damage
+            // support chip it behaves as a multiplier — one card would lift a support mount over the class
+            // line the weapon table just drew, and R10's "+15-35%" guidance would be broken in the one
+            // place it matters. A support gun buys growth with rate and reach instead.
+            foreach (var turret in turrets.Where(t => !t.IsSupport))
+                allOptions.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Damage));
         }
         else
         {
             foreach (var weapon in weaponNames)
             {
-                var stats = turrets.First(t => t.WeaponName == weapon).Weapon;
+                var mounted = turrets.First(t => t.WeaponName == weapon);
+                var stats = mounted.Weapon;
 
                 // R18: a guided volley that has reached its round budget (R17) would be offered a
                 // "+1 shot" card it cannot honour, so the card is withdrawn and the gun keeps the
@@ -74,7 +80,12 @@ public static class UpgradeOffer
                 if (stats.CanToughenRound)
                     allOptions.Add(new UpgradableOption(weapon, UpgradeOption.MissileHealth));
 
-                allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
+                // R29: a support gun stops at its class roof (R24/R26). The Range card stretches the shot's
+                // lifetime as well as its range, so withdrawing it at the roof caps the chip's live rounds
+                // too — which is the same reason the card is withdrawn at R18/R19: never a card the rules
+                // would refuse to honour.
+                if (!mounted.IsSupport || mounted.Range * UpgradeDefinition.Range.Multiplier <= WeaponType.SupportRangeCeiling)
+                    allOptions.Add(new UpgradableOption(weapon, UpgradeOption.Range));
             }
 
             allOptions.Add(new UpgradableOption("", UpgradeOption.PickupRadius));

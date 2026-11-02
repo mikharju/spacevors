@@ -555,3 +555,19 @@ beam never touched, and never looked at whether the beam itself had been consume
 - Perf: the added lookup runs only for missile candidates inside a beam's box, and no scenario seeds
   beams. A/B on `missile-384 --sim --iters 3`: 2.56 ms median with the fix, 2.88 ms without it — the
   host's own run-to-run spread is larger than the change, so this costs nothing measurable.
+
+## Follow-up (2026-11-02): weapon balance pass 2 touched two things here
+
+- **R15 is now class-anchored.** A guided round is priced against the cheapest non-guided gun **of its own
+  mount class**, not the cheapest *anything* in its range band (`WeaponBalanceTest.GuidedGunDpsStaysUnderItsOwnBand`).
+  The old version chained: nerfing a support chip re-priced every missile in that band. Pass 2's support nerfs
+  would have pushed HavocTorpedo out of a ceiling it never earned. Ceilings after the pass: SeekerPod 3.6 ≤ 4.8,
+  Swarmlet 4.2 ≤ 4.8, HavocTorpedo 6 ≤ 8.64, FarlockSalvo 5.4 ≤ 8.32. SeekerPod also repriced to a chip —
+  **2 damage at 1.8/s**, the same 3.6 DPS (R27 caps a support shot at 2 damage).
+- **Gunfire now *acquires* a hostile guided round** (R28 in `plans/WEAPON_BALANCE.md`): every Small non-guided
+  mount screens a closing round ahead of any hull, kill mounts and racks never volunteer (a clicked round is an
+  order, so they can be told to). This is what makes R22's comment true — *"lifting the cap is only safe because
+  gunfire shoots missiles down"* — and it stays role-only, no damage multiplier, as §15 decided. A shot-down
+  round still does not detonate. The enemy side still does not intercept player missiles.
+- Correction to the 2026-10-31 number audit above: "player guided rounds are all 1 hp" is stale — FarlockSalvo
+  ships `MissileHealth: 2` (`Stats/WeaponStats.cs`). Enemy racks remain 2 (Interceptor) and 3 (HeavyCannon).
