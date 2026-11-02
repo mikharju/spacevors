@@ -5,3 +5,5 @@
 .tools/scenario.sh hull-damage     --iters 5 --check-baseline --update-baseline
 .tools/scenario.sh missile-384     --iters 5 --check-baseline --update-baseline
 .tools/scenario.sh missile-1024    --iters 5 --check-baseline --update-baseline
+.tools/ceiling.sh
+.tools/ceiling.sh --window

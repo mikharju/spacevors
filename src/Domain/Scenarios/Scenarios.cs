@@ -42,7 +42,10 @@ public sealed record ScenarioSpec(
     // Guided rounds seeded by ScenarioWorld (plans/MISSILE_PERF.md): half enemy-guided down the
     // ammo corridor, half player-guided on armed hulls that shoot back. 0 leaves the world unarmed.
     int MissileCount = 0,
-    int Seed = EntityManager.DefaultRngSeed);
+    int Seed = EntityManager.DefaultRngSeed,
+    // A world grown to this many entities on the pinned CeilingMix ratio (plans/CEILING_TEST.md),
+    // used by the ceiling probe. 0 leaves the world as the named scenario built it.
+    int CeilingCount = 0);
 
 // Steady-state particle counts for the impact area, in entities.
 public sealed record SeededEffects(int Sparks, int Explosions);

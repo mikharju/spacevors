@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
@@ -20,6 +21,13 @@ public static class SpaceVorsApp
     const string ScenarioHoldEnvVar = "SPACEVORS_SCENARIO_HOLD";
     const double DefaultHoldSeconds = 3.0;
 
+    // Ceiling probe seam (plans/CEILING_TEST.md): SPACEVORS_CEILING=<budgetMs> searches for the largest
+    // world that still fits that budget in this window; _START and _MAX bound the search. The budget is
+    // parsed invariantly because it is a machine-written number, not a locale-dependent one.
+    const string CeilingEnvVar = "SPACEVORS_CEILING";
+    const string CeilingStartEnvVar = "SPACEVORS_CEILING_START";
+    const string CeilingMaxEnvVar = "SPACEVORS_CEILING_MAX";
+
     public static void Main()
     {
         Raylib.SetConfigFlags(ConfigFlags.ResizableWindow);
@@ -28,7 +36,9 @@ public static class SpaceVorsApp
         ImageLoader.LoadAssets();
         Lighting.Init();
 
-        if (TryScenarioFromEnvironment(out var scenario))
+        if (TryCeilingFromEnvironment(out double ceilingBudgetMs, out int ceilingStart, out int ceilingMax))
+            RunCeiling(ceilingBudgetMs, ceilingStart, ceilingMax);
+        else if (TryScenarioFromEnvironment(out var scenario))
             RunScenario(scenario!);
         else
             RunNormalPlay();
@@ -91,6 +101,89 @@ public static class SpaceVorsApp
             session.Update();
         }
     }
+
+    // The window half of the ceiling probe (plans/CEILING_TEST.md): the same search the headless bench
+    // runs, but every measurement is a real frame with the renderer in it, so the number includes the
+    // draw path. The window opens once and each probe swaps in a fresh world - that is what keeps the
+    // search in seconds, because paying process startup once per probe the way the scenario harness pays
+    // it per iteration would dominate the whole run.
+    private static void RunCeiling(double budgetMs, int startCount, int maxCount)
+    {
+        // Uncapped: a cap sleeps inside EndDraw, which would hide the very cost being searched for.
+        Raylib.SetTargetFPS(0);
+        var clock = Stopwatch.StartNew();
+        _probes = 0;
+
+        // One throwaway world, unreported: the first frames of a fresh process pay shader compilation
+        // and the first texture uploads - the black screen before frame 1 - and would otherwise read as
+        // the cost of the smallest probe.
+        MeasureProbe(budgetMs, startCount);
+
+        Console.WriteLine($"[CEIL-BEGIN] host=window mix={CeilingMix.Version} budgetMs={budgetMs:F2} " +
+                          $"playableBudgetMs={budgetMs * CeilingProbe.PlayableBudgetFraction:F2} maxCount={maxCount}");
+
+        CeilingBracket full = Probe(budgetMs, startCount, maxCount);
+        CeilingBracket playable = Probe(budgetMs * CeilingProbe.PlayableBudgetFraction, startCount, maxCount);
+
+        Console.WriteLine($"[CEIL-END] host=window mix={CeilingMix.Version} seconds={clock.Elapsed.TotalSeconds:F1} probes={_probes}");
+        Console.WriteLine(CeilingProbe.Headline("window", CeilingMix.Version, "frame", budgetMs, full));
+        Console.WriteLine(CeilingProbe.Headline("window", CeilingMix.Version, "playable",
+            budgetMs * CeilingProbe.PlayableBudgetFraction, playable));
+    }
+
+    private static CeilingBracket Probe(double budgetMs, int startCount, int maxCount) => CeilingProbe.Search(
+        count => MeasureProbe(budgetMs, count), budgetMs, startCount, maxCount, CeilingProbe.Resolution,
+        sample => { _probes++; Console.WriteLine(CeilingProbe.Row(sample)); });
+
+    private static CeilingSample MeasureProbe(double budgetMs, int count)
+    {
+        ScenarioSpec spec = CeilingSpec(count);
+        var session = new GameSession(spec.Ship, spec);
+
+        int gen2Before = GC.CollectionCount(2);
+        while (!Raylib.WindowShouldClose() && !session.ScenarioFinished) session.Update();
+
+        double[] frames = DropWarmup(session.ScenarioFrameMs);
+        if (frames.Length == 0) return new CeilingSample(count, 0, 0, 0, 0, 0, Pass: false);
+
+        double median = CeilingProbe.Median(frames);
+        int live = (int)Math.Round(session.ScenarioLiveEntities.Skip(CeilingProbe.WarmupFrames).DefaultIfEmpty(0).Average());
+
+        return new CeilingSample(count, Math.Round(median, 3), Math.Round(frames.Average(), 3), Math.Round(frames[^1], 3),
+            live, GC.CollectionCount(2) - gen2Before, median <= budgetMs);
+    }
+
+    // The probe borrows baseline-idle, which seeds no volley of its own, and swaps in the pinned ceiling
+    // mix. ExpectedOverBudget because the search deliberately walks past the budget to bracket it.
+    private static ScenarioSpec CeilingSpec(int count) =>
+        Scenarios.Find("baseline-idle")! with
+        {
+            Name = $"ceiling-{count}",
+            CeilingCount = count,
+            MeasureTicks = CeilingProbe.WarmupFrames + CeilingProbe.MeasuredFrames,
+            ExpectedOverBudget = true,
+        };
+
+    // The first frames of a probe belong to the world build; the sim host drops the same number.
+    private static double[] DropWarmup(IReadOnlyList<double> frames) =>
+        frames.Count > CeilingProbe.WarmupFrames
+            ? frames.Skip(CeilingProbe.WarmupFrames).ToArray()
+            : frames.ToArray();
+
+    private static bool TryCeilingFromEnvironment(out double budgetMs, out int startCount, out int maxCount)
+    {
+        budgetMs = 0; startCount = 0; maxCount = 0;
+        string value = Environment.GetEnvironmentVariable(CeilingEnvVar) ?? "";
+
+        if (!double.TryParse(value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out budgetMs) || budgetMs <= 0) return false;
+
+        startCount = ReadIntEnv(CeilingStartEnvVar, CeilingProbe.StartCount);
+        maxCount = ReadIntEnv(CeilingMaxEnvVar, CeilingProbe.MaxCount);
+        return true;
+    }
+
+    private static int _probes;
 
     private static bool TryScenarioFromEnvironment(out ScenarioSpec? scenario)
     {

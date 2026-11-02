@@ -41,7 +41,131 @@ public static class ScenarioWorld
 
         if (spec.MissileCount > 0)
             SeedMissileWorld(em, playerEntity, playerPos, spec.MissileCount, spec.AimDirection);
+
+        if (spec.CeilingCount > 0)
+            SeedMixedWorld(em, playerEntity, spec.CeilingCount);
     }
+
+    // ── Ceiling worlds (plans/CEILING_TEST.md) ───────────────────────────────────────────────────
+    // A world of a requested size, built to the pinned CeilingMix ratio: "how many objects still fit
+    // the frame budget" is only an honest number when the composition is fixed, so the count is the
+    // only variable. Effects and explosions are seeded already aged for the same reason the scenario
+    // effects are - the measured ticks should see a steady live count, not a pile-up.
+
+    public static void SeedMixedWorld(EntityManager em, Entity playerEntity, int count)
+    {
+        CeilingCounts counts = CeilingMix.CountsFor(count);
+        var playerPos = em.GetComponent<Position>(playerEntity).Value;
+        float radius = CeilingMix.SpawnRadius(count);
+
+        SeedMixedEffects(em, playerPos, radius, counts, em.Rng);
+        SeedMixedRounds(em, playerEntity, playerPos, radius, counts, em.Rng);
+        SeedMixedWorldObjects(em, playerPos, radius, counts, em.Rng);
+
+        // The probe controls exactly one variable - the count - so the world is pinned at both ends:
+        // the player's own turrets would keep adding bullets on top of the pinned mix, and the homing
+        // rounds would kill the player inside the measured window of a large world. The probe measures
+        // what a tick costs, not whether the ship survives it.
+        SilencePlayerTurrets(em);
+        em.AddComponent(playerEntity, new Health(CeilingPlayerHealth, CeilingPlayerHealth));
+    }
+
+    const int CeilingPlayerHealth = 1_000_000;
+
+    private static void SeedMixedEffects(EntityManager em, Vector2 centre, float radius, CeilingCounts counts, Random rng)
+    {
+        for (int i = 0; i < counts.Sparks; i++)
+        {
+            float speed = DamageEffectSystem.SparkSpeedMin +
+                (float)rng.NextDouble() * (DamageEffectSystem.SparkSpeedMax - DamageEffectSystem.SparkSpeedMin);
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(RandomInDisc(centre, radius, rng)));
+            em.AddComponent(entity, new Velocity(SpawnPlacement.AnyDirection(rng) * speed));
+            em.AddComponent(entity, new DamageSpark(RandomAge(DamageEffectSystem.EffectLifetime, rng), DamageEffectSystem.EffectLifetime));
+        }
+
+        for (int i = 0; i < counts.Explosions; i++)
+        {
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(RandomInDisc(centre, radius, rng)));
+            em.AddComponent(entity, new Explosion(ExplosionRadius, RandomAge(ExplosionLifetime, rng), ExplosionLifetime));
+        }
+    }
+
+    // Rounds borrow the bench's own weapon and the enemy missile rack, so a bullet and a missile in a
+    // ceiling world cost what they cost in play instead of what a synthetic placeholder would.
+    private static void SeedMixedRounds(EntityManager em, Entity playerEntity, Vector2 playerPos, float radius, CeilingCounts counts, Random rng)
+    {
+        var gun = WeaponType.LoadTestWeapon;
+        for (int i = 0; i < counts.Bullets; i++)
+        {
+            Vector2 dir = SpawnPlacement.AnyDirection(rng);
+            float speed = gun.Stats.AmmoSpeed * (1f + (float)(rng.NextDouble() - 0.5f) * TurretFiringSystem.AmmoSpeedVariation);
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(RandomInDisc(playerPos, radius, rng)));
+            em.AddComponent(entity, new Velocity(dir * speed));
+            em.AddComponent(entity, new Ammo(dir * speed, gun.AmmoRadius, RemainingFuse(gun.Stats.ShotLifetime, rng),
+                IsEnemy: false, gun.Stats.Damage, gun.Color));
+        }
+
+        if (EnemyShipType.HeavyCannon.Missiles is not { } rack) return;
+
+        float cruise = EnemyShipStats.MissileSpeedFor(rack, MissileScenarioTier);
+        int damage = EnemyShipStats.BaseDamage + EnemyShipStats.MissileDamageAdd(MissileScenarioTier) + rack.DamageBonus;
+
+        for (int i = 0; i < counts.Missiles; i++)
+        {
+            Vector2 start = RandomInDisc(playerPos, radius, rng);
+            Vector2 velocity = (playerPos - start).Normalized * cruise;
+
+            var entity = em.CreateEntity();
+            em.AddComponent(entity, new Position(start));
+            em.AddComponent(entity, new Velocity(velocity));
+            em.AddComponent(entity, new Ammo(velocity, EnemyShipStats.MissileAmmoRadius, RemainingFuse(rack.Fuse, rng),
+                IsEnemy: true, damage, AmmoColor.Red));
+            em.AddComponent(entity, new Missile(playerEntity, cruise, cruise, WeaponStats.MissileLaunchAcceleration, rack.TurnRate, Steering: 0f));
+            em.AddComponent(entity, new Health(rack.RoundHealth, rack.RoundHealth));
+        }
+    }
+
+    private static void SeedMixedWorldObjects(EntityManager em, Vector2 playerPos, float radius, CeilingCounts counts, Random rng)
+    {
+        for (int i = 0; i < counts.Asteroids; i++)
+        {
+            float speed = AsteroidScenarioSpeedMin + (float)rng.NextDouble() * (AsteroidScenarioSpeedMax - AsteroidScenarioSpeedMin);
+            var asteroid = em.CreateEntity();
+            AsteroidFactory.AddAsteroidComponents(em, asteroid, RandomInDisc(playerPos, radius, rng), speed,
+                (float)(rng.NextDouble() * MathF.PI * 2f), rng);
+        }
+
+        for (int i = 0; i < counts.Mines; i++)
+        {
+            MineSize size = rng.NextDouble() < MineStats.LargeChanceFor(0) ? MineSize.Large : MineSize.Small;
+            var mine = em.CreateEntity();
+            em.AddComponent(mine, new Position(RandomInDisc(playerPos, radius, rng)));
+            em.AddComponent(mine, new Velocity(Vector2.Zero));
+            em.AddComponent(mine, new EnemyMine(size, MineStats.SpawnSpeedMin +
+                (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), (float)(rng.NextDouble() * MathF.PI * 2f)));
+            em.AddComponent(mine, new Health(MineType.FromSize(size).Health, MineType.FromSize(size).Health));
+        }
+
+        // The hull the crowding ring also uses: an authored capsule shape, so a ceiling world prices
+        // the hull narrow-phase and not just the circle fast path.
+        for (int i = 0; i < counts.Hulls; i++)
+            AddUnarmedHull(em, playerPos, RandomInDisc(playerPos, radius, rng), holdAtPlayerDistance: false, CeilingHullType);
+    }
+
+    private static readonly EnemyShipType CeilingHullType = EnemyShipType.Interceptor;
+
+    // The speed band WorldFactory drifts its opening field at.
+    private const float AsteroidScenarioSpeedMin = 10f;
+    private const float AsteroidScenarioSpeedMax = 35f;
+
+    // Uniform over the disc: sqrt on the sampled fraction, or every probe would pile up at the centre.
+    private static Vector2 RandomInDisc(Vector2 centre, float radius, Random rng) =>
+        centre + SpawnPlacement.AnyDirection(rng) * (radius * MathF.Sqrt((float)rng.NextDouble()));
 
     // ── Hull worlds (plans/NON_CIRCLE_COLLISION.md) ────────────────────────────────────────────
     // The rock-based scenarios price a bullet's narrow-phase test against a circle and never against a

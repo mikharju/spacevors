@@ -108,6 +108,13 @@ public sealed class GameSession
     private int _scenarioFramesMeasured;
     private HashSet<int> _shotFrames = [];
 
+    // Per-frame measurements of the scenario run. scenario.sh reads the [PERF] rows off stdout, but the
+    // ceiling probe has to decide the next count in-process, so it reads these.
+    private readonly List<double> _scenarioFrameMs = [];
+    private readonly List<double> _scenarioSimMs = [];
+    private readonly List<double> _scenarioRenderMs = [];
+    private readonly List<int> _scenarioLiveEntities = [];
+
     // Last frame's stage totals, in stopwatch ticks, for the [PERF] line.
     private long _lastSimTicks;
     private long _lastApplyTicks;
@@ -116,6 +123,13 @@ public sealed class GameSession
     private long _lastAllocBytes;
 
     public bool ScenarioFinished => _scenario is not null && _scenarioFramesMeasured >= _scenario.MeasureTicks;
+
+    // What the ceiling probe needs to pick the next count: per-frame totals and the live entity count.
+    // The scenario harness reads the same numbers out of the [PERF] rows; this is the in-process view.
+    public IReadOnlyList<double> ScenarioFrameMs => _scenarioFrameMs;
+    public IReadOnlyList<double> ScenarioSimMs => _scenarioSimMs;
+    public IReadOnlyList<double> ScenarioRenderMs => _scenarioRenderMs;
+    public IReadOnlyList<int> ScenarioLiveEntities => _scenarioLiveEntities;
 
     public GameSession(ShipType ship, ScenarioSpec? scenario = null)
     {
@@ -554,6 +568,11 @@ public sealed class GameSession
 
         int frame = ++_scenarioFramesMeasured;
         bool shot = _shotFrames.Contains(frame);
+
+        _scenarioFrameMs.Add(frameMs);
+        _scenarioSimMs.Add(simMs);
+        _scenarioRenderMs.Add(renderMs);
+        _scenarioLiveEntities.Add(Count<Position>());
 
         Console.WriteLine(
             $"[PERF] frame={frame} dt={frameMs:F2} sim={simMs:F2} apply={TicksToMs(_lastApplyTicks):F2} " +

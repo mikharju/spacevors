@@ -40,6 +40,10 @@ Environment variables:
   100 px, where an under-sized source texture steps at the edge
 - `SPACEVORS_PERF_HOST=ci` — selects the CI ceiling set in `Tests/ScenarioPerformanceTest.cs`
   (the CI runner is ~3x slower per core, so the budgets differ per host)
+- `SPACEVORS_CEILING=<budgetMs>` with `SPACEVORS_CEILING_START` / `_MAX` — the window half of
+  `.tools/ceiling.sh`: doubles a pinned mixed-object world until the median frame misses that budget,
+  then bisects, one `GameSession` per probe inside a single window. `[CEIL]` per probe, `CEILING` per
+  bracket, nothing gated, exit 0. plans/CEILING_TEST.md
 
 Perf scenario env vars (`SPACEVORS_SCENARIO`, `_CAP`, `_TICKS`, `_HOLD`): plans/PERF_SCENARIOS.md.
 Headless build/run/screenshot recipe: TROUBLE_SHOOTING.md, "General workflow that works".

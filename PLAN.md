@@ -108,6 +108,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md
 - Missile-loaded perf scenarios (missile-384/1024) — shipped — plans/MISSILE_PERF.md
+- Ceiling test: the largest mixed world that still fits 8.33 ms, probed in sim and in window, recorded in `.tools/run/ceiling.tsv`, never gated — shipped 2026-11-02 — plans/CEILING_TEST.md
 - Minor shipped features (camera-follows-mouse, rocks-as-cover, aim-line volley, ...) — record — plans/MINOR.md
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 

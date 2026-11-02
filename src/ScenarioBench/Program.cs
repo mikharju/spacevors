@@ -8,6 +8,7 @@ using Spacevors.Domain.Scenarios;
 // render=0, so .tools/scenario.sh aggregates either host.
 //
 // Usage: ScenarioBench <scenario> [ticks]
+//        ScenarioBench ceiling [--budget MS] [--start N] [--max N]   -- the ceiling probe, see Ceiling.cs
 public static class Program
 {
     // Must match the game's fixed timestep (SpaceVorsApp.MaxFps); scenarios are defined in ticks.
@@ -15,9 +16,11 @@ public static class Program
 
     static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == Ceiling.CommandName) return Ceiling.Run(args[1..]);
+
         if (args.Length == 0)
         {
-            Console.Error.WriteLine($"usage: ScenarioBench <scenario> [ticks]; known: {Scenarios.Names}");
+            Console.Error.WriteLine($"usage: ScenarioBench <scenario> [ticks] or 'ceiling'; known: {Scenarios.Names}");
             return 2;
         }
 
