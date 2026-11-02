@@ -528,3 +528,45 @@ test never depends on the model's eyes.
   (`new HealthOrb(Lifetime: 90f, Radius: 8f)`). Production code is unaffected because it always passes a
   radius. When an entity in a test vanishes, dump `commands.Commands` before the `Apply`: the
   `DestroyEntityCommand` names the component whose fields came out as zeros.
+
+## 64. An A/B script that greps away build errors measures the previous build's dll
+
+- **Symptom**: an A/B of a lit-shader change reported a tidy "-8.5% cpu, pixels differ by 1/255 in
+  0.02% of the frame" — with a suspiciously *small* spread on the new side and a control (`flat-200`,
+  code the change cannot touch) that moved by 11% in the same run. The change had never compiled:
+  `CS0214: Pointers and fixed size buffers may only be used in an unsafe context`.
+- **Cause**: the A/B helper ran `dotnet build … | grep -E "error|Build FAILED"` and continued whatever
+  happened. On a build failure the dll on disk is still the **other side's** binary, so both sides
+  measure the same code and the "difference" is host drift. The 1/255 pixel "difference" was not the
+  change either: the probe screenshot is not bit-exact across runs on llvmpipe (~0.02 % of pixels
+  differ by one step, `mean=0 max=1`).
+- **Fix / Prevention**: a build failure must fail that side of the run — `.tools/ab-lit.sh` returns
+  non-zero from its `build()` and always pops the stash, so a failed A side cannot strand the change
+  in the stash *or* get measured. Two tells that you measured the wrong binary: a control that moves
+  as much as the subject, and a "changed" pixel diff at 1/255 rather than the exact 0 you expect from
+  a change that is only a repacking of the same texels.
+
+## 65. Wall-clock render timings on this host are noise; per-frame CPU time is not
+
+- **Symptom**: the byte-identical `flat-200` bench scenario measured 4.8, then 8.5, then 12.5 ms in
+  one afternoon, and one run had `lit-200-L0` **cheaper** than `flat-200` in the same process.
+- **Cause**: the sandbox has no GPU — llvmpipe rasterises on the host's CPU, the host is shared, and
+  wall time also charges the process for being descheduled. Ratios (lit vs flat) drift by 2x.
+- **Fix / Prevention**: compare **CPU time per frame** (`Process.TotalProcessorTime`, which counts
+  llvmpipe's worker threads — RenderBench prints it next to wall time) with the rasteriser pinned:
+  `LP_NUM_THREADS=4`. The same build then reproduces within 0.1 %, and paired A/B (`.tools/ab-lit.sh`)
+  resolves single-digit-percent changes. It is still software rasterisation: the number prices CPU
+  fragment work, not GPU bandwidth, so treat it as direction and take the final verdict on the
+  real-GPU window host with `.tools/scenario.sh`.
+
+## 66. `Raylib_cs` `Image.Data` is a `void*`, so touching pixels needs unsafe
+
+- **Symptom**: `Marshal.Copy(normals.Data, buffer, 0, count)` fails to compile with `CS1503: cannot
+  convert from 'byte[]' to 'int'` plus `CS0214: Pointers and fixed size buffers may only be used in
+  an unsafe context` — the overload looks right and is not.
+- **Cause**: the binding exposes raylib's raw pixel pointer, not an `IntPtr`, so no `Marshal` overload
+  accepts it and the project has no unsafe context.
+- **Fix / Prevention**: the one project that edits image pixels (`Game`, `ImageLoader`) keeps
+  `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` with a comment saying why, and indexes the pointer
+  directly inside `Width * Height * 4`. Keep the unsafe region to a single loop over two buffers the
+  caller owns; everything above it stays safe code.
