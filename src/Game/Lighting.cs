@@ -55,6 +55,13 @@ public static class Lighting
         // Lights sit this many px above the scene plane (toward viewer), so flat surfaces still receive light.
         const float PointLightHeight = 80.0f;
 
+        // One 8-bit alpha step: a texel this transparent blends nothing at all, so all the shading
+        // below is wasted on it. Ship quads are 20-80% bare background (measured per-asset in
+        // plans/LIT_SPRITE_RENDERING.md), and skipping them skips both depth taps, the self-shadow
+        // math and the whole point-light loop. Output alpha would be zero either way, so this is
+        // pixel-identical, not an approximation.
+        const float TransparentAlphaCutoff = 1.5 / 255.0;
+
         // Hull damage rides in vertex color B (0 = pristine: every damage line below is skipped,
         // so undamaged sprites execute the identical path as before damage existed).
         const float DamageGrid = 4.0;  // impact cells per sprite edge
@@ -84,6 +91,14 @@ public static class Lighting
             float damage = fragColor.b;
 
             vec4 baseColor = texture(texture0, fragTexCoord);
+
+            // Bare background: nothing to light, and nothing that survives blending. Everything below
+            // (two depth taps, self-shadow, up to 16 point lights, the damage field) is dead code here.
+            if (baseColor.a <= TransparentAlphaCutoff)
+            {
+                finalColor = vec4(0.0);
+                return;
+            }
 
             // Normal map is tangent space with +Y up in image; screen y points down.
             vec3 nMap = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
