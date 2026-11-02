@@ -51,7 +51,9 @@ public static class Lighting
         const int MaxPointLights = {{MaxPointLights}};
         uniform vec4 uLights[MaxPointLights];
         uniform int uLightCount;
-        const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
+        // Each light's own colour: thruster flame is cool blue-white, an explosion is warm orange.
+        // A second array because all four channels of uLights are already position, radius, intensity.
+        uniform vec3 uLightTints[MaxPointLights];
         // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
         const float MaxPointLightContribution = 1.0f;
         // Lights sit this many px above the scene plane (toward viewer), so flat surfaces still receive light.
@@ -85,15 +87,15 @@ public static class Lighting
         // facing. gl_FragCoord and the light position are GL space (y up); normalScreen is y down.
         // The squared-distance test skips the sqrt and the normalize for every fragment outside the
         // light, which is most of them: a radius covers a small fraction of a hull-sized quad.
-        float PointLightContribution(vec3 normalScreen, vec4 light)
+        vec3 PointLightContribution(vec3 normalScreen, vec4 light, vec3 tint)
         {
             vec2 dGl = light.xy - gl_FragCoord.xy;
             float distSq = dot(dGl, dGl);
-            if (distSq > light.z * light.z) return 0.0;
+            if (distSq > light.z * light.z) return vec3(0.0);
 
             float fall = 1.0 - smoothstep(0.0, light.z, sqrt(distSq));
             vec3 toLight = normalize(vec3(dGl.x, -dGl.y, PointLightHeight));
-            return light.w * fall * fall * max(dot(normalScreen, toLight), 0.0);
+            return tint * (light.w * fall * fall * max(dot(normalScreen, toLight), 0.0));
         }
 
         void main()
@@ -198,12 +200,12 @@ public static class Lighting
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
 
             // Point lights add a warm glow on top of the directional light, shaded by sprite normals.
-            float pointLight = 0.0;
+            vec3 pointLight = vec3(0.0);
             for (int i = 0; i < uLightCount; i++)
-                pointLight += PointLightContribution(normalScreen, uLights[i]);
-            pointLight = min(pointLight, MaxPointLightContribution);
+                pointLight += PointLightContribution(normalScreen, uLights[i], uLightTints[i]);
+            pointLight = min(pointLight, vec3(MaxPointLightContribution));
 
-            vec3 lit = albedo * (AmbientLevel + diffuse) + PointLightTint * pointLight + ember;
+            vec3 lit = albedo * (AmbientLevel + diffuse) + pointLight + ember;
 
             // RGB of the vertex color carries the packed angle, so only its alpha tints.
             finalColor = vec4(lit, sampled.a * fragColor.a);
@@ -216,10 +218,12 @@ public static class Lighting
     static int _normalDepthLoc;
     static int _lightsLoc;
     static int _lightCountLoc;
+    static int _lightTintsLoc;
     static int _timeLoc;
 
     // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
     static readonly System.Numerics.Vector4[] PointLights = new System.Numerics.Vector4[MaxPointLights];
+    static readonly System.Numerics.Vector3[] PointLightTints = new System.Numerics.Vector3[MaxPointLights];
     static int _pointLightCount;
     static float _camX;
     static float _camY;
@@ -239,14 +243,21 @@ public static class Lighting
         _pointLightCount = 0;
     }
 
-    // Adds a point light in world coordinates (1 unit = 1 px). Dropped when the list is full.
-    public static void AddLight(Vector2 worldPos, float radius, float intensity)
+    // True once every slot is taken: a gatherer that stops here instead of walking the rest of the
+    // world is doing work that AddLight would throw away.
+    public static bool IsFull => _pointLightCount >= MaxPointLights;
+
+    // Adds a point light in world coordinates (1 unit = 1 px) with its own colour.
+    // Dropped when the list is full.
+    public static void AddLight(Vector2 worldPos, float radius, float intensity, System.Numerics.Vector3 tint)
     {
         if (_pointLightCount >= MaxPointLights || radius <= 0f || intensity <= 0f) return;
 
         // The shader works in GL screen space (origin bottom-left), so only y is flipped here.
         var screen = RenderHelpers.ToScreen(worldPos, _camX, _camY, _windowWidth, _windowHeight);
-        PointLights[_pointLightCount++] = new System.Numerics.Vector4(screen.X, _windowHeight - screen.Y, radius, intensity);
+        PointLights[_pointLightCount] = new System.Numerics.Vector4(screen.X, _windowHeight - screen.Y, radius, intensity);
+        PointLightTints[_pointLightCount] = tint;
+        _pointLightCount++;
     }
 
     public static void Init()
@@ -263,6 +274,7 @@ public static class Lighting
         _normalDepthLoc = Raylib.GetShaderLocation(shader, "normalDepth");
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
         _lightCountLoc = Raylib.GetShaderLocation(shader, "uLightCount");
+        _lightTintsLoc = Raylib.GetShaderLocation(shader, "uLightTints");
         _timeLoc = Raylib.GetShaderLocation(shader, "uTime");
         IsReady = true;
     }
@@ -291,7 +303,10 @@ public static class Lighting
         // The count travels with the lights: the shader loops over exactly what was gathered.
         Raylib.SetShaderValue(shader, _lightCountLoc, _pointLightCount, ShaderUniformDataType.Int);
         if (_pointLightCount > 0)
+        {
             Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, _pointLightCount);
+            Raylib.SetShaderValueV(shader, _lightTintsLoc, PointLightTints, ShaderUniformDataType.Vec3, _pointLightCount);
+        }
         // Frame-global time drives the ember pulse; a global uniform is exactly right here.
         Raylib.SetShaderValue(shader, _timeLoc, (float)Raylib.GetTime(), ShaderUniformDataType.Float);
         return true;

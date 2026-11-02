@@ -11,6 +11,10 @@ public static class Program
 {
     const int WindowWidth = 1920;
     const int WindowHeight = 1024;
+    // Synthetic bench lights keep the warm colour the oracle shader hard-codes, so L4/L16 still look
+    // like the scene the probe checks.
+    static readonly System.Numerics.Vector3 BenchLightTint = new(1.0f, 0.72f, 0.42f);
+
     const int WarmupFrames = 30;
     const int MeasureFrames = 240;
 
@@ -98,7 +102,7 @@ public static class Program
         {
             Lighting.BeginFrame(0f, 0f, WindowWidth, WindowHeight);
             foreach (var light in lights)
-                Lighting.AddLight(light.Position, light.Radius, light.Intensity);
+                Lighting.AddLight(light.Position, light.Radius, light.Intensity, BenchLightTint);
 
             var cpuBefore = Self.TotalProcessorTime;
             var sw = Stopwatch.StartNew();
