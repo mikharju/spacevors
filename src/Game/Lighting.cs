@@ -90,15 +90,21 @@ public static class Lighting
             float angleRad = float(rByte * 256 + gByte) / 65535.0 * TwoPi;
             float damage = fragColor.b;
 
-            vec4 baseColor = texture(texture0, fragTexCoord);
+            vec4 sampled = texture(texture0, fragTexCoord);
 
             // Bare background: nothing to light, and nothing that survives blending. Everything below
             // (two depth taps, self-shadow, up to 16 point lights, the damage field) is dead code here.
-            if (baseColor.a <= TransparentAlphaCutoff)
+            if (sampled.a <= TransparentAlphaCutoff)
             {
                 finalColor = vec4(0.0);
                 return;
             }
+
+            // The base map is uploaded premultiplied, which is what lets a 1024 px map be halved and
+            // mipmapped without the black background around the hull bleeding a dark fringe into the
+            // silhouette. Undoing the premultiply is one divide, and a premultiplied channel never
+            // exceeds its own alpha, so the quotient stays inside the hull's original colour.
+            vec3 albedo = sampled.rgb / max(sampled.a, TransparentAlphaCutoff);
 
             // Normal map is tangent space with +Y up in image; screen y points down.
             vec3 nMap = texture(normalDepth, fragTexCoord).rgb * 2.0 - 1.0;
@@ -111,7 +117,7 @@ public static class Lighting
                 // Procedural hull damage in sprite-local UV space: the pattern rotates with the
                 // hull while lighting stays screen-space, so a turning ship keeps its lit and
                 // shadow sides. Pure function of uv — no textures, no RNG.
-                float hull = step(0.5, baseColor.a);
+                float hull = step(0.5, sampled.a);
                 vec2 uv = fragTexCoord * DamageGrid;
                 vec2 cell = floor(uv);
                 vec2 f = fract(uv);
@@ -137,7 +143,7 @@ public static class Lighting
                 float crater = hull * impact * smoothstep(craterR, craterR * 0.25, distC);
                 float scorch = hull * impact * smoothstep(craterR * 2.6, craterR * 0.5, distC);
 
-                baseColor.rgb = mix(baseColor.rgb, SootColor, scorch * mix(0.45, 0.8, damage));
+                albedo = mix(albedo, SootColor, scorch * mix(0.45, 0.8, damage));
 
                 // Perforation: interior impacts punch alpha holes once damage is critical,
                 // so space shows through; the hole rotates with the hull, the rest stays lit.
@@ -189,10 +195,10 @@ public static class Lighting
             }
             pointLight = min(pointLight, MaxPointLightContribution);
 
-            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight + ember;
+            vec3 lit = albedo * (AmbientLevel + diffuse) + PointLightTint * pointLight + ember;
 
             // RGB of the vertex color carries the packed angle, so only its alpha tints.
-            finalColor = vec4(lit, baseColor.a * fragColor.a);
+            finalColor = vec4(lit, sampled.a * fragColor.a);
         }
         """;
 

@@ -171,10 +171,12 @@ public static class Program
 
     // Frozen copy of the pre-batching shader (per-sprite angleRad uniform, no damage path, no
     // transparent early-out), kept as a pixel oracle: if the current grouped path renders this scene
-    // identically, vertex-color angle encoding, variant grouping and the early-out are correct. The
-    // oracle reads the same packed surface map the live shader does, so the packing itself is checked
-    // by diffing screenshots across builds (plans/LIT_SPRITE_RENDERING.md). Delete only when the
-    // legacy per-sprite path is gone for good.
+    // identically, vertex-color angle encoding, variant grouping and the early-out are correct. It has
+    // no early-out, so a match also proves skipping transparent texels changes no pixel. The oracle
+    // reads the maps in whatever encoding the live path uploads them in - packed normal+depth, and a
+    // premultiplied base whose albedo it divides back out - so the encoding itself is checked by
+    // diffing screenshots across builds (plans/LIT_SPRITE_RENDERING.md). Delete only when the legacy
+    // per-sprite path is gone for good.
     const string LegacyVertexShader = """
         #version 330
         in vec3 vertexPosition;
@@ -207,6 +209,8 @@ public static class Program
         const float ShadowUvOffset = 0.02;
         const float ShadowDepthBias = 0.03;
         const float ShadowDiffuseScale = 0.15;
+        // Matches Lighting.TransparentAlphaCutoff, the divisor floor for the premultiplied base.
+        const float TransparentAlphaCutoff = 1.5 / 255.0;
 
         // Point lights: xy screen pos (GL origin bottom-left), z radius px, w intensity.
         // Slots with zero radius or intensity are skipped, so unused slots stay inert.
@@ -221,6 +225,8 @@ public static class Program
         void main()
         {
             vec4 baseColor = texture(texture0, fragTexCoord);
+            // Same albedo recovery as the live shader: the base is uploaded premultiplied.
+            vec3 albedo = baseColor.rgb / max(baseColor.a, TransparentAlphaCutoff);
 
             // Normal map is tangent space with +Y up in image; screen y points down.
             vec3 nMap = texture(normalDepth, fragTexCoord).rgb * 2.0 - 1.0;
@@ -256,7 +262,7 @@ public static class Program
             }
             pointLight = min(pointLight, MaxPointLightContribution);
 
-            vec3 lit = baseColor.rgb * (AmbientLevel + diffuse) + PointLightTint * pointLight;
+            vec3 lit = albedo * (AmbientLevel + diffuse) + PointLightTint * pointLight;
 
             finalColor = vec4(lit, baseColor.a) * fragColor;
         }

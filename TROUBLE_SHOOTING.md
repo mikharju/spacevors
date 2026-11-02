@@ -570,3 +570,21 @@ test never depends on the model's eyes.
   `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>` with a comment saying why, and indexes the pointer
   directly inside `Width * Height * 4`. Keep the unsafe region to a single loop over two buffers the
   caller owns; everything above it stays safe code.
+
+## 67. Mutating a raylib `Image` inside a helper leaves the caller holding freed memory
+
+- **Symptom**: RenderBench died right after loading the first lit set with `free(): invalid size`, or
+  with `double free or corruption (!prev)`. Which message appeared — and whether anything appeared at
+  all — changed when *unrelated* code was edited: a heap-layout lottery, not a logic bug. The crash
+  lands at some later `free()`, far from the code that caused it.
+- **Cause**: `Image` is a value-type handle over a raylib-allocated buffer. A helper that takes it **by
+  value** and calls a mutating raylib function (`ImageAlphaPremultiply`, `ImageFormat`, `ImageResize`)
+  updates only its copy: raylib can allocate a replacement buffer and free the original, so the caller
+  keeps a stale `Data` pointer and its later `Raylib.UnloadImage` frees bytes raylib already freed. The
+  same class of bug is a wrong stride: PNG maps decode to `R8G8B8`, **three** bytes a texel, so a packer
+  that writes RGBA into that buffer runs a quarter past the end of it.
+- **Fix / Prevention**: run every raylib image mutator on the caller's **own** variable (`ref`), and keep
+  helpers that take an `Image` by value read-only. When a helper must produce changed pixels, let it build
+  and return a **new** image it owns (`ImageLoader.PackSurfaceMap` allocates with `GenImageColor` rather
+  than writing into the normal map) and derive the stride from `image.Format`. Do not guess what a PNG
+  decoded to: run once and read raylib's own `INFO: IMAGE: ... (WxH | R8G8B8 | ...)` line.

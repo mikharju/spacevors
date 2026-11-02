@@ -99,9 +99,13 @@ public static class ImageLoader
         return (flat, lit);
     }
 
+    // The largest a lit sprite is ever drawn is the 520 px hull on the turret-mount screen and the
+    // largest rock is 500 px across, so a 512 px map costs no visible detail - while the 1024 px
+    // originals are minified 2-19x (enemy-1: a 762 px texture drawn 40 px across).
+    const int MaxLitMapEdge = 512;
+
     // Maps are sampled with the base texture's normalized UVs, so a pure resolution difference is fine;
     // a size mismatch still warns because differently-framed maps would misregister silently.
-    // The depth map is folded into the normal map's alpha before upload (see WriteDepthIntoAlpha).
     private static LitSprite LoadLitSet(LitSpriteMatcher.Set set, Dictionary<string, string> byStem, string directory)
     {
         var baseImg = Raylib.LoadImage(byStem[set.BaseStem]);
@@ -115,43 +119,109 @@ public static class ImageLoader
                 $"{normalsImg.Width}x{normalsImg.Height}/{depthImg.Width}x{depthImg.Height}, base {baseImg.Width}x{baseImg.Height}; " +
                 "regenerate maps at the base dimensions");
 
-        // Byte-level packing needs one known layout, and every map upload goes through the same path.
-        Raylib.ImageFormat(ref baseImg, PixelFormat.UncompressedR8G8B8A8);
-        Raylib.ImageFormat(ref normalsImg, PixelFormat.UncompressedR8G8B8A8);
-        Raylib.ImageFormat(ref depthImg, PixelFormat.UncompressedR8G8B8A8);
+        ClampToMaxEdge(ref baseImg);
+        ClampToMaxEdge(ref normalsImg);
+        ClampToMaxEdge(ref depthImg);
 
         // A differently sized depth map is resampled to the normal map: the shader samples both with
         // the same UVs, so the two channels must refer to the same texel.
         if (depthImg.Width != normalsImg.Width || depthImg.Height != normalsImg.Height)
             Raylib.ImageResize(ref depthImg, normalsImg.Width, normalsImg.Height);
 
-        WriteDepthIntoAlpha(normalsImg, depthImg);
+        // Only the base is premultiplied: its transparent margin is black, so halving and mipmapping it
+        // un-premultiplied would average the background into the hull silhouette (the shader divides the
+        // alpha back out). Every raylib call that can reallocate a buffer runs on this function's own
+        // variable - Image is a handle over native memory, and mutating a copy leaves this one pointing
+        // at freed bytes (TROUBLE_SHOOTING.md).
+        Raylib.ImageAlphaPremultiply(ref baseImg);
 
-        var baseTex = Raylib.LoadTextureFromImage(baseImg);
-        var normalDepthTex = Raylib.LoadTextureFromImage(normalsImg);
+        Image surfaceImg = PackSurfaceMap(normalsImg, depthImg);
+
+        var baseTex = UploadLitTexture(baseImg);
+        var normalDepthTex = UploadLitTexture(surfaceImg);
+
         Raylib.UnloadImage(baseImg);
         Raylib.UnloadImage(normalsImg);
         Raylib.UnloadImage(depthImg);
+        Raylib.UnloadImage(surfaceImg);
 
         return new LitSprite(baseTex, normalDepthTex);
     }
 
-    // Copies the depth map's red channel into the normal map's alpha. Both are plain 8-bit PNGs whose
-    // alpha carries nothing, and a lit fragment needs the normal and the depth at overlapping UVs, so
-    // packing them saves one texture fetch per fragment and a third of the lit maps' VRAM.
-    // Unsafe because raylib holds image pixels behind a raw pointer (Image.Data); the loop stays
-    // inside the two buffers the caller already owns.
-    static unsafe void WriteDepthIntoAlpha(Image normals, Image depth)
+    // Downscale to MaxLitMapEdge on the long edge, keeping the aspect. Halving a 1024 px map is an
+    // exact 2:1, which is the ratio raylib's resample filters best.
+    static void ClampToMaxEdge(ref Image image)
     {
-        const int BytesPerTexel = 4;
-        const int AlphaOffset = 3;
+        int longest = Math.Max(image.Width, image.Height);
+        if (longest <= MaxLitMapEdge) return;
 
-        int byteCount = normals.Width * normals.Height * BytesPerTexel;
-        byte* surface = (byte*)normals.Data;
-        byte* heights = (byte*)depth.Data;
+        float scale = (float)MaxLitMapEdge / longest;
+        Raylib.ImageResize(ref image, (int)MathF.Round(image.Width * scale), (int)MathF.Round(image.Height * scale));
+    }
 
-        for (int alpha = AlphaOffset; alpha < byteCount; alpha += BytesPerTexel)
-            surface[alpha] = heights[alpha - AlphaOffset];
+    // Builds the one surface map a lit sprite needs: RGB from the normal map, alpha from the depth
+    // map's red channel. A lit fragment reads the normal at one UV and the depth at two, so packing
+    // them saves a sampler and a texture fetch per fragment and a third of the lit maps' VRAM.
+    // It writes into a fresh RGBA8 image instead of into the normal map, because the maps decode as
+    // 8-bit RGB - three bytes a texel - and writing four bytes there runs off the end of that buffer.
+    static unsafe Image PackSurfaceMap(Image normals, Image depth)
+    {
+        Image packed = Raylib.GenImageColor(normals.Width, normals.Height, Color.White);
+        int texels = packed.Width * packed.Height;
+        int normalStride = BytesPerTexel(normals.Format);
+        int depthStride = BytesPerTexel(depth.Format);
+        bool normalHasRgb = normalStride >= 3;
+
+        byte* dst = (byte*)packed.Data;
+        byte* n = (byte*)normals.Data;
+        byte* d = (byte*)depth.Data;
+
+        for (int t = 0, i = 0; t < texels; t++, i += 4)
+        {
+            // A normal map with fewer than three channels cannot carry a normal; a flat one is drawn
+            // rather than a wrong one, and the warning below names it.
+            if (normalHasRgb)
+            {
+                dst[i] = n[t * normalStride];
+                dst[i + 1] = n[t * normalStride + 1];
+                dst[i + 2] = n[t * normalStride + 2];
+            }
+            else
+            {
+                DiagnosticLogger.LogWarning($"normal map format {normals.Format} has no colour channels; drawing a flat normal");
+                dst[i] = 128;
+                dst[i + 1] = 128;
+                dst[i + 2] = 255;
+            }
+            dst[i + 3] = d[t * depthStride];
+        }
+
+        return packed;
+    }
+
+    // Bytes a texel occupies in the formats a PNG can decode to. Guessing a stride on anything else is
+    // how a heap gets corrupted, so an unexpected format stops here instead of reading past a buffer.
+    static int BytesPerTexel(PixelFormat format) => format switch
+    {
+        PixelFormat.UncompressedGrayscale => 1,
+        PixelFormat.UncompressedGrayAlpha => 2,
+        PixelFormat.UncompressedR8G8B8 => 3,
+        PixelFormat.UncompressedR8G8B8A8 => 4,
+        _ => throw new InvalidDataException($"lit map format {format} is not one a PNG decodes to"),
+    };
+
+    // Uploads with a mip chain, which is what stops a minified sprite shimmering: without one, a filter
+    // that reads 4 texels out of a 19x19 footprint makes a spinning rock crawl. The base needs its
+    // albedo recovered in the shader (it is uploaded premultiplied); the surface map does not, because
+    // averaging a normal and a depth is meaningful and the shader normalizes what it reads.
+    // The image is taken by value because this only reads it: anything that can reallocate a buffer has
+    // to run on the caller's own variable.
+    static Texture2D UploadLitTexture(Image image)
+    {
+        var texture = Raylib.LoadTextureFromImage(image);
+        Raylib.GenTextureMipmaps(ref texture);
+        Raylib.SetTextureFilter(texture, TextureFilter.Trilinear);
+        return texture;
     }
 
     public static void UnloadAssets()
