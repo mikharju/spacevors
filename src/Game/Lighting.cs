@@ -46,9 +46,11 @@ public static class Lighting
         const float ShadowDiffuseScale = 0.15;
 
         // Point lights: xy screen pos (GL origin bottom-left), z radius px, w intensity.
-        // Slots with zero radius or intensity are skipped, so unused slots stay inert.
+        // uLightCount is how many slots LightGatherer filled this frame; slots past it are never read,
+        // so a frame with two lights pays for two, not for the whole array.
         const int MaxPointLights = {{MaxPointLights}};
         uniform vec4 uLights[MaxPointLights];
+        uniform int uLightCount;
         const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
         // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
         const float MaxPointLightContribution = 1.0f;
@@ -77,6 +79,21 @@ public static class Lighting
             vec3 p3 = fract(vec3(p.xyx) * 0.1031);
             p3 += dot(p3, p3.yzx + 33.33);
             return fract((p3.xx + p3.yz) * p3.zy);
+        }
+
+        // One light's contribution to one fragment: quadratic falloff inside its radius, then lambert
+        // facing. gl_FragCoord and the light position are GL space (y up); normalScreen is y down.
+        // The squared-distance test skips the sqrt and the normalize for every fragment outside the
+        // light, which is most of them: a radius covers a small fraction of a hull-sized quad.
+        float PointLightContribution(vec3 normalScreen, vec4 light)
+        {
+            vec2 dGl = light.xy - gl_FragCoord.xy;
+            float distSq = dot(dGl, dGl);
+            if (distSq > light.z * light.z) return 0.0;
+
+            float fall = 1.0 - smoothstep(0.0, light.z, sqrt(distSq));
+            vec3 toLight = normalize(vec3(dGl.x, -dGl.y, PointLightHeight));
+            return light.w * fall * fall * max(dot(normalScreen, toLight), 0.0);
         }
 
         void main()
@@ -182,17 +199,8 @@ public static class Lighting
 
             // Point lights add a warm glow on top of the directional light, shaded by sprite normals.
             float pointLight = 0.0;
-            for (int i = 0; i < MaxPointLights; i++) {
-                vec4 light = uLights[i];
-                if (light.w <= 0.0 || light.z <= 0.0) continue;
-                float dist = distance(gl_FragCoord.xy, light.xy);
-                float fall = 1.0 - smoothstep(0.0, light.z, dist);
-                // gl_FragCoord and light positions are GL space (y up); normalScreen is y down.
-                vec2 dGl = light.xy - gl_FragCoord.xy;
-                vec3 toLight = normalize(vec3(dGl.x, -dGl.y, PointLightHeight));
-                float facing = max(dot(normalScreen, toLight), 0.0);
-                pointLight += light.w * fall * fall * facing;
-            }
+            for (int i = 0; i < uLightCount; i++)
+                pointLight += PointLightContribution(normalScreen, uLights[i]);
             pointLight = min(pointLight, MaxPointLightContribution);
 
             vec3 lit = albedo * (AmbientLevel + diffuse) + PointLightTint * pointLight + ember;
@@ -207,6 +215,7 @@ public static class Lighting
     static Shader? _shader;
     static int _normalDepthLoc;
     static int _lightsLoc;
+    static int _lightCountLoc;
     static int _timeLoc;
 
     // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
@@ -225,7 +234,8 @@ public static class Lighting
         _camY = camY;
         _windowWidth = windowWidth;
         _windowHeight = windowHeight;
-        Array.Clear(PointLights);
+        // Only the first _pointLightCount slots are ever uploaded or read, so stale slots past the
+        // count are inert and need no clearing.
         _pointLightCount = 0;
     }
 
@@ -252,6 +262,7 @@ public static class Lighting
         _shader = shader;
         _normalDepthLoc = Raylib.GetShaderLocation(shader, "normalDepth");
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
+        _lightCountLoc = Raylib.GetShaderLocation(shader, "uLightCount");
         _timeLoc = Raylib.GetShaderLocation(shader, "uTime");
         IsReady = true;
     }
@@ -277,7 +288,10 @@ public static class Lighting
         // so map uniforms set before it are lost on an empty flush.
         Raylib.BeginShaderMode(shader);
         Raylib.SetShaderValueTexture(shader, _normalDepthLoc, sprite.NormalDepth);
-        Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, MaxPointLights);
+        // The count travels with the lights: the shader loops over exactly what was gathered.
+        Raylib.SetShaderValue(shader, _lightCountLoc, _pointLightCount, ShaderUniformDataType.Int);
+        if (_pointLightCount > 0)
+            Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, _pointLightCount);
         // Frame-global time drives the ember pulse; a global uniform is exactly right here.
         Raylib.SetShaderValue(shader, _timeLoc, (float)Raylib.GetTime(), ShaderUniformDataType.Float);
         return true;

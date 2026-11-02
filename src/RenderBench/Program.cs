@@ -36,12 +36,12 @@ public static class Program
         foreach (string arg in args)
         {
             if (arg == "probe") RunProbe(sprites);
-            else RunScenario(arg, ParseCount(arg), ParseLights(arg), sprites);
+            else if (!RunScenario(arg, ParseCount(arg), ParseLights(arg), sprites)) return 1;
         }
 
         if (args.Length == 0)
             foreach (var (name, spriteCount, lightCount) in Scenarios())
-                RunScenario(name, spriteCount, lightCount, sprites);
+                if (!RunScenario(name, spriteCount, lightCount, sprites)) return 1;
 
         Lighting.Shutdown();
         ImageLoader.UnloadAssets();
@@ -80,8 +80,16 @@ public static class Program
     static int ParseCount(string name) => int.Parse(name.Split('-')[1].Split('_')[0]);
     static int ParseLights(string name) => name.Contains('L') ? int.Parse(name[(name.IndexOf('L') + 1)..]) : -1;
 
-    static void RunScenario(string name, int spriteCount, int lightCount, List<LitSprite> sprites)
+    // Returns false when the scenario could not measure what its name claims: with no lit shader the
+    // draws fall back to flat sprites, and the timing then prices nothing while still printing a line.
+    static bool RunScenario(string name, int spriteCount, int lightCount, List<LitSprite> sprites)
     {
+        if (name.StartsWith("lit", StringComparison.Ordinal) && !Lighting.IsReady)
+        {
+            Console.WriteLine($"ERROR {name}: lit shader unavailable - the lit path did not run, so this would time the flat fallback");
+            return false;
+        }
+
         var layout = BuildLayout(spriteCount);
         var lights = BuildLights(lightCount);
         var timings = new List<(double WallMs, double CpuMs)>();
@@ -108,6 +116,7 @@ public static class Program
         double wall = timings.Average(t => t.WallMs);
         double cpu = timings.Average(t => t.CpuMs);
         Console.WriteLine($"{name,-14} {wall,7:F3} ms wall  {cpu,7:F3} ms cpu  ({1000.0 / cpu,5:F0} fps if whole frame)");
+        return true;
     }
 
     // Grid layout covering the viewport; each cell gets one sprite at a fixed scale.

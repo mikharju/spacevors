@@ -588,3 +588,21 @@ test never depends on the model's eyes.
   and return a **new** image it owns (`ImageLoader.PackSurfaceMap` allocates with `GenImageColor` rather
   than writing into the normal map) and derive the stride from `image.Format`. Do not guess what a PNG
   decoded to: run once and read raylib's own `INFO: IMAGE: ... (WxH | R8G8B8 | ...)` line.
+
+## 68. A lit scenario that times the same as `flat` means the lit path never ran
+
+- **Symptom**: a shader edit reported a **-74%** cost on `lit-200-L0/L4/L16` — the lit scenarios came
+  back at exactly the `flat-200` number — while the cross-build screenshot diff moved 9 % of pixels.
+  The bench exited 0 and `probe: PASS` still appeared (from the *other* side of the A/B).
+- **Cause**: the lighting shader failed to compile, so `Lighting.IsReady` was false and every lit draw
+  fell back to a flat `DrawTexturePro`. The fallback is silent by design (an unlit game still runs),
+  the one `LIGHTING: shader failed to compile` line went to stderr, and the A/B helper had `2>/dev/null`
+  on the bench call. The edit itself was a scripted replace anchored on `void main()`, which appears in
+  **both** the vertex and fragment shader: the new helper landed in the vertex stage, where
+  `gl_FragCoord` does not exist.
+- **Fix / Prevention**: RenderBench now refuses to time a `lit-*` scenario when the shader is not live
+  (it prints `ERROR <name>: lit shader unavailable` and exits non-zero), and `.tools/ab-lit.sh` keeps
+  the bench's stderr in `.tools/run/ab-lit-rep.txt`. Two tells to read before believing a render win:
+  a lit scenario costing what the flat scenario costs, and a "speedup" that arrives with a pixel diff
+  that was expected to be zero. Scripted edits into GLSL must anchor on a line unique to one shader
+  stage, or assert the expected number of occurrences before writing.

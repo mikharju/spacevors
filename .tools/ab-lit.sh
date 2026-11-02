@@ -51,7 +51,7 @@ build() {
 
 side=""
 measure() {
-    dotnet "$dll" $scen probe 2>/dev/null > "$tmp" || { echo "$side run failed" >&2; return 1; }
+    dotnet "$dll" $scen probe > "$tmp" 2>&1 || { echo "$side run failed (see $tmp)" >&2; return 1; }
     awk -v side="$side" '/ms wall/ { print side, $1, $5 }' "$tmp" >> "$log"
     grep "^probe:" "$tmp" | tail -1
     cp /tmp/probe_current.png "$1" || { echo "probe wrote no screenshot" >&2; return 1; }
