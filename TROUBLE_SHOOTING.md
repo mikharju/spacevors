@@ -606,3 +606,18 @@ test never depends on the model's eyes.
   a lit scenario costing what the flat scenario costs, and a "speedup" that arrives with a pixel diff
   that was expected to be zero. Scripted edits into GLSL must anchor on a line unique to one shader
   stage, or assert the expected number of occurrences before writing.
+
+## 69. An A/B that runs one side after the other measures the host, not the change
+
+- **Symptom**: a paired A/B of a small shader change reported the subject at +36 % **and** the untouched
+  control (`flat-200`, a path the change cannot reach) at +41 %. Taking the minimum over four reps did
+  not help, because all four reps of a side run in the same minute.
+- **Cause**: the two sides were measured back to back — four reps of B, then four of A — so any load the
+  host picked up between the two blocks lands entirely on one side. Minimum-of-N only removes
+  *within-block* spikes; it cannot remove a shift in the baseline. (Related: entry 65, wall time vs CPU
+  time.)
+- **Fix / Prevention**: build both sides up front, snapshot the binaries that differ, and **alternate the
+  reps** — A, B, A, B — so interference is charged to both. `.tools/ab-lit.sh` does this and prints the
+  md5 of the dll each rep runs, which also catches the wrong-binary trap of entry 64. Judge the run by
+  the control first: if it moved, the subject's delta means nothing; on a quiet host the control now
+  repeats within ~1 %.
