@@ -1,6 +1,6 @@
 # LIT_SPRITE_RENDERING.md — inspection + improvement proposals
 
-Status: proposed (inspection only; no code changed)
+Status: shipped (2026-11-02 — P1..P6 landed, each measured; P7 parked)
 
 Written 2026-11-02. Scope: `Lighting.cs`, `LitGroupRenderer.cs`, `LightGatherer.cs`,
 `ImageLoader.cs`, `LitSprite.cs`, and the lit call sites in `WorldRenderer` / `EnemyShipRenderer` /
@@ -179,3 +179,49 @@ Each step: `.tools/scenario.sh impact-storm --iters 3` and `hull-damage --iters 
 window host (sim host cannot see render changes), `RenderBench probe` for pixel parity, and the run's
 start/mid/end shots for anything that changes look. A pass that got cheaper than its geometry can
 explain means the geometry is not being drawn — check the shots before believing the number.
+
+## Shipped (2026-11-02):
+
+P1-P6 landed, one commit each, each with its own paired measurement. P7 (alpha-bbox trim) stayed
+parked: after P1 and P4 the transparent margin no longer costs anything worth trimming.
+
+| stage | change | L0 | L4 | L16 | flat control | pixels |
+|---|---|---|---|---|---|---|
+| P1 | early-out on transparent texels | -26.5% | - | -28.6% | - | identical |
+| P2 | depth folded into the normal map's alpha (3 maps -> 2) | -6% | - | - | - | identical (cross-build diff max 0) |
+| P3 | 512 px cap + mip chain, base uploaded premultiplied | -0.7% | - | - | -25.7% | softer at 2-19x minification, no dark fringe |
+| P4 | `uLightCount` loop bound + squared-distance light cull | -47% | -39% | -22.8% | -0.4% | identical |
+| P5 | per-light colour, gatherer priority, `IsFull` early exit | +0.9% | +3.0% | +6.6% | -0.9% | identical |
+| P6 | key + cool fill + rim + Blinn-Phong, albedo-modulated point light | +3.1% | +2.4% | +1.3% | +0.4% | 8.6% of pixels moved, mean 1.5/255 |
+
+Cumulative, measured the same way with the pre-series files checked back out (B = before P1, A = shipped):
+`lit-200-L0` 97.4 -> 36.0 ms cpu (-63%), `L4` 99.7 -> 41.6 (-58%), `L16` 105.4 -> 58.4 (-45%),
+`flat-200` 23.7 -> 17.2 (-27%, the cap on the shared base textures).
+
+VRAM, from the PNG headers of all 25 lit sets: 272 MB native (3 maps) -> 181 MB after P2 -> 77 MB after
+the 512 px cap, **103 MB including the mip chains**. That is the art budget, not a per-frame cost.
+
+Look, judged from seeded screenshots (`hull-damage`, `impact-storm`, frame 60) rather than numbers:
+before P6 a fireball turned a charcoal hull into a white blob and a rock under a fireball lost its
+surface; after it the plating and the rock texture stay readable while the fireball sprite itself is
+untouched. The scene as a whole reads slightly dimmer and cooler - deliberate, the old rig peaked at
+1.30 and clipped wherever the key light landed. The rim is deliberately subtle at gameplay zoom.
+
+Deviations from the plan:
+- P6 skipped the 2-tap self-shadow softening listed in the proposal: it spends back the fetch that P2
+  bought, and the craters already read. It added the optional highlight and rim instead.
+- The `RenderBench` probe could not stay a frozen copy of the pre-batching shader. It now mirrors the
+  live light rig and differs only in taking the angle from a uniform, so it still checks the vertex-angle
+  encoding and variant grouping; a look change has to be copied into it or the probe reports the change
+  itself as a mismatch. It also refuses to time a `lit-*` scenario when the shader did not load, because
+  a silent flat fallback once measured as a -74% win.
+- Verification ran on the sandbox's llvmpipe (`RenderBench`, `.tools/ab-lit.sh`), not on the real-GPU
+  window host as the order of work assumed: `scenario.sh --sim` cannot see render changes and there is no
+  GPU here. These numbers price CPU fragment work, not GPU bandwidth. One direction to re-check on real
+  hardware: mip filtering costs a little CPU under llvmpipe while saving a lot of texture traffic on a
+  GPU, so P3's verdict on real hardware should be no worse than neutral.
+
+Measurement method, since the numbers above are only meaningful with it: `.tools/ab-lit.sh` builds both
+sides, snapshots the dlls, and interleaves 6 reps per side, reporting the minimum per-frame CPU time with
+llvmpipe pinned to 4 threads. Sequential sides once put the untouched control at +41%; wall time on this
+host swings by 50% while the drawn work is byte-identical (TROUBLE_SHOOTING 65, 69).

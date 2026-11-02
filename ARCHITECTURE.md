@@ -306,6 +306,7 @@ For example: All ship related data in record structs related to ship, no ship co
 - Frame-cost split: with `SPACEVORS_DIAGNOSTIC=1` each tick logs `[SIM] tick: Xms`, each flush `[APPLY] <phase>: Xms`, each frame `[RENDER] frame: Xms`. `[RENDER]` includes raylib's `SetTargetFPS` pacing wait — read it against `[FRAME] dt=` to tell sim-bound from render-bound. Never sum `[SYSTEM]` totals together with their sub-stage lines.
 - Threat readout: `[THREAT]` prints once a second in every run (it is what the difficulty knobs are tuned against); `ThreatMeter.Measure` is a read-only aggregate, never called from the hot path.
 - Perf scenarios: `SPACEVORS_SCENARIO=<name>` runs a seeded scenario (pinned viewport/mouse, one tick per frame, uncapped); one `[PERF]` row per measured frame; `.tools/scenario.sh` pools runs, `.tools/run/index.tsv` is the perf record; budgets and `--check-baseline` exit non-zero. Design, decisions and current numbers: plans/PERF_SCENARIOS.md.
+- Lit render A/B: `.tools/ab-lit.sh` builds the working tree and HEAD, snapshots both pairs of dlls and **interleaves** the reps, comparing per-frame CPU time (`.tools/run/ab-lit-cpu.tsv`). Sequential sides and wall time both measure the host, not the change; `RenderBench` refuses to time a lit scenario whose shader did not load.
 - Shape batching: the many-small passes (ammo, sparks, explosions, smoke) draw through `ShapeSprites` — a generated disc quad inside raylib's batched 2D path — not `DrawCircle`/`DrawLineEx`, so thousands of particles become a handful of draws.
 
 ## Troubleshooting

@@ -103,6 +103,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Hull damage shading — shipped — plans/DAMAGE_SHADING.md
 - UI polish — shipped — plans/UI_POLISH.md
 - Off-screen edge indicators: distance-tapered chevrons, enemies red, pickups in their world colours — shipped — plans/OFF_SCREEN_INDICATORS.md
+- Lit sprite rendering: skip transparent texels, pack depth into the normal map, 512 px mipmapped maps, count/colour the gathered lights, key+fill+rim+spec rig — shipped 2026-11-02 — plans/LIT_SPRITE_RENDERING.md
 
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md
