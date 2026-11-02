@@ -226,3 +226,12 @@ measurement distance - the fit says 103k live fits 16.67 ms - so the next run wo
 
 Still not measured by the probe: RSS and the p99 shape, by design (it takes the median). The scenario
 baselines own those numbers.
+
+Record, later the same day: the history moved out of `.tools/run/ceiling.tsv` (gitignored, so it only ever
+existed on the machine that ran it) into **`.tools/ceiling-history.tsv`, tracked** — one row per bracket
+per run, now with a cpu column. Each run prints a `compare:` line against the previous row of the same
+host, mix, bracket and budget: a percentage when the cpu matches, the bare numbers when it does not, and
+nothing gates on the file either way. The four rows above are the first entries; their cpu column is empty
+because they were copied in by hand, so the first real run compares without a percentage and the second one
+gets the percentage. The per-probe logs stay in `.tools/run/` and out of git on purpose - they are forty
+lines of host-specific noise, and the table already holds every field worth diffing.
