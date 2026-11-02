@@ -218,10 +218,23 @@ public static class Program
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
         const vec3 LightDir = normalize(vec3(0.6, -0.6, 0.5));
-        const float AmbientLevel = 0.30;
         const float ShadowUvOffset = 0.02;
         const float ShadowDepthBias = 0.03;
         const float ShadowDiffuseScale = 0.15;
+
+        // Mirrors Lighting's rig: key, fill, highlight, rim. A look change must be copied here too, or
+        // the probe reports the change itself as a mismatch.
+        const vec3 KeyColor = vec3(1.00, 0.95, 0.86);
+        const float KeyStrength = 0.72;
+        const vec3 FillColor = vec3(0.45, 0.58, 0.95);
+        const float FillStrength = 0.32;
+        const vec3 HalfVector = normalize(vec3(0.6, -0.6, 1.5));
+        const float SpecularPower = 24.0;
+        const float SpecularStrength = 0.32;
+        const vec3 RimColor = vec3(0.42, 0.60, 1.0);
+        const float RimPower = 3.0;
+        const float RimStrength = 0.18;
+        const float PointLightShadowScale = 0.5;
         // Matches Lighting.TransparentAlphaCutoff, the divisor floor for the premultiplied base.
         const float TransparentAlphaCutoff = 1.5 / 255.0;
 
@@ -229,7 +242,7 @@ public static class Program
         // Slots with zero radius or intensity are skipped, so unused slots stay inert.
         const int MaxPointLights = 16;
         uniform vec4 uLights[MaxPointLights];
-        const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);
+        const vec3 PointLightTint = vec3(1.0, 0.72, 0.42);   // the bench's one light colour
         // Caps stacked lights so lit surfaces keep texture detail instead of clipping to white.
         const float MaxPointLightContribution = 1.0f;
         // Lights sit this many px above the scene plane (toward viewer), so flat surfaces still receive light.
@@ -275,7 +288,13 @@ public static class Program
             }
             pointLight = min(pointLight, MaxPointLightContribution);
 
-            vec3 lit = albedo * (AmbientLevel + diffuse) + PointLightTint * pointLight;
+            float specular = pow(max(dot(normalScreen, HalfVector), 0.0), SpecularPower) * SpecularStrength * shadowed;
+            float rim = pow(1.0 - normalScreen.z, RimPower) * RimStrength;
+
+            vec3 lit = albedo * (FillColor * FillStrength + KeyColor * (diffuse * KeyStrength))
+                     + albedo * PointLightTint * pointLight * mix(1.0, PointLightShadowScale, shadowed)
+                     + KeyColor * specular
+                     + RimColor * rim;
 
             finalColor = vec4(lit, baseColor.a) * fragColor;
         }

@@ -40,10 +40,34 @@ public static class Lighting
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
         const vec3 LightDir = normalize(vec3(0.6, -0.6, 0.5));
-        const float AmbientLevel = 0.30;
         const float ShadowUvOffset = 0.02;
         const float ShadowDepthBias = 0.03;
         const float ShadowDiffuseScale = 0.15;
+
+        // Light rig. A warm key from the top-right, a cool fill standing in for starlight, and a cool rim
+        // on grazing surfaces. Key and fill together peak just over 1.0 on a white texel: the old rig
+        // (ambient 0.30 + diffuse 1.0) peaked at 1.30, so the brightest hulls and rocks clipped to flat
+        // white wherever the light landed.
+        const vec3 KeyColor = vec3(1.00, 0.95, 0.86);
+        const float KeyStrength = 0.72;
+        const vec3 FillColor = vec3(0.45, 0.58, 0.95);
+        const float FillStrength = 0.32;
+
+        // Blinn-Phong highlight against the key light. The view direction of an orthographic 2D scene is
+        // straight out of the screen, so the half vector is a constant, not a per-fragment sum.
+        const vec3 HalfVector = normalize(vec3(0.6, -0.6, 1.5));
+        const float SpecularPower = 24.0;
+        const float SpecularStrength = 0.32;
+
+        // Grazing surfaces catch a cool edge light: this is what separates a dark hull from the black
+        // background once the key light is on its far side.
+        const vec3 RimColor = vec3(0.42, 0.60, 1.0);
+        const float RimPower = 3.0;
+        const float RimStrength = 0.18;
+
+        // Gathered lights all sit on one side of the plane, so a fragment the key light has shadowed
+        // still keeps part of their glow rather than dropping to the fill alone.
+        const float PointLightShadowScale = 0.5;
 
         // Point lights: xy screen pos (GL origin bottom-left), z radius px, w intensity.
         // uLightCount is how many slots LightGatherer filled this frame; slots past it are never read,
@@ -199,13 +223,25 @@ public static class Lighting
 
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
 
-            // Point lights add a warm glow on top of the directional light, shaded by sprite normals.
+            // Point lights add a coloured glow on top of the rig, shaded by sprite normals.
             vec3 pointLight = vec3(0.0);
             for (int i = 0; i < uLightCount; i++)
                 pointLight += PointLightContribution(normalScreen, uLights[i], uLightTints[i]);
             pointLight = min(pointLight, vec3(MaxPointLightContribution));
 
-            vec3 lit = albedo * (AmbientLevel + diffuse) + pointLight + ember;
+            // Highlight and rim. Both are multiplied by shadowed so a crater does not glint or glow
+            // through the self-shadow that the depth map just put there.
+            float specular = pow(max(dot(normalScreen, HalfVector), 0.0), SpecularPower) * SpecularStrength * shadowed;
+            float rim = pow(1.0 - normalScreen.z, RimPower) * RimStrength;
+
+            // Point light is multiplied by the albedo, as the key and the fill are: light falling on a
+            // dark hull stays dark. Added raw, as it used to be, a fireball turned a charcoal hull into
+            // a white blob - the one case the game shows most.
+            vec3 lit = albedo * (FillColor * FillStrength + KeyColor * (diffuse * KeyStrength))
+                     + albedo * pointLight * mix(1.0, PointLightShadowScale, shadowed)
+                     + KeyColor * specular
+                     + RimColor * rim
+                     + ember;
 
             // RGB of the vertex color carries the packed angle, so only its alpha tints.
             finalColor = vec4(lit, sampled.a * fragColor.a);
