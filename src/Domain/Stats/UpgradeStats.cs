@@ -4,7 +4,7 @@ namespace Spacevors.Domain.Stats;
 public static class UpgradeStats
 {
     // What the next level costs, on top of what the previous one cost.
-    private const int XpStepPerLevel = 10;
+    private const int XpStepPerLevel = 5;
 
     // Cumulative XP that must be reached while at `level` to advance. A level costs `XpStepPerLevel` more
     // than the one before it (10 to leave level 1, then 20 more, then 30 more), so the total is the
