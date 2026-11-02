@@ -19,6 +19,9 @@
          bin/... output - `.tools/game.sh` does - is not running this build. scenario.sh publishes, and
          prints which artifact it ran. -->
     <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- ImageLoader packs a lit sprite's normal and depth maps into one texture, and raylib holds
+         image pixels behind a raw pointer (Image.Data), so that one loop needs unsafe. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

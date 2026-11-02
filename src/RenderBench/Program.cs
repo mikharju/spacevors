@@ -169,9 +169,12 @@ public static class Program
     static System.Numerics.Vector2 CenterOf((float X, float Y, float Width, float Height) cell) => new(cell.Width / 2f, cell.Height / 2f);
     static System.Numerics.Vector2 CenterOf(Rectangle rect) => new(rect.Width / 2f, rect.Height / 2f);
 
-    // Frozen copy of the pre-batching shader (per-sprite angleRad uniform), kept as a pixel oracle:
-    // if the current grouped path renders this scene identically, vertex-color angle encoding and
-    // variant grouping are correct. Delete only when the legacy per-sprite path is gone for good.
+    // Frozen copy of the pre-batching shader (per-sprite angleRad uniform, no damage path, no
+    // transparent early-out), kept as a pixel oracle: if the current grouped path renders this scene
+    // identically, vertex-color angle encoding, variant grouping and the early-out are correct. The
+    // oracle reads the same packed surface map the live shader does, so the packing itself is checked
+    // by diffing screenshots across builds (plans/LIT_SPRITE_RENDERING.md). Delete only when the
+    // legacy per-sprite path is gone for good.
     const string LegacyVertexShader = """
         #version 330
         in vec3 vertexPosition;
@@ -194,8 +197,8 @@ public static class Program
         in vec4 fragColor;
         out vec4 finalColor;
         uniform sampler2D texture0;
-        uniform sampler2D normalMap;
-        uniform sampler2D depthMap;
+        // One packed surface map, like the live shader: RGB = normal, A = depth.
+        uniform sampler2D normalDepth;
         uniform float angleRad;
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
@@ -220,7 +223,7 @@ public static class Program
             vec4 baseColor = texture(texture0, fragTexCoord);
 
             // Normal map is tangent space with +Y up in image; screen y points down.
-            vec3 nMap = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
+            vec3 nMap = texture(normalDepth, fragTexCoord).rgb * 2.0 - 1.0;
             vec3 normalLocal = normalize(vec3(nMap.x, -nMap.y, nMap.z));
 
             float c = cos(angleRad);
@@ -232,8 +235,8 @@ public static class Program
 
             // Self-shadow: a higher surface toward the light blocks it. Depth white = closer to viewer.
             vec2 lightUvDir = vec2(c * LightDir.x + s * LightDir.y, -s * LightDir.x + c * LightDir.y);
-            float depthHere = texture(depthMap, fragTexCoord).r;
-            float depthTowardLight = texture(depthMap, fragTexCoord + lightUvDir * ShadowUvOffset).r;
+            float depthHere = texture(normalDepth, fragTexCoord).a;
+            float depthTowardLight = texture(normalDepth, fragTexCoord + lightUvDir * ShadowUvOffset).a;
             float shadowed = 1.0 - smoothstep(-ShadowDepthBias, ShadowDepthBias, depthHere - depthTowardLight);
 
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
@@ -311,8 +314,7 @@ public static class Program
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
 
-        int normalLoc = Raylib.GetShaderLocation(legacy, "normalMap");
-        int depthLoc = Raylib.GetShaderLocation(legacy, "depthMap");
+        int normalDepthLoc = Raylib.GetShaderLocation(legacy, "normalDepth");
         int angleLoc = Raylib.GetShaderLocation(legacy, "angleRad");
         int lightsLoc = Raylib.GetShaderLocation(legacy, "uLights");
 
@@ -320,8 +322,7 @@ public static class Program
         {
             var (sprite, angleDeg) = scene[i];
             Raylib.BeginShaderMode(legacy);
-            Raylib.SetShaderValueTexture(legacy, normalLoc, sprite.Normals);
-            Raylib.SetShaderValueTexture(legacy, depthLoc, sprite.Depth);
+            Raylib.SetShaderValueTexture(legacy, normalDepthLoc, sprite.NormalDepth);
             Raylib.SetShaderValue(legacy, angleLoc, angleDeg * MathF.PI / 180f, ShaderUniformDataType.Float);
             Raylib.SetShaderValueV(legacy, lightsLoc, InertLights, ShaderUniformDataType.Vec4, InertLights.Length);
             Raylib.DrawTexturePro(sprite.Base, ToSource(sprite), CellRect(i), CenterOf(CellRect(i)), angleDeg, Color.White);

@@ -101,20 +101,57 @@ public static class ImageLoader
 
     // Maps are sampled with the base texture's normalized UVs, so a pure resolution difference is fine;
     // a size mismatch still warns because differently-framed maps would misregister silently.
+    // The depth map is folded into the normal map's alpha before upload (see WriteDepthIntoAlpha).
     private static LitSprite LoadLitSet(LitSpriteMatcher.Set set, Dictionary<string, string> byStem, string directory)
     {
-        var baseTex = Raylib.LoadTexture(byStem[set.BaseStem]);
-        var normalsTex = Raylib.LoadTexture(byStem[set.NormalsStem]);
-        var depthTex = Raylib.LoadTexture(byStem[set.DepthStem]);
+        var baseImg = Raylib.LoadImage(byStem[set.BaseStem]);
+        var normalsImg = Raylib.LoadImage(byStem[set.NormalsStem]);
+        var depthImg = Raylib.LoadImage(byStem[set.DepthStem]);
 
-        if (normalsTex.Width != baseTex.Width || normalsTex.Height != baseTex.Height ||
-            depthTex.Width != baseTex.Width || depthTex.Height != baseTex.Height)
+        if (normalsImg.Width != baseImg.Width || normalsImg.Height != baseImg.Height ||
+            depthImg.Width != baseImg.Width || depthImg.Height != baseImg.Height)
             DiagnosticLogger.LogWarning(
                 $"lit set '{set.Prefix}' in {Path.GetFileName(directory)}: maps " +
-                $"{normalsTex.Width}x{normalsTex.Height}/{depthTex.Width}x{depthTex.Height}, base {baseTex.Width}x{baseTex.Height}; " +
+                $"{normalsImg.Width}x{normalsImg.Height}/{depthImg.Width}x{depthImg.Height}, base {baseImg.Width}x{baseImg.Height}; " +
                 "regenerate maps at the base dimensions");
 
-        return new LitSprite(baseTex, normalsTex, depthTex);
+        // Byte-level packing needs one known layout, and every map upload goes through the same path.
+        Raylib.ImageFormat(ref baseImg, PixelFormat.UncompressedR8G8B8A8);
+        Raylib.ImageFormat(ref normalsImg, PixelFormat.UncompressedR8G8B8A8);
+        Raylib.ImageFormat(ref depthImg, PixelFormat.UncompressedR8G8B8A8);
+
+        // A differently sized depth map is resampled to the normal map: the shader samples both with
+        // the same UVs, so the two channels must refer to the same texel.
+        if (depthImg.Width != normalsImg.Width || depthImg.Height != normalsImg.Height)
+            Raylib.ImageResize(ref depthImg, normalsImg.Width, normalsImg.Height);
+
+        WriteDepthIntoAlpha(normalsImg, depthImg);
+
+        var baseTex = Raylib.LoadTextureFromImage(baseImg);
+        var normalDepthTex = Raylib.LoadTextureFromImage(normalsImg);
+        Raylib.UnloadImage(baseImg);
+        Raylib.UnloadImage(normalsImg);
+        Raylib.UnloadImage(depthImg);
+
+        return new LitSprite(baseTex, normalDepthTex);
+    }
+
+    // Copies the depth map's red channel into the normal map's alpha. Both are plain 8-bit PNGs whose
+    // alpha carries nothing, and a lit fragment needs the normal and the depth at overlapping UVs, so
+    // packing them saves one texture fetch per fragment and a third of the lit maps' VRAM.
+    // Unsafe because raylib holds image pixels behind a raw pointer (Image.Data); the loop stays
+    // inside the two buffers the caller already owns.
+    static unsafe void WriteDepthIntoAlpha(Image normals, Image depth)
+    {
+        const int BytesPerTexel = 4;
+        const int AlphaOffset = 3;
+
+        int byteCount = normals.Width * normals.Height * BytesPerTexel;
+        byte* surface = (byte*)normals.Data;
+        byte* heights = (byte*)depth.Data;
+
+        for (int alpha = AlphaOffset; alpha < byteCount; alpha += BytesPerTexel)
+            surface[alpha] = heights[alpha - AlphaOffset];
     }
 
     public static void UnloadAssets()
@@ -165,8 +202,7 @@ public static class ImageLoader
         foreach (var sprite in litSprites.Values)
         {
             if (sprite.Base.Id != 0) Raylib.UnloadTexture(sprite.Base);
-            if (sprite.Normals.Id != 0) Raylib.UnloadTexture(sprite.Normals);
-            if (sprite.Depth.Id != 0) Raylib.UnloadTexture(sprite.Depth);
+            if (sprite.NormalDepth.Id != 0) Raylib.UnloadTexture(sprite.NormalDepth);
         }
     }
 
@@ -180,8 +216,7 @@ public static class ImageLoader
             if (lit != null)
             {
                 if (lit.Base.Id != 0) Raylib.UnloadTexture(lit.Base);
-                if (lit.Normals.Id != 0) Raylib.UnloadTexture(lit.Normals);
-                if (lit.Depth.Id != 0) Raylib.UnloadTexture(lit.Depth);
+                if (lit.NormalDepth.Id != 0) Raylib.UnloadTexture(lit.NormalDepth);
             }
             if (sprite.Flat.HasValue && sprite.Flat.Value.Id != 0)
                 Raylib.UnloadTexture(sprite.Flat.Value);

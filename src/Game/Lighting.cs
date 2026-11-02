@@ -32,8 +32,8 @@ public static class Lighting
         in vec4 fragColor;
         out vec4 finalColor;
         uniform sampler2D texture0;
-        uniform sampler2D normalMap;
-        uniform sampler2D depthMap;
+        // One surface map: RGB = tangent-space normal, A = depth (packed at load, see ImageLoader).
+        uniform sampler2D normalDepth;
         uniform float uTime;
 
         const float TwoPi = 6.28318530718;
@@ -101,7 +101,7 @@ public static class Lighting
             }
 
             // Normal map is tangent space with +Y up in image; screen y points down.
-            vec3 nMap = texture(normalMap, fragTexCoord).rgb * 2.0 - 1.0;
+            vec3 nMap = texture(normalDepth, fragTexCoord).rgb * 2.0 - 1.0;
             vec3 normalLocal = normalize(vec3(nMap.x, -nMap.y, nMap.z));
             float depthDamage = 0.0;
             vec3 ember = vec3(0.0);
@@ -168,8 +168,8 @@ public static class Lighting
 
             // Self-shadow: a higher surface toward the light blocks it. Depth white = closer to viewer.
             vec2 lightUvDir = vec2(c * LightDir.x + s * LightDir.y, -s * LightDir.x + c * LightDir.y);
-            float depthHere = texture(depthMap, fragTexCoord).r - depthDamage;
-            float depthTowardLight = texture(depthMap, fragTexCoord + lightUvDir * ShadowUvOffset).r;
+            float depthHere = texture(normalDepth, fragTexCoord).a - depthDamage;
+            float depthTowardLight = texture(normalDepth, fragTexCoord + lightUvDir * ShadowUvOffset).a;
             float shadowed = 1.0 - smoothstep(-ShadowDepthBias, ShadowDepthBias, depthHere - depthTowardLight);
 
             float diffuse = max(dot(normalScreen, LightDir), 0.0) * mix(1.0, ShadowDiffuseScale, shadowed);
@@ -199,8 +199,7 @@ public static class Lighting
     public static bool IsReady { get; private set; }
 
     static Shader? _shader;
-    static int _normalMapLoc;
-    static int _depthMapLoc;
+    static int _normalDepthLoc;
     static int _lightsLoc;
     static int _timeLoc;
 
@@ -245,8 +244,7 @@ public static class Lighting
         }
 
         _shader = shader;
-        _normalMapLoc = Raylib.GetShaderLocation(shader, "normalMap");
-        _depthMapLoc = Raylib.GetShaderLocation(shader, "depthMap");
+        _normalDepthLoc = Raylib.GetShaderLocation(shader, "normalDepth");
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
         _timeLoc = Raylib.GetShaderLocation(shader, "uTime");
         IsReady = true;
@@ -272,8 +270,7 @@ public static class Lighting
         // BeginShaderMode must come first: its batch flush clears raylib's texture-unit registry,
         // so map uniforms set before it are lost on an empty flush.
         Raylib.BeginShaderMode(shader);
-        Raylib.SetShaderValueTexture(shader, _normalMapLoc, sprite.Normals);
-        Raylib.SetShaderValueTexture(shader, _depthMapLoc, sprite.Depth);
+        Raylib.SetShaderValueTexture(shader, _normalDepthLoc, sprite.NormalDepth);
         Raylib.SetShaderValueV(shader, _lightsLoc, PointLights, ShaderUniformDataType.Vec4, MaxPointLights);
         // Frame-global time drives the ember pulse; a global uniform is exactly right here.
         Raylib.SetShaderValue(shader, _timeLoc, (float)Raylib.GetTime(), ShaderUniformDataType.Float);
