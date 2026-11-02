@@ -10,14 +10,15 @@ public static class MineStats
     public const float SpawnSpeedMax = 50f;
 
     // Damage dealt to the player on contact (CollisionSystem).
-    public const int ContactDamage = 3;
+    public const int ContactDamage = 12;
 
     // The field thins out as the run goes on (SpawningStats.Mines), so what is left of it grows rather
-    // than gets tougher: the large share drifts up with the difficulty tier — the same enemy stat clock
-    // that mines deliberately stay outside for hp. A large mine is easier to see and to dodge, worth 2 xp
-    // instead of 1 and shoves harder, but it still dies in the same two hits
-    // (plans/DIFFICULTY_SCALING.md R2.6 item 6: scarcer, not a chore to clear). The real threat step comes
-    // later from new mine kinds, not from bigger ones: plans/ENDLESS_DIFFICULTY.md P6.
+    // than gets more numerous: the large share drifts up with the difficulty tier, and since R32 so does the
+    // hp of what spawns (`HealthAtTier`). A large mine is easier to see and to dodge, worth 2 xp instead of
+    // 1 and shoves harder, but it is never harder to kill than a small one of its own tier
+    // (plans/DIFFICULTY_SCALING.md R2.6 item 6: scarcer, not a chore to clear — R32 only gave the leftover
+    // field some hp so a sniper round stops being pure overkill). The real threat step still comes later
+    // from new mine kinds, not from bigger ones: plans/ENDLESS_DIFFICULTY.md P6.
     public const float LargeShareStart = 0.5f;
     public const float LargeShareAtTierCap = 0.7f;
 
@@ -28,6 +29,14 @@ public static class MineStats
         float progress = Math.Clamp((float)tier / EnemyShipStats.MaxTier, 0f, 1f);
         return LargeShareStart + (LargeShareAtTierCap - LargeShareStart) * progress;
     }
+
+    // R32: the hit points a spawned mine carries. 8 at the opening — two hits from a 4-damage support chip,
+    // as a 2 hp mine was under a 1-damage one — and +2 per difficulty minute up to 28 at the tier cap, so the
+    // field left late in a run is worth more than one RailGun slug (7.5x overkill before, 2.1x now) without
+    // becoming a chore to clear. Both sizes share it, as they always have.
+    public const int HealthBase = 8;
+    public const int HealthPerTier = 2;
+    public static int HealthAtTier(int tier) => HealthBase + HealthPerTier * tier;
 }
 
 public readonly record struct MineType(
@@ -38,11 +47,11 @@ public readonly record struct MineType(
     int PlayerContactSparkCount,
     int XpAmount,
     float XpPickupRadius,
-    // Fixed health shared by all mines; difficulty tiers do not apply to mines.
+    // Health shared by both sizes — the base that the tier scaling is added to at spawn (`HealthAtTier`).
     int Health)
 {
-    public static MineType Small { get; } = new(7.5f, 15f, 3, 120f, 5, 1, 6f, Health: 2);
-    public static MineType Large { get; } = new(15f, 30f, 7, 240f, 10, 2, 9f, Health: 2);
+    public static MineType Small { get; } = new(7.5f, 15f, 3, 120f, 5, 1, 6f, Health: MineStats.HealthBase);
+    public static MineType Large { get; } = new(15f, 30f, 7, 240f, 10, 2, 9f, Health: MineStats.HealthBase);
 
     public static MineType FromSize(MineSize size) => size == MineSize.Large ? Large : Small;
 }

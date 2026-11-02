@@ -28,7 +28,7 @@ public class EnemyTierStatsTest
         var (health, turret) = Spawn(type, 0f);
 
         Assert.Equal(type.Health, health);
-        Assert.Equal(1, turret.Weapon.Damage); // base enemy damage before tier scaling
+        Assert.Equal(4, turret.Weapon.Damage); // base enemy damage before tier scaling
         Assert.Equal(type.TurretFireRate, turret.Weapon.FireRate, precision: 3);
     }
 

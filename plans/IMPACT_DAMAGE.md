@@ -194,3 +194,13 @@ wrong:
 - Dating correction: the body's "done (2026-09-16)" was the design date; the first impact-damage code
   anywhere in git is fa32c38 (2026-10-11).
 
+
+## Follow-up (2026-11-02): the rule moved to R32's ×4 scale
+
+`ImpactScale` 7.2e-9 → **2.88e-8**, `MaxImpactDamage` 3 → **12**, `SparkDamageThreshold` 2 → **8**
+(`MinClosingSpeed` 160 unchanged) — so the fractions of a hull are exactly what this file describes, on hulls
+that are four times bigger (the Scout's 8 hp is 32). Because the rule *ceilings* raw damage over a 0.5 floor,
+the integers are not exactly four times the old ones: a 200 px/s touch 0 → 2, a 300 px/s nudge 1 → 4, a
+400 px/s pilot's ram 1 → 3, and the tuned 800 px/s big hit 3 → 12, which now lands on the per-hit allowance.
+An enemy driven into an asteroid reads 11, not 12, because its heavier partner absorbs the rest. Full record:
+`plans/WEAPON_BALANCE.md`, `## Shipped (2026-11-02): pass 3 steps 1-2`.

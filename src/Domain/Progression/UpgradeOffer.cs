@@ -10,9 +10,10 @@ namespace Spacevors.Domain.Systems;
 // re-deal that re-implemented the pool would drift the first time an offer rule was fixed, so a reroll
 // cannot invent a card a level-up would have withdrawn — no card naming a cargo gun, no projectile-speed
 // card on a hitscan beam, no "+1 shot" past the guided volley budget (R17/R18), no missile-health card
-// past its ceiling (R19), no damage card on a support gun and no range card past a support gun's class
-// roof (R29), no weapon the ship already owns, at most three new-weapon cards in a milestone
-// hand. Balance rules R6/R10/R18/R19/R29 all say a card must never be a lie; that applies to a re-deal too.
+// past its ceiling (R19), no range card past a support gun's class roof (R29), no weapon the ship already
+// owns, at most three new-weapon cards in a milestone hand, and a damage card sized by the mount's class
+// (R33). Balance rules R6/R10/R18/R19/R29/R33 all say a card must never be a lie; that applies to a
+// re-deal too.
 public static class UpgradeOffer
 {
     const int HandSize = 5;
@@ -50,11 +51,10 @@ public static class UpgradeOffer
         {
             allOptions.AddRange(NewWeaponOptions(ownedNames, level, view.Rng));
 
-            // R29: `Damage` is a kill-gun card. It is a flat +1 (`UpgradeStats.cs:21`), so on a 1-damage
-            // support chip it behaves as a multiplier — one card would lift a support mount over the class
-            // line the weapon table just drew, and R10's "+15-35%" guidance would be broken in the one
-            // place it matters. A support gun buys growth with rate and reach instead.
-            foreach (var turret in turrets.Where(t => !t.IsSupport))
+            // R33: every mounted gun is dealt its damage card at a milestone. It used to be a kill-gun
+            // card because a flat +1 on a 1-damage chip was a x2 multiplier; as a percent of the base the
+            // support gun buys a quarter and the kill gun a half, so the class line holds without a ban.
+            foreach (var turret in turrets)
                 allOptions.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Damage));
         }
         else
@@ -75,9 +75,11 @@ public static class UpgradeOffer
                 if (!stats.Hitscan)
                     allOptions.Add(new UpgradableOption(weapon, UpgradeOption.ProjectileSpeed));
 
-                // R19: only a guided round has hit points to raise, and only up to the ceiling, so the
-                // card exists only for the guns that fire them and only while they can still take it.
-                if (stats.CanToughenRound)
+                // R19: only a guided round has hit points to raise, so the card exists only for the guns
+                // that fire them, and only while the next whole step still lands at or under the ceiling.
+                // The step is the gun's percent of its **base** round health (R33's shape), read off the
+                // table, so a mount that already bought a card is offered the same honest step again.
+                if (WeaponType.FromName(weapon) is { } gun && stats.CanToughenRound(gun.MissileHealthStep))
                     allOptions.Add(new UpgradableOption(weapon, UpgradeOption.MissileHealth));
 
                 // R29: a support gun stops at its class roof (R24/R26). The Range card stretches the shot's

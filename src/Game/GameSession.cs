@@ -1169,9 +1169,14 @@ public sealed class GameSession
 
             case UpgradeOption.MissileHealth:
                 // The card is bought for the mount, so it lands on the rounds the mount fires next and
-                // not on the ones already in the air.
+                // not on the ones already in the air. Its step is a percent of the gun's **base** round
+                // health, so it is added rather than compounded: a second card buys exactly as much as
+                // the first, and a gun that starts with a tougher round buys more of it.
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = turret.Weapon.MissileHealth + def.Additive } });
+                {
+                    if (WeaponType.FromName(turret.WeaponName) is not { } gun) continue;
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = turret.Weapon.MissileHealth + gun.MissileHealthStep } });
+                }
                 break;
 
             case UpgradeOption.PickupRadius:
@@ -1184,8 +1189,14 @@ public sealed class GameSession
                 break;
 
             case UpgradeOption.Damage:
+                // R33: the step is a percent of the gun's **base** damage, sized by mount class, so cards
+                // stack on the table value instead of on each other and a support chip never multiplies
+                // itself the way a flat +1 once did.
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Damage = turret.Weapon.Damage + def.Additive } });
+                {
+                    if (WeaponType.FromName(turret.WeaponName) is not { } gun) continue;
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Damage = turret.Weapon.Damage + gun.DamageStep } });
+                }
                 break;
 
             case UpgradeOption.Hp:

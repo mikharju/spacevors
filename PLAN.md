@@ -76,6 +76,12 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Weapon balance passes 1-2; rules R1-R31, open knobs — shipped — plans/WEAPON_BALANCE.md
   (pass 2 split the roster into a kill class that owns the top DPS and the long band and a support class of
   chips + missile screens; support guns lost the `Damage` card and their range roof is 1350 px)
+- Weapon balance pass 3 steps 1-2; rules R32-R33: every damage and hp number ×4 (same hit counts, same TTK,
+  same feel) and `Damage` cards become percents of the table base added not compounded (+25% support, +50% kill,
+  milestone-only), `MissileHealth` +50% of the round's base, `Hp` +8, mines now walk the tier clock (8 + 2·tier)
+  — shipped — plans/WEAPON_BALANCE.md
+- Weapon balance pass 3 steps 3-5; rules R34-R36: band-scaled `Range` with no ceiling, a scatter-tightening
+  card, a missile-agility card — proposed — plans/WEAPON_BALANCE.md
 - Weapon identity cells; R23 one gun of each type aboard, FlechetteFan/Stiletto/SiegeSalvo/FarlockSalvo, deduped Shadow and Heavy loadouts — shipped — plans/WEAPON_IDENTITY_CELLS.md
 - Impact damage — shipped — plans/IMPACT_DAMAGE.md
 - Primary target lock and enemy hp bars — shipped — plans/TARGETING_HP_BARS.md

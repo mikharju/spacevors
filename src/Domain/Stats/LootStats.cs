@@ -9,7 +9,7 @@ public static class LootStats
 
     // Chance that a death also drops a health orb (mines and ships alike).
     public const float HealthOrbChance = 0.05f;
-    public const int HealthOrbHealAmount = 3;
+    public const int HealthOrbHealAmount = 12;
     public const float HealthOrbRadius = 20f;
 
     // Mine orbs are sized relative to the mine's XP pickup radius instead of using a fixed value.

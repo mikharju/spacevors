@@ -114,6 +114,25 @@ public class ShipRosterTest
         Assert.True(fullyBooked <= 1, $"{fullyBooked} hulls start with every mount filled");
     }
 
+    // R32: the hit points the HUD and the stats screen actually print, at the ×4 scale — the Fighter reads
+    // 40 where it used to read 10. R12's ordering and every hull's relative toughness are unchanged; only the
+    // resolution moved. A quarter of the smallest hull (8) is what one `Hp` card buys, as it always was.
+    [Fact]
+    public void HullHitPointsSitAtTheX4Scale()
+    {
+        var hp = ShipType.All.ToDictionary(s => s.Name, s => s.MaxHealth);
+
+        Assert.Equal(32, hp["Scout"]);
+        Assert.Equal(40, hp["Fighter"]);
+        Assert.Equal(40, hp["Shadow"]);
+        Assert.Equal(40, hp["Falcon"]);
+        Assert.Equal(48, hp["Manta"]);
+        Assert.Equal(56, hp["Raptor"]);
+        Assert.Equal(64, hp["Eagle"]);
+        Assert.Equal(80, hp["Heavy"]);
+        Assert.Equal(UpgradeDefinition.Hp.Additive, ShipType.Scout.MaxHealth / 4);
+    }
+
     [Fact]
     public void DiagnosticShips_FireTheirWeaponInAStartedWorld()
     {

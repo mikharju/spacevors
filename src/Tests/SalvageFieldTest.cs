@@ -13,7 +13,7 @@ public class SalvageFieldTest
 {
     const float Dt = 1f / 120f;
 
-    // A hull at 95/100 needs two 3 hp orbs; at 100/100 it needs none. Both are the interesting cases.
+    // A hull at 76/100 needs two 12 hp orbs; at 100/100 it needs none. Both are the interesting cases.
     private static (EntityManager Em, Entity Player) World(int hp)
     {
         var em = new EntityManager();
@@ -93,12 +93,12 @@ public class SalvageFieldTest
         Assert.Equal(3, em.GetComponent<Player>(player).Xp);
     }
 
-    // 95/100 needs two orbs, so the two nearest are called and the two furthest are left exactly where they
+    // 76/100 needs two orbs, so the two nearest are called and the two furthest are left exactly where they
     // lie — the field is a top-up, not a vacuum.
     [Fact]
     public void Field_PullsOnlyTheNearestHealthOrbsTheHullNeeds()
     {
-        var (em, _) = World(hp: 95);
+        var (em, _) = World(hp: 76);
         AddField(em);
         Entity near = AddOrb(em, 100f);
         Entity second = AddOrb(em, 300f);

@@ -63,7 +63,7 @@ public class HealthOrbChaseTest
         }
 
         Assert.True(collected, "a committed health orb must not be outrun by a boosting hull");
-        Assert.Equal(53, em.GetComponent<Health>(player).Current);
+        Assert.Equal(62, em.GetComponent<Health>(player).Current);
     }
 
     // A committed orb stops aging. At 149 px out it needs ~0.12 s to arrive, so a 0.05 s fuse would have
@@ -91,7 +91,7 @@ public class HealthOrbChaseTest
         }
 
         Assert.True(collected, "an orb already hunting the hull should not expire mid-flight");
-        Assert.Equal(53, em.GetComponent<Health>(player).Current);
+        Assert.Equal(62, em.GetComponent<Health>(player).Current);
     }
 
     // An orb outside the magnet radius and uncommitted still ages and still expires — the sweep and the

@@ -10,15 +10,16 @@ public static class ImpactDamage
     // closing speeds far below), asteroid drift and side-by-side flight all stay under it.
     public const float MinClosingSpeed = 160f;
 
-    // Damage per unit of absorbed energy. Calibrated on the initial 8 hp Scout hull: a big
-    // impact (800 px/s closing into a large asteroid) costs 3 hp, a full-speed ram (400 px/s) 1.
-    public const float ImpactScale = 7.2e-9f;
+    // Damage per unit of absorbed energy. Calibrated on the initial 32 hp Scout hull (R32): a big
+    // impact (800 px/s closing into a large asteroid) costs its whole 12 hp allowance, a full-speed ram
+    // (400 px/s) 3.
+    public const float ImpactScale = 2.88e-8f;
 
     // Per hit per body: one hit is at most a big impact, never a kill on its own.
-    public const int MaxImpactDamage = 3;
+    public const int MaxImpactDamage = 12;
 
     // A hit where either body absorbs at least this much throws a spark burst at the contact point.
-    public const int SparkDamageThreshold = 2;
+    public const int SparkDamageThreshold = 8;
 
     // Per-body damage from a collision of two masses with the given closing speed
     // (normal component of relative velocity, px/s). Zero below MinClosingSpeed.

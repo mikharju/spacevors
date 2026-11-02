@@ -226,7 +226,7 @@ public class WeaponBalanceTest
         string[] bigRoundLicence = [WeaponType.RailGun.Name, WeaponType.HavocTorpedo.Name];
 
         foreach (var w in Guns.Where(w => !bigRoundLicence.Contains(w.Name)))
-            Assert.True(w.Stats.Damage <= 4, $"{w.Name} deals {w.Stats.Damage} damage per shot without a licence");
+            Assert.True(w.Stats.Damage <= 16, $"{w.Name} deals {w.Stats.Damage} damage per shot without a licence");
     }
 
     // R12: a bigger hull is a worse dodge, so the big ship may carry more firepower from the start
@@ -254,7 +254,7 @@ public class WeaponBalanceTest
     {
         foreach (var w in Guns.Where(w => w.IsSupport && !w.Stats.Homing))
         {
-            float ceiling = w.Range < 1100f ? 8f : 6f;
+            float ceiling = w.Range < 1100f ? 32f : 24f;
             Assert.True(Dps(w) <= ceiling, $"{w.Name} is a support gun at {Dps(w):0.#} dps, over its {ceiling:0.#} dps band ceiling");
             Assert.True(w.Range <= WeaponType.SupportRangeCeiling, $"{w.Name} reaches {w.Range:0} px from a small mount");
         }
@@ -296,7 +296,7 @@ public class WeaponBalanceTest
     public void SupportGunsFireChips()
     {
         foreach (var w in Guns.Where(w => w.IsSupport))
-            Assert.True(w.Stats.Damage <= 2, $"{w.Name} deals {w.Stats.Damage} damage a shot from a support mount");
+            Assert.True(w.Stats.Damage <= 8, $"{w.Name} deals {w.Stats.Damage} damage a shot from a support mount");
     }
 
     // R28: missile defence is the support class's job, keyed on the mount class rather than a per-gun list,

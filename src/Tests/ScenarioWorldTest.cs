@@ -104,8 +104,8 @@ public class ScenarioWorldTest
         ScenarioWorld.Apply(em, player, Scenarios.Find("hull-damage")!);
 
         var health = em.GetComponent<Health>(player);
-        Assert.Equal(20, health.Max);
-        Assert.Equal(2, health.Current);
+        Assert.Equal(80, health.Max);
+        Assert.Equal(8, health.Current);
     }
 
     [Fact]

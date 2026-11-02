@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Tests;
 
-// Mines get scarcer over a run (SpawningStats.Mines) and what is left of them gets bigger, never tougher:
-// the large share drifts with the tier while hp stays fixed for both sizes, because clearing mines must
-// stay a one-or-two-shot chore (plans/DIFFICULTY_SCALING.md R2.6 item 6).
+// Mines get scarcer over a run (SpawningStats.Mines) and what is left of them gets bigger and, since R32,
+// carries more hits: the large share and the spawned hp both drift with the tier, and neither of them ever
+// makes a large mine harder to kill than a small one (plans/DIFFICULTY_SCALING.md R2.6 item 6).
 public class MineSizeMixTest
 {
     [Theory]
@@ -37,7 +37,8 @@ public class MineSizeMixTest
     [Fact]
     public void BothMineSizesShareOneFixedHealth()
     {
-        // The mix may drift; the hp may not. A large mine is bigger and worth more, never harder to kill.
+        // The mix may drift and the tier may add hp; the two sizes never differ. A large mine is bigger and
+        // worth more xp, never harder to kill than a small one of its own tier.
         Assert.Equal(MineType.Small.Health, MineType.Large.Health);
     }
 
@@ -52,6 +53,42 @@ public class MineSizeMixTest
 
         Assert.True(lateLarge > openingLarge,
             $"the large share did not rise: {openingLarge} large mines at the opening, {lateLarge} late");
+    }
+
+    // R32: a mine's hp follows the difficulty tier it spawns at — 8 at the opening, two support-chip hits as
+    // before, and 28 at the tier cap. Both sizes carry it, so this is the leftover field getting weightier,
+    // not the large mine getting an unfair deal.
+    [Theory]
+    [InlineData(0, MineStats.HealthBase)]
+    [InlineData(5, MineStats.HealthBase + 10)]
+    [InlineData(EnemyShipStats.MaxTier, 28)]
+    public void MineHp_RampsWithTheDifficultyTier(int tier, int expectedHp)
+    {
+        Assert.Equal(expectedHp, MineStats.HealthAtTier(tier));
+    }
+
+    [Fact]
+    public void LateMinesSpawnTougherThanOpeningMines()
+    {
+        // Through the respawner, not just the pure function: a call site that ignored the tier would spawn
+        // both fields at the base hp and fail here.
+        Assert.True(SpawnedMineHp(SpawningStats.Mines.RampDuration + WaveStats.WaveDuration)
+            > SpawnedMineHp(WaveStats.OpeningLull), "the respawner never consulted the tier for hp");
+    }
+
+    static int SpawnedMineHp(float elapsed)
+    {
+        var em = new EntityManager();
+        var view = new WorldView(em);
+        AddStationaryPlayer(em);
+        em.AddElapsedTime(elapsed);
+
+        var commands = new CommandBuffer();
+        new MineRespawnSystem().Update(view, 100f, commands);
+        commands.Apply(em);
+
+        Assert.True(view.GetEntitiesWithComponents<Health>().TryFirst(out var mine));
+        return view.GetComponent<Health>(mine.Entity).Max;
     }
 
     // How many of 200 respawns come out large at a fixed elapsed time. One spawn per call: a long tick

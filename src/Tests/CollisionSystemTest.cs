@@ -14,12 +14,14 @@ public class CollisionSystemTests
         return (em, view, system);
     }
 
-    private void AddPlayer(EntityManager em)
+    // The fixture hull is 10 hp. A test that wants more than one contact hit to land asks for a bigger
+    // one: at R32's ×4 scale a large mine's contact damage is 12, which would kill a 10 hp hull on its own.
+    private void AddPlayer(EntityManager em, int hp = 10)
     {
         var player = em.CreateEntity();
         em.AddComponent(player, new Position(new Vector2(0f, 0f)));
-        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10));
-        em.AddComponent(player, new Health(10, 10));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: hp));
+        em.AddComponent(player, new Health(hp, hp));
     }
 
     [Fact]
@@ -485,7 +487,7 @@ public class CollisionSystemTests
     {
         var (em, view, system) = Setup();
 
-        AddPlayer(em);
+        AddPlayer(em, hp: 40);
 
         var mine1 = em.CreateEntity();
         em.AddComponent(mine1, new Position(new Vector2(-15f, 0f)));
@@ -504,7 +506,7 @@ public class CollisionSystemTests
 
         view.GetEntitiesWithComponents<Player, Health>().TryFirst(out var playerTuple);
         var playerHealth = playerTuple.Value2;
-        Assert.Equal(4, playerHealth.Current);
+        Assert.Equal(16, playerHealth.Current); // 40 - 2 x 12 contact damage
     }
 
     [Fact]

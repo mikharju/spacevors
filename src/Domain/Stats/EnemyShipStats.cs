@@ -51,26 +51,26 @@ public readonly record struct EnemyShipType(
     // What the hull's rack throws, or null when the hull never carries one.
     EnemyMissileSpec? Missiles = null)
 {
-    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 15,
+    public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 60,
         RangePerTier: 10f, SpeedPerTier: 2f, AmmoSpeedPerTier: 2f,
         // The swarmer stays un-armed: with up to 100 of them live it is the one armament no weight
         // table tames, so the missile never comes from the smallest, fastest hull.
         Armaments: [new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f)]);
 
-    // The middle hull is the first missile carrier: it already stands off, and 7 hp makes it something
+    // The middle hull is the first missile carrier: it already stands off, and 28 hp makes it something
     // the player can kill before it launches. 0.43 against the guns' 1 is ~30 % of its spawns; from
     // composition tier 5 the two armaments are an even mix.
-    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 7,
+    public static EnemyShipType Interceptor { get; } = new(1, "interceptor", 45f, 90f, 1.0f, 700f, 0.6f, 200f, 85f, 28,
         RangePerTier: -15f, SpeedPerTier: 3f, AmmoSpeedPerTier: 2f,
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
             new EnemyArmamentRow(EnemyArmament.Missiles, 3, 0.43f),
             new EnemyArmamentRow(EnemyArmament.Missiles, 5, 1f)],
-        Missiles: new EnemyMissileSpec(165f, 4f, Angle.FromDeg(70f), 6f, RoundHealth: 2, DamageBonus: 0));
+        Missiles: new EnemyMissileSpec(165f, 4f, Angle.FromDeg(70f), 6f, RoundHealth: 8, DamageBonus: 0));
 
     // The large hull gets the rack last and gets it alongside its guns: it is the slow long firing
     // line, so a missile on it reads as the execution of a role the player already knows.
-    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 30,
+    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 120,
         RangePerTier: 25f, AmmoSpeedPerTier: 1.6f,
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
@@ -78,12 +78,12 @@ public readonly record struct EnemyShipType(
             // From composition tier 10 the long firing line almost always carries its rack: 4 to 1 over
             // gun-only heavies, so a bare heavy is the rare sight rather than the norm.
             new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f)],
-        Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 3, DamageBonus: 1));
+        Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 12, DamageBonus: 4));
 
     // Streak: the dart. The fastest and flimsiest gunner in the fleet — it trades all its reach (the
     // shortest firing ring, so it must cross the whole no-man's land to shoot) for closing speed and a
     // spray rate that punishes standing still. It survives by out-flying shots, never by eating them.
-    public static EnemyShipType Streak { get; } = new(3, "streak", 36f, 115f, 1.15f, 520f, 2.0f, 170f, 110f, 5,
+    public static EnemyShipType Streak { get; } = new(3, "streak", 36f, 115f, 1.15f, 520f, 2.0f, 170f, 110f, 20,
         RangePerTier: 12f, SpeedPerTier: 3f, AmmoSpeedPerTier: 3f,
         SpawnWeight: 0.8f);
 
@@ -91,7 +91,7 @@ public readonly record struct EnemyShipType(
     // faster hull and a busier gun: it marches the firing line inward to just past the point-blank
     // band and wins the exchange on volume, escorting the slower heavies that hold the long line.
     // Gun-only — the missile ladder stays with the two hulls that introduced it (plans/MISSILES.md R20).
-    public static EnemyShipType Carmine { get; } = new(4, "carmine", 62f, 55f, 0.8f, 640f, 1.3f, 160f, 40f, 22,
+    public static EnemyShipType Carmine { get; } = new(4, "carmine", 62f, 55f, 0.8f, 640f, 1.3f, 160f, 40f, 88,
         RangePerTier: 18f, AmmoSpeedPerTier: 2f,
         SpawnWeight: 0.6f);
 
@@ -111,8 +111,9 @@ public static class EnemyShipStats
     public const float WeaponKickbackForce = 0f;
     public const float AmmoRadius = 2.5f;
 
-    // Base damage of enemy turret ammo (all types); tiers add on top via DamageAdd.
-    public const int BaseDamage = 1;
+    // Base damage of enemy turret ammo (all types); tiers add on top via DamageAdd. 4 at the ×4 scale
+    // (R32): the same bite against four times the hull, and a hull round still eats four of them.
+    public const int BaseDamage = 4;
 
     // Tiers are applied at spawn time only, so existing entities are never mutated mid-run.
     // Multipliers are capped by MaxTier — stats stop growing after 10 minutes instead of compounding forever against the player's upgrades.
@@ -123,7 +124,7 @@ public static class EnemyShipStats
 
     public static float HpMultiplier(int tier) => 1f + 0.25f * tier;
 
-    public static int DamageAdd(int tier) => tier / 2;
+    public static int DamageAdd(int tier) => 4 * (tier / 2);
 
     public static float FireRateMultiplier(int tier) => 1f + 0.1f * tier;
 
@@ -224,7 +225,7 @@ public static class EnemyShipStats
 
     // The missile's own, slower damage ladder: a steering round is the most certain delivery the enemy
     // ever gets, and certainty is paid for in damage (R1/R9 price it the same way for the player).
-    public static int MissileDamageAdd(int tier) => tier / 3;
+    public static int MissileDamageAdd(int tier) => 4 * (tier / 3);
 
     // The speed a rack's round builds to — not the speed it leaves at, which is a fraction of this.
     public static float MissileSpeedFor(EnemyMissileSpec spec, int tier) =>

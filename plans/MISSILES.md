@@ -571,3 +571,31 @@ beam never touched, and never looked at whether the beam itself had been consume
   round still does not detonate. The enemy side still does not intercept player missiles.
 - Correction to the 2026-10-31 number audit above: "player guided rounds are all 1 hp" is stale — FarlockSalvo
   ships `MissileHealth: 2` (`Stats/WeaponStats.cs`). Enemy racks remain 2 (Interceptor) and 3 (HeavyCannon).
+
+## Follow-up (2026-11-02): the `MissileHealth` card is a percent now
+
+- §7's `MissileHealth` card was `Additive: 1`. It is now **+50% of the gun's base round health, added, never
+  compounded** (`UpgradeDefinition.MissileHealth.PercentOfBase`, stepped through
+  `WeaponType.MissileHealthStep`), so a gun that starts with a tougher round is not limited to the same flat
+  point forever, and two cards are +100% of the base rather than +125%. R19's ceiling is unchanged at 3 and is
+  now landed on exactly: the offer asks `CanToughenRound(step)` — the next *whole* step must fit — where the
+  old gate (`hp < ceiling`) could deal a card for a step the ceiling would refuse.
+- Today the step is 1 hp on all four guided guns, because their bases are 1 and 2 hp and half of either rounds
+  to 1 — so no behaviour moved. The percent earns its keep when round hp grows (at the ×4 scale proposed in
+  `plans/WEAPON_BALANCE.md` R32, a 4 hp pod round buys +2 and an 8 hp rack round +4).
+- R19's card had **no test at all** until this change. Three went into `LevelUpSlotOfferTest`: the step, its
+  floor of 1 hp (a card that rounds to nothing would be a lie, R10) and its `+50%` label; that cards stack on
+  the base and stop exactly at the ceiling; and that the card is withdrawn at the ceiling while still dealt one
+  hit point below it.
+
+## Follow-up (2026-11-02): R32 moved the missile numbers to the ×4 scale
+
+- Round hp is **4** for a pod/swarm/torpedo round and **8** for FarlockSalvo, ceiling **12** — four hits of the
+  4-damage enemy bullet, same ratio as R19 set. Enemy racks carry **8** (Interceptor) and **12** (HeavyCannon),
+  and a HeavyCannon rack round hits for **20** at tier 10 (4 + 12 + 4), four times its old 5.
+- The `MissileHealth` card finally does what it was reshaped to do: +50% of the base buys **+2** hp on a 4 hp
+  round and **+4** on the 8 hp rack round. R19's ceiling is still landed on exactly (four cards for a pod, one
+  for FarlockSalvo) and the offer still withdraws the card the moment the next whole step would pass it.
+- A support chip that has bought one `Damage` card (R33: +25%) shoots a 12 hp rack round down in two hits
+  instead of three — the screen improves with the run, which R33 called a bonus rather than the point.
+- `plans/WEAPON_BALANCE.md`'s `## Shipped (2026-11-02): pass 3 steps 1-2` holds the whole rescale and the A/B.

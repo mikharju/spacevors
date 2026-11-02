@@ -267,6 +267,11 @@ public static class UpgradeMenuRenderer
         if (option.IsNewWeapon)
             return weapon.Size == TurretSize.Large ? "large" : "small";
 
+        // R33: the damage card is a percent of the gun's base damage sized by its mount class, so the label
+        // is read off the gun; the card definition carries no single percent.
+        if (option.Stat == UpgradeOption.Damage)
+            return $"+{UpgradeDefinition.DamagePercentFor(weapon.IsSupport)}%";
+
         // ApplyUpgrade hands a multi-pellet gun another pellet instead of speeding it up, so the card
         // must not promise the +15% a single-pellet gun gets. A guided volley that has hit its round
         // budget (R17) grows no further, and the card is withdrawn rather than relabelled.

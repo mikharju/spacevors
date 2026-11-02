@@ -1,8 +1,13 @@
 # WEAPON_BALANCE.md
 
-Status: shipped — pass 1 (delivery ladder, range ladder, identity cells) and pass 2 (the kill/support class
-split, R24-R31, missile screens, class card filters) are both in the code and asserted by `WeaponBalanceTest`.
-§6 (armour) is **future work, not implemented**.
+Status: shipped for passes 1-2 and for R32/R33 — the delivery/range ladders and identity cells (pass 1), the
+kill/support class split with R24-R31 (pass 2), and the ×4 damage/hp resolution with percent `Damage` cards
+(R32/R33, landed 2026-11-02 — see `## Shipped (2026-11-02): pass 3 steps 1-2` at the end of this file).
+**Pass 3's remaining rules R34-R36 — band-scaled `Range`, a `Scatter` card, a `MissileAgility` card — stay
+proposed.** §6 (armour) is **future work, not implemented**.
+Rule numbers R1-R31 are stable identifiers, so their text above was *not* rewritten when R32 landed: it
+carries the pre-rescale constants, and the Shipped section at the end restates every literal the tests hold
+(cap 16, support envelope 32/24, class floor 40, chip licence 8, round-hp ceiling 12).
 
 Source of truth is `src/Domain/Stats/WeaponStats.cs` + the tests; this file is the rule set. Firing and
 target acquisition: `src/Domain/Combat/TurretFiringSystem.cs`; damage: `src/Domain/Combat/CollisionSystem.cs`;
@@ -386,3 +391,377 @@ hopeless rather than specialised.
 - Mine hp is still 2 and never scales, and pass 2 makes kill rounds fatter: a 15-damage RailGun slug on a
   2 hp mine wastes more than it did. Scaling mine hp with the tier curve is the fix, or accept snipers as
   anti-ship tools only.
+
+## Pass 3 (2026-11-02): the resolution pass — ×4 scale, percent damage cards, R32-R36
+
+> **R32 and R33 shipped the day this section was written** — see `## Shipped (2026-11-02): pass 3 steps 1-2`
+> at the end of this file for what landed, the deviations and the perf verdict. **R34-R36 below are still
+> proposals and are not in the code.** Pass 2's `## Shipped` record above stays true as written; where pass 3
+> withdraws or restates a shipped rule it says so by number, and the number itself is never reused.
+
+### What pass 2 left broken
+
+Three symptoms, one root cause. The damage scale is too coarse for the game pass 2 built:
+
+1. **`Damage` is `Additive: 1`** (`UpgradeStats.cs:21`) on chips that deal 1 damage, so the card is a ×2 —
+   which is why R29 had to ban it from support guns outright. The fix pass 2 chose (ban the card) works, but
+   it makes the support class's card economy two cards wide (rate, reach) against the kill class's three.
+2. **A 15-damage RailGun slug on a 2 hp mine** wastes 13 damage — 7.5× the target — and mine hp never scales.
+   R5's overkill discipline is asserted on the table but leaks badly in play, because the smallest target is tiny.
+3. **`+1` is the only damage step there is.** Nothing in the card economy can say "this is a big gun's
+   upgrade": a flat 1 is worth 50% to a sniper and 100% to a chip, and pricing it per gun needs a pile of
+   licence rules to stop the chip crossing the class line.
+
+The fix is two moves. **Raise the resolution:** every damage and hp number ×4, which changes nothing about the
+shape of the table because every rule is a ratio. **Make the damage card a percent of the base**, added not
+compounded, which prices the *gun* instead of the *step* — and lets the licence machinery go away instead of
+growing.
+
+### R32 — the rescale: damage and hp ×4, nothing else
+
+Every integer that deals or absorbs damage goes ×4. Rates, fire intervals, ranges, ammo speeds, radii, arcs,
+slew rates and turn rates do **not** — the pass is resolution, not feel.
+
+| ×4 | Now → after |
+|---|---|
+| Player gun `Damage`, all 19 guns | 1-15 → 4-60 (chips 1 → 4, needles 2 → 8, MachineGun 3 → 12, ScatterCannon/SiegeSalvo/LaserLance/PrismLance 16, RailGun 15 → 60, HavocTorpedo 10 → 40) |
+| Player hull `MaxHealth`, 8 hulls | 8/10/12/14/16/20 → 32/40/48/56/64/80 |
+| Enemy hull `Health`, then ×`HpMultiplier` | 5/7/15/22/30 → 20/28/60/88/120 (tier-10 HeavyCannon 105 → 420) |
+| Enemy gun damage: base 1 + `DamageAdd(tier) = tier/2` | base 1 → 4, add → `2·tier` (tier-10 bullet 6 → 24 against a 32 hp Scout, as today's 6 against 8) |
+| Enemy missile `MissileDamageAdd = tier/3`, rack `DamageBonus` | add → `4·tier/3`; bonus 0/1 → 0/4 |
+| Round hp: player default / FarlockSalvo / ceiling | 1 / 2 / 3 → 4 / 8 / 12 |
+| Round hp: enemy racks (Interceptor, HeavyCannon) | 2 / 3 → 8 / 12 |
+| Mines (`MineType.Health`) | 2 → 8, **and now scales with tier** (`8 + 2·tier`, 28 at tier 10) — pass 2's last open knob, closed |
+| Asteroids (`Asteroid.SmallHealth`) | 50 → 200 (still ~17 MachineGun hits, as today's 50 / 3) |
+| `LootStats.HealthOrbHealAmount` | 3 → 12 |
+| `MineStats.ContactDamage` | 3 → 12 |
+| `ImpactDamage.ImpactScale`, `MaxImpactDamage`, `SparkDamageThreshold` | 7.2e-9 → 2.88e-8, 3 → 12, 2 → 8 (`MinClosingSpeed` 160 unchanged) |
+
+**Card *steps* are not scaled ×4 — they are re-derived from the new bases, because a step is a fraction.**
+`Hp` goes `+2 → +8` (still a quarter of a Scout's hull). `MissileHealth` stays `+1`: on a 4 hp round that is
++25% and honest, where on today's 1 hp round it is +100% — the rescale quietly fixes that card too. The
+`Damage` card becomes a percent under R33. XP, level curve, spawn weights, pickup chances and the tier ladder's
+speeds are untouched, so the pace of a run does not change. Round hp must scale with damage or the R28 screen
+starts one-shotting every missile and R19's "a round eats several hits of ordinary fire" stops being true.
+
+Mine scaling is the one thing this pass genuinely improves rather than rescales: a RailGun slug on a tier-10
+mine goes from 7.5× the target's hp to 2.1×, so sniping mines stops being pure waste while still never being the
+right tool.
+
+**Every margin survives, unchanged.** Modelled against the live rule set at ×4:
+
+- R1 beams: LaserLance 41.6 ≤ 48 (13% under, same as today), PrismLance 43.2 ≤ 53.8 (20%), RippleCutter
+  24 ≤ 25.6 (6%), Stiletto 24 ≤ 53.8.
+- R15 class-anchored: SeekerPod 14.4 ≤ 19.2, Swarmlet 16.8 ≤ 19.2, HavocTorpedo 24 ≤ 34.6, FarlockSalvo 21.6 ≤ 33.3.
+- R3 within tier and delivery: medium Large MachineGun 48 ≥ 1.25 × InterceptorTurret 24 ✓; slow Large
+  ScatterCannon 72 ≥ 1.25 × FlakCurtain 32 ✓; slow Large SiegeSalvo 67.2 ≥ 1.25 × AcidBubbleSpray 24 ✓.
+- R4: ceiling 1.4 × 48 = 67.2 — SiegeSalvo sits at it exactly, as today; GravitonBurst 66 and RailGun 60 under ✓;
+  floors unchanged. R12 hull ordering unchanged. R31 kill shares unchanged.
+- R7 max 9 rounds/s per mount (budget 12) ✓ unchanged. R6 honest reach unchanged ✓. R16 turn radii unchanged ✓.
+- **TTK unchanged**: the tier-10 HeavyCannon's 420 hp against the Scout's 72 DPS (MachineGun 48 + Interceptor
+  Turret 24) is still 5.83 s, inside the 7 s budget that forced pass 2's Scout loadout change.
+
+Absolute constants to restate when this lands, because the tests hold them literally: R5's per-shot cap
+4 → **16** (licence list unchanged: RailGun 60, HavocTorpedo 40; SiegeSalvo, LaserLance and PrismLance sit at
+the cap as they do today); R24's support envelope 8/6 → **32/24** (FlakCurtain, RippleCutter and Stiletto sit
+at their caps, as today); R25's class floor 1.25 × 32 = **40** (weakest kill gun LaserLance 41.6 — ratio 1.30,
+unchanged); R27's chip licence 2 → **8** damage per shot. R26 and R6/R7/R9/R13/R16-R23 do not move at all.
+
+**Why ×4 and not ×2:** the damage card's percent step has to land on integers. At ×4 every damage base is a
+multiple of 4, so +25% and +50% are exact on all nineteen guns (chips 4 → +1, needles 8 → +2, MachineGun 12 →
++6, RailGun 60 → +30) — no rounding drift, and the label never lies about what was bought. At ×2 a quarter of a
+2-damage chip is 0.5 and the card's displayed value and its effect diverge. ×4 also gives the smallest numbers
+in the game — round hp, mine hp, hull hp — enough headroom to carry their own scaling without collapsing into
+one-hit things. What it costs: hp bars and the stats screen now read in the hundreds, and every absolute
+hp/damage literal in the tests and the HUD moves.
+
+### R33 — `Damage` becomes a percent card, additive on the base, sized by class
+
+R29's damage half is **withdrawn**: every mounted gun is dealt a `Damage` card again, as a percentage of its
+**table base** — **+25% for a support gun, +50% for a kill gun** — and each card adds
+`round(base × percent)` where `base = WeaponType.For(name).Stats.Damage`. Two cards are therefore +50%, never
++56.25%: the base never moves, so additive-on-base is a property of the formula rather than a rule the code has
+to remember. No counter field, no compounding state, no re-derivation from live stats. One helper,
+`UpgradeDefinition.DamagePercentFor(bool isSupport)`, read by both the apply path and the label (R10: the number
+on the card is the number bought).
+
+**Should support get weaker upgrades? Yes — a quarter instead of a half, not a ban.** Banning the card was only
+necessary while it was a flat `+1`, where one card was a ×2 on a chip. A percent is scale-safe: it prices the
+gun, not the step, and the class difference is already sitting in the base — a 50% kill card buys three to six
+times the DPS of a 25% chip card. The asymmetry is what makes the doctrine scale: with the same percent the
+1.30 class ratio would stay pinned at 1.30 forever, and R25/R31 want the kill class to *pull ahead* over a run
+— at eight picks MachineGun is ×5.0 and FlakCurtain ×3.0, so the ratio opens from 1.30 to 2.17. The named
+alternative is one symmetric percent for everyone, which is simpler and holds the ratio exactly; it is rejected
+because a chip's extra per-shot authority buys it nothing in role terms — it already screens, already chips, and
+its growth is rate, reach and spread. Its screen does improve, which is a bonus rather than the point: a chip at
+6 damage takes down a 12 hp rack round in two hits instead of three.
+
+**No licence ceilings.** The earlier draft of this pass needed them (a flat add can cross a class line); a
+percent cannot, and R5/R24/R25/R27 stay what they always were — rules on the weapon *table*. Deleting the
+licence rules is the point of making the card relative. The ceiling stays a table rule, so a card-stacked chip
+still walks through it by design: FlakCurtain with eight cards is 12 damage × 8/s = 96 DPS against a fresh
+LaserLance's 41.6.
+
+**Fire rate stays a non-issue next to damage, by construction.** `DPS = rate × pellets × base × (1 + Σpct)`:
+there is no cross-term, so a rate card cannot change what a damage card is worth or vice versa. They stay
+comparable and differently-timed: `FireRate` is the common card (+15%, `UpgradeStats.cs:16`) that also grows
+live rounds and stops at R7's 12 rounds/s per mount and at R17/R18 for guided salvos; `Damage` is the milestone
+card, dealt once every five levels (`UpgradeOffer.IsMilestoneLevel`, `MilestoneLevelInterval = 5`) against three
+new-weapon cards in the same hand. Over one milestone interval four rate picks (×1.15⁴ = 1.75) beat one damage
+card (×1.25 or ×1.50) *while R7 leaves headroom* — which is the honest shape: rate is the early, capped card and
+damage is the late, uncapped one. How early depends on the gun: FlakCurtain (8 rounds/s) hits the R7 ceiling
+after two rate cards, MachineGun (4/s) after seven.
+
+R10's guidance is restated for this one card: a card dealt once every five levels may move DPS by up to +50%;
+the 15-35% band stays for the cards that appear in every hand.
+
+Long-run numbers worth watching: eight milestone picks into MachineGun is 12 + 48 = 60 damage, 240 DPS, and a
+tier-10 HeavyCannon dies in 1.75 s — enemy hp stops compounding at `MaxTier` while the player does not, which is
+the genre's power curve and the number a playtest should judge. The lever if it reads too strong is the 50% step,
+not a cap.
+
+New tests: `DamageCardsAddOnTheBaseAndNotOnEachOther` (MachineGun 12 → 18 → 24, explicitly not 27);
+`DamageCardIsSizedByClass` (a Shotgun's next card is worth +1, a MachineGun's +6);
+`PercentStepsAreExactOnEveryGun` (the ×4 invariant above — no rounding drift anywhere on the table).
+R29's two support tests are deleted.
+
+### R34 — `Range` gets band-scaled and loses its ceiling
+
+One `Range` card, one multiplier today (×1.15, `UpgradeStats.cs:20`). It becomes **band-scaled**, keyed on the
+band of the gun's **base** range so the step never compounds on its own growth:
+
+| Base band | aura (< 750) | close (< 1100) | mid (< 1500) | long (≥ 1500) |
+|---|---|---|---|---|
+| Step per card | ×1.04 | ×1.06 | ×1.08 | ×1.10 |
+
+Short-range guns get the weakest step because a range card on a 600 px gun is an identity change, not an
+upgrade: a chip that walks its reach out stops being the thing that makes killing possible and starts being a
+bad mid-range gun. A long gun that buys reach stays the same gun with more of it. Five cards, modelled: aura
+600 → 730 (still aura), close 900 → 1204 (mid), mid 1350 → 1984 (long), long 1700 → 2738.
+
+**No ceiling** (the user's instruction, and the right call): R29's support roof and its test are **withdrawn**,
+and R26 becomes explicitly a base-table rule. A maxed Stiletto at 1984 px is a long-range needle that still
+screens missiles — still support by every rule that matters, and it cost five cards to get there.
+
+Two things make this safe without a ceiling. The card already multiplies `ShotLifetime` with `Range`
+(`GameSession.cs:1181-1184`), so R6's honest-reach rule is invariant under it — reach always stays long enough
+to cover the range it grants. And the label must show the gun's own step (`+4%` on a Shotgun, `+10%` on a
+RailGun) or R10's "a card is never a lie" is broken on the spot; the step has to be resolved per option before
+the menu renders it.
+
+Perf: five cards are ×1.61 of lifetime against today's ×2.01, so this is **cheaper** in live rounds than the
+card that ships today. A maxed Heavy is ~119 live rounds worst case against ~74 today — still two orders
+under the 10k budget, and R7 is untouched.
+
+### R35 — a new card: tighter spread
+
+`UpgradeOption.Scatter`, **×0.8 on `Weapon.Scatter`**, offered only while the live scatter is **≥ 0.10 rad**
+and the next step stays **≥ 0.08**. Eight of the nineteen guns have a cone wide enough to tighten: FlakCurtain
+0.50, AcidBubbleSpray 0.45, Swarmlet 0.25, SiegeSalvo 0.22, InterceptorTurret 0.20, ScatterCannon 0.18,
+Shotgun 0.12, FlechetteFan 0.10. The other eleven are never offered it — every beam, RailGun, GravitonBurst,
+HavocTorpedo and SeekerPod at 0, MachineGun at 0.033, Cyclotron at 0.015, FarlockSalvo at 0.08 — because a card
+that changes nothing is a lie (R10). The gate reads the live value, so the card spends itself: Shotgun and
+FlechetteFan take one (0.12 → 0.096, 0.10 → 0.080), ScatterCannon three (→ 0.092), InterceptorTurret four
+(→ 0.082), SiegeSalvo four (→ 0.090), Swarmlet and AcidBubbleSpray and FlakCurtain five (0.50 → 0.164).
+
+What it really buys, honestly: **pellet convergence, whose value scales as 1/range.** Shotgun's three slugs at
+0.12 rad land ~108 px apart at 900 px against a ~20 px hull — one hits; at 200 px a tightened cone lands all
+three. So this is a close-range card, and it is the answer to R34 taking reach away from the guns that needed
+it least: a close build buys accuracy, a long build buys distance. On a cone spray (FlakCurtain 0.50,
+AcidBubbleSpray 0.45) it is a real trade — a narrower cone covers fewer angles — while the burst disc
+(`AmmoRadius`) is untouched, so the flak still denies area.
+
+It is a DPS upgrade in disguise on multi-pellet guns: more slugs on one hull is more damage on that hull.
+That is accepted, and it is capped by the floor — no gun's cone ever tightens into a needle. Cost is nil:
+`Scatter` is read once, at spawn (`TurretFiringSystem.cs:508`).
+
+### R36 — a new card: missile agility
+
+`UpgradeOption.MissileAgility`, **×1.15 on `Weapon.HomingTurnRate`**, for the four guided guns. It lands on
+the rounds the mount fires *next*, never the ones already airborne, because the turn rate is copied into the
+`Missile` component at launch (`TurretFiringSystem.cs:594`) — which is honest with the player and free.
+
+**The guard is R16, read live.** A missile must still be out-turnable: the card is withdrawn when the next step
+would put the **launch** turn radius under 46 px, which is the tightest tier-10 hull's radius (38.5 px, the
+HeavyCannon — derived the way `WeaponBalanceTest.GuidedRoundTurnsWiderThanAnythingItHunts:97-113` derives it,
+times a 1.2 margin). It must read the *live* ammo speed and turn rate, because a `ProjectileSpeed` card widens
+the radius and an `Agility` card narrows it: only the combination can be checked, and it is exactly the sort
+of rule a card economy breaks quietly.
+
+Legal steps today: SeekerPod 112 → 48.6 px (6 cards), Swarmlet 116 → 50.0 (6), HavocTorpedo 250 → 81.6 (8),
+FarlockSalvo 187 → 61.2 (8). Every missile ends its build still wider than the hull it hunts.
+
+What it costs the player is a slot that used to buy speed or reach; what it costs the world is nothing per
+tick (steering already clamps to `Missile.TurnRate`). Counter-play survives intact: the R28 screen does not
+care how tight the arc is, ECM still detonates the round, and hull hp still absorbs it. It raises no speed, so
+R16's second half ("radius widens as the round builds") and the R22 enemy ladder are untouched. Enemy racks
+get no such card — the enemy has no card economy, and that asymmetry is a feature of the genre.
+
+### What has to move when this lands
+
+- `WeaponStats.cs` (every `Damage`, `MissileHealth` default, `MissileHealthCeiling` 3 → 12), `PlayerShipStats.cs`
+  (`MaxHealth` ×8), `EnemyShipStats.cs` (five `Health` fields, `DamageAdd` → `2·tier`, `MissileDamageAdd` →
+  `4·tier/3`, two `DamageBonus`, both `EnemyMissileSpec.RoundHealth`), `MineStats.cs` (`Health` 8 plus a
+  tier-scaled spawn at `MineRespawnSystem.cs:45`, `ContactDamage`), `EntityComponents.cs`
+  (`Asteroid.SmallHealth`), `LootStats.cs` (orb heal), `ImpactDamage.cs` (scale, cap, spark threshold).
+- `UpgradeStats.cs`: `Damage` gains a percent instead of an `Additive` (with `DamagePercentFor(isSupport)` →
+  25 / 50), `Range` loses its single multiplier in favour of `RangeStepFor(baseRange)`, `Hp` additive 2 → 8,
+  two new `UpgradeOption` members (`Scatter`, `MissileAgility`), and a sign fix in `DisplayValue` — a ×0.8
+  multiplier renders as `"+-20%"` today.
+- `UpgradeOffer.cs`: R29's two filters deleted (percent needs no gate: a percent cannot cross a class line);
+  the milestone deal goes back to one `Damage` card per mounted gun; the scatter card takes R18/R19's shape
+  (`CanTightenSpread`) and the agility card a `CanTurnTighter` predicate that reads live speed and turn rate.
+- `GameSession.ApplyUpgrade`: `Damage` becomes `+= round(base × DamagePercentFor(turret.IsSupport))` with the
+  base from `WeaponType.For(name)`, not from the turret's live stats; `Range` step by base band; two new cases
+  (`Scatter`, `MissileAgility`).
+- `UpgradeMenuRenderer.cs:231+` and `StatsScreenRenderer.cs:254+`: labels and stat rows for the two new cards,
+  the per-gun range step, and the per-gun damage percent — `+25%` on a Shotgun, `+50%` on a MachineGun, since
+  the number the menu shows is the number the player is buying (R10).
+- Tests: `WeaponBalanceTest` constants (R5 16, R24 32/24, R25 40, R27 8) plus the three new R33 tests;
+  `EnemyDifficultyTest` and `EnemyMissileLadderTest` absolute hp/damage; mine and asteroid hp tests;
+  `ImpactDamageTest`; `MissileGuidanceTest` round hp and the combined speed+agility radius check;
+  `LevelUpSlotOfferTest`/`RerollOfferTest` hand shape (delete R29's two tests, add the percent, scatter-gate and
+  agility-guard tests).
+- Unaffected by design: `ThreatMeterTest`, `AimLeadTest`, `CollisionSystemTest`, `LaserTest`'s synthetic
+  turret — they build their own stats.
+
+### Order of work
+
+1. **R32 alone.** Data and hp only, no card changes; every rule-test constant moves in the same commit. The
+   suite is green with the same TTK and the same hit counts — the pass is only visible as bigger numbers.
+2. **R33** the percent card (25% support / 50% kill), additive on the table base; delete R29's damage filter
+   and both its tests; add the three percent tests.
+3. **R34** the band-scaled range step; delete R29's roof and its test; fix the label.
+4. **R35** the scatter card (with the `DisplayValue` sign fix).
+5. **R36** the agility card and the live R16 guard.
+6. Docs: this section → `## Shipped (date)`, the restated constants written into R5/R24/R25/R27 in place, R29
+   and R10 revised to say what replaced them, PLAN.md line.
+
+Steps 2-5 each stand alone; step 1 must land first, because the percent steps are exact only once every damage
+base is a multiple of 4.
+
+### Open knobs
+
+- **A maxed chip beats a fresh sniper.** FlakCurtain at eight cards is 96 DPS against LaserLance's fresh 41.6.
+  Intended under R33 (the ceiling is a table rule), and the playtest question is whether the kill/support *read*
+  survives it; the lever is the support percent (25%), not a DPS cap.
+- **How far the late game runs away.** Enemy hp stops compounding at `MaxTier` while damage cards do not: eight
+  picks on MachineGun is 240 DPS and a 1.75 s HeavyCannon. That is the genre's curve; if it reads wrong, shrink
+  the kill percent (50 → 40) before inventing a cap — the percent is the whole lever and the exactness survives
+  as long as bases stay multiples of 4 (40% of 60 is 24 ✓, of 12 is 4.8 ✗, so a 40% step would reintroduce
+  rounding drift: prefer 25/50, 25/75 or 50/50).
+- **Rate and damage compose.** Both multiply DPS, so the worst case is both: FlakCurtain with five `FireRate`
+  cards (×2.01, which is where R7 leaves it) and eight `Damage` cards (×3.0) is 32 × 6.03 ≈ 193 DPS. Nothing in
+  this pass caps that pair; R7 caps the rate half, the milestone interval caps the damage half. If it reads too
+  strong, the rate card on support guns is the one to shrink — it is the common card and the less legible half.
+- **Percent is already in the card economy for round health** (see `## Shipped (2026-11-02)` at the end of this
+  file): `MissileHealth` buys 50% of the gun's base round health, added. `Damage` (R33) and `Hp` are the two
+  cards left with a flat step; making `Hp` a percent of the hull's base health is the same one-line shape, and
+  it needs R33's base anchor to avoid compounding.
+- **The scatter card is strictly good on sprays.** Tightening AcidBubbleSpray's 0.45 rad cone looks like pure
+  gain until a swarm arrives and the coverage is missed. If playtest says it is pure gain, the answer is a
+  smaller step on single-pellet guns (×0.9) — not a higher floor.
+- **Close guns migrating bands by card 4** (Shotgun 900 → 1134 px) is intended under R34, but nothing asserts
+  a card-stacked gun's band today. If it starts to matter for the threat display, assert the band on the table
+  only and say so.
+- **The `Hp` card stays additive, at `+8`** — a quarter of a Scout's 32 hp, a tenth of the biggest hull's 80, and
+  that drift is unchanged by the rescale (today's `+2` has exactly the same spread). Making it a percent card
+  would fix the drift, but it needs the same base anchor as R33 (`MaxHealth` from the hull table, not the live
+  value) or it compounds like the old `+1` did; worth doing only if the card reads weak on the big hulls.
+
+## Shipped (2026-11-02): the `MissileHealth` card became a percent of the base round health
+
+**What landed.** `UpgradeDefinition.MissileHealth` is `PercentOfBase: 50` where it was `Additive: 1`
+(`UpgradeStats.cs`). `UpgradeDefinition` gained a `PercentOfBase` field and `StepForBase(baseValue)`: a
+percent of the stat's **table** value, added, floored at 1 hit point so the card can never round down into a
+card that does nothing (R10). `WeaponType.MissileHealthStep` reads the gun's base round health off the table,
+so the step is the same whoever has already bought the card — two cards are +100% of the base, never +125%.
+The offer gate became `WeaponStats.CanToughenRound(step)`: the next **whole** step has to land at or under
+R19's ceiling, which is exact where the old `hp < ceiling` test could sell a step the ceiling would refuse.
+The menu reads `+50%` from `DisplayValue`, which now knows three card shapes (`+50%`, `+15%`, `+2`).
+
+**Why ship a change that changes nothing today.** The table's guided rounds carry 1 hp (SeekerPod, Swarmlet,
+HavocTorpedo) and 2 hp (FarlockSalvo), so a 50% step is 1 hp on all four and the card behaves hit-for-hit the
+way it did. What changed is that the step is now *derived from the missile* rather than fixed: the same card
+on a 4 hp round buys +2 and on an 8 hp round +4 — which is what R32's ×4 rescale needs, so a FarlockSalvo's
+rack round does not end up as tough per card as a SeekerPod's. Landing it before the rescale costs nothing,
+and it keeps R19's ceiling arithmetic honest through it (a base-2 round reaches the ceiling in one card, a
+base-1 round in two — a tougher round is closer, and each card buys it the same honest step).
+
+**Notes.**
+- Nothing tested this card before — R19's was the one upgrade path with no test at all. Three went into
+  `LevelUpSlotOfferTest`: the step, its floor and its label
+  (`MissileHealthCardIsAPercentOfTheBaseRoundHealth`); that cards stack on the base and land exactly on the
+  ceiling, with fewer cards for the gun that starts tougher
+  (`MissileHealthCardsStackOnTheBaseAndLandOnTheCeiling`); and that the card is withdrawn at the ceiling but
+  still dealt a hit point below it (`GuidedRoundsAtTheirHealthCeiling_AreNotOfferedMoreToughness`).
+- Suite green at 550. No scenario run: the change is offer-time and card-time. The firing path still reads
+  `turret.Weapon.MissileHealth` once at round spawn (`TurretFiringSystem.cs:589`), so nothing in the tick loop
+  moved — there is nothing here to measure.
+- `Damage` and `Hp` are now the only cards with a flat step; both become percents under R32/R33, on the same
+  base anchor.
+
+## Shipped (2026-11-02): pass 3 steps 1-2 — the ×4 scale (R32) and percent damage cards (R33)
+
+**What landed.** Every integer that deals or absorbs damage went ×4; nothing else moved.
+
+| Where | Before → after |
+|---|---|
+| `WeaponStats.cs` — 20 gun rows' `Damage`, and the record default | chips 1 → 4, needles 2 → 8, ScatterCannon 2 → 8, MachineGun/GravitonBurst/FarlockSalvo 3 → 12, SiegeSalvo/LaserLance/PrismLance 4 → 16, RailGun 15 → 60, HavocTorpedo 10 → 40 |
+| `WeaponStats.cs` — round hp | default 1 → 4, FarlockSalvo 2 → 8, `MissileHealthCeiling` 3 → 12 |
+| `PlayerShipStats.cs` — 8 hulls | 8/10/12/14/16/20 → 32/40/48/56/64/80 (the Fighter the HUD shows is **40**) |
+| `EnemyShipStats.cs` — hulls, ladder, racks | 5/7/15/22/30 → 20/28/60/88/120 (tier-10 HeavyCannon 105 → 420); `BaseDamage` 1 → 4; `DamageAdd` `tier/2` → `4·(tier/2)` (tier-10 bullet 6 → 24); `MissileDamageAdd` `tier/3` → `4·(tier/3)`; rack rounds 2/3 → 8/12 with `DamageBonus` 0/1 → 0/4 (tier-10 HeavyCannon round 5 → 20) |
+| `MineStats.cs` | hp 2 → 8 **plus the tier walk R32 asked for**: `HealthBase` 8 + `HealthPerTier` 2 → 28 at the cap; contact damage 3 → 12. Spawned through `MineRespawnSystem`, so pass 2's last open knob is closed |
+| `EntityComponents.cs`, `LootStats.cs` | asteroid 50 → 200 (still ~17 MachineGun hits); health orb 3 → 12 |
+| `ImpactDamage.cs` | scale 7.2e-9 → 2.88e-8, `MaxImpactDamage` 3 → 12, `SparkDamageThreshold` 2 → 8 (`MinClosingSpeed` 160 unchanged) |
+| `UpgradeStats.cs` — card steps | `Hp` +2 → **+8** (still a quarter of a Scout's hull); `Damage` flat +1 → **percent of the base**; `MissileHealth` +50% of the base, which at these bases finally buys **+2** on a pod round and **+4** on a FarlockSalvo round |
+
+The enemy ladder keeps its integer division *inside* the ×4 (`4 · (tier / 2)`, not `2 · tier`) so the ladder stays
+the same run of values at four times the size — tier-10 bullet 24, tier-10 rack round 20 — instead of drifting.
+
+**R33.** Every mounted gun is dealt a `Damage` card again at a milestone: **+25% of the table base for a support
+gun, +50% for a kill gun**. `WeaponType.DamageStep` reads the base off the table and `UpgradeDefinition` carries
+`PercentOfBase`/`PercentStep` shared with the round-health card, so cards add on the base (+50% twice is +100%,
+never +125%) with no counter and no compounding state. The menu reads the percent off the gun (`+25%` / `+50%`),
+which is what R10 asks: the number on the card is the number bought. R29's damage half is withdrawn; **its
+range-roof half stays** until R34 replaces it.
+
+**Constants the tests hold literally, restated (they supersede the numbers in the R5/R19/R24/R25/R27 text
+above, which is left as written):** R5's per-shot cap **16** (licence list unchanged: RailGun 60, HavocTorpedo
+40; SiegeSalvo, LaserLance and PrismLance sit at the cap as before); R19's round-hp ceiling **12**; R24's support
+envelope **32 / 24** in the mid band (FlakCurtain, RippleCutter, Stiletto sit at their caps); R25's class floor
+**40** against LaserLance's 41.6 (ratio 1.30, unchanged); R27's chip licence **8** damage a shot. R26 and
+R6/R7/R9/R13/R15-R23 do not move at all, and **TTK is exactly what it was**: the tier-10 HeavyCannon's 420 hp
+against the Scout's 72 DPS is 5.83 s.
+
+**What did not move:** fire rates, ranges, ammo speeds, scatter, kickback, lifetimes, radii, arcs, slew and turn
+rates, the XP curve, spawn weights and pickup chances, the tier ladder's multipliers, and therefore every ratio,
+band, identity cell, class line and missile screen. The pass is resolution, not feel — a playtest should feel the
+same fight with finer numbers on the bars.
+
+**Rounding, honestly.** Impact damage is ceiling-rounded, so its numbers are not exactly four times the old
+*rounded* ones: at equal masses 200 px/s went 0 → 2, 300 → 1 to 4, a 400 px/s pilot's ram 1 → 3, the tuned big
+Scout hit 3 → 12 (it now lands on the cap), and an enemy driven into an asteroid 3 → 11. Everything else is
+exact: hp, the enemy ladder, the racks, the mines, the asteroid, the orb, and every card step (R33's 25/50
+divide each ×4 base exactly — asserted by `DamageCardPercentsDivideEveryGunBaseExactly`, so no card ever
+drifts across a long run).
+
+**Tests: 557 green.** Deleted `SupportGun_IsNeverOfferedADamageCard` (R29's damage half is gone); added
+`MilestoneHand_DealsADamageCardToEveryMountedGun`, `DamageCardIsSizedByItsMountClass`,
+`DamageCardsAddOnTheBaseAndNotOnEachOther` (12 → 18 → 24, explicitly not 27) and
+`DamageCardPercentsDivideEveryGunBaseExactly` — the latter two are R33's `DamageCardIsSizedByClass` and
+`PercentStepsAreExactOnEveryGun`, named for what they assert; `MineHp_RampsWithTheDifficultyTier` and
+`LateMinesSpawnTougherThanOpeningMines`; restated the hull/enemy/mine/asteroid/orb/impact/round-hp literals and
+the R5/R24/R27 ceilings. The collision fixture's 10 hp hull gained an `hp:` parameter, because at 12 contact
+damage one large mine would otherwise kill it before the second hit could be counted.
+
+**Perf verdict (2026-11-02): costs nothing measurable — keep.** Paired A/B against HEAD (`61df011`) in a second
+worktree, `.tools/scenario.sh <s> --sim --iters 3`, same host: entity means identical to 0.1 (ammo-spray 11466.4,
+impact-storm 23833.7, hull-stream 6250.2 — so no lifetime or churn changed), allocations identical to 0.1 KB/frame
+(290.7 / 745.4 / 170.2), per-entity ns 218.8 → 225.5, 145.4 → 152.0, 291.9 → 300.8. The hull-stream pair was
+repeated twice more and came out the other way (median 0.92 → 0.84 and 0.86 ms, per-entity 162.6 → 156.7 and
+162.7), which is the size of the host's noise. Every run reported `budget pass`.
+
+**Supersedes two lines above.** The missile-health record said `Damage` and `Hp` were "the two cards left with a
+flat step" and described the ×4 scale as something that would land later: `Damage` is a percent now, and the
+scale has landed. `Hp` remains the game's only additive card.

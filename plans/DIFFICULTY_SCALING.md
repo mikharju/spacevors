@@ -495,3 +495,17 @@ Three more problems from the same review landed with it, plus one deliberate non
   (a unit test), that placement rule caps a wave near 5 ships on a 1920×1024 screen whatever the quota
   says. In a real run the ring travels with the player, so it is a rate limit rather than a wall; measured
   before raising anything, and tracked in plans/ENDLESS_DIFFICULTY.md.
+
+## Follow-up (2026-11-02): the tier ladder and the mine field moved to R32's ×4 scale
+
+- Enemy per-shot damage is four times what this file states, with the integer division kept **inside** the ×4
+  so the ladder stays the same run of values: `BaseDamage` 1 → **4**, `DamageAdd` `tier/2` → **`4·(tier/2)`**
+  (tier-10 bullet 6 → 24), `MissileDamageAdd` `tier/3` → **`4·(tier/3)`**, rack `DamageBonus` 0/1 → 0/4. Enemy
+  hulls 5/7/15/22/30 → **20/28/60/88/120** and player hulls 8-20 → **32-80**, so every "hp against damage"
+  comparison in this file holds at the new scale, including the tier-10 HeavyCannon's 420 effective hp.
+- Hp multiplier per tier (0.25), fire-rate multiplier (0.1), the tier clock and `MaxTier` are untouched — the
+  pace of escalation is exactly as described above.
+- **One thing genuinely changed rather than rescaled:** mines left the "hp outside the tier clock" rule
+  (R2.6 item 6). They spawn at `MineStats.HealthAtTier(tier)` — **8 + 2·tier**, 28 at the cap — so the thin
+  leftover field is worth more than one RailGun slug (7.5× overkill before, 2.1× now). Size still never changes
+  hp: a large mine is only bigger, worth more xp and shoves harder.

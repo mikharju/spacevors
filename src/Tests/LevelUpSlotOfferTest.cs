@@ -185,38 +185,70 @@ public class LevelUpSlotOfferTest
         Assert.DoesNotContain(WeaponType.NewWeaponPoolFor(5), w => w.Name == WeaponType.LoadTestWeapon.Name);
     }
 
-    // R29: `Damage` is a kill-gun card. The card is a flat +1 (`UpgradeStats.cs:21`), so on a 1-damage
-    // support chip it acts as a multiplier — one card would lift a support mount over the class line the
-    // weapon table draws (R24/R25). The same milestone hand still deals the card to the kill gun on the
-    // same hull, which is what makes the refusal a rule rather than an accident of the shuffle.
+    // R33 (it supersedes R29's ban): the damage card is a percent of the gun's **base** damage, sized by its
+    // mount class, so a support chip is no longer doubled by a flat +1 and the milestone hand deals the card
+    // to every mounted gun. The hand is checked on a hull that carries both classes at once, so the card is
+    // shown to be class-sized rather than class-banned.
     [Fact]
-    public void SupportGun_IsNeverOfferedADamageCard()
+    public void MilestoneHand_DealsADamageCardToEveryMountedGun()
     {
-        WeaponMount[] supportOnly = [new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain)];
-        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, supportOnly);
-
-        RunLevelUp(em); // level 5: the milestone hand, which is the only hand that carries Damage cards
-
-        // A new-weapon card reuses the Damage stat with `IsNewWeapon` set: it hands over a gun, it does not
-        // upgrade one. Only the upgrade card is the one R29 withdraws from a support gun.
-        foreach (var (_, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
-            Assert.DoesNotContain(options.Options, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon);
-
         WeaponMount[] mixed =
         [
             new(TurretSlotName.MainGun, WeaponType.MachineGun),
             new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain),
         ];
-        var (mixedEm, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, mixed);
+        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, mixed);
 
-        RunLevelUp(mixedEm);
+        RunLevelUp(em); // level 5: the milestone hand, which is the only hand that carries Damage cards
 
+        // A new-weapon card reuses the Damage stat with `IsNewWeapon` set: it hands over a gun, it does not
+        // upgrade one, so only the upgrade cards count here.
         var offered = new List<UpgradableOption>();
-        foreach (var (_, _, options) in mixedEm.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
+        foreach (var (_, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
             offered.AddRange(options.Options);
 
         Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.MachineGun.Name);
-        Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.FlakCurtain.Name);
+        Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.FlakCurtain.Name);
+    }
+
+    // R33: the card is sized by mount class — a support chip grows a quarter at a time, a kill gun a half —
+    // which is what lets the card be dealt to both classes without the chip overtaking the gun (R24/R25).
+    [Fact]
+    public void DamageCardIsSizedByItsMountClass()
+    {
+        Assert.Equal(6, WeaponType.MachineGun.DamageStep);   // +50% of 12
+        Assert.Equal(30, WeaponType.RailGun.DamageStep);     // +50% of 60
+        Assert.Equal(20, WeaponType.HavocTorpedo.DamageStep); // +50% of 40
+        Assert.Equal(1, WeaponType.FlakCurtain.DamageStep);  // +25% of 4
+        Assert.Equal(2, WeaponType.Stiletto.DamageStep);     // +25% of 8
+        Assert.Equal(2, WeaponType.SeekerPod.DamageStep);    // +25% of 8, a guided chip
+    }
+
+    // R33: the step is read off the table, so cards add on the base instead of compounding on each other —
+    // two cards on the MachineGun are 12 + 6 + 6 = 24, exactly double the base, and not 12 × 1.5 × 1.5 = 27.
+    [Fact]
+    public void DamageCardsAddOnTheBaseAndNotOnEachOther()
+    {
+        var gun = WeaponType.MachineGun;
+        int once = gun.Stats.Damage + gun.DamageStep;
+        int twice = once + gun.DamageStep;
+
+        Assert.Equal(18, once);
+        Assert.Equal(2 * gun.Stats.Damage, twice);
+        Assert.NotEqual((int)MathF.Round(gun.Stats.Damage * 1.5f * 1.5f), twice);
+    }
+
+    // R33's two percents divide every gun's base damage exactly at R32's ×4 scale, so a card is always a
+    // whole number of damage: no rounding drift to compound across a long run.
+    [Fact]
+    public void DamageCardPercentsDivideEveryGunBaseExactly()
+    {
+        foreach (var gun in WeaponType.All)
+        {
+            int percent = UpgradeDefinition.DamagePercentFor(gun.IsSupport);
+            Assert.Equal(0, gun.Stats.Damage * percent % 100);
+            Assert.Equal(gun.Stats.Damage * percent / 100, gun.DamageStep);
+        }
     }
 
     // R29: the Range card stops at the support class's roof (R24/R26). A chip at 1350 px has nothing left
@@ -258,6 +290,94 @@ public class LevelUpSlotOfferTest
         }
 
         Assert.True(offered, "a chip below the class roof should still be dealt its Range card");
+    }
+
+    // R19, percent shape (plans/WEAPON_BALANCE.md R33): a `MissileHealth` card buys a percent of the gun's
+    // **base** round health. A gun whose rounds start tougher therefore gains more from the card, the step
+    // is the same every time it is bought (+50% +50% = +100% of the base, never +125%), and the floor of one
+    // hit point keeps the card honest on a 1 hp round, where half a hit point would round away to nothing.
+    [Fact]
+    public void MissileHealthCardIsAPercentOfTheBaseRoundHealth()
+    {
+        Assert.Equal(1, UpgradeDefinition.MissileHealth.StepForBase(1)); // floored, never a dead card
+        Assert.Equal(1, UpgradeDefinition.MissileHealth.StepForBase(2));
+        Assert.Equal(2, UpgradeDefinition.MissileHealth.StepForBase(4));
+        Assert.Equal(4, UpgradeDefinition.MissileHealth.StepForBase(8));
+        Assert.Equal("+50%", UpgradeDefinition.MissileHealth.DisplayValue);
+
+        foreach (var gun in WeaponType.All)
+            Assert.Equal(UpgradeDefinition.MissileHealth.StepForBase(gun.Stats.MissileHealth), gun.MissileHealthStep);
+    }
+
+    // Stacking the card: the same base-derived step every time, and the ceiling landed on exactly — never
+    // oversold, never a card the rules would refuse to honour. A gun that starts with a tougher round needs
+    // fewer cards to get there, because it starts closer with the same step per card.
+    [Fact]
+    public void MissileHealthCardsStackOnTheBaseAndLandOnTheCeiling()
+    {
+        foreach (var gun in WeaponType.All.Where(g => g.Stats.Homing))
+        {
+            int step = gun.MissileHealthStep;
+            var live = gun.Stats;
+            int cards = 0;
+            while (live.CanToughenRound(step))
+            {
+                live = live with { MissileHealth = live.MissileHealth + step };
+                Assert.True(++cards <= 6, $"{gun.Name} never stopped taking missile-health cards");
+            }
+
+            Assert.Equal(WeaponStats.MissileHealthCeiling, live.MissileHealth);
+            Assert.Equal(gun.Stats.MissileHealth + cards * step, live.MissileHealth);
+        }
+
+        Assert.Equal(4, CardsToTheRoundCeiling(WeaponType.SeekerPod));
+        Assert.Equal(1, CardsToTheRoundCeiling(WeaponType.FarlockSalvo));
+    }
+
+    // R19: a mount whose rounds are already at the ceiling is dealt no more toughness cards, while the same
+    // gun one step below it still is — the card is withdrawn at the ceiling, not banned.
+    [Fact]
+    public void GuidedRoundsAtTheirHealthCeiling_AreNotOfferedMoreToughness()
+    {
+        int atCeiling = WeaponStats.MissileHealthCeiling;
+        foreach (int health in new[] { atCeiling - WeaponType.SeekerPod.MissileHealthStep, atCeiling })
+        {
+            WeaponMount[] podOnly = [new(TurretSlotName.MainGun, WeaponType.SeekerPod)];
+            var (em, _) = CreateHull(ShipType.Fighter, xp: 999_999, level: 1, podOnly);
+            foreach (var (turretEntity, turret) in em.GetEntitiesWithComponents<Turret>().ToList())
+                em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = health } });
+
+            bool offered = false;
+            for (int levelUp = 0; levelUp < 12; levelUp++)
+            {
+                RunLevelUp(em);
+
+                foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
+                {
+                    if (health == atCeiling)
+                        Assert.DoesNotContain(options.Options,
+                            o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.SeekerPod.Name);
+                    else if (options.Options.Any(o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.SeekerPod.Name))
+                        offered = true;
+                    em.DestroyEntity(entity);
+                }
+            }
+
+            if (health != atCeiling)
+                Assert.True(offered, "a pod below the round-health ceiling should still be dealt its toughness card");
+        }
+    }
+
+    static int CardsToTheRoundCeiling(WeaponType gun)
+    {
+        var live = gun.Stats;
+        int cards = 0;
+        while (live.CanToughenRound(gun.MissileHealthStep))
+        {
+            live = live with { MissileHealth = live.MissileHealth + gun.MissileHealthStep };
+            cards++;
+        }
+        return cards;
     }
 
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null)

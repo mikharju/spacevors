@@ -36,13 +36,17 @@ public class MineRespawnSystem : GameSystem
         Vector2 minePos = SpawnPlacement.OutsideScreen(playerPos.Value, view.ViewportSize, spawnDir);
         float mineAngle = (float)(rng.NextDouble() * Math.PI * 2);
 
+        int tier = EnemyShipStats.TierFor(view.ElapsedTime);
+
         // Bigger mines later as the field thins (MineStats.LargeChanceFor); the draw count is unchanged.
-        MineSize mSize = rng.NextDouble() < MineStats.LargeChanceFor(EnemyShipStats.TierFor(view.ElapsedTime))
-            ? MineSize.Large
-            : MineSize.Small;
+        MineSize mSize = rng.NextDouble() < MineStats.LargeChanceFor(tier) ? MineSize.Large : MineSize.Small;
         var mineType = MineType.FromSize(mSize);
 
-        commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), mineAngle), new Health(mineType.Health, mineType.Health));
+        // R32: what is left of a thinning field is worth more hits, so a late mine is not one RailGun slug of
+        // pure overkill. Both sizes carry the same hp at the same tier.
+        int mineHp = MineStats.HealthAtTier(tier);
+
+        commands.AddEntity(new Position(minePos), new Velocity(Vector2.Zero), new EnemyMine(mSize, MineStats.SpawnSpeedMin + (float)rng.NextDouble() * (MineStats.SpawnSpeedMax - MineStats.SpawnSpeedMin), mineAngle), new Health(mineHp, mineHp));
 
         _timer = NextInterval(view.ElapsedTime, rng);
     }
