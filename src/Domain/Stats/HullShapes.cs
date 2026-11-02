@@ -11,6 +11,11 @@ namespace Spacevors.Domain.Stats;
 public readonly record struct Capsule(Vector2 From, Vector2 To, float HalfThickness)
 {
     public static Capsule Disc(Vector2 centre, float halfThickness) => new(centre, centre, halfThickness);
+
+    // How far this primitive reaches from the hull centre along a unit direction in the hull's own
+    // frame: the farther endpoint's projection plus the round cap.
+    public float SupportAlong(Vector2 dir)
+        => MathF.Max(Vector2.Dot(From, dir), Vector2.Dot(To, dir)) + HalfThickness;
 }
 
 // How one hull art collides: the primitives, in local units. A hull's `Radius` stays its bounding
@@ -22,6 +27,17 @@ public sealed record HullShape(Capsule[] Capsules)
     public static HullShape Circle { get; } = new([Capsule.Disc(Vector2.Zero, 1f)]);
 
     public bool IsCircle => Capsules.Length == 1 && Capsules[0].From == Capsules[0].To;
+
+    // How far the hull reaches along a unit direction in the hull's own frame: the widest capsule
+    // along it. Renderers anchor flame and light bases on this surface instead of the bounding
+    // radius, so a non-circular hull's fire comes out of the hull (plans/THRUSTER_FLAME_ANCHORS.md).
+    public float SupportAlong(Vector2 dir)
+    {
+        float support = float.MinValue;
+        foreach (var capsule in Capsules)
+            support = MathF.Max(support, capsule.SupportAlong(dir));
+        return support;
+    }
 }
 
 // The hull shapes, one entry per enemy art id (`EnemyShipType.GraphicsId`).

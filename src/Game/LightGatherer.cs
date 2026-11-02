@@ -1,5 +1,6 @@
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 
 namespace Spacevors.Game;
@@ -65,20 +66,21 @@ public static class LightGatherer
             Vector2 forwardDir = new Vector2(sin, -cos);
 
             float maxForce = player.MaxThrustForce;
+            var shape = player.Shape ?? HullShape.Circle;
 
             float mainAccel = Vector2.Dot(accel.Value, forwardDir);
-            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
-            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, shape, player.Radius, rot.Angle, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, shape, player.Radius, rot.Angle, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
     }
 
     static void CollectEnemyThrustLights(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
-        foreach (var (entity, ship, pos, accel) in em.GetEntitiesWithComponents<EnemyShip, Position, Acceleration>())
+        foreach (var (entity, ship, pos, rot, accel) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation, Acceleration>())
         {
             if (Lighting.IsFull) return;
             if (em.HasComponent<Dead>(entity)) continue;
-            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, HullShapes.ForEnemy(ship.GraphicsId), ship.Radius, rot.Angle, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
@@ -87,12 +89,13 @@ public static class LightGatherer
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;
-            AddThrustLight(pos.Value, v, mine.Speed, mine.Radius, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, v, mine.Speed, HullShape.Circle, mine.Radius, 0f, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
     }
 
-    // Light sits at the flame base: behind the hull, opposite the thrust direction.
-    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, float radius, System.Numerics.Vector3 tint, float intensity, float camX, float camY, int windowWidth, int windowHeight)
+    // Light sits at the flame base: on the hull's surface opposite the thrust, exactly where
+    // ThrusterFlameRenderer starts the plume, so a hull is lit where its fire actually is.
+    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, HullShape shape, float radius, float angle, System.Numerics.Vector3 tint, float intensity, float camX, float camY, int windowWidth, int windowHeight)
     {
         if (maxAccel <= 0f) return;
         float mag = accel.Magnitude;
@@ -100,7 +103,7 @@ public static class LightGatherer
         if (mag <= 0f || ratio < MinThrustLightRatio) return;
 
         var dir = new Vector2(-accel.Normalized.X, -accel.Normalized.Y);
-        Vector2 lightPos = pos + dir * radius;
+        Vector2 lightPos = ThrusterFlameRenderer.FlameBase(pos, shape, radius, dir, angle);
         float lightRadius = radius * ThrustLightRadiusRatio;
         if (!IsInLightRange(lightPos, lightRadius, camX, camY, windowWidth, windowHeight)) return;
 

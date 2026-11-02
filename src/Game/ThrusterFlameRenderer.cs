@@ -1,13 +1,17 @@
 using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
+using Spacevors.Domain.Stats;
 using Spacevors.Domain.Systems;
 
 namespace Spacevors.Game;
 
 public static class ThrusterFlameRenderer
 {
-    const float ThrustBaseOffsetRatio = 1.0f;
+    // The base sits this much inside the hull's surface along the flame direction. Flames draw before
+    // the hull, so an inset base hides under the paint and only the plume shows; without it the base
+    // floats wherever the hurtbox reaches past the paint (plans/THRUSTER_FLAME_ANCHORS.md).
+    const float FlameBaseInsetRatio = 0.10f;
     const float MaxThrustFlameLengthRatio = 1.2f;
     const float ThrustFlameHalfWidthRatio = 0.35f;
     const float TurnSideOffsetRatio = 0.6f;
@@ -19,13 +23,25 @@ public static class ThrusterFlameRenderer
     const float MinVisibleFlameIntensity = 0.2f;
     const int FlameAlpha = 230;
 
+    // Where a flame's base sits: on the hull's own surface along that direction, not at the bounding
+    // radius. Shapes are authored in the sprite frame (nose at -v), so the unit world direction rotates
+    // by -angle into it. Also the anchor for the flame's point light (LightGatherer).
+    public static Vector2 FlameBase(Vector2 pos, HullShape shape, float radius, Vector2 dir, float angle)
+    {
+        float cos = MathF.Cos(angle);
+        float sin = MathF.Sin(angle);
+        var local = new Vector2(dir.X * cos + dir.Y * sin, -dir.X * sin + dir.Y * cos);
+        float reach = MathF.Max(0f, shape.SupportAlong(local) - FlameBaseInsetRatio) * radius;
+        return pos + dir * reach;
+    }
+
     public static void Draw(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
         foreach (var (entity, player, pos, rot) in em.GetEntitiesWithComponents<Player, Position, Rotation>())
         {
             if (em.HasComponent<Dead>(entity)) continue;
             DrawPlayerThrustFlames(em, entity, pos.Value, rot.Angle, player, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(em, entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, HullFaction.Player, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, player.Shape ?? HullShape.Circle, player.Radius, player.RotationSpeed, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, ship, pos, rot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
@@ -34,8 +50,8 @@ public static class ThrusterFlameRenderer
             // An ECM-jammed hull shows no fire at all — not the thrust plume, not the turn pair. A ship
             // drifting without light is the read that it has lost control, and the arcs say why.
             if (em.HasComponent<EcmDisabled>(entity)) continue;
-            DrawEnemyThrustFlame(em, entity, pos.Value, ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
+            DrawEnemyThrustFlame(em, entity, pos.Value, rot.Angle, HullShapes.ForEnemy(ship.GraphicsId), ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, HullShapes.ForEnemy(ship.GraphicsId), ship.Radius, ship.TurnRate, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
@@ -49,7 +65,8 @@ public static class ThrusterFlameRenderer
 
             var n = v.Normalized;
             var dir = new Vector2(-n.X, -n.Y);
-            DrawThrustFlame(pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio, dir, mine.Radius, speed, mine.Speed, HullFaction.Neutral, camX, camY, windowWidth, windowHeight);
+            // A mine is a disc: support is its radius in every direction, so the base lands where it always did.
+            DrawThrustFlame(FlameBase(pos.Value, HullShape.Circle, mine.Radius, dir, 0f), dir, mine.Radius, speed, mine.Speed, HullFaction.Neutral, camX, camY, windowWidth, windowHeight);
         }
     }
 
@@ -67,28 +84,29 @@ public static class ThrusterFlameRenderer
         var right = new Vector2(cos, sin);
 
         float maxForce = player.MaxThrustForce;
+        var shape = player.Shape ?? HullShape.Circle;
 
         float fwd = Vector2.Dot(a, forward);
         if (fwd > 0f)
         {
             var dir = new Vector2(-forward.X, -forward.Y);
-            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(FlameBase(pos, shape, player.Radius, dir, angle), dir, player.Radius, fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
         else if (fwd < 0f)
-            DrawThrustFlame(pos + forward * player.Radius * ThrustBaseOffsetRatio, forward, player.Radius, -fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(FlameBase(pos, shape, player.Radius, forward, angle), forward, player.Radius, -fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
 
         float side = Vector2.Dot(a, right);
         if (side > 0f)
         {
             var dir = new Vector2(-right.X, -right.Y);
-            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(FlameBase(pos, shape, player.Radius, dir, angle), dir, player.Radius, side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
         else if (side < 0f)
-            DrawThrustFlame(pos + right * player.Radius * ThrustBaseOffsetRatio, right, player.Radius, -side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(FlameBase(pos, shape, player.Radius, right, angle), right, player.Radius, -side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawEnemyThrustFlame(
-        EntityManager em, Entity entity, Vector2 pos, float radius, float maxAccel,
+        EntityManager em, Entity entity, Vector2 pos, float angle, HullShape shape, float radius, float maxAccel,
         float camX, float camY, int windowWidth, int windowHeight)
     {
         if (!em.TryGetComponent<Acceleration>(entity, out var accel)) return;
@@ -98,11 +116,11 @@ public static class ThrusterFlameRenderer
 
         var n = a.Normalized;
         var dir = new Vector2(-n.X, -n.Y);
-        DrawThrustFlame(pos + dir * radius * ThrustBaseOffsetRatio, dir, radius, mag, maxAccel, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
+        DrawThrustFlame(FlameBase(pos, shape, radius, dir, angle), dir, radius, mag, maxAccel, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawTurnFlame(
-        EntityManager em, Entity entity, Vector2 pos, float angle, float radius, float maxTurnRate,
+        EntityManager em, Entity entity, Vector2 pos, float angle, HullShape shape, float radius, float maxTurnRate,
         HullFaction faction, float camX, float camY, int windowWidth, int windowHeight)
     {
         if (maxTurnRate <= 0f || !em.TryGetComponent<AngularVelocity>(entity, out var angVel)) return;
@@ -121,11 +139,13 @@ public static class ThrusterFlameRenderer
         float halfWidth = radius * TurnFlameHalfWidthRatio * turnIntensity;
         var color = FlameColor(faction, turnIntensity);
 
-        var frontPos = pos + forward * radius * TurnFrontOffsetRatio - right * radius * TurnSideOffsetRatio * sideSign;
-        DrawFlame(frontPos, forward, length, halfWidth, color, camX, camY, windowWidth, windowHeight);
+        // The authored mount directions survive; only their length becomes the hull's surface distance,
+        // so the pair sits on a shaped hull's corners instead of floating off the bounding disc.
+        var frontMount = (forward * TurnFrontOffsetRatio - right * TurnSideOffsetRatio * sideSign).Normalized;
+        DrawFlame(FlameBase(pos, shape, radius, frontMount, angle), forward, length, halfWidth, color, camX, camY, windowWidth, windowHeight);
 
-        var rearPos = pos - forward * radius * TurnRearOffsetRatio + right * radius * TurnSideOffsetRatio * sideSign;
-        DrawFlame(rearPos, new Vector2(-forward.X, -forward.Y), length, halfWidth, color, camX, camY, windowWidth, windowHeight);
+        var rearMount = (right * TurnSideOffsetRatio * sideSign - forward * TurnRearOffsetRatio).Normalized;
+        DrawFlame(FlameBase(pos, shape, radius, rearMount, angle), new Vector2(-forward.X, -forward.Y), length, halfWidth, color, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawThrustFlame(
