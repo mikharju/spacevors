@@ -14,7 +14,11 @@ public static class Program
     const int WarmupFrames = 30;
     const int MeasureFrames = 240;
 
-    static readonly Dictionary<string, List<double>> Timings = new();
+    // CPU time, not wall time, is what makes an A/B readable on a contended host: another tenant can
+    // double the wall clock while the drawn work stays byte-identical (the untouched flat path measured
+    // 8.5 - 12.5 ms inside three minutes). TotalProcessorTime charges every thread, so it also counts
+    // llvmpipe's rasteriser workers.
+    static readonly Process Self = Process.GetCurrentProcess();
 
     public static int Main(string[] args)
     {
@@ -80,6 +84,7 @@ public static class Program
     {
         var layout = BuildLayout(spriteCount);
         var lights = BuildLights(lightCount);
+        var timings = new List<(double WallMs, double CpuMs)>();
 
         for (int frame = 0; frame < WarmupFrames + MeasureFrames; frame++)
         {
@@ -87,26 +92,22 @@ public static class Program
             foreach (var light in lights)
                 Lighting.AddLight(light.Position, light.Radius, light.Intensity);
 
+            var cpuBefore = Self.TotalProcessorTime;
             var sw = Stopwatch.StartNew();
             Raylib.BeginDrawing();
             Raylib.ClearBackground(new Color(15, 15, 25, 255));
             DrawSprites(layout, sprites, flat: lightCount < 0);
             Raylib.EndDrawing();
             sw.Stop();
+            double cpuMs = (Self.TotalProcessorTime - cpuBefore).TotalMilliseconds;
 
             if (frame >= WarmupFrames)
-                Accumulate(name, sw.Elapsed.TotalMilliseconds);
+                timings.Add((sw.Elapsed.TotalMilliseconds, cpuMs));
         }
 
-        double avg = Timings[name].Average();
-        Console.WriteLine($"{name,-14} {avg,7:F3} ms/frame  ({(1000.0 / avg):5.0} fps if whole frame)");
-    }
-
-    static void Accumulate(string name, double ms)
-    {
-        if (!Timings.TryGetValue(name, out var list))
-            Timings[name] = list = new List<double>();
-        list.Add(ms);
+        double wall = timings.Average(t => t.WallMs);
+        double cpu = timings.Average(t => t.CpuMs);
+        Console.WriteLine($"{name,-14} {wall,7:F3} ms wall  {cpu,7:F3} ms cpu  ({1000.0 / cpu,5:F0} fps if whole frame)");
     }
 
     // Grid layout covering the viewport; each cell gets one sprite at a fixed scale.
