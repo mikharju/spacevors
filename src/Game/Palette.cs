@@ -3,8 +3,40 @@ using Raylib_cs;
 namespace Spacevors.Game;
 
 // Colours used by more than one renderer. Everything else stays with the renderer that owns it.
+
+// Whose hull this is (plans/SHIP_TINT_PALETTE.md). The hue rides on the ambient and the rim light only,
+// so the key light and the specular glint still read as white metal.
+// Player: near-white ivory, because the player must stay the brightest thing on screen; its cool identity
+// comes from the rim and its own engine glow, not from a blue hull. Enemy: crimson, so warm hostiles stand
+// off the cool background, the cool player rim and the blue XP field.
+// Reserved, deliberately unassigned: magenta for elites, gold for bosses. Asteroids, mines and wrecks stay
+// Neutral so a rock never reads as a ship. Green and saturated blue stay off hulls entirely: green is
+// health orbs and turret arcs (and the universal "ally" colour), blue is XP, ECM and the UI.
+public enum HullFaction { Neutral, Player, Enemy }
+
 internal static class Palette
 {
+    // The lit shader multiplies this into the ambient and the rim. Above 1 is not a mistake: the hue costs
+    // luminance, and the enemy's red channel buys some of it back (multiplying a crimson tint over the
+    // finished colour costs ~25% luminance; tinting only the ambient and the rim costs ~10%).
+    public static System.Numerics.Vector3 HullTintOf(HullFaction faction) => faction switch
+    {
+        HullFaction.Player => new System.Numerics.Vector3(1.06f, 1.02f, 0.94f),
+        HullFaction.Enemy => new System.Numerics.Vector3(1.30f, 0.60f, 0.55f),
+        _ => System.Numerics.Vector3.One
+    };
+
+    // The same hue for a sprite drawn without the lighting rig: there the tint multiplies the whole
+    // texel instead of just the ambient and the rim, so it is derived from the one constant above rather
+    // than kept as a second colour that can drift.
+    public static Color HullFallbackTint(HullFaction faction)
+    {
+        var tint = HullTintOf(faction);
+        return new Color(ClampToChannel(tint.X), ClampToChannel(tint.Y), ClampToChannel(tint.Z), 255);
+    }
+
+    static int ClampToChannel(float value) => (int)Math.Round(Math.Clamp(value, 0f, 1f) * 255f);
+
     // Health bar endpoints: green at full hp, red when nearly dead.
     // HudRenderer switches between them, TargetingRenderer lerps across them.
     public static readonly Color HealthFull = new(80, 255, 80, 255);

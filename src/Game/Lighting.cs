@@ -36,6 +36,12 @@ public static class Lighting
         uniform sampler2D normalDepth;
         uniform float uTime;
 
+        // Whose hull this is (Palette.HullTintOf): one value per batch, multiplied into the ambient and the
+        // rim below — the two terms every texel sees whatever the surface faces. The key light, the
+        // specular glint and the gathered point lights stay unshifted, so lit metal still reads as white
+        // metal and a fireball still lights a hostile in fireball orange.
+        uniform vec3 uHullTint;
+
         const float TwoPi = 6.28318530718;
 
         // Screen space: x right, y down. Light from top-right, slightly toward viewer.
@@ -44,14 +50,19 @@ public static class Lighting
         const float ShadowDepthBias = 0.03;
         const float ShadowDiffuseScale = 0.15;
 
-        // Light rig. A warm key from the top-right, a cool fill standing in for starlight, and a cool rim
-        // on grazing surfaces. Key and fill together peak just over 1.0 on a white texel: the old rig
-        // (ambient 0.30 + diffuse 1.0) peaked at 1.30, so the brightest hulls and rocks clipped to flat
-        // white wherever the light landed.
+        // Light rig. A warm key from the top-right, a near-neutral fill standing in for starlight, and a
+        // cool rim on grazing surfaces. Key and fill together peak just over 1.0 on a white texel: the old
+        // rig (ambient 0.30 + diffuse 1.0) peaked at 1.30, so the brightest hulls and rocks clipped to
+        // flat white wherever the light landed.
+        // The fill used to be a saturated blue (0.45, 0.58, 0.95). It lands on every texel whatever the
+        // surface faces, so it recoloured the whole fleet: measured over the real sprites, 65-99% of every
+        // hull's pixels came out blue-dominant and the art's own grey paint and red/green accents
+        // disappeared. The fill is now close to neutral; the cool tone lives in the rim, which only
+        // grazing surfaces see and which is what separates a dark hull from the black background.
         const vec3 KeyColor = vec3(1.00, 0.95, 0.86);
-        const float KeyStrength = 0.72;
-        const vec3 FillColor = vec3(0.45, 0.58, 0.95);
-        const float FillStrength = 0.32;
+        const float KeyStrength = 0.80;
+        const vec3 FillColor = vec3(0.74, 0.76, 0.80);
+        const float FillStrength = 0.24;
 
         // Blinn-Phong highlight against the key light. The view direction of an orthographic 2D scene is
         // straight out of the screen, so the half vector is a constant, not a per-fragment sum.
@@ -60,10 +71,11 @@ public static class Lighting
         const float SpecularStrength = 0.32;
 
         // Grazing surfaces catch a cool edge light: this is what separates a dark hull from the black
-        // background once the key light is on its far side.
-        const vec3 RimColor = vec3(0.42, 0.60, 1.0);
+        // background once the key light is on its far side. It is also where a hull's faction hue shows at
+        // distance, so it keeps a clear blue of its own under the tint.
+        const vec3 RimColor = vec3(0.46, 0.66, 1.00);
         const float RimPower = 3.0;
-        const float RimStrength = 0.18;
+        const float RimStrength = 0.20;
 
         // Gathered lights all sit on one side of the plane, so a fragment the key light has shadowed
         // still keeps part of their glow rather than dropping to the fill alone.
@@ -237,10 +249,10 @@ public static class Lighting
             // Point light is multiplied by the albedo, as the key and the fill are: light falling on a
             // dark hull stays dark. Added raw, as it used to be, a fireball turned a charcoal hull into
             // a white blob - the one case the game shows most.
-            vec3 lit = albedo * (FillColor * FillStrength + KeyColor * (diffuse * KeyStrength))
+            vec3 lit = albedo * (FillColor * FillStrength * uHullTint + KeyColor * (diffuse * KeyStrength))
                      + albedo * pointLight * mix(1.0, PointLightShadowScale, shadowed)
                      + KeyColor * specular
-                     + RimColor * rim
+                     + RimColor * rim * uHullTint
                      + ember;
 
             // RGB of the vertex color carries the packed angle, so only its alpha tints.
@@ -255,6 +267,7 @@ public static class Lighting
     static int _lightsLoc;
     static int _lightCountLoc;
     static int _lightTintsLoc;
+    static int _hullTintLoc;
     static int _timeLoc;
 
     // Frame-scoped point light list, filled by LightGatherer after BeginFrame.
@@ -311,6 +324,7 @@ public static class Lighting
         _lightsLoc = Raylib.GetShaderLocation(shader, "uLights");
         _lightCountLoc = Raylib.GetShaderLocation(shader, "uLightCount");
         _lightTintsLoc = Raylib.GetShaderLocation(shader, "uLightTints");
+        _hullTintLoc = Raylib.GetShaderLocation(shader, "uHullTint");
         _timeLoc = Raylib.GetShaderLocation(shader, "uTime");
         IsReady = true;
     }
@@ -323,11 +337,13 @@ public static class Lighting
         IsReady = false;
     }
 
-    // Begins a block of lit draws that all share one sprite variant (one normal/depth map pair).
+    // Begins a block of lit draws that all share one sprite variant (one normal/depth map pair) and one
+    // hull faction. The hull tint travels with the variant because it is a per-block uniform, exactly like
+    // the maps.
     // Shader uniforms are global at batch-flush time in this raylib build, so mixing variants in
     // one block renders earlier sprites with later ones' maps. Returns false when the shader is
     // unavailable; callers then draw flat fallbacks for the whole group.
-    public static bool BeginDraw(LitSprite sprite)
+    public static bool BeginDraw(LitSprite sprite, System.Numerics.Vector3 hullTint)
     {
         if (!IsReady || _shader == null) return false;
 
@@ -336,6 +352,7 @@ public static class Lighting
         // so map uniforms set before it are lost on an empty flush.
         Raylib.BeginShaderMode(shader);
         Raylib.SetShaderValueTexture(shader, _normalDepthLoc, sprite.NormalDepth);
+        Raylib.SetShaderValue(shader, _hullTintLoc, hullTint, ShaderUniformDataType.Vec3);
         // The count travels with the lights: the shader loops over exactly what was gathered.
         Raylib.SetShaderValue(shader, _lightCountLoc, _pointLightCount, ShaderUniformDataType.Int);
         if (_pointLightCount > 0)

@@ -25,7 +25,7 @@ public static class ThrusterFlameRenderer
         {
             if (em.HasComponent<Dead>(entity)) continue;
             DrawPlayerThrustFlames(em, entity, pos.Value, rot.Angle, player, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(em, entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, player.Radius, player.RotationSpeed, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, ship, pos, rot) in em.GetEntitiesWithComponents<EnemyShip, Position, Rotation>())
@@ -35,7 +35,7 @@ public static class ThrusterFlameRenderer
             // drifting without light is the read that it has lost control, and the arcs say why.
             if (em.HasComponent<EcmDisabled>(entity)) continue;
             DrawEnemyThrustFlame(em, entity, pos.Value, ship.Radius, ship.Acceleration, camX, camY, windowWidth, windowHeight);
-            DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, camX, camY, windowWidth, windowHeight);
+            DrawTurnFlame(em, entity, pos.Value, rot.Angle, ship.Radius, ship.TurnRate, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
@@ -49,7 +49,7 @@ public static class ThrusterFlameRenderer
 
             var n = v.Normalized;
             var dir = new Vector2(-n.X, -n.Y);
-            DrawThrustFlame(pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio, dir, mine.Radius, speed, mine.Speed, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos.Value + dir * mine.Radius * ThrustBaseOffsetRatio, dir, mine.Radius, speed, mine.Speed, HullFaction.Neutral, camX, camY, windowWidth, windowHeight);
         }
     }
 
@@ -72,19 +72,19 @@ public static class ThrusterFlameRenderer
         if (fwd > 0f)
         {
             var dir = new Vector2(-forward.X, -forward.Y);
-            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, fwd, maxForce, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
         else if (fwd < 0f)
-            DrawThrustFlame(pos + forward * player.Radius * ThrustBaseOffsetRatio, forward, player.Radius, -fwd, maxForce, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos + forward * player.Radius * ThrustBaseOffsetRatio, forward, player.Radius, -fwd, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
 
         float side = Vector2.Dot(a, right);
         if (side > 0f)
         {
             var dir = new Vector2(-right.X, -right.Y);
-            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, side, maxForce, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos + dir * player.Radius * ThrustBaseOffsetRatio, dir, player.Radius, side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
         }
         else if (side < 0f)
-            DrawThrustFlame(pos + right * player.Radius * ThrustBaseOffsetRatio, right, player.Radius, -side, maxForce, camX, camY, windowWidth, windowHeight);
+            DrawThrustFlame(pos + right * player.Radius * ThrustBaseOffsetRatio, right, player.Radius, -side, maxForce, HullFaction.Player, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawEnemyThrustFlame(
@@ -98,12 +98,12 @@ public static class ThrusterFlameRenderer
 
         var n = a.Normalized;
         var dir = new Vector2(-n.X, -n.Y);
-        DrawThrustFlame(pos + dir * radius * ThrustBaseOffsetRatio, dir, radius, mag, maxAccel, camX, camY, windowWidth, windowHeight);
+        DrawThrustFlame(pos + dir * radius * ThrustBaseOffsetRatio, dir, radius, mag, maxAccel, HullFaction.Enemy, camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawTurnFlame(
         EntityManager em, Entity entity, Vector2 pos, float angle, float radius, float maxTurnRate,
-        float camX, float camY, int windowWidth, int windowHeight)
+        HullFaction faction, float camX, float camY, int windowWidth, int windowHeight)
     {
         if (maxTurnRate <= 0f || !em.TryGetComponent<AngularVelocity>(entity, out var angVel)) return;
 
@@ -119,7 +119,7 @@ public static class ThrusterFlameRenderer
         // Diagonal RCS pair: front thruster on the side opposite the turn, rear thruster on the turn's side.
         float length = radius * MaxTurnFlameLengthRatio * turnIntensity;
         float halfWidth = radius * TurnFlameHalfWidthRatio * turnIntensity;
-        var color = FlameColor(turnIntensity);
+        var color = FlameColor(faction, turnIntensity);
 
         var frontPos = pos + forward * radius * TurnFrontOffsetRatio - right * radius * TurnSideOffsetRatio * sideSign;
         DrawFlame(frontPos, forward, length, halfWidth, color, camX, camY, windowWidth, windowHeight);
@@ -129,7 +129,7 @@ public static class ThrusterFlameRenderer
     }
 
     private static void DrawThrustFlame(
-        Vector2 basePos, Vector2 dir, float radius, float force, float maxForce,
+        Vector2 basePos, Vector2 dir, float radius, float force, float maxForce, HullFaction faction,
         float camX, float camY, int windowWidth, int windowHeight)
     {
         if (force <= 0f || maxForce <= 0f) return;
@@ -141,7 +141,7 @@ public static class ThrusterFlameRenderer
             basePos, dir,
             radius * MaxThrustFlameLengthRatio * intensity,
             radius * ThrustFlameHalfWidthRatio * intensity,
-            FlameColor(intensity), camX, camY, windowWidth, windowHeight);
+            FlameColor(faction, intensity), camX, camY, windowWidth, windowHeight);
     }
 
     private static void DrawFlame(
@@ -166,11 +166,11 @@ public static class ThrusterFlameRenderer
             color);
     }
 
-    private static Color FlameColor(float intensity)
-    {
-        int green = (int)(140f + 90f * intensity);
-        int blue = (int)(30f + 90f * intensity);
-        return new Color(255, green, blue, FlameAlpha);
-    }
+    // Engine fire carries the faction: a cool ion plume on the player, a warm chemical plume on every
+    // hostile. Same shape, same alpha, only the hue moves — and it is the hue of the point light that the
+    // same flame casts (LightGatherer), so a hull is lit by the colour of the fire coming out of it.
+    private static Color FlameColor(HullFaction faction, float intensity) => faction == HullFaction.Player
+        ? new Color((int)(70 + 80 * intensity), (int)(150 + 80 * intensity), 255, FlameAlpha)
+        : new Color(255, (int)(140 + 90 * intensity), (int)(30 + 90 * intensity), FlameAlpha);
 
 }

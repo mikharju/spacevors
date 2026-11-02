@@ -13,13 +13,21 @@ public static class LightGatherer
     const float ExplosionLightRadiusScale = 2.5f; // light spills past the visible fireball
     const float ExplosionLightIntensity = 1.0f;
     const float ThrustLightRadiusRatio = 3.0f; // x ship radius
-    const float ThrustLightIntensity = 0.8f; // dimmer than explosions (peak 1.0)
+    // The player's glow is as bright as an explosion's; a hostile's is dimmer, because every hostile in a
+    // wave thrusts at once and the 16 light slots fill with engine glow: at full strength a crowd turned
+    // itself into one orange field and the hulls lost their shape.
+    const float PlayerThrustLightIntensity = 0.8f;
+    const float EnemyThrustLightIntensity = 0.5f;
     const float MinThrustLightRatio = 0.1f; // ignore near-zero thrust
 
-    // Engine flame burns blue-white, a fireball orange; the hull picks these up as coloured light
-    // rather than one uniform wash (Lighting.uLightTints).
+    // A fireball is orange. An engine's light is its hull's faction colour, because that light lands on
+    // the hull it comes out of: the player's glow is cool and the enemy's is warm, matching the flame the
+    // ThrusterFlameRenderer draws. One blue-white glow for both used to wash every hostile hull cyan -
+    // radius 3x the hull at up to 0.8 intensity, on top of the ambient - which is what buried the enemy
+    // art's own red and green (plans/SHIP_TINT_PALETTE.md).
     static readonly System.Numerics.Vector3 ExplosionLightTint = new(1.0f, 0.55f, 0.30f);
-    static readonly System.Numerics.Vector3 ThrustLightTint = new(0.55f, 0.78f, 1.0f);
+    static readonly System.Numerics.Vector3 PlayerThrustLightTint = new(0.55f, 0.78f, 1.0f);
+    static readonly System.Numerics.Vector3 EnemyThrustLightTint = new(1.0f, 0.66f, 0.42f);
 
     public static void Collect(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
@@ -59,8 +67,8 @@ public static class LightGatherer
             float maxForce = player.MaxThrustForce;
 
             float mainAccel = Vector2.Dot(accel.Value, forwardDir);
-            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius, camX, camY, windowWidth, windowHeight);
-            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, forwardDir * mainAccel, maxForce, player.Radius, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, accel.Value - forwardDir * mainAccel, maxForce, player.Radius, PlayerThrustLightTint, PlayerThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
     }
 
@@ -70,7 +78,7 @@ public static class LightGatherer
         {
             if (Lighting.IsFull) return;
             if (em.HasComponent<Dead>(entity)) continue;
-            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, accel.Value, ship.Acceleration, ship.Radius, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
 
         foreach (var (entity, mine, pos, vel) in em.GetEntitiesWithComponents<EnemyMine, Position, Velocity>())
@@ -79,12 +87,12 @@ public static class LightGatherer
             Vector2 v = vel.Value;
             float speed = v.Magnitude;
             if (speed < 1f || mine.Speed <= 0f) continue;
-            AddThrustLight(pos.Value, v, mine.Speed, mine.Radius, camX, camY, windowWidth, windowHeight);
+            AddThrustLight(pos.Value, v, mine.Speed, mine.Radius, EnemyThrustLightTint, EnemyThrustLightIntensity, camX, camY, windowWidth, windowHeight);
         }
     }
 
     // Light sits at the flame base: behind the hull, opposite the thrust direction.
-    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, float radius, float camX, float camY, int windowWidth, int windowHeight)
+    static void AddThrustLight(Vector2 pos, Vector2 accel, float maxAccel, float radius, System.Numerics.Vector3 tint, float intensity, float camX, float camY, int windowWidth, int windowHeight)
     {
         if (maxAccel <= 0f) return;
         float mag = accel.Magnitude;
@@ -96,7 +104,7 @@ public static class LightGatherer
         float lightRadius = radius * ThrustLightRadiusRatio;
         if (!IsInLightRange(lightPos, lightRadius, camX, camY, windowWidth, windowHeight)) return;
 
-        Lighting.AddLight(lightPos, lightRadius, Math.Clamp(ratio, 0f, 1f) * ThrustLightIntensity, ThrustLightTint);
+        Lighting.AddLight(lightPos, lightRadius, Math.Clamp(ratio, 0f, 1f) * intensity, tint);
     }
 
     static bool IsInLightRange(Vector2 worldPos, float radius, float camX, float camY, int windowWidth, int windowHeight)

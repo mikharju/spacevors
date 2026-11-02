@@ -104,6 +104,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - UI polish — shipped — plans/UI_POLISH.md
 - Off-screen edge indicators: distance-tapered chevrons, enemies red, pickups in their world colours — shipped — plans/OFF_SCREEN_INDICATORS.md
 - Lit sprite rendering: skip transparent texels, pack depth into the normal map, 512 px mipmapped maps, count/colour the gathered lights, key+fill+rim+spec rig — shipped 2026-11-02 — plans/LIT_SPRITE_RENDERING.md
+- Ship tint palette: neutral fill + cool rim, per-faction hull tint (ivory player, crimson enemies), faction engine glow; magenta reserved for elites, gold for bosses — shipped 2026-11-02 — plans/SHIP_TINT_PALETTE.md
 
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md

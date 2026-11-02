@@ -7,7 +7,7 @@ namespace Spacevors.Game;
 
 public static class WorldRenderer
 {
-    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
+    private static readonly Dictionary<LitBlock, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     // Asteroid colliders, queued while the rocks draw and painted after the lit batch flush so they sit
     // over the art instead of under it.
     private static readonly List<(HullShape Shape, float Radius, float X, float Y, float AngleDeg)> _diagnosticShapes = new();
@@ -148,7 +148,8 @@ public static class WorldRenderer
         var dest = new Rectangle(cx, cy, baseTex.Width * scale, baseTex.Height * scale);
 
         if (sprite?.Lit is { } lit)
-            LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg);
+            // Rocks keep the Neutral hull tint: a tinted rock reads as a ship.
+            LitGroupRenderer.Add(_litDraws, lit, HullFaction.Neutral, dest, angleDeg);
         else
             Raylib.DrawTexturePro(baseTex, RenderHelpers.FullSource(baseTex), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
     }

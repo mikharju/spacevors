@@ -7,9 +7,13 @@ namespace Spacevors.Game;
 
 public static class EnemyShipRenderer
 {
+    // Every hostile hull reads crimson, whatever art it wears: the faction is one value here, so an
+    // elite or boss hue later is a second value, not a per-hull table.
+    const HullFaction Faction = HullFaction.Enemy;
+
     static readonly Color EnemyTurretColor = new(255, 140, 30, 255);
 
-    private static readonly Dictionary<LitSprite, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
+    private static readonly Dictionary<LitBlock, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
     private static readonly List<(float Cx, float Cy, float AngleDeg, byte GraphicsId, float Radius)> _diagnosticShapes = new();
 
@@ -72,15 +76,15 @@ public static class EnemyShipRenderer
                 float damage = em.TryGetComponent<Health>(entity, out var health) ? DamageShading.FromHealth(health) : 0f;
 
                 if (lit != null)
-                    LitGroupRenderer.Add(_litDraws, lit, dest, angleDeg, damage);
+                    LitGroupRenderer.Add(_litDraws, lit, Faction, dest, angleDeg, damage);
                 else
                     // Flat sprites draw straight away while lit ones wait for the batch flush below,
                     // so a mixed layer draws flat variants under lit ones.
-                    Raylib.DrawTexturePro(t, RenderHelpers.FullSource(t), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Color.White);
+                    Raylib.DrawTexturePro(t, RenderHelpers.FullSource(t), dest, RenderHelpers.CenterOrigin(dest), angleDeg, Palette.HullFallbackTint(Faction));
             }
             else
             {
-                ShipSpriteRenderer.DrawFallbackShip(screenCx, screenCy, enemyShip.Radius, angleDeg);
+                ShipSpriteRenderer.DrawFallbackShip(screenCx, screenCy, enemyShip.Radius, angleDeg, Faction);
             }
 
             _turretMarkers.Add((screenCx, screenCy));
@@ -111,7 +115,7 @@ public static class EnemyShipRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, enemyShip.Radius, windowWidth, windowHeight)) continue;
 
-            ShipSpriteRenderer.DrawFallbackShip(cx, cy, enemyShip.Radius, shipRot.Angle * 180f / MathF.PI);
+            ShipSpriteRenderer.DrawFallbackShip(cx, cy, enemyShip.Radius, shipRot.Angle * 180f / MathF.PI, Faction);
 
             RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 

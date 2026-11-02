@@ -621,3 +621,17 @@ test never depends on the model's eyes.
   md5 of the dll each rep runs, which also catches the wrong-binary trap of entry 64. Judge the run by
   the control first: if it moved, the subject's delta means nothing; on a quiet host the control now
   repeats within ~1 %.
+## 70. An intentional colour change makes the A/B `probe: FAIL` — that is the check working, not a bug
+
+- **Symptom**: `.tools/ab-lit.sh` on a lighting-rig change printed `A probe: PASS` on every rep and
+  `B probe: FAIL (compare /tmp/probe_legacy.png vs /tmp/probe_current.png)` on every rep, which reads as
+  "the working tree's grouped path disagrees with the per-sprite path".
+- **Cause**: the probe pixel-compares the current shader against `LegacyFragmentShader`, a **frozen oracle
+  of the old rig** kept to prove that batching and the transparent early-out change no pixel (RenderBench
+  says this at its own line 226). Change the rig on purpose and the two sides disagree by construction, so
+  the probe fails on the changed side and only on the changed side.
+- **Fix / Prevention**: for a palette or rig change run the A/B with `AB_PIXELS=different` and read the
+  final pixel step (`mean/max/changed`) as the report; treat the probe line as informational. For a change
+  that must not move pixels, keep the default `AB_PIXELS=same` — then a probe FAIL really is the batching
+  bug of entry 14. Judge the cost by the `flat-200` control first (entry 69): if the control moved, the
+  subject's delta means nothing.
