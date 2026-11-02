@@ -39,19 +39,20 @@ public static class HudRenderer
         Raylib.DrawText(text, paddingX + barWidth + 10, paddingY, 14, Palette.TextMuted);
     }
 
-    // Thin top-edge xp bar: full-width track, accent fill for progress toward the next
-    // level, muted level readout at the right end.
+    // Thin top-edge xp bar: full-width track, accent fill for how far this level still has to go, and the
+    // level plus the run's total XP at the right end. The bar shows one level's slice, so the total is what
+    // tells a long run from a short one.
     public static void DrawXpBar(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight)
     {
         var player = em.GetComponent<Player>(playerEntity);
-        float progress = Math.Clamp((float)player.Xp / UpgradeStats.XpForLevel(player.Level), 0f, 1f);
+        float progress = UpgradeStats.LevelProgress(player.Level, player.Xp);
 
         const int BarHeight = 3;
         Raylib.DrawRectangle(0, 0, windowWidth, BarHeight, Palette.TrackDark);
         if (progress > 0f)
             Raylib.DrawRectangle(0, 0, (int)(windowWidth * progress), BarHeight, Palette.Accent);
 
-        string level = $"LV {player.Level}";
+        string level = $"LV {player.Level}  {player.Xp} XP";
         const int Font = 12;
         Raylib.DrawText(level, windowWidth - Raylib.MeasureText(level, Font) - 10, 6, Font, Palette.TextMuted);
     }

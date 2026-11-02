@@ -13,7 +13,7 @@ public class LevelUpSlotOfferTest
     [Fact]
     public void MilestoneHand_OffersAtMostThreeNewWeapons()
     {
-        var (em, player) = CreateHull(ShipType.Fighter, xp: 45, level: 4);
+        var (em, player) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(4), level: 4);
 
         RunLevelUp(em);
 
@@ -57,7 +57,7 @@ public class LevelUpSlotOfferTest
     [Fact]
     public void MountedWeaponsAreNeverOfferedAgain()
     {
-        var (em, _) = CreateHull(ShipType.Fighter, xp: 45, level: 4);
+        var (em, _) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(4), level: 4);
         var mounted = TurretMount.MountedSlots(new WorldView(em)).Select(m => m.WeaponName).ToHashSet();
 
         RunLevelUp(em);
@@ -68,7 +68,7 @@ public class LevelUpSlotOfferTest
     [Fact]
     public void CargoWeaponsAreNeverOfferedAgain()
     {
-        var (em, player) = CreateHull(ShipType.Fighter, xp: 45, level: 4);
+        var (em, player) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(4), level: 4);
         em.AddComponent(player, WeaponCargo.Empty.With(TurretMount.CarriedTurret(WeaponType.RailGun)));
 
         RunLevelUp(em);

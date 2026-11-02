@@ -363,7 +363,7 @@ public sealed class GameSession
     {
         // Diagnostic only: force level-up to test the upgrade screen
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.L))
-            _em.AddComponent(_playerEntity, playerStats with { Xp = playerStats.Level * 10 });
+            _em.AddComponent(_playerEntity, playerStats with { Xp = UpgradeStats.XpForLevel(playerStats.Level) });
 
         // Diagnostic only: grant salvage charges so the reroll can be tested without farming a ship kill.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.G))

@@ -35,7 +35,7 @@ public class LevelUpScriptTest
         Assert.Equal(UpgradeOption.Hp, GetChoiceOptions(em)[0].Stat);
 
         DestroyChoices(em);
-        SetXp(em, player, 25);
+        SetXp(em, player, UpgradeStats.XpForLevel(2));
 
         RunLevelUp(system, em);
 
@@ -53,7 +53,7 @@ public class LevelUpScriptTest
 
         RunLevelUp(system, em);
         DestroyChoices(em);
-        SetXp(em, player, 25);
+        SetXp(em, player, UpgradeStats.XpForLevel(2));
 
         RunLevelUp(system, em);
 
@@ -65,7 +65,7 @@ public class LevelUpScriptTest
     public void MilestoneOffersNewWeaponsWhenMountsAreFree()
     {
         // Heavy hull: three of its seven mounts filled, two distinct weapon types.
-        var (em, player) = CreateHeavyLikePlayer(xp: 45, level: 4);
+        var (em, player) = CreateHeavyLikePlayer(xp: UpgradeStats.XpForLevel(4), level: 4);
 
         RunLevelUp(new LevelUpSystem(), em);
 

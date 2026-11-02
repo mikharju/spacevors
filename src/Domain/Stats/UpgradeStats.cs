@@ -3,8 +3,22 @@ namespace Spacevors.Domain.Stats;
 // XP progression (LevelUpSystem).
 public static class UpgradeStats
 {
-    // Cumulative XP threshold that must be reached while at `level` to advance.
-    public static int XpForLevel(int level) => level * 10;
+    // What the next level costs, on top of what the previous one cost.
+    private const int XpStepPerLevel = 10;
+
+    // Cumulative XP that must be reached while at `level` to advance. A level costs `XpStepPerLevel` more
+    // than the one before it (10 to leave level 1, then 20 more, then 30 more), so the total is the
+    // triangular sum. `Player.Xp` is the run's total and is never spent or reset.
+    public static int XpForLevel(int level) => XpStepPerLevel * level * (level + 1) / 2;
+
+    // How far through `level` the player is, 0..1 — the slice between where this level started and the
+    // next threshold, not the run total, so the bar empties on every level-up while Xp keeps counting up.
+    public static float LevelProgress(int level, int xp)
+    {
+        int levelStart = XpForLevel(level - 1);
+        int levelSpan = XpForLevel(level) - levelStart;
+        return Math.Clamp((xp - levelStart) / (float)levelSpan, 0f, 1f);
+    }
 }
 
 public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth }

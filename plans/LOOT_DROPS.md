@@ -214,3 +214,26 @@ one RNG number and the XP orb every ship drops is unchanged. The capsule stocks 
 re-deals the upgrade hand — decisions, drop rates and the survey of other possible drops:
 plans/REROLL_TOKENS.md. Two more pickups from that survey (salvage field, ECM pulse) are deferred in
 plans/LOOT_ITEMS.md. Mines and rocks still drop exactly what this plan gave them.
+
+## Follow-up (2026-11-02): XP curve — a level costs more than the one before
+
+The body's `Level * 10` cumulative threshold made every level cost the same **10 XP on top of the last**
+(10 to leave level 1, 20 total to leave level 2, 30 to leave level 3 — so 10 more each time). Levels therefore
+kept arriving on the same ~4-kill clock all run long.
+
+Now the marginal cost grows: `XpForLevel(level) = 10 · level · (level + 1) / 2` — 10 to leave level 1, **20 more**
+to leave level 2, 30 more for level 3, so 10 / 30 / 60 / 100 / 150 total by level 5. `Player.Xp` is still the
+run's total: it is never spent, reset or subtracted, only added to by `PickupMagnetSystem`.
+
+Two consequences worth knowing:
+
+- The top bar no longer shows `Xp / XpForLevel(level)`, which after this curve would sit at a third on the
+  frame you reach level 2. It shows `UpgradeStats.LevelProgress(level, xp)` — the slice between where this
+  level started and its threshold — so it empties on every level-up. The same readout now carries the run's
+  total XP (`LV 5  123 XP`) next to the level, since the bar alone no longer tells a long run from a short one.
+- Drop rates and XP values (3 per ship, 1–2 per mine) are untouched: pacing comes from the curve alone.
+  Level 2 is still four ship kills; level 10 needs 550 XP ≈ 180 kills, which is where a run should be deep
+  into a hull's mounts rather than handing out its fifth card.
+
+Tests: `src/Tests/XpCurveTest.cs` pins the curve and the per-level progress; the offer tests read their
+"enough XP to level" from `UpgradeStats.XpForLevel(level)` instead of a hard-coded number.
