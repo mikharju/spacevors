@@ -17,6 +17,13 @@ public class CollisionSystem : GameSystem
     private const float Slop = 1.0f;
 
     private const float EnemyShipMass = 3000f;
+
+    // How much of the hull's own velocity a shatter shard inherits, so the pieces trail behind a moving
+    // hull the way a damage spark does (DamageEffectSystem.FollowFactor is the same idea at 0.5).
+    private const float ShardVelocityInherit = 0.4f;
+    // How fast the pieces of a broken field fly off. Slow enough to read as glass, not as a blast.
+    private const float ShardSpeed = 150f;
+
     private readonly List<(Entity, Position)> _asteroidPositions = new();
     private readonly List<(Entity, Position)> _shipPositions = new();
     private readonly HashSet<Entity> _entitiesToDestroy = new();
@@ -29,6 +36,15 @@ public class CollisionSystem : GameSystem
     private readonly Dictionary<Entity, Vector2> _positionCorrections = new();
     private readonly Dictionary<Entity, float> _angularVelocityAccumulator = new();
     private readonly Dictionary<Entity, int> _frameRemainingHealth = new();
+    // Per-tick shield bookkeeping (plans/SHIELDS.md). A shield is written back the same way Health is —
+    // accumulate in the tick, issue one command at the end — because several rounds can soak off one
+    // hull in a single tick and last-write-wins would drop all but the last.
+    //   pool       what the pool has left after this tick's soaks
+    //   intercepts the bearing of the last hit that spent points (its presence also arms the shock)
+    //   breaks     hulls whose pool hit zero this tick, with the hull radius the shards fly from
+    private readonly Dictionary<Entity, float> _frameRemainingShield = new();
+    private readonly Dictionary<Entity, float> _shieldIntercepts = new();
+    private readonly Dictionary<Entity, float> _shieldBreaks = new();
     private readonly HashSet<Entity> _hitMines = new();
     private readonly HashSet<Entity> _hitAsteroids = new();
     private readonly HashSet<Entity> _hitMissiles = new();
@@ -49,6 +65,9 @@ public class CollisionSystem : GameSystem
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
         _frameRemainingHealth.Clear();
+        _frameRemainingShield.Clear();
+        _shieldIntercepts.Clear();
+        _shieldBreaks.Clear();
         _hitMines.Clear();
         _hitAsteroids.Clear();
         _hitMissiles.Clear();
@@ -323,9 +342,12 @@ public class CollisionSystem : GameSystem
             // round inside it is tested against the hull's shape, which says where it stops.
             bool playerHit = false;
             float playerT = float.MaxValue;
+            // The hull-shape contact is kept, not discarded: its point is the direction a soaked hit
+            // came from, which is what the shield's intercept flash is drawn at (plans/SHIELDS.md §7).
+            Contact playerContact = default;
             if (ammo.IsEnemy && hasPlayer
                 && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerTuple.Value2.Value, playerTuple.Value1.Radius, out _, out _)
-                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out _, out float playerTouchedAt))
+                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out playerContact, out float playerTouchedAt))
             {
                 playerHit = true;
                 playerT = playerTouchedAt;
@@ -370,10 +392,10 @@ public class CollisionSystem : GameSystem
                     h = shipHealth;
                     _frameRemainingHealth[earliestShipHit.Value] = h;
                 }
-                int shipDealt = MitigatedGunfireDamage(view, earliestShipHit.Value, ammo.Damage, ammo.Pierce);
-                _frameRemainingHealth[earliestShipHit.Value] -= shipDealt;
                 var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
                 var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
+                int shipDealt = MitigatedGunfireHit(view, earliestShipHit.Value, ammo.Damage, ammo.Pierce, shipPos.Value, shipHitPos);
+                _frameRemainingHealth[earliestShipHit.Value] -= shipDealt;
                 _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, shipDealt, enemyShip.Radius, enemyShip.GraphicsId));
                 // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
                 _entitiesToDestroy.Add(ammoEntity);
@@ -404,8 +426,12 @@ public class CollisionSystem : GameSystem
                 remaining = playerHealth.Current;
                 _frameRemainingHealth[playerEntity] = remaining;
             }
-            _frameRemainingHealth[playerEntity] -= MitigatedGunfireDamage(view, playerEntity, ammo.Damage, ammo.Pierce);
-            _effectsToSpawn.Add((playerPos.Value, MineType.Small));
+            // Armor first, then the shield pool. A hit the field fully ate shows only its flash on the
+            // ring; the amber spark is what says "the hull took it", so it is spawned only when damage
+            // got through (plans/SHIELDS.md §7). A partial soak shows both reads at once.
+            int playerDealt = MitigatedGunfireHit(view, playerEntity, ammo.Damage, ammo.Pierce, playerPos.Value, playerContact.Point);
+            _frameRemainingHealth[playerEntity] -= playerDealt;
+            if (playerDealt > 0) _effectsToSpawn.Add((playerPos.Value, MineType.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
 
@@ -429,7 +455,7 @@ public class CollisionSystem : GameSystem
                 // Enemy beams engage only the player, mirroring enemy ammo. A beam is a segment inflated by its
                 // width, so it crosses the swept seam and meets the player's shape instead of its bounding
                 // circle — which is what lets a beam pass through the gap in a hull that has one.
-                if (hasPlayer && NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, playerBody, out _, out _))
+                if (hasPlayer && NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, playerBody, out Contact beamContact, out _))
                 {
                     var beamPlayerHealth = view.GetComponent<Health>(playerEntity);
                     if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
@@ -437,7 +463,8 @@ public class CollisionSystem : GameSystem
                         remaining = beamPlayerHealth.Current;
                         _frameRemainingHealth[playerEntity] = remaining;
                     }
-                    _frameRemainingHealth[playerEntity] -= MitigatedGunfireDamage(view, playerEntity, beam.Damage, beam.Pierce);
+                    _frameRemainingHealth[playerEntity] -= MitigatedGunfireHit(view, playerEntity, beam.Damage, beam.Pierce,
+                        playerTuple.Value2.Value, beamContact.Point);
 
                     stopLength = BeamEntryLength(playerBody, beamStart, beam.Direction, beam.Width, beam.Length);
                     beamStopped = true;
@@ -529,10 +556,11 @@ public class CollisionSystem : GameSystem
                                     sh = beamShipHealth.Current;
                                     _frameRemainingHealth[firstHit.Value] = sh;
                                 }
-                                _frameRemainingHealth[firstHit.Value] -= MitigatedGunfireDamage(view, firstHit.Value, beam.Damage, beam.Pierce);
                                 var beamShip = view.GetComponent<EnemyShip>(firstHit.Value);
                                 var beamShipPos = view.GetComponent<Position>(firstHit.Value);
                                 Vector2 beamHitPoint = beamShipPos.Value + firstContact.Normal * beamShip.Radius;
+                                _frameRemainingHealth[firstHit.Value] -= MitigatedGunfireHit(view, firstHit.Value, beam.Damage, beam.Pierce,
+                                    beamShipPos.Value, beamHitPoint);
                                 if (!_shipDeathData.ContainsKey(firstHit.Value))
                                     _shipDeathData[firstHit.Value] = (beamHitPoint, beamShipPos.Value, beamShip.Radius, beamShip.GraphicsId);
                             }
@@ -732,6 +760,28 @@ public class CollisionSystem : GameSystem
                 var playerHealth = view.GetComponent<Health>(playerEntity);
                 commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerRemaining, playerHealth.Max)));
             }
+        }
+
+        // Shield write-back (plans/SHIELDS.md): one command per hull whose pool was spent this tick —
+        // the points left, the shock armed by any hit that spent points of it, and the flash's bearing.
+        // A hull whose pool hit zero also gets the shatter ring and its shards. Queued before the
+        // destroy loop, so a hull that died this tick is destroyed after its pool was written.
+        foreach (var (entity, left) in _frameRemainingShield)
+        {
+            var shield = view.GetComponent<Shield>(entity);
+            float points = MathF.Max(0f, left);
+            bool spent = _shieldIntercepts.TryGetValue(entity, out float bearingDeg);
+            commands.Add(new AddComponentCommand<Shield>(entity,
+                new Shield(points, shield.Max, spent ? ShieldRules.ShockSeconds : shield.Offline)));
+            if (spent)
+                commands.Add(new AddComponentCommand<ShieldFlash>(entity, new ShieldFlash(ShieldRules.FlashSeconds, bearingDeg)));
+        }
+
+        foreach (var (entity, hullRadius) in _shieldBreaks)
+        {
+            commands.Add(new AddComponentCommand<ShieldBurst>(entity, new ShieldBurst(ShieldRules.BurstSeconds)));
+            view.TryGetComponent<Velocity>(entity, out var hullVelocity);
+            SpawnShieldShards(commands, view.GetComponent<Position>(entity).Value, hullVelocity.Value, hullRadius, view.Rng);
         }
 
         foreach (var entity in _entitiesToDestroy)
@@ -1054,6 +1104,57 @@ public class CollisionSystem : GameSystem
     // targets pay one failed lookup and the formula's identity.
     private int MitigatedGunfireDamage(WorldView view, Entity target, int damage, int pierce) =>
         ArmorRules.EffectiveDamage(damage, view.TryGetComponent<Armor>(target, out var armor) ? armor.Value : 0, pierce);
+
+    // Gunfire mitigation for one hit (plans/SHIELDS.md): armor first — ArmorRules changes the size of the
+    // number — then the target's shield pool, which banks what is left of it. Returns the damage that
+    // reaches Health. A hit that spends points of the pool arms the shock and records the bearing the
+    // ring flashes at; emptying the pool records the break, which the write-back turns into the shatter
+    // and its shards. A target with no shield pays one failed lookup and the plain armor result.
+    private int MitigatedGunfireHit(WorldView view, Entity target, int damage, int pierce, Vector2 hullCentre, Vector2 contactPoint)
+    {
+        int mitigated = MitigatedGunfireDamage(view, target, damage, pierce);
+        if (!view.TryGetComponent<Shield>(target, out var shield) || shield.Points <= 0f) return mitigated;
+
+        float points = _frameRemainingShield.TryGetValue(target, out var left) ? left : shield.Points;
+        int soaked = ShieldRules.Soak(points, mitigated);
+        if (soaked == 0) return mitigated;
+
+        _frameRemainingShield[target] = points - soaked;
+        _shieldIntercepts[target] = BearingDeg(hullCentre, contactPoint);
+        if (points - soaked <= 0f) _shieldBreaks[target] = HullRadius(view, target);
+        return mitigated - soaked;
+    }
+
+    // The intercept's direction seen from the hull's centre, in degrees, in the screen-space convention
+    // the ring is drawn in (world +Y is down, so this is the raylib angle directly). The flash is drawn
+    // centred on it, which is what makes the winding of the angle irrelevant.
+    private static float BearingDeg(Vector2 hullCentre, Vector2 contactPoint)
+    {
+        Vector2 offset = contactPoint - hullCentre;
+        return MathF.Atan2(offset.Y, offset.X) * 180f / MathF.PI;
+    }
+
+    // A hull's drawn radius. Only hulls carry a shield, so one of the two hull components is there.
+    private static float HullRadius(WorldView view, Entity hull) =>
+        view.TryGetComponent<Player>(hull, out var player) ? player.Radius : view.GetComponent<EnemyShip>(hull).Radius;
+
+    // The shatter: pieces of field flying off roughly outward. The angles are spread evenly under one
+    // random offset, so a break always reads as a ring coming apart rather than as a puff, and each
+    // piece inherits part of the hull's velocity so the shards trail a moving hull.
+    private void SpawnShieldShards(CommandBuffer commands, Vector2 hullPos, Vector2 hullVelocity, float hullRadius, Random rng)
+    {
+        float ring = ShieldRules.RingRadius(hullRadius);
+        float offset = (float)rng.NextDouble() * MathF.PI * 2f;
+        for (int i = 0; i < ShieldRules.ShardCount; i++)
+        {
+            float angle = offset + i * MathF.PI * 2f / ShieldRules.ShardCount;
+            var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+            commands.AddEntity(
+                new Position(hullPos + direction * ring),
+                new Velocity(direction * ShardSpeed + hullVelocity * ShardVelocityInherit),
+                new ShieldShard(ShieldRules.ShardSeconds, ShieldRules.ShardSeconds));
+        }
+    }
 
     // Impact damage (plans/IMPACT_DAMAGE.md). Damage flows through the same per-frame health    // accumulator as bullet damage, so the existing death pass covers impact kills.
     private void ApplyImpactDamage(

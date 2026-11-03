@@ -123,11 +123,13 @@ One tick runs four phases in order (SimulationRunner). The per-tick CommandBuffe
 1. Movement: PhysicsSystem → PositionIntegrationSystem → AmmoLifetimeSystem
 2. Action: TurretFiringSystem → EnemyMissileFiringSystem → EnemyShipSpawnSystem
 3. Resolution: CollisionSystem → PickupMagnetSystem → EcmSystem → LevelUpSystem → ShipDeathExplosionSystem → EffectSystem
-4. Intent: MissileGuidanceSystem → MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem
+4. Intent: MissileGuidanceSystem → MineDriftSystem → MineRespawnSystem → EnemyShipSystem → CameraSystem → DamageEffectSystem → ShieldSystem
 
 Systems in this phase write next-tick motion intent (Acceleration/Velocity) and view state; Movement integrates them on the following tick. Order within a phase matters for command-written components (see Write patterns).
 
 `MissileGuidanceSystem` is deliberately **first** in Intent: it rewrites both `Velocity` and the round's own `Ammo.Velocity` so the position next tick, the collision segment and the drawn direction all agree on the heading it just chose. A round keeps one constant velocity between ticks, so its turn radius stays `Speed / TurnRate`.
+
+`ShieldSystem` is deliberately **last**, in Intent rather than Resolution: it refills the shield pool, so it must read the pool as CollisionSystem left it. Anywhere earlier it would read the pre-hit `Shield`, queue a write of that stale copy, and land it after the collision spend in the same flush — undoing the hit (TROUBLE_SHOOTING #58). `ShieldCombatTest.ShieldSystemRunsLastInTheIntentPhase` guards the placement.
 
 ## Main loop
 

@@ -27,6 +27,26 @@ public class EffectSystem : GameSystem
 
         sw.Restart();
 
+        // The pieces of a broken shield field (plans/SHIELDS.md §7). They move, so PositionSystem runs
+        // them; only their lifetime is ticked here, exactly as with a spark.
+        foreach (var (entity, shard) in view.GetEntitiesWithComponents<ShieldShard>())
+        {
+            var newLifetime = shard.Lifetime - deltaTime;
+            if (newLifetime <= 0f)
+            {
+                commands.Add(new DestroyEntityCommand(entity));
+            }
+            else
+            {
+                commands.Add(new AddComponentCommand<ShieldShard>(entity, new ShieldShard(newLifetime, shard.InitialLifetime)));
+            }
+        }
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Effects: shield shard", sw.ElapsedTicks);
+
+        sw.Restart();
+
         foreach (var (entity, impact) in view.GetEntitiesWithComponents<BeamImpact>())
         {
             var newLifetime = impact.Lifetime - deltaTime;

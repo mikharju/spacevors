@@ -46,7 +46,11 @@ public sealed class SimulationRunner
             new MineRespawnSystem(),
             new EnemyShipSystem(),
             new CameraSystem(),
-            new DamageEffectSystem()
+            new DamageEffectSystem(),
+            // Last, deliberately: it refills the pool, so it has to see the pool as CollisionSystem left
+            // it this tick. Anywhere earlier it would write a pre-hit copy back over the spend
+            // (TROUBLE_SHOOTING #58). See ShieldSystem.
+            new ShieldSystem()
         };
     }
 

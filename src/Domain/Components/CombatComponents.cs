@@ -17,6 +17,26 @@ public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetim
 // and impact and mine-contact damage ignore it.
 public readonly record struct Armor(int Value);
 
+// Hull shield (plans/SHIELDS.md): a pool of absorb points in front of Health. Gunfire spends it after
+// armor has shrunk the hit, and a hit that spends any of it arms `Offline` — the shock — during which
+// the pool will not refill. Once `Offline` reaches 0 the pool climbs at ShieldRules.RechargeRate to
+// `Max`, so the payback time is proportional to the hole.
+// `Points` is a float because it is its own fractional accumulator: the rate is faster than one point
+// per tick, and a second accumulator field would only be a place for the same number to drift. Damage
+// still spends whole points (ShieldRules.Soak); the read-out rounds up.
+// Only hulls carry it — the player now, elite hulls later; mines, rocks and rounds never do.
+public readonly record struct Shield(float Points, int Max, float Offline);
+
+// The arc of light a soaked hit leaves on the field, riding the hull it belongs to. `BearingDeg` is the
+// intercept's direction seen from the hull's centre, so the flash says which way the round came from.
+// It rides the hull rather than being a free-floating effect entity because a flash that detaches from
+// a moving hull blames the wrong thing.
+public readonly record struct ShieldFlash(float Lifetime, float BearingDeg);
+
+// The ring that goes out when the pool breaks. Hull-borne for the same reason as the flash.
+public readonly record struct ShieldBurst(float Lifetime);
+
+
 public readonly record struct FireCooldown(float Timer);
 
 // A guided round: the entity it is locked onto, the flight numbers it was launched with, and how hard it

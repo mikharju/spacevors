@@ -7,6 +7,14 @@ public readonly record struct Explosion(float Radius, float Lifetime, float Init
 
 public readonly record struct DamageSpark(float Lifetime, float InitialLifetime = 1.4f);
 
+// A piece of broken shield field, flying off the hull whose pool broke (plans/SHIELDS.md §7). Its own
+// component rather than another DamageSpark because colour is the message: the sparks' amber is the
+// game's "this hull is being hit" colour, and giving DamageSpark a colour would re-decide every
+// particle in the game, whose hue is derived from its lifetime. The renderer draws a shard as a short
+// streak along its own velocity in the shield's near-white ice, so a shatter reads as glass off a
+// field rather than as another hit landing. Spawners pass ShieldRules.ShardSeconds for both slots.
+public readonly record struct ShieldShard(float Lifetime, float InitialLifetime);
+
 // The flash where a beam stopped: one round glow, slightly wider than the beam, in a darkened copy
 // of the beam's colour, centred exactly on the shortened beam's end. Fades over its lifetime.
 public readonly record struct BeamImpact(float Radius, AmmoColor Color, float Lifetime = BeamImpact.FlashLifetime)
