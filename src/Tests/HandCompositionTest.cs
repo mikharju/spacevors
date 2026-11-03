@@ -18,13 +18,14 @@ public class HandCompositionTest
     [Fact]
     public void Hand_AlwaysCarriesOneHullCard()
     {
-        // The hull slot always carries exactly one hull card: `Hp` alone below level 5, and `Hp` or
-        // `Armor` from level 5 (plans/ARMOR_AND_PIERCE.md) — the fixture hulls start unarmored, so
-        // the armor card is always in the draw there.
+        // The hull slot always carries exactly one hull card: `Hp` alone below level 5, `Hp` or `Armor`
+        // from level 5 (plans/ARMOR_AND_PIERCE.md), and `Hp`, `Armor` or `Shield` from level 10
+        // (plans/SHIELDS.md) — the fixture hulls start unarmored and unshielded, so both defence cards are
+        // in the draw there. Exactly one is dealt either way: the slot sets the shape, not the bucket.
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
             {
-                var hullCards = Hand(hull, level).Where(o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor).ToList();
+                var hullCards = Hand(hull, level).Where(o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor or UpgradeOption.Shield).ToList();
                 Assert.Single(hullCards);
                 if (level < 5) Assert.Equal(UpgradeOption.Hp, hullCards[0].Stat);
             }

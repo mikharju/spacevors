@@ -21,7 +21,7 @@ public static class UpgradeStats
     }
 }
 
-public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce }
+public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce, Shield }
 
 // A card's effect on one stat. `Multiplier` scales the live value; `Additive` shifts it; `PercentOfBase`
 // adds a share of the stat's table value, so the step never grows with the cards already bought.
@@ -82,7 +82,13 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
     // the right shape for a situational card, no multiplier to compound).
     public static UpgradeDefinition ArmorPierce { get; } = new(UpgradeOption.ArmorPierce, Additive: 4);
 
-    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce];
+    // plans/SHIELDS.md: a card buys 16 points of absorb pool, two cards to the 32-point ceiling
+    // (ShieldRules.ShieldCeiling). Additive, not percent-of-base: the pool has one base for every hull.
+    // The step is twice the hp card because the pool absorbs whole hits instead of taxing them — but it
+    // is offered from level 10, two beats after armor, and it is withdrawn at the ceiling.
+    public static UpgradeDefinition Shield { get; } = new(UpgradeOption.Shield, Additive: 16);
+
+    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce, Shield];
 
     public static UpgradeDefinition For(UpgradeOption stat) => All.First(d => d.Stat == stat);
 }

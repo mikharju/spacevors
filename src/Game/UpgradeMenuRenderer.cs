@@ -216,6 +216,9 @@ public static class UpgradeMenuRenderer
                 UpgradeOption.Hp => "hit points",
                 // plans/ARMOR_AND_PIERCE.md: gunfire subtracts this from every hit, floored at 1.
                 UpgradeOption.Armor => "hull armor",
+                // plans/SHIELDS.md: the pool drinks a hit whole instead of taxing it, then recharges
+                // behind a short shock. The card's value line is the points it banks: +16.
+                UpgradeOption.Shield => "hull shield",
                 UpgradeOption.ForwardAcceleration => "forward acceleration",
                 UpgradeOption.TurnSpeed => "turn speed",
                 UpgradeOption.SideThrust => "side thrust",

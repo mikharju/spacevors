@@ -37,6 +37,12 @@ public sealed class GameSession
     private const string DiagnosticSalvageEnvVar = "SPACEVORS_DIAG_REROLLS";
     private const int DiagnosticSalvageGrant = 2;
 
+    // Diagnostics: the hull shield (plans/SHIELDS.md). The card is gated at level 10, so the env var
+    // starts a run with a pool and `Y`/`X` move it mid-run — the ring, the HUD segment, the shatter and
+    // the recharge are otherwise unreachable without twenty minutes of farming.
+    private const string DiagnosticShieldEnvVar = "SPACEVORS_DIAG_SHIELD";
+    private const int DiagnosticShieldGrant = 16;
+
     private readonly EntityManager _em;
     private readonly WorldView _worldView;
     private readonly CommandBuffer _commands = new();
@@ -153,6 +159,7 @@ public sealed class GameSession
         _ship = ship;
         _diagnostics = Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1";
         if (_diagnostics) GrantDiagnosticSalvage();
+        if (_diagnostics) GrantDiagnosticShield();
 
         if (scenario is not null)
         {
@@ -368,6 +375,24 @@ public sealed class GameSession
         // Diagnostic only: grant salvage charges so the reroll can be tested without farming a ship kill.
         if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.G))
             GrantSalvage(DiagnosticSalvageGrant);
+
+        // Diagnostic only: Y fills the hull's shield pool — giving it one if it has none — and X spends it
+        // to nothing, firing the shatter the way a real break would. The card is gated at level 10, so
+        // without these the ring, the HUD segment and the recharge are twenty minutes of farming away.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.Y))
+        {
+            int pool = Math.Max(_em.TryGetComponent<Shield>(_playerEntity, out var filled) ? filled.Max : 0, DiagnosticShieldGrant);
+            _em.AddComponent(_playerEntity, new Shield(pool, pool, Offline: 0f));
+            DiagnosticLogger.LogEvent("diag", $"Y pressed — shield {pool}/{pool}");
+        }
+
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.X)
+            && _em.TryGetComponent<Shield>(_playerEntity, out var drained))
+        {
+            _em.AddComponent(_playerEntity, drained with { Points = 0f });
+            _em.AddComponent(_playerEntity, new ShieldBurst(ShieldRules.BurstSeconds));
+            DiagnosticLogger.LogEvent("diag", "X pressed — shield spent, burst fired");
+        }
 
         // Diagnostic only: drop a field capsule just outside arm's reach, so the jam and the sweep can be
         // watched without farming a 2.5 % / 3 % ship drop. E is the ECM capsule, F the salvage field.
@@ -849,6 +874,19 @@ public sealed class GameSession
         DiagnosticLogger.LogEvent("diag", $"{DiagnosticSalvageEnvVar}: {charges} salvage charges");
     }
 
+    // Diagnostics: SPACEVORS_DIAG_SHIELD=<points> starts the run with a whole pool of that size, so the
+    // ring, the HUD segment and the recharge are testable without two level-10 cards. A whole pool draws
+    // nothing but its heartbeat by design (plans/SHIELDS.md §7) — spend it with `X` to see the ring.
+    private void GrantDiagnosticShield()
+    {
+        string raw = Environment.GetEnvironmentVariable(DiagnosticShieldEnvVar) ?? "";
+        if (!int.TryParse(raw, out int points) || points <= 0) return;
+
+        int max = Math.Min(points, ShieldRules.ShieldCeiling);
+        _em.AddComponent(_playerEntity, new Shield(max, max, 0f));
+        DiagnosticLogger.LogEvent("diag", $"{DiagnosticShieldEnvVar}: shield {max}/{max}");
+    }
+
     void RenderCardScreen(StatsScreenRenderer.Prepared screen, PendingUpgradeOptions? options, int hoveredIndex, bool hoveredReroll, int windowWidth, int windowHeight)
     {
         var upgradeCam = _em.GetComponent<Camera>(_cameraEntity);
@@ -1231,6 +1269,16 @@ public sealed class GameSession
                 // The offer withdraws the card at the ceiling; the clamp keeps the apply honest too.
                 int currentArmor = em.TryGetComponent<Armor>(playerEntity, out var armorComp) ? armorComp.Value : 0;
                 em.AddComponent(playerEntity, new Armor(Math.Min(currentArmor + def.Additive, ArmorRules.ArmorCeiling)));
+                break;
+
+            case UpgradeOption.Shield:
+                // plans/SHIELDS.md: the pool grows and the same amount is banked at once, a shock already
+                // running is left running, and the ceiling is clamped on the apply side as well as in the
+                // offer. The rule itself is ShieldRules.WithCard, so it is testable without a window.
+                var boughtShield = em.TryGetComponent<Shield>(playerEntity, out var existingShield)
+                    ? existingShield
+                    : new Shield(Points: 0f, Max: 0, Offline: 0f);
+                em.AddComponent(playerEntity, ShieldRules.WithCard(boughtShield, def.Additive));
                 break;
 
             case UpgradeOption.ArmorPierce:

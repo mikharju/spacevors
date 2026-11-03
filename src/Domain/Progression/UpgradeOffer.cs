@@ -29,6 +29,9 @@ public static class UpgradeOffer
     // Armor and its counter unlock with tier 2 — the same beat as the `UnlockLevel: 5` guns and the
     // first milestone hand (plans/ARMOR_AND_PIERCE.md). Before it, no hand may deal either card.
     const int ArmorUnlockLevel = 5;
+    // The shield pool unlocks a tier later than armor (plans/SHIELDS.md): the same beat as the `UnlockLevel:
+    // 10` guided guns, which is where a run starts meeting fire heavy enough for a pool to be worth banking.
+    const int ShieldUnlockLevel = 10;
     // A hand never carries more than three new weapons. Whether they fit a free hull mount is the
     // player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
     const int MaxNewWeaponCardsPerHand = 3;
@@ -180,17 +183,26 @@ public static class UpgradeOffer
     // The guaranteed hull-slot card. `Hp` is always there; `Armor` joins the draw from level 5
     // (plans/ARMOR_AND_PIERCE.md) while the hull still has room under the ceiling — at the ceiling
     // it is withdrawn, never dealt as a lie (R19's rule), and `Hp` goes back to guaranteed.
+    // `Shield` joins two beats later, at tier 4's unlock level (plans/SHIELDS.md): a pool that drinks a
+    // whole hit is worth more than +2 armor, so it competes at the point where a run has spare cards to
+    // spend on defence, and it is withdrawn at its own ceiling the same way.
     static List<UpgradableOption> HullOptions(WorldView view, Entity playerEntity, int level)
     {
         var cards = new List<UpgradableOption> { new("", UpgradeOption.Hp) };
         if (level >= ArmorUnlockLevel && CurrentArmor(view, playerEntity) < ArmorRules.ArmorCeiling)
             cards.Add(new UpgradableOption("", UpgradeOption.Armor));
+        if (level >= ShieldUnlockLevel && CurrentShieldMax(view, playerEntity) < ShieldRules.ShieldCeiling)
+            cards.Add(new UpgradableOption("", UpgradeOption.Shield));
 
         return cards;
     }
 
     static int CurrentArmor(WorldView view, Entity playerEntity) =>
         view.TryGetComponent<Armor>(playerEntity, out var armor) ? armor.Value : 0;
+
+    // A hull with no shield has a pool of 0, so the first card is always offerable at the gate.
+    static int CurrentShieldMax(WorldView view, Entity playerEntity) =>
+        view.TryGetComponent<Shield>(playerEntity, out var shield) ? shield.Max : 0;
 
     // The per-gun stat cards, gated exactly as they always were — a card the rules would refuse to honour
     // is never dealt, so an empty slot is honest rather than a bug.
