@@ -682,3 +682,34 @@ test never depends on the model's eyes.
   through the same rule combat uses (`ArmorRules.EffectiveDamage`) and re-set the budget honestly —
   the armor-tax budget widened 7 s → 12 s in the same commit as the armor, not in a later "fix the
   red test" patch.
+
+## 74. An A/B worktree of HEAD runs the scenario but cannot summarize it: no numpy there
+
+- **Symptom**: `git worktree add .ab-shield HEAD` for an honest interleaved A/B, then
+  `.ab-shield/.tools/scenario.sh ammo-spray --sim` printed the iterations and died with
+  `ModuleNotFoundError: No module named 'numpy'`; no `summary.json`, so a `grep budget:` A/B loop
+  silently compared *nothing* on one side and reported a clean delta that was never measured.
+- **Cause**: `.tools/pylibs` (numpy/pillow, unpacked by `setup.sh`) is gitignored, so it exists only in
+  the live checkout. The worktree runs the sim fine — only `scenario.py`'s summary step needs python.
+- **Fix / Prevention**: The raw `iter-N.log` rows are complete, so read those:
+  `grep '^\[PERF\]' iter-*.log | sed -E 's/.* sim=([0-9.]+).*/\1/' | sort -n` and take the middle
+  element (skip `iter-1`, the discarded cold run). Or `ln -s $PWD/.tools/pylibs .ab-shield/.tools/pylibs`.
+  Always print a marker per side in an A/B loop — an empty side looks exactly like a fast side.
+
+## 75. A small faint graphic cannot be judged from a screenshot, and identical shot hashes mean the world stopped
+
+- **Symptom**: asked to confirm a ~40 px shield arc, six consecutive `shot.sh` captures came back with
+  the **same md5**, and the frames I could look at showed no ring at all — read as "the feature draws
+  nothing".
+- **Cause**: two unrelated things. (1) 1920×1024 is downscaled before the model sees it, so a thin
+  alpha-90 arc is gone; and a *correctly invisible* state (a full shield draws nothing by design) looks
+  identical to a broken one. (2) Once the run hits GAME OVER the world render passes stop, so every
+  later capture is the same frozen frame — and `input.sh key r` does not restart it here, so keys after
+  that point are dropped without error (see #27).
+- **Fix / Prevention**: assert numerically on the captured frame — decode the PNG (pillow from
+  `.tools/pylibs`, or stdlib `zlib` + `struct` when python has no imaging library) and count pixels near
+  the palette colour plus their bounding box: 0 near-white pixels at the hull when the pool is whole,
+  ~150 forming the arc once it is spent. Crop the few hundred pixels around the entity and read *that*
+  if eyes are needed. Pair the two states (whole vs spent) so "nothing drawn" and "nothing to draw"
+  cannot be confused, cross-check the `[RENDER-PASS]` row for the pass, and if two shots hash the same,
+  stop and relaunch the game job rather than capturing more frames.

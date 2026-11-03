@@ -71,6 +71,18 @@ internal static class Palette
     public static readonly Color EcmArc = new(170, 215, 255, 215);
     public static readonly Color EcmIndicator = new(160, 200, 250, 255);
 
+    // The shield field (plans/SHIELDS.md §7). A cool ice hue that is deliberately none of the game's
+    // other blues — not XP, not the ECM jam, not the UI accent — because a field that eats a hit has to
+    // read as its own thing. `ShieldArc` is the charge, faint and wide; `ShieldLit` is anything the
+    // field does while it is being spent: the intercept flash, the refill front, the heartbeat glint,
+    // and the white-hot core of a shard. That near-white is the only near-white **particle** in the
+    // game — sparks are amber, explosions orange/red, and the ECM capsule's white is an object flashing
+    // rather than a flying piece — which is what makes a shatter read as glass off a field, not as
+    // another hit landing. Against the ECM arcs the difference is shape: those are three jagged flickers
+    // on a jammed hull, this is one smooth ring outside the hull.
+    public static readonly Color ShieldArc = new(185, 222, 250, 90);
+    public static readonly Color ShieldLit = new(215, 238, 255, 235);
+
     // Soft-depth UI language (plans/UI_POLISH.md): one accent used sparingly,
     // off-white text, translucent panels so stars faintly show through.
     public static readonly Color Accent = new(120, 200, 230, 255);

@@ -238,6 +238,13 @@ public static class StatsScreenRenderer
             new("Pickup radius", FormatInt(player.PickupRadius), CountOf(em, playerEntity, UpgradeOption.PickupRadius)),
         };
 
+        // plans/SHIELDS.md: the pool that drinks hits before they reach hp. Unlike armor, no hull starts
+        // with one, so this row appears only once the card has been bought — a row of zeros would pad the
+        // panel. The number rounds up: a partly refilled point is still holding a hit.
+        if (em.TryGetComponent<Shield>(playerEntity, out var shieldComp))
+            shipRows.Insert(2, new("Shield", $"{(int)MathF.Ceiling(shieldComp.Points)}/{shieldComp.Max}",
+                CountOf(em, playerEntity, UpgradeOption.Shield)));
+
         var mounts = CountMounts(em);
         if (mounts.SmallTotal > 0) shipRows.Add(new("Small mounts", $"{mounts.SmallUsed}/{mounts.SmallTotal}", -1));
         if (mounts.LargeTotal > 0) shipRows.Add(new("Large mounts", $"{mounts.LargeUsed}/{mounts.LargeTotal}", -1));

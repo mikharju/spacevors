@@ -62,6 +62,12 @@ public static class WorldRenderer
         // as an event happening to the field rather than as part of a hull.
         EcmRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.ecm");
+        // The shield field rides over the hull it protects, over the jam arcs and under the targeting
+        // brackets. A full pool draws nothing but an occasional glint, so on a run whose shield is whole
+        // this pass reads ~0 µs: that is the geometry being deliberately absent, not a ring that failed
+        // to draw (plans/SHIELDS.md §7).
+        ShieldRenderer.Draw(em, camX, camY, windowWidth, windowHeight);
+        RenderTimings.Pass("world.shield");
         TargetingRenderer.Draw(em, playerEntity, camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("world.targeting");
         DrawXpPickups(em, camX, camY, windowWidth, windowHeight);

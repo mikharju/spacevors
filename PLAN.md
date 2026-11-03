@@ -90,6 +90,11 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
   wider, 140 px/s) — the only enemy round that walks through armor, enemies never pierce — shipped
   2026-11-03 — plans/ARMOR_AND_PIERCE.md
 - Primary target lock and enemy hp bars — shipped — plans/TARGETING_HP_BARS.md
+- Shields: gunfire is taxed by armor and then banked by a pool of absorb points in front of hp; it spends
+  whole points, arms a 2 s shock whenever a hit spends any of it, and refills at 16 pts/s after that, so a
+  small hole closes fast and sustained fire pays hp again; `Shield` (+16) in the hull slot from level 10,
+  ceiling 32, no hull starts shielded, impact and mine contact bypass it, and the ring is an event not an
+  aura (invisible at full and at empty, a ~5 s glint while whole) — shipped 2026-11-03 — plans/SHIELDS.md
 
 ### Enemies and difficulty
 - Waves and lulls — shipped — plans/WAVES_AND_BREATHERS.md
@@ -141,7 +146,6 @@ plans/functional-ecs.md.
   already shipped — plans/TURRET_LAYOUTS.md)
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
-- Shields absorp a hit go on cooldown
 
 ## Roadmap — future (new systems)
 

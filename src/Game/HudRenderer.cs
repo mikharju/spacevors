@@ -37,6 +37,30 @@ public static class HudRenderer
 
         string text = $"{playerHealth.Current}/{playerHealth.Max}";
         Raylib.DrawText(text, paddingX + barWidth + 10, paddingY, 14, Palette.TextMuted);
+
+        DrawShieldBar(em, playerEntity, paddingX, paddingY, barWidth, max);
+    }
+
+    // The shield pool riding above the health bar, on that bar's own scale: the track runs as far as the
+    // pool can hold — a 16-point pool on a 40 hp hull covers 40% of the bar's width — and the fill is
+    // what is banked right now. While the shock is up the fill goes dim: spent, not refilling yet.
+    // Nothing at all is drawn for a hull that has no shield, so a run that never bought the card gets no
+    // unexplained widget (the same rule the salvage icon follows), and the cost is two rects whatever the
+    // pool (TROUBLE_SHOOTING #61).
+    private static void DrawShieldBar(EntityManager em, Entity playerEntity, int paddingX, int paddingY, int barWidth, int maxHealth)
+    {
+        if (!em.TryGetComponent<Shield>(playerEntity, out var shield)) return;
+
+        const int BarHeight = 5;
+        int top = paddingY - BarHeight - 3;
+        int trackWidth = (int)(barWidth * Math.Clamp(shield.Max / (float)maxHealth, 0f, 1f));
+        int fillWidth = (int)(barWidth * Math.Clamp(shield.Points / maxHealth, 0f, 1f));
+
+        Ui.DrawRoundedRect(paddingX, top, trackWidth, BarHeight, 2, Palette.TrackDark);
+        if (fillWidth <= 0) return;
+
+        var fillColor = shield.Offline > 0f ? Ui.WithAlpha(Palette.ShieldLit, 0.4f) : Palette.ShieldLit;
+        Ui.DrawRoundedRect(paddingX, top, fillWidth, BarHeight, 2, fillColor);
     }
 
     // Thin top-edge xp bar: full-width track, accent fill for how far this level still has to go, and the
