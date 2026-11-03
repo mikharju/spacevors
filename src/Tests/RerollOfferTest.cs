@@ -107,8 +107,10 @@ public class RerollOfferTest
         {
             UpgradeOffer.TryReroll(em, player);
             var newWeapons = Hand(em).Where(o => o.IsNewWeapon).Select(o => o.WeaponName).ToList();
+            int mostOfOneClass = newWeapons.GroupBy(name => WeaponType.FromName(name) is { } gun ? gun.Size : TurretSize.Small)
+                .Select(group => group.Count()).DefaultIfEmpty(0).Max();
 
-            Assert.True(newWeapons.Count <= 3, $"a milestone re-deal offered {newWeapons.Count} new weapons");
+            Assert.True(mostOfOneClass <= 3, $"a milestone re-deal offered {mostOfOneClass} new weapons of one class");
             Assert.DoesNotContain(newWeapons, name => mounted.Contains(name));
         }
     }
@@ -140,10 +142,12 @@ public class RerollOfferTest
         return (em, player);
     }
 
+    // Flattened to cards: a reroll is judged on what it offers, not on how the pairs are cut.
     static UpgradableOption[] Hand(EntityManager em)
     {
         Assert.True(em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pending));
-        return em.GetComponent<PendingUpgradeOptions>(pending.Entity).Options;
+        return [.. em.GetComponent<PendingUpgradeOptions>(pending.Entity).Bundles
+            .SelectMany(bundle => new[] { bundle.Powerful, bundle.Weak })];
     }
 
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts)

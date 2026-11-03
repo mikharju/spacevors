@@ -7,8 +7,8 @@ namespace Spacevors.Domain.Systems;
 // UpgradeOffer's business — the same offer code re-deals a hand when a salvage capsule is spent.
 public class LevelUpSystem : GameSystem
 {
-    // Diagnostics only: fixed upgrade sequence consumed one entry per card taken, so a run scripted
-    // `Hp,FireRate:MachineGun` spends both picks of its first level-up on those two cards.
+    // Diagnostics only: fixed upgrade sequence consumed two entries per level — the bundle's strong card,
+    // then its weak one — so a run scripted `Damage:MachineGun,SideThrust` benches exactly that pair.
     private readonly UpgradableOption[]? _scriptedUpgrades;
     private int _scriptIndex;
 
@@ -27,38 +27,30 @@ public class LevelUpSystem : GameSystem
         if (playerStats.Xp < UpgradeStats.XpForLevel(playerStats.Level)) return;
 
         int newLevel = playerStats.Level + 1;
-        var hand = NextHand(view, playerEntity, newLevel);
+        var bundles = NextBundles(view, playerEntity, newLevel);
 
         // Do not consume the level-up when no choice can be offered (e.g. zero turrets).
-        if (hand is null) return;
+        if (bundles is not { Length: > 0 }) return;
 
-        var options = PendingUpgradeOptions.Deal(hand, UpgradeOffer.CardsPerLevel);
-        commands.AddEntity(playerTuple.Value2, new PendingChoice(), options);
+        commands.AddEntity(playerTuple.Value2, new PendingChoice(), new PendingUpgradeOptions(bundles));
         commands.Add(new AddComponentCommand<Player>(playerEntity, playerStats with { Level = newLevel }));
     }
 
     // Scripted entries win over the random pool and over the empty-hull rule: the script is a bench, and a
-    // bench that cannot fill every pick of the level it is benching is not benching the real thing.
-    private UpgradableOption[]? NextHand(WorldView view, Entity playerEntity, int newLevel)
+    // bench that cannot fill the level it is benching is not benching the real thing. Fewer than two entries
+    // left is an exhausted bench, so the level falls back to the dealt offer.
+    private UpgradeBundle[]? NextBundles(WorldView view, Entity playerEntity, int newLevel)
     {
-        if (_scriptedUpgrades is { } script && _scriptIndex < script.Length)
+        if (_scriptedUpgrades is { } script && _scriptIndex + 2 <= script.Length)
         {
-            var scripted = TakeScripted(script);
-            foreach (var card in scripted)
-                DiagnosticLogger.LogEvent("UPGRADE", $"level={newLevel} scripted choice: {UpgradeOffer.FormatChoice(card)}");
+            var strong = UpgradeOffer.StampDefenceTier(script[_scriptIndex++], newLevel);
+            var weak = UpgradeOffer.StampDefenceTier(script[_scriptIndex++], newLevel);
+            DiagnosticLogger.LogEvent("UPGRADE",
+                $"level={newLevel} scripted bundle: {UpgradeOffer.FormatChoice(strong)} + {UpgradeOffer.FormatChoice(weak)}");
 
-            return scripted;
+            return [new UpgradeBundle(strong, weak)];
         }
 
         return UpgradeOffer.Roll(view, playerEntity, newLevel, "level-up");
-    }
-
-    UpgradableOption[] TakeScripted(UpgradableOption[] script)
-    {
-        var taken = new List<UpgradableOption>();
-        while (taken.Count < UpgradeOffer.CardsPerLevel && _scriptIndex < script.Length)
-            taken.Add(script[_scriptIndex++]);
-
-        return [.. taken];
     }
 }

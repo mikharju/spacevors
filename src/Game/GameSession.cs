@@ -86,16 +86,11 @@ public sealed class GameSession
     // The weapon in hand on the mount screen: a new weapon from a card, or one taken down from the
     // hull (then it is already in cargo). "" means nothing is in hand.
     string _heldWeapon = "";
-    // The held weapon is the card's, so it is not the player's yet: backing out hands the card back.
+    // The held weapon came from a taken bundle, so it is already paid for: backing out of the mount screen
+    // stores it in cargo rather than handing the card back.
     bool _heldIsCardWeapon;
-    // The card's weapon has been mounted or stored, so the level-up is spent even while a displaced
-    // gun is still in hand.
-    bool _cardResolved;
-    // The mount screen was opened from the stats screen instead of from a card.
+    // The mount screen was opened from the stats screen instead of from a bundle.
     bool _mountsFromStats;
-    // Which card of the level's bundle the weapon in hand was paid for, so leaving the mount screen spends
-    // exactly that one. Null when the mount screen came from the stats screen, or once the card is spent.
-    UpgradableOption? _cardInHand;
 
     // Salvage (reroll) spend is edge-triggered: raylib's IsKeyPressed reports X11 auto-repeat as fresh
     // presses, so a held `R` — or one of `.tools/input.sh`'s deliberately long 0.4 s holds — would drain
@@ -213,7 +208,7 @@ public sealed class GameSession
         // PendingChoice cannot insert unmeasured frames into the run.
         if (_scenario is not null && hasPendingChoice)
         {
-            ChooseUpgrade(0, autoMountInSlot: true);
+            ChooseBundle(0, autoMountInSlot: true);
             hasPendingChoice = false;
         }
 
@@ -815,7 +810,7 @@ public sealed class GameSession
         bool hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pendingTuple);
         PendingUpgradeOptions? upgradeOptions = hasPending ? pendingTuple.Value2 : null;
 
-        bool hasCards = upgradeOptions is { Options.Length: > 0 };
+        bool hasCards = upgradeOptions is { Bundles.Length: > 0 };
         int mouseX = Raylib.GetMouseX(), mouseY = Raylib.GetMouseY();
 
         int hoveredIndex = hasCards
@@ -826,18 +821,12 @@ public sealed class GameSession
         int selectedIndex = ReadChoiceSelection(hoveredIndex);
         if (selectedIndex >= 0)
         {
-            ChooseUpgrade(selectedIndex, autoMountInSlot: _scenario is not null);
+            ChooseBundle(selectedIndex, autoMountInSlot: _scenario is not null);
 
-            // A bundle spends one pick and leaves the rest on screen, so this frame has to draw the hand the
-            // pick just changed — the same re-read a bought hand gets.
-            screen = PrepareCardScreen(windowWidth, windowHeight);
-            hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out pendingTuple);
-            upgradeOptions = hasPending ? pendingTuple.Value2 : null;
-            hasCards = upgradeOptions is { Options.Length: > 0 };
-            hoveredIndex = hasCards
-                ? StatsScreenRenderer.GetHoveredCardIndex(screen, upgradeOptions!.Value, mouseX, mouseY, windowWidth, windowHeight)
-                : -1;
-            hoveredReroll = hasCards && StatsScreenRenderer.IsRerollHovered(screen, mouseX, mouseY, windowWidth, windowHeight);
+            // A bundle spends the level in one go, so there is no shortened hand to redraw: this frame keeps
+            // what was already on screen, and the next one shows the game — or the mount screen a new-gun
+            // bundle opened.
+            return;
         }
 
         RenderCardScreen(screen, upgradeOptions, hoveredIndex, hoveredReroll, windowWidth, windowHeight);
@@ -935,13 +924,6 @@ public sealed class GameSession
         else if (Raylib.IsKeyPressed(KeyboardKey.Escape)) LeaveMountsScreen();
         else if (Raylib.IsKeyPressed(KeyboardKey.C)) StoreHeldInCargo();
 
-        // The card has been paid for and nothing is left in hand: that pick of the bundle is done.
-        if (_cardInHand is { } placedCard && _cardResolved && _heldWeapon.Length == 0)
-        {
-            FinishPick(placedCard);
-            return;
-        }
-
         _renderSw.Restart();
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mounts, hoveredMount, hoveredCargo);
@@ -954,7 +936,7 @@ public sealed class GameSession
         if (_heldWeapon.Length == 0)
             return "Click a mounted turret, or press its number, to take it down into cargo — Esc to go back";
 
-        string exit = _cardResolved ? "Esc to finish" : _mountsFromStats ? "Esc to go back" : "Esc back to the cards";
+        string exit = _mountsFromStats ? "Esc to go back" : "Esc to finish";
 
         if (_heldIsCardWeapon || !cargo.Holds(_heldWeapon))
             return $"Green ring = the mount fits {_heldWeapon}: click one, or press its number — C stores it in cargo — {exit}";
@@ -1020,15 +1002,15 @@ public sealed class GameSession
             DiagnosticLogger.LogEvent("MOUNT", $"new weapon {fresh.Name} mounted in {marker.Slot.Name}");
         }
 
-        if (!_mountsFromStats) _cardResolved = true;
     }
 
-    // Right-click puts the held weapon down. A card weapon that was never placed goes back to the card.
+    // Right-click puts the held weapon down. A weapon a bundle paid for cannot simply be dropped: it goes to
+    // cargo, where it waits for a mount.
     private void DropHold()
     {
-        if (_heldIsCardWeapon && !_cardResolved)
+        if (_heldIsCardWeapon)
         {
-            LeaveMountsScreen();
+            StoreHeldInCargo();
             return;
         }
 
@@ -1057,20 +1039,14 @@ public sealed class GameSession
 
         _heldIsCardWeapon = false;
         _heldWeapon = "";
-        if (!_mountsFromStats) _cardResolved = true;
         DiagnosticLogger.LogEvent("MOUNT", $"{stored} stored in cargo");
     }
 
+    // Leaving the mount screen. A bundle's weapon is already paid for, so a weapon still in hand goes to
+    // cargo rather than vanishing with the screen.
     private void LeaveMountsScreen()
     {
-        if (_cardInHand is { } card && _cardResolved)
-        {
-            FinishPick(card);
-            return;
-        }
-
-        // The card's weapon was never placed, so the card goes back to the hand unchanged.
-        _cardInHand = null;
+        if (_heldIsCardWeapon) StoreHeldInCargo();
         ReturnToCards();
     }
 
@@ -1080,8 +1056,6 @@ public sealed class GameSession
         _mountsFromStats = true;
         _heldWeapon = "";
         _heldIsCardWeapon = false;
-        _cardResolved = false;
-        _cardInHand = null;
     }
 
     private WeaponCargo ReadCargo() =>
@@ -1130,76 +1104,61 @@ public sealed class GameSession
         return -1;
     }
 
-    private void ChooseUpgrade(int selectedIndex, bool autoMountInSlot)
+    // A bundle is taken whole: the weak half lands at once, and the strong half lands too unless it offers a
+    // new gun, which the player then fits on the hull or leaves in cargo. The level is spent the moment the
+    // bundle is taken, so the pending choice goes before anything is applied — there is no second pick left
+    // to see a half-finished one (plans/UPGRADE_BUNDLE_PAIRS.md §6).
+    private void ChooseBundle(int selectedIndex, bool autoMountInSlot)
     {
         if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple)) return;
 
-        var options = choiceTuple.Value2.Options;
-        // A key outside the hand that is on screen now takes nothing and loses nothing: the hand shrinks as
-        // the bundle spends its picks, so a stale number must not stand for "abandon the level".
-        if (selectedIndex < 0 || selectedIndex >= options.Length) return;
+        var bundles = choiceTuple.Value2.Bundles;
+        // A key outside the hand that is on screen now takes nothing and loses nothing.
+        if (selectedIndex < 0 || selectedIndex >= bundles.Length) return;
 
-        var option = options[selectedIndex];
+        var bundle = bundles[selectedIndex];
+        ClearPendingChoices();
+        DiagnosticLogger.LogEvent("UPGRADE",
+            $"bundle {selectedIndex + 1} taken: {UpgradeOffer.FormatChoice(bundle.Powerful)} + {UpgradeOffer.FormatChoice(bundle.Weak)}");
 
-        // A new weapon is only half a choice: it goes into hand and the player puts it on the hull or
-        // leaves it in cargo. The pick is not spent until that is settled, so backing out of the mount
-        // screen hands the card straight back.
-        if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage && WeaponType.FromName(option.WeaponName) is { } weapon)
+        // The new gun of the pair — whichever side it sits on — is only half a grant: it goes into hand for the
+        // player to fit on the hull or leave in cargo. Everything else lands immediately, and it lands **first**,
+        // so an upgrade spent on a gun the new gun then displaces travels to cargo with that gun instead of
+        // being dropped on the floor.
+        var (toMount, toApply) = SplitBundle(bundle);
+        foreach (var card in toApply)
+            ApplyUpgrade(_em, _playerEntity, card);
+
+        if (toMount is not { } held) return;
+        if (WeaponType.FromName(held.WeaponName) is not { } gun) return;
+
+        DiagnosticLogger.LogEvent("UPGRADE", $"weapon {gun.Name} in hand: mount it or store it in cargo");
+
+        if (autoMountInSlot)
         {
-            _cardInHand = option;
-            _heldWeapon = weapon.Name;
-            _heldIsCardWeapon = true;
-            _cardResolved = false;
-            _mountsFromStats = false;
-            DiagnosticLogger.LogEvent("UPGRADE", $"weapon {weapon.Name} in hand: mount it or store it in cargo");
-
-            if (autoMountInSlot)
-            {
-                MountIntoFirstFit(weapon);
-                FinishPick(option);
-            }
-            else
-            {
-                _upgradeStep = UpgradeStep.Mounts;
-            }
-
+            MountIntoFirstFit(gun);
             return;
         }
 
-        ApplyUpgrade(_em, _playerEntity, option);
-        FinishPick(option);
+        _heldWeapon = gun.Name;
+        _heldIsCardWeapon = true;
+        _mountsFromStats = false;
+        _upgradeStep = UpgradeStep.Mounts;
     }
 
-    // One pick of the level's bundle is spent. The bookkeeping is the domain's (`UpgradeOffer.SpendPick`,
-    // so the two-pick rule is testable without a window); this is the app half: clear the choice when the
-    // level is done, otherwise put the shortened hand back on screen for the next pick. A card that was just
-    // mounted may have displaced a gun into cargo, which retires that gun's cards from the hand.
-    private void FinishPick(UpgradableOption taken)
-    {
-        _cardInHand = null;
-        if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out _)) return;
+    // At most one card of a bundle needs the mount screen, because the deal never pairs two new guns.
+    static (UpgradableOption? ToMount, UpgradableOption[] ToApply) SplitBundle(UpgradeBundle bundle) =>
+        bundle.Powerful.IsNewWeapon ? (bundle.Powerful, [bundle.Weak])
+            : bundle.Weak.IsNewWeapon ? (bundle.Weak, [bundle.Powerful])
+            : (null, [bundle.Powerful, bundle.Weak]);
 
-        bool owesAnotherPick = UpgradeOffer.SpendPick(_em, _playerEntity, taken)
-            && UpgradeOffer.PruneCardsThatNoLongerApply(_em, _playerEntity);
-
-        if (!owesAnotherPick)
-        {
-            ClearPendingChoices();
-            return;
-        }
-
-        DiagnosticLogger.LogEvent("UPGRADE", $"bundle pick spent: {UpgradeOffer.FormatChoice(taken)}");
-        ReturnToCards();
-    }
-
-    // The mount screen is done with. Whatever was in hand is already in cargo, so dropping the hold loses
-    // nothing the player owns.
+    // The mount screen is done with. Whatever was in hand is already mounted or in cargo, so dropping the
+    // hold loses nothing the player owns.
     private void ReturnToCards()
     {
         _upgradeStep = UpgradeStep.Cards;
         _heldWeapon = "";
         _heldIsCardWeapon = false;
-        _cardResolved = false;
         _mountsFromStats = false;
     }
 
@@ -1232,7 +1191,6 @@ public sealed class GameSession
         foreach (var (entity, _) in _em.GetEntitiesWithComponents<PendingChoice>().ToList())
             _em.DestroyEntity(entity);
 
-        _cardInHand = null;
         ReturnToCards();
     }
 
@@ -1310,20 +1268,25 @@ public sealed class GameSession
                 break;
 
             case UpgradeOption.Armor:
-                // plans/ARMOR_AND_PIERCE.md: one hull, +2 a card, walking to ArmorRules.ArmorCeiling.
-                // The offer withdraws the card at the ceiling; the clamp keeps the apply honest too.
+                // plans/ARMOR_AND_PIERCE.md: one hull, walking to ArmorRules.ArmorCeiling. The step is the
+                // card's own defence tier — +1 ordinary, +2 milestone — which is the number the card printed
+                // (plans/UPGRADE_BUNDLE_PAIRS.md §2). The offer withdraws the card once the step no longer
+                // fits under the ceiling; the clamp here keeps the apply honest too.
+                int armorStep = UpgradeDefinition.DefenceStep(UpgradeOption.Armor, upgrade.Tier);
                 int currentArmor = em.TryGetComponent<Armor>(playerEntity, out var armorComp) ? armorComp.Value : 0;
-                em.AddComponent(playerEntity, new Armor(Math.Min(currentArmor + def.Additive, ArmorRules.ArmorCeiling)));
+                em.AddComponent(playerEntity, new Armor(Math.Min(currentArmor + armorStep, ArmorRules.ArmorCeiling)));
                 break;
 
             case UpgradeOption.Shield:
                 // plans/SHIELDS.md: the pool grows and the same amount is banked at once, a shock already
                 // running is left running, and the ceiling is clamped on the apply side as well as in the
                 // offer. The rule itself is ShieldRules.WithCard, so it is testable without a window.
+                // The step is the card's tier: +8 on an ordinary level, +16 at a milestone.
                 var boughtShield = em.TryGetComponent<Shield>(playerEntity, out var existingShield)
                     ? existingShield
                     : new Shield(Points: 0f, Max: 0, Offline: 0f);
-                em.AddComponent(playerEntity, ShieldRules.WithCard(boughtShield, def.Additive));
+                int shieldStep = UpgradeDefinition.DefenceStep(UpgradeOption.Shield, upgrade.Tier);
+                em.AddComponent(playerEntity, ShieldRules.WithCard(boughtShield, shieldStep));
                 break;
 
             case UpgradeOption.ArmorPierce:

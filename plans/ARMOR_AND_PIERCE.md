@@ -253,3 +253,13 @@ Deviations from the plan body:
   median 1.41 → 1.41 ms (0%), impact-storm 2.24 → 2.22 ms (−0.9%, inside the host noise of entry
   69); both `budget pass`. Mitigation is a few int ops per hit against a hull that carries an
   Armor component — as predicted, the broad phase never sees it. Keep.
+
+## Follow-up (2026-11-03): the armor card is dealt in two tiers
+
+plans/UPGRADE_BUNDLE_PAIRS.md split the armour card's step by the **level that deals it**: +1 at an ordinary
+level, +2 at a milestone (`DefenceTier`, `UpgradeDefinition.MilestoneDefenceMultiplier = 2`). The ceiling
+(`ArmorRules.ArmorCeiling = 12`) is unchanged and still withdraws a card rather than shrinking it, so a card is dealt
+only while its whole tier step fits: at armour 11 the ordinary +1 card is dealt and the milestone +2 card is
+not, and at 12 neither is. The card's printed number is always the number it grants — `FormatChoice` and the
+HUD read the card's own tier, not the constant. The arithmetic in this plan's body (`+2` per card) is therefore
+now the **milestone** step; read an ordinary level's card as half that.

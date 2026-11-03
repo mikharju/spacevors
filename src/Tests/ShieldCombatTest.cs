@@ -366,12 +366,16 @@ public class ShieldCombatTest
         Assert.False(OffersShieldCard(em, player, level: 10));
     }
 
+    // A shield card buys 16 points of pool at a milestone and half that (+8) on an ordinary level
+    // (plans/UPGRADE_BUNDLE_PAIRS.md §2), so the 32-point ceiling is two milestone buys or four ordinary ones.
     [Fact]
-    public void TheShieldCardIsAWholePoolStepOfSixteen()
+    public void TheShieldCardIsAWholePoolStepAtAMilestone_AndHalfOneOrdinarily()
     {
         Assert.Equal(16, UpgradeDefinition.Shield.Additive);
         Assert.Equal("+16", UpgradeDefinition.Shield.DisplayValue);
-        Assert.Equal(32, ShieldRules.ShieldCeiling);   // exactly two cards
+        Assert.Equal(16, UpgradeDefinition.DefenceStep(UpgradeOption.Shield, DefenceTier.Milestone));
+        Assert.Equal(8, UpgradeDefinition.DefenceStep(UpgradeOption.Shield, DefenceTier.Ordinary));
+        Assert.Equal(32, ShieldRules.ShieldCeiling);   // exactly two milestone cards
     }
 
     // ---- helpers ----
@@ -429,7 +433,7 @@ public class ShieldCombatTest
         => Assert.True(MathF.Abs(MathF.Abs(actual) - MathF.Abs(expected)) < 5f,
             $"bearing {actual}° should be ±{expected}°");
 
-    // The hull slot draws between `Hp`, `Armor` and `Shield`, so one hand that lacks the shield card
+    // The strong pool draws armour and shield beside its gun cards, so one hand that lacks the shield card
     // proves nothing — roll enough hands that "never" is a real answer.
     static bool OffersShieldCard(EntityManager em, Entity player, int level)
     {
@@ -437,7 +441,8 @@ public class ShieldCombatTest
         for (int roll = 0; roll < 60; roll++)
         {
             var hand = UpgradeOffer.Roll(view, player, level, "test");
-            if (hand is not null && hand.Any(option => option.Stat == UpgradeOption.Shield)) return true;
+            if (hand is not null && hand.SelectMany(bundle => new[] { bundle.Powerful, bundle.Weak })
+                    .Any(card => card.Stat == UpgradeOption.Shield)) return true;
         }
         return false;
     }

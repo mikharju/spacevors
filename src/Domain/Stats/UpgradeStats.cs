@@ -23,6 +23,12 @@ public static class UpgradeStats
 
 public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce, Shield }
 
+// How big a defence step a card grants. A milestone level deals the doubled step and an ordinary level the
+// half step (plans/UPGRADE_BUNDLE_PAIRS.md §2), so `Armor` is +1 / +2 and `Shield` +8 / +16. The tier travels
+// on the card, because the number printed on the card and the number granted must not be derived twice
+// (R10's rule that a card is never a lie).
+public enum DefenceTier { Ordinary, Milestone }
+
 // A card's effect on one stat. `Multiplier` scales the live value; `Additive` shifts it; `PercentOfBase`
 // adds a share of the stat's table value, so the step never grows with the cards already bought.
 public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multiplier = 1f, int Additive = 0, int PercentOfBase = 0)
@@ -74,7 +80,8 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
     public static UpgradeDefinition MissileHealth { get; } = new(UpgradeOption.MissileHealth, PercentOfBase: 50);
 
     // plans/ARMOR_AND_PIERCE.md: one hull, so the armor card is small (+2) and walks the ceiling (12)
-    // slowly; it competes with `Hp` in the guaranteed hull slot and is offered only from level 5.
+    // slowly. plans/UPGRADE_BUNDLE_PAIRS.md §2: this is the **milestone** step; an ordinary level deals half
+    // of it (`DefenceStep`), and the offer withdraws the card when the step no longer fits the headroom.
     public static UpgradeDefinition Armor { get; } = new(UpgradeOption.Armor, Additive: 2);
 
     // Many weapons each buy their own line against the one armored hull, and pierce is worthless
@@ -85,10 +92,19 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
     // plans/SHIELDS.md: a card buys 16 points of absorb pool, two cards to the 32-point ceiling
     // (ShieldRules.ShieldCeiling). Additive, not percent-of-base: the pool has one base for every hull.
     // The step is twice the hp card because the pool absorbs whole hits instead of taxing them — but it
-    // is offered from level 10, two beats after armor, and it is withdrawn at the ceiling.
+    // is offered from level 10, two beats after armor, and it is withdrawn at the ceiling. Like armor, this
+    // is the milestone step; an ordinary level deals half of it.
     public static UpgradeDefinition Shield { get; } = new(UpgradeOption.Shield, Additive: 16);
 
     public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce, Shield];
 
     public static UpgradeDefinition For(UpgradeOption stat) => All.First(d => d.Stat == stat);
+
+    // The milestone defence step is the definition's own step; an ordinary level grants half of it
+    // (plans/UPGRADE_BUNDLE_PAIRS.md §2). One multiplier over the two steps, in one place, so the tiers stay
+    // comparable and the ceilings (armor 12, shield 32) still bound the whole axis.
+    public const int MilestoneDefenceMultiplier = 2;
+
+    public static int DefenceStep(UpgradeOption stat, DefenceTier tier) =>
+        tier == DefenceTier.Milestone ? For(stat).Additive : For(stat).Additive / MilestoneDefenceMultiplier;
 }

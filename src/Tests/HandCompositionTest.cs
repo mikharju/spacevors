@@ -6,344 +6,376 @@ using Xunit;
 
 namespace Tests;
 
-// What a hand is made of (plans/UPGRADE_BUNDLES.md, on the bucket machinery shipped under
-// plans/UPGRADE_HAND_COMPOSITION.md): the legal cards are dealt by kind and by priority, so a level-up can
-// never be five engine cards or three upgrades for the one chip gun the player barely uses, and a slot
-// whose kind has run dry leaks rather than inventing a card. These are the shape rules;
-// `LevelUpSlotOfferTest` and `RerollOfferTest` keep guarding the per-card legality rules
-// (R18/R19/R23/R29/R33) these slots are built on top of, and `TwoPickLevelUpTest` the two-pick bundle.
+// What a level's offer is made of (plans/UPGRADE_BUNDLE_PAIRS.md). The legal cards are sorted into kinds and
+// drained into two pools whose **order** carries the promises; five bundles are cut from those pools, each one
+// powerful half and one weak half, and the player takes one bundle. So these are the shape rules: the pair is
+// always one of each side, a promised card (a new large gun, a `Damage` card per class at a milestone) shows up
+// while it is legal, neither half is disabled by the other, and a pool that runs dry deals fewer bundles rather
+// than a broken pair. The per-card legality rules (R18/R19/R23/R29/R33) are guarded by `LevelUpSlotOfferTest`
+// and `RerollOfferTest`, and what a taken bundle does by `BundleChoiceTest`.
 public class HandCompositionTest
 {
-    // Every hand shape, over enough levels to cross the milestone beats at 5, 10, 15 and 20.
+    // Every hull shape, over enough levels to cross the milestone beats at 5, 10, 15 and 20.
     static readonly ShipType[] Hulls = [ShipType.Scout, ShipType.Fighter, ShipType.Shadow, ShipType.Falcon, ShipType.Eagle, ShipType.Manta, ShipType.Raptor, ShipType.Heavy];
 
+    // The invariant the whole design balances on: a bundle is one powerful card and one weak card, on every
+    // hull, at every level, milestone or not.
     [Fact]
-    public void Hand_AlwaysCarriesOneHullCard()
+    public void EveryBundle_IsOnePowerfulHalfAndOneWeakHalf()
     {
-        // The hull slot always carries exactly one hull card: `Hp` alone below level 5, `Hp` or `Armor`
-        // from level 5 (plans/ARMOR_AND_PIERCE.md), and `Hp`, `Armor` or `Shield` from level 10
-        // (plans/SHIELDS.md) — the fixture hulls start unarmored and unshielded, so both defence cards are
-        // in the draw there. Exactly one is dealt either way: the slot sets the shape, not the bucket.
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
+                foreach (var bundle in Hand(hull, level))
+                {
+                    Assert.True(UpgradeOffer.IsPowerfulCard(bundle.Powerful),
+                        $"{hull} L{level}: strong half {UpgradeOffer.FormatChoice(bundle.Powerful)} is not a powerful card");
+                    Assert.False(UpgradeOffer.IsPowerfulCard(bundle.Weak),
+                        $"{hull} L{level}: weak half {UpgradeOffer.FormatChoice(bundle.Weak)} is not a weak card");
+                }
+    }
+
+    // A hand of one or two choices is the complaint this change answers, so the full five bundles are demanded
+    // wherever the legal pools can fill them: every hull, from the level both defence cards are legal.
+    [Fact]
+    public void Hand_IsFiveBundles_OnceBothDefenceCardsAreLegal()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 10; level <= 21; level++)
             {
-                var hullCards = Hand(hull, level).Where(o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor or UpgradeOption.Shield).ToList();
-                Assert.Single(hullCards);
-                if (level < 5) Assert.Equal(UpgradeOption.Hp, hullCards[0].Stat);
+                var hand = Hand(hull, level);
+                Assert.True(hand.Length == UpgradeOffer.BundlesPerLevel, $"{hull} L{level}: only {hand.Length} bundles: {Names(hand)}");
             }
     }
 
-    // The complaint this change answers: a hand used to be able to carry almost nothing for the guns the
-    // player is actually shooting with — 40% of a one-gun hull's hands held at most one.
+    // From the level armour joins the strong pool a hand is at most one bundle short — the strong side is still
+    // limited to the kill gun's cards plus one defence card.
     [Fact]
-    public void Hand_AlwaysCarriesThreeCardsForGuns()
+    public void Hand_IsNearlyFull_FromTheLevelArmorUnlocks()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 5; level <= 9; level++)
+                Assert.InRange(Hand(hull, level).Length, 4, UpgradeOffer.BundlesPerLevel);
+    }
+
+    // Never more bundles than there are cards to fill them with, and never a bundle that breaks a rule just to
+    // reach the number.
+    [Fact]
+    public void Hand_IsNeverEmptyAndNeverLongerThanTheHand()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 21; level++)
+                Assert.InRange(Hand(hull, level).Length, 1, UpgradeOffer.BundlesPerLevel);
+    }
+
+    // One new gun per bundle: the mount screen settles one weapon, so a pair of two would need two trips
+    // (plans/UPGRADE_BUNDLE_PAIRS.md §3.7). Nothing else can go wrong inside a pair — the weak half is applied
+    // before the strong half is mounted, so an upgrade spent on a gun the new gun displaces rides into cargo
+    // with that gun rather than vanishing.
+    [Fact]
+    public void Bundle_NeverCarriesTwoNewGuns()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 21; level++)
+                foreach (var bundle in Hand(hull, level))
+                    Assert.False(bundle.Powerful.IsNewWeapon && bundle.Weak.IsNewWeapon,
+                        $"{hull} L{level}: {Names(bundle)} — a bundle carries one new gun at most");
+    }
+
+    // A hull with nothing powerful to offer — its only gun is a chip and its large mount is taken — is still
+    // dealt one bundle of two ordinary cards, so the level it earned resolves instead of hanging on an empty
+    // choice forever.
+    [Fact]
+    public void ChipOnlyHull_WithNothingPowerfulToOffer_IsStillDealtOneBundle()
+    {
+        WeaponMount[] chipOnly = [new(TurretSlotName.MainGun, WeaponType.Stiletto)];
+
+        for (int seed = 1; seed <= 5; seed++)
+        {
+            var bundles = Hand(ShipType.Fighter, 3, chipOnly, seed);
+            Assert.Single(bundles);
+            Assert.False(UpgradeOffer.IsPowerfulCard(bundles[0].Powerful), "there was nothing powerful to offer");
+            Assert.False(bundles[0].Powerful.IsNewWeapon && bundles[0].Weak.IsNewWeapon);
+        }
+    }
+
+    // One side of the hand never names one gun past its cap: three cards for the one kill gun is the ceiling on
+    // the strong side, two for a chip gun on the weak side.
+    [Fact]
+    public void Hand_NeverNamesOneGunPastItsSideOfTheCap()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
             {
-                var offered = Hand(hull, level);
-                int gunCards = offered.Count(NamesAGun);
-                Assert.True(gunCards >= 3, $"{hull.Name} at level {level} got {gunCards} cards for guns: {Names(offered)}");
+                var bundles = Hand(hull, level);
+                Assert.True(HighestCountForOneGun(bundles.Select(b => b.Powerful)) <= 3,
+                    $"{hull} L{level}: the strong half named one gun too often: {Names(bundles)}");
+                Assert.True(HighestCountForOneGun(bundles.Select(b => b.Weak)) <= 2,
+                    $"{hull} L{level}: the weak half named one chip gun three times: {Names(bundles)}");
             }
     }
 
+    static int HighestCountForOneGun(IEnumerable<UpgradableOption> cards) =>
+        cards.Where(card => card.WeaponName.Length > 0).GroupBy(card => card.WeaponName).Select(g => g.Count()).DefaultIfEmpty(0).Max();
+
+    // The hull grows one way per hand: `Hp` at most once, armour and shield at most once each — and the
+    // engine/vacuum filler at most twice, so a hand is never all thrust.
     [Fact]
-    public void Hand_IsAlwaysFiveCards_WhileTheHullHasLegalCardsToFillIt()
+    public void Hand_CapsHullAndUtilityCards()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
-                Assert.Equal(5, Hand(hull, level).Length);
+            {
+                var cards = Cards(Hand(hull, level));
+                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Hp) <= 1, $"{hull} L{level}: two hull cards in one hand");
+                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Armor) <= 1, $"{hull} L{level}: two armor cards in one hand");
+                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Shield) <= 1, $"{hull} L{level}: two shield cards in one hand");
+                Assert.True(cards.Count(IsUtilityCard) <= 2, $"{hull} L{level}: the hand is mostly filler: {Names(cards)}");
+            }
     }
 
-    // One engine/utility card per non-milestone hand: flying stays a choice, it is just no longer the
-    // default answer to a level-up.
+    // Both classes grow at every level: while the hull flies a kill gun and a chip gun, the strong half of some
+    // bundle names a kill gun and the weak half of some bundle names a chip gun. This is R25's class line made
+    // visible in the offer.
     [Fact]
-    public void NonMilestoneHand_CarriesOneEngineOrUtilityCard()
+    public void Hand_GrowsBothClassesTheHullFlies()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 21; level++)
+            {
+                var bundles = Hand(hull, level);
+                if (!FliesBothClasses(hull)) continue;
+
+                Assert.Contains(bundles, bundle => NamesAKillGun(bundle.Powerful));
+                Assert.Contains(bundles, bundle => NamesAChipGun(bundle.Weak));
+            }
+    }
+
+    // R33: the `Damage` card stays milestone-only. Ordinary hands grow the guns with stat cards.
+    [Fact]
+    public void OrdinaryHand_NeverCarriesADamageCard()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
             {
                 if (UpgradeOffer.IsMilestoneLevel(level)) continue;
-                Assert.Equal(1, Hand(hull, level).Count(IsUtilityCard));
+                Assert.DoesNotContain(Cards(Hand(hull, level)), card => card.Stat == UpgradeOption.Damage && !card.IsNewWeapon);
             }
     }
 
-    // A four-gun hull has enough distinct guns that no hand needs to double up on one of them. A two-gun
-    // hull does — three weapon slots against two guns — and doubling up there is the honest choice: it
-    // upgrades what the player is carrying instead of padding the hand with filler.
+    // A milestone hand is the build beat: a new large gun to switch into even on a hull whose mounts are all
+    // booked, and a `Damage` card for each class aboard — the kill card as a strong half, the chip card as the
+    // weak half of another bundle.
     [Fact]
-    public void HeavyHand_NeverNamesTheSameGunTwice()
+    public void MilestoneHand_OffersANewLargeGunAndADamageCardPerClassAboard()
     {
-        for (int level = 2; level <= 21; level++)
-        {
-            var offered = Hand(ShipType.Heavy, level);
-            var guns = offered.Where(NamesAGun).Select(o => o.WeaponName).ToList();
-            Assert.True(guns.Count == guns.Distinct().Count(), $"level {level} doubled up on a gun: {Names(offered)}");
-        }
+        foreach (var hull in Hulls)
+            foreach (int level in new[] { 5, 10, 15, 20 })
+            {
+                var bundles = Hand(hull, level);
+                Assert.Contains(bundles, bundle => bundle.Powerful.IsNewWeapon && WeaponType.FromName(bundle.Powerful.WeaponName) is { IsSupport: false });
+
+                if (FliesAKillGun(hull))
+                    Assert.True(bundles.Any(bundle => IsDamageCard(bundle.Powerful)), $"{hull} L{level}: no kill-gun damage card: {Names(bundles)}");
+                if (FliesAChipGun(hull))
+                    Assert.True(bundles.Any(bundle => IsDamageCard(bundle.Weak)), $"{hull} L{level}: no chip-gun damage card: {Names(bundles)}");
+            }
     }
 
-    // The one-gun hull with two free mounts was the worst case of the old shuffle. The spilled slots buy
-    // it guns to mount rather than a third upgrade for the gun it already has.
+    // A milestone hand's strong half is always the build beat — a new gun, a `Damage` card, or the doubled
+    // defence tier. It never falls back to an ordinary stat card: R33 keeps `Damage` milestone-only and the
+    // strong pool has no stat fallback at all.
     [Fact]
-    public void OneGunHull_WithFreeMounts_IsOfferedNewGuns()
+    public void MilestoneHand_NeverDealsAnOrdinaryStatCardAsItsStrongHalf()
     {
-        for (int level = 2; level <= 4; level++)
-        {
-            var offered = Hand(ShipType.Falcon, level);
-            Assert.True(offered.Count(o => o.IsNewWeapon) >= 2, $"Falcon at level {level} got no guns to mount: {Names(offered)}");
-        }
+        foreach (var hull in Hulls)
+            foreach (int level in new[] { 5, 10, 15, 20 })
+                foreach (var bundle in Hand(hull, level))
+                    Assert.True(
+                        bundle.Powerful.IsNewWeapon || IsDamageCard(bundle.Powerful)
+                            || bundle.Powerful.Stat is UpgradeOption.Armor or UpgradeOption.Shield,
+                        $"L{level} strong half {UpgradeOffer.FormatChoice(bundle.Powerful)} is not a milestone card");
     }
 
-    // A hull holding only one class still gets a full hand out of the spill rules.
+    // A milestone hand never grows a kill gun with an ordinary stat card: its strong half is the build beat —
+    // a new gun, a `Damage` card, the doubled defence tier — and its weak half is the chip line (a new small
+    // gun, the chip's `Damage` card, then the documented fallback). Kill-gun stat cards are what ordinary levels
+    // are made of.
     [Fact]
-    public void SupportOnlyHull_StillGetsAFullHand()
+    public void MilestoneHand_NeverDealsAKillGunStatCard()
     {
-        WeaponMount[] supportOnly = [new(TurretSlotName.SmallLeft, WeaponType.Stiletto), new(TurretSlotName.SmallRight, WeaponType.FlakCurtain)];
-
-        for (int level = 2; level <= 21; level++)
-            Assert.Equal(5, Hand(ShipType.Fighter, level, supportOnly).Length);
+        foreach (var hull in Hulls)
+            foreach (int level in new[] { 5, 10, 15, 20 })
+                Assert.DoesNotContain(Cards(Hand(hull, level)), NamesAKillGunStatCard);
     }
 
+    // When the milestone's own weak kinds have run dry — no chip gun aboard, so no `Damage` chip card, and a
+    // new small gun that no kill gun's card may pair with — the weak halves fall back to the ordinary pool
+    // rather than pairing two powerful halves.
     [Fact]
-    public void MilestoneHand_OfferANewGun_WhileGunsRemainToUnlock()
+    public void MilestoneHand_WhenItsWeakPoolRunsDry_FallsBackToEngineCards()
     {
-        for (int level = 5; level <= 20; level += 5)
-            Assert.Contains(Hand(ShipType.Fighter, level), o => o.IsNewWeapon);
-    }
-
-    // A milestone hand has one weapon slot left after the hull card and the three new guns, so it deals
-    // one mounted gun's damage card — kill class first — instead of one per gun and a shuffle deciding
-    // which one the player gets to see. R33 still sizes the card; this only picks the gun.
-    // R33 as plans/UPGRADE_BUNDLES.md deals it: a milestone hand has one damage slot per class, so a hull
-    // that flies both classes grows both — the chip's card is +25% of its base, the kill gun's +50%.
-    [Fact]
-    public void MilestoneHand_GrowsBothClasses_WithOneDamageCardEach()
-    {
-        WeaponMount[] mixed =
-        [
-            new(TurretSlotName.MainGun, WeaponType.MachineGun),
-            new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain),
-        ];
-
-        var offered = Hand(ShipType.Heavy, 5, mixed);
-        var damageCards = offered.Where(o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon).ToList();
-
-        Assert.Equal(2, damageCards.Count);
-        Assert.Contains(damageCards, card => card.WeaponName == WeaponType.MachineGun.Name);
-        Assert.Contains(damageCards, card => card.WeaponName == WeaponType.FlakCurtain.Name);
-    }
-
-    // With no chip aboard, the chip's damage slot has nothing honest to name and does not invent one. The
-    // freed slot goes to a new gun of the class the hull does not fly — something it could actually mount —
-    // rather than to filler, and the kill class is served first.
-    [Fact]
-    public void MilestoneHand_WithNoChipAboard_OffersAGunForTheMissingClass()
-    {
+        // A hull flying only large kill guns, so no chip gun can hold a chip `Damage` card.
         WeaponMount[] killOnly =
         [
             new(TurretSlotName.MainGun, WeaponType.MachineGun),
-            new(TurretSlotName.HeavyLeft, WeaponType.ScatterCannon),
+            new(TurretSlotName.HeavyLeft, WeaponType.RailGun),
+            new(TurretSlotName.HeavyRight, WeaponType.ScatterCannon),
         ];
 
-        var offered = Hand(ShipType.Heavy, 5, killOnly);
-        var damageCards = offered.Where(o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon).ToList();
+        for (int seed = 1; seed <= 6; seed++)
+        {
+            var bundles = Hand(ShipType.Heavy, 20, killOnly, seed);
 
-        Assert.Single(damageCards);
-        Assert.Equal(WeaponType.MachineGun.Name, damageCards[0].WeaponName);
-        Assert.Contains(offered, o => o.IsNewWeapon && IsSupportGun(o.WeaponName));
-    }
-
-    // R33's cadence: the damage card is a milestone card. The leak path may reach it, but only at a
-    // milestone, because the buckets are built empty for every ordinary hand.
-    [Fact]
-    public void StandardHand_NeverCarriesADamageCard()
-    {
-        foreach (var hull in Hulls)
-            for (int level = 2; level <= 21; level++)
+            foreach (var bundle in bundles)
             {
-                if (UpgradeOffer.IsMilestoneLevel(level)) continue;
-                Assert.DoesNotContain(Hand(hull, level), o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon);
+                Assert.True(UpgradeOffer.IsPowerfulCard(bundle.Powerful), $"strong half {UpgradeOffer.FormatChoice(bundle.Powerful)} is not powerful");
+                Assert.False(UpgradeOffer.IsPowerfulCard(bundle.Weak), $"weak half {UpgradeOffer.FormatChoice(bundle.Weak)} is not weak");
             }
-    }
 
-    // A milestone hand owes the player a large gun to switch into — even a hull with every mount filled,
-    // where the only way to fly it is to displace the gun already there (plans/UPGRADE_BUNDLES.md §2).
-    [Fact]
-    public void MilestoneHand_OffersANewLargeGun_WhileOneIsUnowned()
-    {
-        for (int seed = 1; seed <= 12; seed++)
-        {
-            var offered = Hand(ShipType.Scout, 5, seed: seed);
-            var newGuns = offered.Where(o => o.IsNewWeapon).Select(o => o.WeaponName).ToList();
-
-            Assert.Contains(newGuns, name => !IsSupportGun(name));
+            Assert.Contains(Cards(bundles), IsUtilityCard);
         }
     }
 
-    // The leak path's guard on `Hp`: the hull card already spent it, so a leaked hull card is health only
-    // when the hull slot drew a defence card instead. A hand therefore never carries two `Hp` cards.
+    // The spill must never reach past a gate the rules already closed (R18/R19/R29), however short its pool is:
+    // a chip at its class range roof is dealt no range card.
     [Fact]
-    public void Hand_NeverCarriesTwoHpCards()
-    {
-        foreach (var hull in Hulls)
-            for (int level = 5; level <= 21; level++)
-                Assert.True(Hand(hull, level).Count(o => o.Stat == UpgradeOption.Hp) <= 1,
-                    $"{hull.Name} at level {level} was dealt two health cards");
-    }
-
-    // Late game, once the ship owns the whole roster, the freed milestone slots buy damage cards for the
-    // guns it flies instead of leaving the hand short.
-    [Fact]
-    public void MilestoneHand_WithNothingLeftToUnlock_FillsWithDamageAndUtilityCards()
-    {
-        var carried = WeaponType.All.Where(w => w.Name != WeaponType.LoadTestWeapon.Name).Select(TurretMount.CarriedTurret).ToList();
-        var (em, player) = CreateHull(ShipType.Fighter, xp: 999_999, level: 4, mounts: [new(TurretSlotName.MainGun, WeaponType.MachineGun)]);
-        em.AddComponent(player, new WeaponCargo(carried));
-
-        var offered = DealHand(em, 5);
-
-        Assert.Equal(5, offered.Length);
-        Assert.Contains(offered, o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor);
-        Assert.DoesNotContain(offered, o => o.IsNewWeapon);
-        Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon);
-    }
-
-    // The re-deal goes through the same dealer, so it cannot break the shape a level-up hand has.
-    [Fact]
-    public void Reroll_HandsOutTheSameShapeAsALevelUpHand()
-    {
-        var (em, player) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(1), level: 1);
-        var commands = new CommandBuffer();
-        new LevelUpSystem().Update(new WorldView(em), 1f / 120f, commands);
-        commands.Apply(em);
-        em.AddComponent(player, new RerollStock(10));
-
-        for (int attempt = 0; attempt < 10; attempt++)
-        {
-            Assert.True(UpgradeOffer.TryReroll(em, player));
-            var offered = PendingHand(em);
-
-            Assert.Contains(offered, o => o.Stat == UpgradeOption.Hp);
-            Assert.Equal(1, offered.Count(IsUtilityCard));
-            Assert.True(offered.Count(NamesAGun) >= 3, $"a re-deal went back to filler: {Names(offered)}");
-        }
-    }
-
-    // The spill must never reach past a gate the rules already closed (R18/R19/R29), however empty its
-    // slot is: a chip at its class range roof is dealt no range card.
-    [Fact]
-    public void Spill_NeverDealsACardTheRulesWouldRefuse()
+    public void Hand_NeverDealsACardTheRulesWouldRefuse()
     {
         WeaponMount[] chipAtItsRoof = [new(TurretSlotName.SmallLeft, WeaponType.Stiletto)];
 
         for (int level = 2; level <= 21; level++)
         {
-            var offered = Hand(ShipType.Fighter, level, chipAtItsRoof);
+            var cards = Cards(Hand(ShipType.Fighter, level, chipAtItsRoof));
 
-            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.Stiletto.Name);
-            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.ProjectileSpeed && o.WeaponName == WeaponType.Stiletto.Name);
-            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.Stiletto.Name);
+            Assert.DoesNotContain(cards, card => card.Stat == UpgradeOption.Range && card.WeaponName == WeaponType.Stiletto.Name);
+            Assert.DoesNotContain(cards, card => card.Stat == UpgradeOption.ProjectileSpeed && card.WeaponName == WeaponType.Stiletto.Name);
+            Assert.DoesNotContain(cards, card => card.Stat == UpgradeOption.MissileHealth && card.WeaponName == WeaponType.Stiletto.Name);
         }
     }
 
-    // Armor and its counter unlock with tier 2 — no hand below level 5 carries either card
+    // Armor and its counter unlock with tier 2 — no bundle below level 5 carries either card
     // (plans/ARMOR_AND_PIERCE.md).
     [Fact]
     public void NoArmorOrPierceCardBeforeLevelFive()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 4; level++)
-                Assert.DoesNotContain(Hand(hull, level), o => o.Stat is UpgradeOption.Armor or UpgradeOption.ArmorPierce);
+                Assert.DoesNotContain(Cards(Hand(hull, level)), card => card.Stat is UpgradeOption.Armor or UpgradeOption.ArmorPierce);
     }
 
-    // From level 5 the Armor card is in the hull slot's draw and shows across a run — deterministic
-    // seeds, so this proves the bucket is wired into the slot, not a probability claim.
+    // From level 5 the Armor card is in the strong pool and shows across a run — deterministic seeds, so this
+    // proves the pool is wired in, not a probability claim.
     [Fact]
     public void ArmorCard_IsDealtSomewhereInAFullRunFromLevelFive()
     {
         for (int level = 5; level <= 21; level++)
-            if (Hand(ShipType.Fighter, level).Any(o => o.Stat == UpgradeOption.Armor))
+            if (Cards(Hand(ShipType.Fighter, level)).Any(card => card.Stat == UpgradeOption.Armor))
                 return;
 
         Assert.Fail("no hand from level 5 up offered Armor");
     }
 
-    // Pierce is a per-gun stat card, dealt for a mounted gun from level 5 in ordinary hands. It shares the
-    // kill bucket with the rate/range/speed cards and an ordinary hand takes one card from it, so the draw
-    // has to be seen several times to say the card reaches play at all — the same seed at the same level
-    // deals the same hand, so the sweep runs over seeds as well as levels.
+    // Pierce is a per-gun stat card, dealt for a mounted gun from level 5 on ordinary hands. It shares the kill
+    // pool with the rate/range/speed cards, so the sweep runs over seeds as well as levels: the same seed at the
+    // same level deals the same hand.
     [Fact]
     public void PierceCard_IsDealtForAMountedGun_FromLevelFive()
     {
         for (int level = 6; level <= 9; level++)
             for (int seed = 1; seed <= 8; seed++)
-            {
-                var offered = Hand(ShipType.Fighter, level, seed: seed);
-                if (offered.Any(o => o.Stat == UpgradeOption.ArmorPierce && o.WeaponName == WeaponType.MachineGun.Name))
+                if (Cards(Hand(ShipType.Fighter, level, seed: seed))
+                        .Any(card => card.Stat == UpgradeOption.ArmorPierce && card.WeaponName == WeaponType.MachineGun.Name))
                     return;
-            }
 
         Assert.Fail("no hand from level 6 up offered MachineGun armor pierce");
     }
 
-    // The ceiling withdraws its card instead of dealing a lie (R19's rule): a hull at armor 12 is
-    // dealt `Hp` alone again, and a gun at the pierce ceiling is never named for another one.
-    // The ceiling is per-gun — the Shotgun beside the maxed MachineGun keeps its own draw.
+    // A defence card is never a lie (R10/R19's rule): it is dealt only while its **tier's whole step** still
+    // fits under the ceiling. At armour 11 the ordinary +1 card is still dealt and the milestone +2 card is not;
+    // at armour 12 neither is, and the strong pool carries no defence card at all.
     [Fact]
-    public void ArmorCardsAtTheirCeilings_AreWithdrawn()
+    public void DefenceCard_WithdrawnWhenItsStepNoLongerFitsTheHeadroom()
     {
         var (em, player) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(6), level: 6);
+        em.AddComponent(player, new Armor(ArmorRules.ArmorCeiling - 1));
+
+        Assert.Contains(Cards(DealHand(em, 7)), card => card.Stat == UpgradeOption.Armor);
+        Assert.DoesNotContain(Cards(DealHand(em, 10)), card => card.Stat == UpgradeOption.Armor);
+
         em.AddComponent(player, new Armor(ArmorRules.ArmorCeiling));
-
-        var maxedMachineGuns = new List<Entity>();
-        foreach (var (turretEntity, turret) in em.GetEntitiesWithComponents<Turret>())
-            if (turret.WeaponName == WeaponType.MachineGun.Name) maxedMachineGuns.Add(turretEntity);
-        foreach (var turretEntity in maxedMachineGuns)
+        for (int attempt = 0; attempt < 8; attempt++)
         {
-            var turret = em.GetComponent<Turret>(turretEntity);
-            em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Pierce = WeaponStats.PierceCeiling } });
-        }
-
-        for (int attempt = 0; attempt < 12; attempt++)
-        {
-            var offered = DealHand(em, 7);
-            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.Armor);
-            Assert.Contains(offered, o => o.Stat == UpgradeOption.Hp);
-            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.ArmorPierce && o.WeaponName == WeaponType.MachineGun.Name);
+            Assert.DoesNotContain(Cards(DealHand(em, 7)), card => card.Stat == UpgradeOption.Armor);
+            Assert.DoesNotContain(Cards(DealHand(em, 10)), card => card.Stat == UpgradeOption.Armor);
         }
     }
 
-    static bool NamesAGun(UpgradableOption option) => option.WeaponName.Length > 0;
+    // The tier is the level's, not the card's: every defence card in a milestone hand carries the doubled step,
+    // every one in an ordinary hand the half step, and no hand mixes the two (plans/UPGRADE_BUNDLE_PAIRS.md §2).
+    [Fact]
+    public void DefenceCards_CarryTheTierOfTheLevelThatDealtThem()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 10; level <= 21; level++)
+            {
+                bool milestone = UpgradeOffer.IsMilestoneLevel(level);
+                var expected = milestone ? DefenceTier.Milestone : DefenceTier.Ordinary;
 
-    // Which class a named card's gun belongs to (R24/R25): support chips and kill guns, keyed on the gun,
-    // never on the mount it happens to sit in.
-    static bool IsSupportGun(string weaponName) => WeaponType.FromName(weaponName) is { } gun && gun.IsSupport;    static bool IsUtilityCard(UpgradableOption option) =>
+                foreach (var card in Cards(Hand(hull, level)).Where(c => c.Stat is UpgradeOption.Armor or UpgradeOption.Shield))
+                    Assert.Equal(expected, card.Tier);
+            }
+    }
+
+    static bool IsUtilityCard(UpgradableOption option) =>
         option.Stat is UpgradeOption.PickupRadius or UpgradeOption.ForwardAcceleration
             or UpgradeOption.TurnSpeed or UpgradeOption.SideThrust or UpgradeOption.BackThrust;
 
-    static string Names(UpgradableOption[] hand) => string.Join(", ", hand.Select(UpgradeOffer.FormatChoice));
+    static bool NamesAKillGun(UpgradableOption card) =>
+        card.WeaponName.Length > 0 && !card.IsNewWeapon && WeaponType.FromName(card.WeaponName) is { IsSupport: false };
 
-    // The hand `hull` is dealt on reaching `level`: the hull starts holding the XP the previous level
-    // needs, so one `Roll` is the hand the player would see. The default seed is the world default, which
-    // makes a hand reproducible; a test that needs to see the draw vary passes different seeds, because the
-    // same seed at the same level deals the same hand.
-    static UpgradableOption[] Hand(ShipType hull, int level, WeaponMount[]? mounts = null, int seed = EntityManager.DefaultRngSeed)
+    // A stat card for a kill gun — the ordinary level's strong half, which a milestone hand never deals. Its
+    // `Damage` card is the milestone's own card and does not count.
+    static bool NamesAKillGunStatCard(UpgradableOption card) => NamesAKillGun(card) && !IsDamageCard(card);
+
+    static bool NamesAChipGun(UpgradableOption card) =>
+        card.WeaponName.Length > 0 && !card.IsNewWeapon && WeaponType.FromName(card.WeaponName) is { IsSupport: true };
+
+    static bool IsDamageCard(UpgradableOption card) => card.Stat == UpgradeOption.Damage && !card.IsNewWeapon;
+
+    // What the fixture hull mounts, by class (R24/R25: keyed on the gun, not the mount).
+    static List<string> Aboard(ShipType hull) => hull.Loadout.Mounts.Select(mount => mount.Weapon.Name).Distinct().ToList();
+
+    static bool FliesBothClasses(ShipType hull) => FliesAKillGun(hull) && FliesAChipGun(hull);
+
+    static bool FliesAKillGun(ShipType hull) => Aboard(hull).Any(name => WeaponType.FromName(name) is { IsSupport: false });
+
+    static bool FliesAChipGun(ShipType hull) => Aboard(hull).Any(name => WeaponType.FromName(name) is { IsSupport: true });
+
+    static string Names(UpgradeBundle[] bundles) => string.Join(" | ", Cards(bundles).Select(UpgradeOffer.FormatChoice));
+
+    static string Names(IEnumerable<UpgradableOption> cards) => string.Join(", ", cards.Select(UpgradeOffer.FormatChoice));
+
+    static string Names(UpgradeBundle bundle) => $"{UpgradeOffer.FormatChoice(bundle.Powerful)} + {UpgradeOffer.FormatChoice(bundle.Weak)}";
+
+    // Both halves of every bundle, in deal order: most of these rules are about cards, not about pairs.
+    static UpgradableOption[] Cards(UpgradeBundle[] bundles) =>
+        [.. bundles.SelectMany(bundle => new[] { bundle.Powerful, bundle.Weak })];
+
+    // The offer `hull` is dealt on reaching `level`: the hull starts holding the XP the previous level needs, so
+    // one `Roll` is what the player would see. The default seed is the world default, which makes an offer
+    // reproducible; a test that needs the draw to vary passes different seeds, because the same seed at the same
+    // level deals the same bundles.
+    static UpgradeBundle[] Hand(ShipType hull, int level, WeaponMount[]? mounts = null, int seed = EntityManager.DefaultRngSeed)
     {
         var (em, _) = CreateHull(hull, xp: UpgradeStats.XpForLevel(level - 1), level: level - 1, mounts, seed);
         return DealHand(em, level);
     }
 
-    static UpgradableOption[] DealHand(EntityManager em, int level)
+    static UpgradeBundle[] DealHand(EntityManager em, int level)
     {
         var view = new WorldView(em);
         Assert.True(view.GetEntitiesWithComponents<Player>().TryFirst(out var playerTuple), "the fixture hull is missing");
-        return UpgradeOffer.Roll(view, playerTuple.Entity, level, "test") ?? throw new InvalidOperationException("a hull with turrets must be dealt a hand");
-    }
-
-    static UpgradableOption[] PendingHand(EntityManager em)
-    {
-        Assert.True(em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pending));
-        return em.GetComponent<PendingUpgradeOptions>(pending.Entity).Options;
+        return UpgradeOffer.Roll(view, playerTuple.Entity, level, "test") ?? throw new InvalidOperationException("a hull with turrets must be dealt an offer");
     }
 
     static (EntityManager Em, Entity Player) CreateHull(ShipType ship, int xp, int level, WeaponMount[]? mounts = null, int seed = EntityManager.DefaultRngSeed)

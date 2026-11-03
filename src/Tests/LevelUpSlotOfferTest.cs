@@ -21,7 +21,9 @@ public class LevelUpSlotOfferTest
 
         var offered = NewWeaponCards(em);
         Assert.NotEmpty(offered);
-        Assert.True(offered.Count <= 3, $"a milestone hand offers at most three new weapons, got {offered.Count}");
+        // Three per mount class, not three in total: a milestone hand has a strong half for the large guns and
+        // a weak half for the chips, so both pools may run to three.
+        Assert.True(MostNewWeaponsOfOneClass(offered) <= 3, $"a milestone hand offered {MostNewWeaponsOfOneClass(offered)} new weapons of one class");
     }
 
     [Fact]
@@ -108,7 +110,7 @@ public class LevelUpSlotOfferTest
 
         var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
         Assert.Single(choices);
-        Assert.DoesNotContain(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options,
+        Assert.DoesNotContain(Cards(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity)),
             o => o.WeaponName == WeaponType.RailGun.Name);
     }
 
@@ -126,7 +128,7 @@ public class LevelUpSlotOfferTest
 
             foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
             {
-                Assert.DoesNotContain(options.Options,
+                Assert.DoesNotContain(Cards(options),
                     o => o.Stat == UpgradeOption.ProjectileSpeed && o.WeaponName == WeaponType.LaserLance.Name);
                 em.DestroyEntity(entity);
             }
@@ -147,13 +149,13 @@ public class LevelUpSlotOfferTest
                 em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { PelletCount = pellets } });
 
             bool offered = false;
-            for (int levelUp = 0; levelUp < 12; levelUp++)
+            for (int levelUp = 0; levelUp < 30; levelUp++)
             {
                 RunLevelUp(em);
 
                 foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
                 {
-                    if (options.Options.Any(o => o.Stat == UpgradeOption.FireRate && o.WeaponName == WeaponType.Swarmlet.Name))
+                    if (Cards(options).Any(o => o.Stat == UpgradeOption.FireRate && o.WeaponName == WeaponType.Swarmlet.Name))
                         offered = true;
                     em.DestroyEntity(entity);
                 }
@@ -202,7 +204,7 @@ public class LevelUpSlotOfferTest
         // upgrade one, so only the upgrade cards count here.
         var offered = new List<UpgradableOption>();
         foreach (var (_, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
-            offered.AddRange(options.Options);
+            offered.AddRange(Cards(options));
 
         Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.FlakCurtain.Name);
     }
@@ -263,7 +265,7 @@ public class LevelUpSlotOfferTest
 
             foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
             {
-                Assert.DoesNotContain(options.Options,
+                Assert.DoesNotContain(Cards(options),
                     o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.Stiletto.Name);
                 em.DestroyEntity(entity);
             }
@@ -279,7 +281,7 @@ public class LevelUpSlotOfferTest
 
             foreach (var (entity, _, options) in shortEm.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
             {
-                if (options.Options.Any(o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.FlakCurtain.Name))
+                if (Cards(options).Any(o => o.Stat == UpgradeOption.Range && o.WeaponName == WeaponType.FlakCurtain.Name))
                     offered = true;
                 shortEm.DestroyEntity(entity);
             }
@@ -344,16 +346,16 @@ public class LevelUpSlotOfferTest
                 em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = health } });
 
             bool offered = false;
-            for (int levelUp = 0; levelUp < 12; levelUp++)
+            for (int levelUp = 0; levelUp < 30; levelUp++)
             {
                 RunLevelUp(em);
 
                 foreach (var (entity, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().ToList())
                 {
                     if (health == atCeiling)
-                        Assert.DoesNotContain(options.Options,
+                        Assert.DoesNotContain(Cards(options),
                             o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.SeekerPod.Name);
-                    else if (options.Options.Any(o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.SeekerPod.Name))
+                    else if (Cards(options).Any(o => o.Stat == UpgradeOption.MissileHealth && o.WeaponName == WeaponType.SeekerPod.Name))
                         offered = true;
                     em.DestroyEntity(entity);
                 }
@@ -411,7 +413,7 @@ public class LevelUpSlotOfferTest
         var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
         Assert.Single(choices);
 
-        return [.. em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options
+        return [.. Cards(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity))
             .Where(o => o.IsNewWeapon)
             .Select(o => o.WeaponName)];
     }
@@ -422,11 +424,21 @@ public class LevelUpSlotOfferTest
         var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
         if (choices.Count == 0) return new List<string>();
 
-        List<string> names = [.. em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options
+        List<string> names = [.. Cards(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity))
             .Where(o => o.IsNewWeapon)
             .Select(o => o.WeaponName)];
 
         foreach (var (entity, _) in choices) em.DestroyEntity(entity);
         return names;
     }
+
+    // Both halves of every bundle, in deal order: these tests ask about cards, not about pairs.
+    static UpgradableOption[] Cards(PendingUpgradeOptions options) =>
+        [.. options.Bundles.SelectMany(bundle => new[] { bundle.Powerful, bundle.Weak })];
+
+    // The cap is per mount class (`UpgradeOffer.MaxNewWeaponCardsPerClass`): the large guns fill the strong
+    // halves of a milestone hand and the chips its weak halves.
+    static int MostNewWeaponsOfOneClass(IEnumerable<string> weaponNames) =>
+        weaponNames.GroupBy(name => WeaponType.FromName(name) is { } gun ? gun.Size : TurretSize.Small)
+            .Select(group => group.Count()).DefaultIfEmpty(0).Max();
 }

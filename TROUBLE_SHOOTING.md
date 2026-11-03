@@ -731,3 +731,20 @@ test never depends on the model's eyes.
   fires", check what the expression it guards actually returns for a miss before blaming the code above it:
   for `T?` where `T` is a struct, `is null` is only true if someone wrote the null themselves. Same shape of
   trap in tests: `FromName(x)!.IsSupport` does not compile for a nullable struct — use `is { } gun && gun.…`.
+
+## 77. Diagnostic keys do nothing until the ship-select screen is cleared, so the shots look frozen
+
+**Symptom.** `.tools/game.sh` is up and the window is drawn, `.tools/input.sh key l` is sent (the force-level-up
+diagnostic), and two consecutive `.tools/shot.sh` runs return **the same hash**. Nothing in `app.log` or the
+captured stdout, no exception, the game is alive and rendering.
+
+**Cause.** The window boots into **ship select** — the hull list with "Arrows/WASD or scroll to browse, CLICK
+or ENTER to select". Diagnostic keys are handled in `GameSession.HandleDiagnosticKeys`, which only runs in the
+playing step, so `L`, `G`, `Y`, `X` are all swallowed harmlessly there. The identical hash is not the world
+stopping (entry 75); it is the *menu* sitting still.
+
+**Fix.** Send `key Return` (or click a hull card) first, wait a frame or two for the run to start, then send the
+diagnostic key. Same trap one step later: after taking a bundle whose half is a new gun the game is on the
+**turret-mount** screen, where number keys pick mounts and `Esc` leaves — a `key l` sent there is consumed by
+that screen and no level-up is dealt. Read the captured stdout (`[UPGRADE]` / `[MOUNT]` rows) to tell which
+step the game is on, not just whether it is alive.

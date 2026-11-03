@@ -1,7 +1,9 @@
 # UPGRADE_BUNDLES.md — two cards a level, dealt from priorities that leak
 
-Status: shipped (2026-11-03) — implemented and verified in the run below; playtest questions at the end
-are what is still open. See `## Shipped (2026-11-03)` for the deviations from this plan.
+Status: shipped (2026-11-03), **superseded the same day** by plans/UPGRADE_BUNDLE_PAIRS.md — the two-pick
+mechanic and the §2 slot table no longer exist; the card kinds, the gates and `XpStepPerLevel = 5` did survive.
+Implemented and verified in the run below; see `## Shipped (2026-11-03)` for the deviations, and the follow-up
+at the end.
 
 Supersedes the *hand shape* half of plans/UPGRADE_HAND_COMPOSITION.md (read that file's `## Shipped`
 first: the bucket-by-kind machinery, the legality gates R10/R17/R18/R19/R23/R29/R33 and the shared
@@ -214,3 +216,19 @@ previous rows' 1.38–1.45 ms band, budget pass, 0 of 357 frames over. **Unchang
 itself is not reachable inside a gated sim (the player never leaves level 1 there, TROUBLE_SHOOTING.md #71),
 so it is 0 % by inspection; the only hot-path change is `FromName`, which sits on the per-round colour and
 radius lookups and is the same loop the LINQ call compiled to.
+
+## Follow-up (2026-11-03): superseded by plans/UPGRADE_BUNDLE_PAIRS.md
+
+The two-pick flow this plan shipped — five cards dealt, two spent, the hand shrinking as it went — was
+replaced the same day by five **bundles** of one powerful and one weak card, of which the player takes one and
+grants both. What broke and what carried over:
+
+- **Gone:** §2's slot table and its priority-saturated leak, `PicksLeft`/`Taken`, the post-pick re-read and
+  prune, and the rare-defence roll. A bundle is chosen as a pair, so the leak's job — keeping a hand full of
+  legal cards — is gone with it.
+- **Kept:** the card kinds and their legality gates, the milestone shape (new guns and `Damage`, `Damage`
+  milestone-only per R33), the per-class new-weapon cap, `XpStepPerLevel = 5`, and this plan's opening rule
+  that a level must be two cards for the numbers to line up. That rule is what the pairs plan builds on: the
+  five bundles now *guarantee* two cards a level instead of hoping the deal fills enough slots.
+- **The playtest questions in §7 are answered or moved, not answered**: they asked about the balance of two
+  picks out of five. The pairs plan's §7 asks instead about the ordinary/milestone defence split.

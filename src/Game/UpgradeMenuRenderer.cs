@@ -12,8 +12,10 @@ public static class UpgradeMenuRenderer
     public const int UpgradeCardHeight = 200;
     const int UpgradeCardSpacing = 16;
     const int UpgradeCardSideMargin = 40;
-    const int UpgradeCardLabelFontSize = 20;
-    const int UpgradeCardValueFontSize = 36;
+    // A card carries two entries — the bundle's strong half and its weak half — so both are drawn smaller
+    // than a one-card layout would need.
+    const int BundleLabelFontSize = 17;
+    const int BundleValueFontSize = 26;
     const int MaxUpgradeLabelLines = 3;
     // A new-weapon card lists what the gun does at its base level; the block is skipped rather than
     // squeezed when the window is too narrow for it.
@@ -35,7 +37,7 @@ public static class UpgradeMenuRenderer
 
     public static void DrawCards(int windowWidth, int windowHeight, PendingUpgradeOptions options, int hoveredIndex, float scale, int rerollCharges, bool hoveredReroll)
     {
-        if (options.Options.Length == 0) return;
+        if (options.Bundles.Length == 0) return;
 
         if (!_cardsWereShown)
         {
@@ -44,18 +46,15 @@ public static class UpgradeMenuRenderer
         }
         float fade = Ui.FadeAlpha(_cardsShownSince, FadeInSeconds);
 
-        for (int i = 0; i < options.Options.Length; i++)
+        for (int i = 0; i < options.Bundles.Length; i++)
         {
-            var opt = options.Options[i];
-            var (topLeft, w, h) = GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, scale);
-            DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt), NewWeaponSpecs(opt), (i + 1).ToString(), i == hoveredIndex, fade, scale);
+            var (topLeft, w, h) = GetUpgradeCardRect(i, options.Bundles.Length, windowWidth, windowHeight, scale);
+            DrawBundleCard((int)topLeft.X, (int)topLeft.Y, w, h, options.Bundles[i], (i + 1).ToString(), i == hoveredIndex, fade, scale);
         }
 
-        // A level spends two of the cards it is dealt (plans/UPGRADE_BUNDLES.md), so the hint row says how
-        // many picks this hand still owes.
-        string hint = options.PicksLeft > 1
-            ? $"Click a card or press keys — {options.PicksLeft} to pick"
-            : "Click a card or press keys — last pick";
+        // A level takes one of the five bundles (plans/UPGRADE_BUNDLE_PAIRS.md), so the hint teaches the card
+        // layout rather than a pick count: the strong card is the one on top.
+        string hint = "Click a bundle or press keys — strong card above, weak card below";
         int font = (int)(HintFontSize * scale);
         Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font,
             Ui.WithAlpha(Palette.TextMuted, fade));
@@ -124,35 +123,48 @@ public static class UpgradeMenuRenderer
         return (new Vector2(x, startY), cardW, cardH);
     }
 
-    // Soft-depth card: rounded translucent panel with shadow; hover lifts it 4px,
-    // brightens the border to the accent; value in accent, label muted. A new-weapon card puts the
-    // mount size where the value goes and lists the gun's base numbers underneath.
-    private static void DrawCard(int x, int y, int width, int height, string label, string statValue, string[]? weaponStats, string key, bool hovered, float fade, float scale)
+    // Soft-depth card: rounded translucent panel with shadow; hover lifts it 4px and brightens the border to
+    // the accent. The panel holds the two cards of one bundle — strong half above, weak half below — because
+    // they are taken together (plans/UPGRADE_BUNDLE_PAIRS.md §6).
+    private static void DrawBundleCard(int x, int y, int width, int height, UpgradeBundle bundle, string key, bool hovered, float fade, float scale)
     {
-        int labelFont = (int)(UpgradeCardLabelFontSize * scale);
-        int valueFont = (int)(UpgradeCardValueFontSize * scale);
-        int statFont = (int)(UpgradeCardStatFontSize * scale);
         int radius = (int)(6 * scale);
-
         Color background = hovered ? new Color(50, 50, 68, 230) : new Color(28, 30, 40, 230);
         Color border = hovered ? Palette.Accent : Palette.PanelEdge;
         y -= hovered ? (int)(4 * scale) : 0;
 
         Ui.DrawPanel(x, y, width, height, radius, Ui.WithAlpha(background, fade), Ui.WithAlpha(border, fade));
-
         DrawKeyBadge(x + (int)(10 * scale), y + (int)(10 * scale), key, fade, scale);
 
-        string[] labelLines = WrapText(label, width - (int)(24 * scale), labelFont);
-        int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
-        int labelValueGap = (int)(24 * scale);
-        int linePitch = labelFont + (int)(4 * scale);
-        int labelHeight = numLines * linePitch - (int)(4 * scale);
-        int statsGap = (int)(10 * scale);
-        int statPitch = statFont + (int)(3 * scale);
-        bool showStats = weaponStats is { Length: > 0 } && width >= (int)(MinCardWidthForStats * scale);
-        int statsHeight = showStats ? weaponStats!.Length * statPitch - (int)(3 * scale) : 0;
+        int halfHeight = height / 2;
+        DrawEntry(x, y, width, halfHeight, bundle.Powerful, fade, scale);
+        DrawEntry(x, y + halfHeight, width, halfHeight, bundle.Weak, fade, scale);
 
-        int contentY = y + (height - labelHeight - labelValueGap - valueFont - (showStats ? statsGap + statsHeight : 0)) / 2;
+        int dividerInset = (int)(14 * scale);
+        Raylib.DrawRectangle(x + dividerInset, y + halfHeight, width - 2 * dividerInset, (int)(1 * scale) + 1,
+            Ui.WithAlpha(Palette.PanelEdge, fade));
+    }
+
+    // One half of a bundle: muted label, accent value, and for a new gun its mount size and two base numbers.
+    // Centred in the band it was given.
+    private static void DrawEntry(int x, int y, int width, int height, UpgradableOption option, float fade, float scale)
+    {
+        int labelFont = (int)(BundleLabelFontSize * scale);
+        int valueFont = (int)(BundleValueFontSize * scale);
+        int statFont = (int)(UpgradeCardStatFontSize * scale);
+        string[] specs = NewWeaponSpecs(option) ?? [];
+
+        string[] labelLines = WrapText(GetUpgradeLabel(option), width - (int)(24 * scale), labelFont);
+        int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
+        int linePitch = labelFont + (int)(3 * scale);
+        int labelHeight = numLines * linePitch - (int)(3 * scale);
+        int valueGap = (int)(10 * scale);
+        bool showSpecs = specs.Length > 0 && width >= (int)(MinCardWidthForStats * scale);
+        int specPitch = statFont + (int)(3 * scale);
+        int specsGap = showSpecs ? (int)(8 * scale) : 0;
+        int specsHeight = showSpecs ? specs.Length * specPitch - (int)(3 * scale) : 0;
+
+        int contentY = y + (height - labelHeight - valueGap - valueFont - specsGap - specsHeight) / 2;
 
         for (int i = 0; i < numLines; i++)
         {
@@ -161,15 +173,14 @@ public static class UpgradeMenuRenderer
                 Ui.WithAlpha(Palette.TextMuted, fade));
         }
 
-        int valueY = contentY + labelHeight + labelValueGap;
+        int valueY = contentY + labelHeight + valueGap;
+        string statValue = GetUpgradeValue(option);
         int valueWidth = Raylib.MeasureText(statValue, valueFont);
         Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, valueY, valueFont,
             Ui.WithAlpha(Palette.Accent, fade));
 
-        if (!showStats) return;
-
-        for (int i = 0; i < weaponStats!.Length; i++)
-            Raylib.DrawText(weaponStats[i], x + (int)(16 * scale), valueY + valueFont + statsGap + i * statPitch, statFont,
+        for (int i = 0; i < specs.Length; i++)
+            Raylib.DrawText(specs[i], x + (int)(16 * scale), valueY + valueFont + specsGap + i * specPitch, statFont,
                 Ui.WithAlpha(Palette.TextMuted, fade));
     }
 
@@ -272,6 +283,11 @@ public static class UpgradeMenuRenderer
     // to know before picking a hull mount.
     private static string GetUpgradeValue(UpgradableOption option)
     {
+        // A defence card prints the step of the tier it was dealt at (+1 or +2 armour, +8 or +16 shield) —
+        // the same field `ApplyUpgrade` grants from, so the card is never a lie (R10).
+        if (option.Stat is UpgradeOption.Armor or UpgradeOption.Shield)
+            return $"+{UpgradeDefinition.DefenceStep(option.Stat, option.Tier)}";
+
         if (WeaponType.FromName(option.WeaponName) is not { } weapon)
             return UpgradeDefinition.For(option.Stat).DisplayValue;
 
@@ -297,17 +313,12 @@ public static class UpgradeMenuRenderer
     {
         if (!option.IsNewWeapon || WeaponType.FromName(option.WeaponName) is not { } weapon) return null;
 
-        // A guided round has no ballistic speed worth quoting: the number that says what it is, and
-        // what the player dodges against, is how hard it can turn.
-        string delivery = weapon.Stats.Hitscan ? "beam instant"
-            : weapon.Stats.Homing ? $"homing turn {Format(Angle.ToDeg(weapon.Stats.HomingTurnRate))} deg/s"
-            : $"projectile speed {Format(weapon.Stats.AmmoSpeed)}";
+        // A card holds two entries, so the new gun says only what its two numbers are; attack speed and how
+        // the round is delivered stay on the stats screen.
         return
         [
             $"range {Format(weapon.Range)}",
             $"damage {weapon.Stats.Damage}{(weapon.Stats.PelletCount > 1 ? $" x{weapon.Stats.PelletCount}" : "")}",
-            $"attack speed {Format(weapon.Stats.FireRate)}/s",
-            delivery,
         ];
     }
 

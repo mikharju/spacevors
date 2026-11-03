@@ -1,7 +1,9 @@
 # UPGRADE_HAND_COMPOSITION.md — tighter upgrade schedule
 
 Status: shipped (2026-11-02) — see `## Shipped` at the end for what landed, the deviations, and the
-perf verdict. **Its hand shape is superseded** (2026-11-03) by plans/UPGRADE_BUNDLES.md — the card-kind
+perf verdict. **Its hand shape is superseded twice over** (2026-11-03): plans/UPGRADE_BUNDLES.md and then
+plans/UPGRADE_BUNDLE_PAIRS.md, which deals five bundles of one powerful and one weak card instead of a
+leak-filled hand — the card-kind
 buckets, the legality gates and the shared `Roll` all still stand; the five hard slots became priorities
 with a leak order, and a level now takes two cards. Read `## Follow-up (2026-11-03)` at the end.
 

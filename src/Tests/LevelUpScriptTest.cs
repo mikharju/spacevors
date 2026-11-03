@@ -8,59 +8,62 @@ namespace Tests;
 
 public class LevelUpScriptTest
 {
+    // A bench entry is one card and a bundle is two, so entries are consumed in pairs — strong card first
+    // (plans/UPGRADE_BUNDLE_PAIRS.md §6).
     [Fact]
-    public void ScriptedUpgradeShowsSingleCardAtAnyLevel()
+    public void ScriptedPairIsDealtAsOneBundle()
     {
         var (em, player) = CreatePlayerWithTurret(xp: 15);
-        var system = new LevelUpSystem([new UpgradableOption("RailGun", UpgradeOption.Damage, IsNewWeapon: true)]);
+        var system = new LevelUpSystem([
+            new UpgradableOption("RailGun", UpgradeOption.Damage, IsNewWeapon: true),
+            new UpgradableOption("TestWeapon", UpgradeOption.FireRate)]);
 
         RunLevelUp(system, em);
 
         Assert.Equal(2, em.GetComponent<Player>(player).Level);
-        var options = GetChoiceOptions(em);
-        Assert.Single(options);
-        Assert.Equal("RailGun", options[0].WeaponName);
-        Assert.True(options[0].IsNewWeapon);
+        var bundle = GetBundles(em)[0];
+        Assert.Equal("RailGun", bundle.Powerful.WeaponName);
+        Assert.True(bundle.Powerful.IsNewWeapon);
+        Assert.Equal("TestWeapon", bundle.Weak.WeaponName);
+        Assert.Equal(UpgradeOption.FireRate, bundle.Weak.Stat);
     }
 
-    // The bench is consumed two entries per level-up — one per pick of the bundle
-    // (plans/UPGRADE_BUNDLES.md) — and a script shorter than the level's picks deals what it has: a bench
-    // that cannot fill every pick is not benching the real thing, so it says so in the hand it deals.
     [Fact]
-    public void ScriptedUpgradesAreConsumedInOrder()
+    public void ScriptedUpgradesAreConsumedInPairs()
     {
         var (em, player) = CreatePlayerWithTurret(xp: 15);
         var system = new LevelUpSystem([
             new UpgradableOption("", UpgradeOption.Hp),
             new UpgradableOption("TestWeapon", UpgradeOption.FireRate),
-            new UpgradableOption("TestWeapon", UpgradeOption.Range)]);
+            new UpgradableOption("TestWeapon", UpgradeOption.Range),
+            new UpgradableOption("TestWeapon", UpgradeOption.ProjectileSpeed)]);
 
         RunLevelUp(system, em);
 
-        var first = GetChoiceOptions(em);
-        Assert.Equal(2, first.Length);
-        Assert.Equal(UpgradeOption.Hp, first[0].Stat);
-        Assert.Equal("TestWeapon", first[1].WeaponName);
-        Assert.Equal(UpgradeOption.FireRate, first[1].Stat);
-        Assert.Equal(2, PicksLeft(em));
+        var first = GetBundles(em);
+        Assert.Equal(UpgradeOption.Hp, first[0].Powerful.Stat);
+        Assert.Equal(UpgradeOption.FireRate, first[0].Weak.Stat);
 
         DestroyChoices(em);
         SetXp(em, player, UpgradeStats.XpForLevel(2));
 
         RunLevelUp(system, em);
 
-        var options = GetChoiceOptions(em);
-        Assert.Single(options);
-        Assert.Equal("TestWeapon", options[0].WeaponName);
-        Assert.Equal(UpgradeOption.Range, options[0].Stat);
-        Assert.Equal(1, PicksLeft(em));
+        var second = GetBundles(em);
+        Assert.Equal(UpgradeOption.Range, second[0].Powerful.Stat);
+        Assert.Equal(UpgradeOption.ProjectileSpeed, second[0].Weak.Stat);
     }
 
+    // Fewer than two entries left is an exhausted bench: the level takes the dealt offer rather than a
+    // half-filled bundle, and a dealt offer is always more than one bundle.
     [Fact]
-    public void ScriptExhaustionFallsBackToRandomPool()
+    public void ScriptExhaustionFallsBackToDealtOffer()
     {
         var (em, player) = CreatePlayerWithTurret(xp: 15);
-        var system = new LevelUpSystem([new UpgradableOption("", UpgradeOption.Hp)]);
+        var system = new LevelUpSystem([
+            new UpgradableOption("", UpgradeOption.Hp),
+            new UpgradableOption("TestWeapon", UpgradeOption.FireRate),
+            new UpgradableOption("", UpgradeOption.TurnSpeed)]);
 
         RunLevelUp(system, em);
         DestroyChoices(em);
@@ -68,8 +71,7 @@ public class LevelUpScriptTest
 
         RunLevelUp(system, em);
 
-        var options = GetChoiceOptions(em);
-        Assert.True(options.Length > 1 && options.Length <= 5);
+        Assert.True(GetBundles(em).Length > 1, "expected a dealt offer of several bundles");
     }
 
     [Fact]
@@ -81,10 +83,10 @@ public class LevelUpScriptTest
         RunLevelUp(new LevelUpSystem(), em);
 
         Assert.Equal(5, em.GetComponent<Player>(player).Level);
-        var options = GetChoiceOptions(em);
-        // Milestone levels offer five random options (was three before the weapon pool grew).
-        Assert.Equal(5, options.Length);
-        Assert.Contains(options, o => o.IsNewWeapon);
+        var bundles = GetBundles(em);
+        // A milestone hand is a full five bundles, and new guns are what it is built to offer.
+        Assert.Equal(5, bundles.Length);
+        Assert.Contains(Cards(bundles), card => card.IsNewWeapon);
     }
 
     [Fact]
@@ -109,8 +111,7 @@ public class LevelUpScriptTest
         RunLevelUp(system, em);
 
         Assert.Equal(2, em.GetComponent<Player>(player).Level);
-        var options = GetChoiceOptions(em);
-        Assert.InRange(options.Length, 1, 5);
+        Assert.InRange(GetBundles(em).Length, 1, 5);
     }
 
     private static void RunLevelUp(LevelUpSystem system, EntityManager em)
@@ -121,19 +122,16 @@ public class LevelUpScriptTest
         commands.Apply(em);
     }
 
-    private static UpgradableOption[] GetChoiceOptions(EntityManager em)
+    private static UpgradeBundle[] GetBundles(EntityManager em)
     {
         var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
         Assert.Single(choices);
-        return em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options;
+        return em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Bundles;
     }
 
-    private static int PicksLeft(EntityManager em)
-    {
-        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
-        Assert.Single(choices);
-        return em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).PicksLeft;
-    }
+    // Both halves of every bundle, in deal order: most of these tests ask about cards, not about pairs.
+    private static UpgradableOption[] Cards(IEnumerable<UpgradeBundle> bundles) =>
+        [.. bundles.SelectMany(bundle => new[] { bundle.Powerful, bundle.Weak })];
 
     private static void DestroyChoices(EntityManager em)
     {

@@ -51,7 +51,7 @@ public static class StatsScreenRenderer
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, Palette.ScreenDim);
 
-        bool hasCards = options is { Options.Length: > 0 };
+        bool hasCards = options is { Bundles.Length: > 0 };
 
         DrawTopPanels(prepared.Layout, shipName, level, windowWidth, prepared.Scale);
 
@@ -91,11 +91,11 @@ public static class StatsScreenRenderer
 
     public static int GetHoveredCardIndex(Prepared prepared, PendingUpgradeOptions options, int mouseX, int mouseY, int windowWidth, int windowHeight)
     {
-        if (options.Options.Length == 0) return -1;
+        if (options.Bundles.Length == 0) return -1;
 
-        for (int i = 0; i < options.Options.Length; i++)
+        for (int i = 0; i < options.Bundles.Length; i++)
         {
-            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, options.Options.Length, windowWidth, windowHeight, prepared.Scale);
+            var (topLeft, w, h) = UpgradeMenuRenderer.GetUpgradeCardRect(i, options.Bundles.Length, windowWidth, windowHeight, prepared.Scale);
             if (mouseX >= topLeft.X && mouseX <= topLeft.X + w && mouseY >= topLeft.Y && mouseY <= topLeft.Y + h)
                 return i;
         }
