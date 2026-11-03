@@ -105,6 +105,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Upgrade hand composition: every hand dealt from card-kind slots with legality gates per card kind — shipped 2026-11-02, hand shape superseded by plans/UPGRADE_BUNDLES.md and again by plans/UPGRADE_BUNDLE_PAIRS.md — plans/UPGRADE_HAND_COMPOSITION.md
 - Upgrade bundles: a level took two cards out of the five it was dealt, dealt from priorities that leak — shipped 2026-11-03, **superseded the same day** by plans/UPGRADE_BUNDLE_PAIRS.md (the card kinds, the gates and two cards a level survived) — plans/UPGRADE_BUNDLES.md
 - Upgrade bundle pairs: a level is dealt five bundles of one powerful + one weak card and takes one bundle, granting both; armor and shield come in an ordinary and a milestone tier — shipped 2026-11-03 — plans/UPGRADE_BUNDLE_PAIRS.md
+- Upgrade bundle duplicates: a side that runs dry repeats a half instead of shortening the hand — fewest-offered card first, never a new weapon, never the same pair twice, no copy cap — shipped 2026-11-03 — plans/UPGRADE_BUNDLE_DUPLICATES.md
 
 ### Physics and sim
 - Capsule collision: hulls and lumpy rocks as their shape — shipped — plans/NON_CIRCLE_COLLISION.md

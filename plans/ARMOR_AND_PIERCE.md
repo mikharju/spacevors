@@ -256,10 +256,10 @@ Deviations from the plan body:
 
 ## Follow-up (2026-11-03): the armor card is dealt in two tiers
 
-plans/UPGRADE_BUNDLE_PAIRS.md split the armour card's step by the **level that deals it**: +1 at an ordinary
+plans/UPGRADE_BUNDLE_PAIRS.md split the armor card's step by the **level that deals it**: +1 at an ordinary
 level, +2 at a milestone (`DefenceTier`, `UpgradeDefinition.MilestoneDefenceMultiplier = 2`). The ceiling
 (`ArmorRules.ArmorCeiling = 12`) is unchanged and still withdraws a card rather than shrinking it, so a card is dealt
-only while its whole tier step fits: at armour 11 the ordinary +1 card is dealt and the milestone +2 card is
+only while its whole tier step fits: at armor 11 the ordinary +1 card is dealt and the milestone +2 card is
 not, and at 12 neither is. The card's printed number is always the number it grants — `FormatChoice` and the
 HUD read the card's own tier, not the constant. The arithmetic in this plan's body (`+2` per card) is therefore
 now the **milestone** step; read an ordinary level's card as half that.

@@ -515,7 +515,7 @@ Verification:
 
 ## Follow-up (2026-11-03): the shield card is dealt in two tiers
 
-Same split as armour (plans/UPGRADE_BUNDLE_PAIRS.md §2): the card is still gated at level 10, but its step is
+Same split as armor (plans/UPGRADE_BUNDLE_PAIRS.md §2): the card is still gated at level 10, but its step is
 now +8 at an ordinary level and +16 at a milestone — 25 % and 50 % of `ShieldRules.PoolCapacity` (32). A card is
 dealt only while its whole tier step fits under the ceiling, so at 25 pool the ordinary +8 card is dealt and the
 milestone +16 card is not. The refill, shock and shatter rules are untouched: a smaller card buys a smaller

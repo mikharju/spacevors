@@ -20,8 +20,9 @@ namespace Spacevors.Domain.Systems;
 // one **weak** (a chip gun's upgrade, a new small gun, an engine or utility card, `Hp`). The split is R25's
 // kill/support axis made visible, so every level grows both classes and the player chooses which to grow
 // more. The pools are built in the order the promises are made, so "a bundle carries a new large gun" and
-// "both classes grow" fall out of the ordering instead of a special case, and a pool that runs dry simply
-// deals fewer bundles — never a powerful+powerful or weak+weak pair.
+// "both classes grow" fall out of the ordering instead of a special case. A side that runs dry repeats a card
+// it has already dealt rather than dealing a short hand (plans/UPGRADE_BUNDLE_DUPLICATES.md) — never a
+// powerful+powerful or weak+weak pair, never the same pair twice, and never a repeated new weapon.
 public static class UpgradeOffer
 {
     // A level is dealt five bundles and takes one of them (plans/UPGRADE_BUNDLE_PAIRS.md §1). The XP cost is
@@ -118,28 +119,90 @@ public static class UpgradeOffer
             ? card with { Tier = IsMilestoneLevel(level) ? DefenceTier.Milestone : DefenceTier.Ordinary }
             : card;
 
-    // One bundle per pair taken from the two pools, in pool order: the promises are already in the order the
-    // pools were built, so a strong half that finds no compatible weak half is dropped rather than paired with
-    // something it would disable. The final shuffle is why a promised card is never a promised position.
+    // The hand: the distinct pairs the two pools allow, topped up from its own halves when a side ran dry,
+    // then shuffled — which is why a promised card is never a promised position.
     static UpgradeBundle[] DealBundles(Dictionary<CardKind, List<UpgradableOption>> buckets, bool milestone, WorldView view, List<Turret> turrets)
     {
         var powerful = PowerfulPool(buckets, milestone, view, turrets);
         var weak = WeakPool(buckets, milestone, view, turrets);
 
         // A hull with nothing powerful to offer — no kill-class gun to upgrade and no free large mount for a
-        // new one — still has to be dealt something, or the level it just earned would never resolve. Its one
+        // new one — still has to be dealt something, or the level it just earned would never resolve. Its first
         // bundle is two ordinary cards, taken together like any other.
-        if (powerful.Count == 0) return FallbackPair(weak);
+        var bundles = powerful.Count == 0 ? FallbackPair(weak).ToList() : DealDistinct(powerful, weak);
 
+        TopUp(bundles, powerful, weak);
+        Shuffle(bundles, view.Rng);
+        return [.. bundles];
+    }
+
+    // One bundle per pair of fresh cards, in pool order: the promises are already in the order the pools were
+    // built, so a strong half that finds no compatible weak half is dropped rather than paired with something it
+    // would disable. Whatever the pass did not reach stays in the two pools for the fill pass below.
+    static List<UpgradeBundle> DealDistinct(List<UpgradableOption> powerful, List<UpgradableOption> weak)
+    {
         var bundles = new List<UpgradeBundle>();
-        foreach (var strong in powerful)
+        while (bundles.Count < BundlesPerLevel && powerful.Count > 0)
         {
-            if (bundles.Count >= BundlesPerLevel) break;
+            var strong = powerful[0];
+            powerful.RemoveAt(0);
             if (TryTakeWeakFor(weak, strong, out var weakCard)) bundles.Add(new UpgradeBundle(strong, weakCard));
         }
 
-        Shuffle(bundles, view.Rng);
-        return [.. bundles];
+        return bundles;
+    }
+
+    // Fill out the rest of the hand (plans/UPGRADE_BUNDLE_DUPLICATES.md §3). A card still sitting in a pool is
+    // offered before one already on the table, so a genuinely new pair always beats a repeat, and a half only
+    // repeats once the pools hold nothing that can still pair with it. That is the §3.1 formula — the hand is
+    // five whenever the two sides can name five different pairs — and there is no copy cap: the refusals below
+    // are the whole bound.
+    static void TopUp(List<UpgradeBundle> hand, List<UpgradableOption> strongLeft, List<UpgradableOption> weakLeft)
+    {
+        while (hand.Count < BundlesPerLevel)
+        {
+            if (NextPair(hand, strongLeft, weakLeft) is not { } bundle) return;
+            hand.Add(bundle);
+            TakeFrom(strongLeft, bundle.Powerful);
+            TakeFrom(weakLeft, bundle.Weak);
+        }
+    }
+
+    static UpgradeBundle? NextPair(List<UpgradeBundle> hand, List<UpgradableOption> strongLeft, List<UpgradableOption> weakLeft)
+    {
+        foreach (var strong in Candidates(hand, strongLeft, powerful: true))
+            foreach (var weak in Candidates(hand, weakLeft, powerful: false))
+            {
+                if (strong == weak) continue;                                     // one card, granted twice
+                if (strong.IsNewWeapon && weak.IsNewWeapon) continue;             // two new guns, two mount trips
+                if (strong.IsNewWeapon && IsDealt(hand, strong)) continue;        // a new gun is offered once
+                if (weak.IsNewWeapon && IsDealt(hand, weak)) continue;
+                if (hand.Any(dealt => dealt.Powerful == strong && dealt.Weak == weak)) continue;
+
+                return new UpgradeBundle(strong, weak);
+            }
+
+        return null;
+    }
+
+    // The cards still in a pool come first — they carry no copies yet — then the hand's own halves from the
+    // least offered upward, ties keeping the order they were dealt in. That order is what makes a new pair win
+    // over a repeat, and what spreads a repeat over a side (2 + 2 + 1) instead of stacking five copies of the
+    // first card. `OrderBy` is a stable sort, so the whole pass is deterministic and draws no RNG.
+    static IOrderedEnumerable<UpgradableOption> Candidates(
+        List<UpgradeBundle> hand, List<UpgradableOption> leftovers, bool powerful)
+    {
+        List<UpgradableOption> cards = [.. leftovers, .. hand.Select(bundle => powerful ? bundle.Powerful : bundle.Weak)];
+        return cards.OrderBy(card => hand.Count(dealt => (powerful ? dealt.Powerful : dealt.Weak) == card));
+    }
+
+    static bool IsDealt(List<UpgradeBundle> hand, UpgradableOption card) =>
+        hand.Any(dealt => dealt.Powerful == card || dealt.Weak == card);
+
+    static void TakeFrom(List<UpgradableOption> pool, UpgradableOption card)
+    {
+        int index = pool.IndexOf(card);
+        if (index >= 0) pool.RemoveAt(index);
     }
 
     static UpgradeBundle[] FallbackPair(List<UpgradableOption> weak)

@@ -34,27 +34,96 @@ public class HandCompositionTest
                 }
     }
 
-    // A hand of one or two choices is the complaint this change answers, so the full five bundles are demanded
-    // wherever the legal pools can fill them: every hull, from the level both defence cards are legal.
+    // A hand of one to four choices is the complaint this change answers: a side that runs dry repeats a half
+    // instead of shortening the hand, so every hull is dealt five bundles at every level
+    // (plans/UPGRADE_BUNDLE_DUPLICATES.md §3.1). The hand is short only where a side genuinely holds one card —
+    // the chip-only fixtures below — never because the deal ran out of ideas.
     [Fact]
-    public void Hand_IsFiveBundles_OnceBothDefenceCardsAreLegal()
+    public void Hand_IsFiveBundles_EveryHullAtEveryLevel()
     {
         foreach (var hull in Hulls)
-            for (int level = 10; level <= 21; level++)
+            for (int level = 2; level <= 21; level++)
             {
                 var hand = Hand(hull, level);
                 Assert.True(hand.Length == UpgradeOffer.BundlesPerLevel, $"{hull} L{level}: only {hand.Length} bundles: {Names(hand)}");
             }
     }
 
-    // From the level armour joins the strong pool a hand is at most one bundle short — the strong side is still
-    // limited to the kill gun's cards plus one defence card.
+    // The rule the whole change is judged by: no two bundles of one hand are the same pair. A repeated half is
+    // allowed precisely because the pair around it is a different offer (§3.3).
     [Fact]
-    public void Hand_IsNearlyFull_FromTheLevelArmorUnlocks()
+    public void Hand_NeverCarriesAnIdenticalPair()
     {
         foreach (var hull in Hulls)
-            for (int level = 5; level <= 9; level++)
-                Assert.InRange(Hand(hull, level).Length, 4, UpgradeOffer.BundlesPerLevel);
+            for (int level = 2; level <= 21; level++)
+            {
+                var hand = Hand(hull, level);
+                var pairs = hand.Select(bundle => (bundle.Powerful, bundle.Weak)).Distinct().Count();
+                Assert.True(pairs == hand.Length, $"{hull} L{level}: the same pair twice: {Names(hand)}");
+            }
+    }
+
+    // One card on both halves of a bundle is one card granted twice, not a pair — refused by the fill pass.
+    [Fact]
+    public void Bundle_NeverGrantsTheSameCardOnBothHalves()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 21; level++)
+                foreach (var bundle in Hand(hull, level))
+                    Assert.False(bundle.Powerful == bundle.Weak, $"{hull} L{level}: {Names(bundle)}");
+    }
+
+    // A new weapon is offered once per hand, on either side: three bundles offering the same new gun reads as a
+    // bug, and R23 lets the ship own one copy of that gun anyway.
+    [Fact]
+    public void Hand_NeverRepeatsANewWeaponCard()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 21; level++)
+            {
+                var newGuns = Cards(Hand(hull, level)).Where(card => card.IsNewWeapon).ToList();
+                Assert.True(newGuns.Count == newGuns.Distinct().Count(), $"{hull} L{level}: a new gun offered twice");
+            }
+    }
+
+    // A thin strong side repeats a stat card rather than dealing four bundles: the three legal cards of the one
+    // kill gun aboard plus the armor card fill five, spread two-and-two-and-one instead of stacking one card
+    // three times. Ordinary levels only — a milestone hand fills its strong side from new large guns instead.
+    [Fact]
+    public void ShortStrongPool_RepeatsAStatCardToFillTheHand()
+    {
+        WeaponMount[] oneKillGun = [new(TurretSlotName.MainGun, WeaponType.MachineGun)];
+
+        foreach (int level in new[] { 6, 7, 8, 9 })
+        {
+            var hand = Hand(ShipType.Fighter, level, oneKillGun);
+            var strong = hand.Select(bundle => bundle.Powerful).ToList();
+            Assert.True(hand.Length == UpgradeOffer.BundlesPerLevel, $"L{level}: only {hand.Length} bundles: {Names(hand)}");
+            Assert.True(strong.Distinct().Count() < hand.Length, $"L{level}: nothing was repeated: {Names(hand)}");
+            Assert.True(MostCopiesOfOneCard(strong) <= 2, $"L{level}: one card stacked past two copies: {Names(hand)}");
+        }
+    }
+
+    // The mirror: a thin weak side — one chip gun whose volley card is withdrawn at the ceiling, plus the two
+    // engine cards and `Hp` — repeats a half rather than dealing a three-bundle hand at the start of a run.
+    [Fact]
+    public void ShortWeakPool_RepeatsAHalfToFillTheHand()
+    {
+        WeaponMount[] killAndCappedChip =
+            [new(TurretSlotName.MainGun, WeaponType.MachineGun), new(TurretSlotName.SmallLeft, WeaponType.Swarmlet)];
+
+        foreach (int level in new[] { 2, 3, 4 })
+        {
+            var hand = Hand(ShipType.Fighter, level, killAndCappedChip);
+            Assert.True(hand.Length == UpgradeOffer.BundlesPerLevel, $"L{level}: only {hand.Length} bundles: {Names(hand)}");
+            Assert.True(Cards(hand).Distinct().Count() < Cards(hand).Length, $"L{level}: nothing was repeated: {Names(hand)}");
+        }
+    }
+
+    static int MostCopiesOfOneCard(IEnumerable<UpgradableOption> cards)
+    {
+        var seen = cards.ToList();
+        return seen.Select(card => seen.Count(other => other == card)).DefaultIfEmpty(0).Max();
     }
 
     // Never more bundles than there are cards to fill them with, and never a bundle that breaks a rule just to
@@ -85,37 +154,63 @@ public class HandCompositionTest
     // dealt one bundle of two ordinary cards, so the level it earned resolves instead of hanging on an empty
     // choice forever.
     [Fact]
-    public void ChipOnlyHull_WithNothingPowerfulToOffer_IsStillDealtOneBundle()
+    public void ChipOnlyHull_WithNothingPowerfulToOffer_FillsItsHandWithOrdinaryPairs()
     {
         WeaponMount[] chipOnly = [new(TurretSlotName.MainGun, WeaponType.Stiletto)];
 
         for (int seed = 1; seed <= 5; seed++)
         {
-            var bundles = Hand(ShipType.Fighter, 3, chipOnly, seed);
-            Assert.Single(bundles);
-            Assert.False(UpgradeOffer.IsPowerfulCard(bundles[0].Powerful), "there was nothing powerful to offer");
-            Assert.False(bundles[0].Powerful.IsNewWeapon && bundles[0].Weak.IsNewWeapon);
+            var hand = Hand(ShipType.Fighter, 3, chipOnly, seed);
+            Assert.True(hand.Length > 1, $"seed {seed}: the fallback hand is still one card: {Names(hand)}");
+            Assert.InRange(hand.Length, 2, UpgradeOffer.BundlesPerLevel);
+
+            foreach (var bundle in hand)
+            {
+                Assert.False(UpgradeOffer.IsPowerfulCard(bundle.Powerful), "there was nothing powerful to offer");
+                Assert.False(bundle.Powerful.IsNewWeapon && bundle.Weak.IsNewWeapon);
+            }
+
+            var pairs = hand.Select(b => (b.Powerful, b.Weak)).Distinct().Count();
+            Assert.True(pairs == hand.Length, $"seed {seed}: the same pair twice: {Names(hand)}");
         }
     }
 
-    // One side of the hand never names one gun past its cap: three cards for the one kill gun is the ceiling on
-    // the strong side, two for a chip gun on the weak side.
+    // Once armor is legal the same hull has one powerful card to offer, and the fill pass pairs it with every
+    // weak card the hull has: five bundles whose top row is the same card and whose whole decision is the
+    // bottom row. That is the accepted cost of the no-cap decision (§10 D1), so it is asserted, not hidden.
     [Fact]
-    public void Hand_NeverNamesOneGunPastItsSideOfTheCap()
+    public void ChipOnlyHull_RepeatsItsOneStrongCardAcrossTheHand()
+    {
+        WeaponMount[] chipOnly = [new(TurretSlotName.MainGun, WeaponType.Stiletto)];
+        var hand = Hand(ShipType.Fighter, 6, chipOnly);
+
+        Assert.Equal(UpgradeOffer.BundlesPerLevel, hand.Length);
+        Assert.True(hand.Select(b => b.Powerful).Distinct().Count() < hand.Length, $"nothing repeated: {Names(hand)}");
+        var pairs = hand.Select(b => (b.Powerful, b.Weak)).Distinct().Count();
+        Assert.True(pairs == hand.Length, $"the same pair twice: {Names(hand)}");
+        Assert.True(MostCopiesOfOneCard(hand.Select(b => b.Powerful)) > 2, "one strong card repeated five times is the point here");
+    }
+
+    // One side never draws more than three cards for one kill gun or two for one chip gun. The caps count the
+    // **distinct** cards drawn from the pools: a repeated half is the same card offered on a second bundle,
+    // which is the pair rule, not a fourth upgrade for that gun (plans/UPGRADE_BUNDLE_DUPLICATES.md §4).
+    [Fact]
+    public void Hand_NeverDrawsOneGunPastItsSideOfTheCap()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
             {
                 var bundles = Hand(hull, level);
-                Assert.True(HighestCountForOneGun(bundles.Select(b => b.Powerful)) <= 3,
-                    $"{hull} L{level}: the strong half named one gun too often: {Names(bundles)}");
-                Assert.True(HighestCountForOneGun(bundles.Select(b => b.Weak)) <= 2,
-                    $"{hull} L{level}: the weak half named one chip gun three times: {Names(bundles)}");
+                Assert.True(HighestDistinctCardsForOneGun(bundles.Select(b => b.Powerful)) <= 3,
+                    $"{hull} L{level}: the strong side drew too many cards for one gun: {Names(bundles)}");
+                Assert.True(HighestDistinctCardsForOneGun(bundles.Select(b => b.Weak)) <= 2,
+                    $"{hull} L{level}: the weak side drew three cards for one chip gun: {Names(bundles)}");
             }
     }
 
-    static int HighestCountForOneGun(IEnumerable<UpgradableOption> cards) =>
-        cards.Where(card => card.WeaponName.Length > 0).GroupBy(card => card.WeaponName).Select(g => g.Count()).DefaultIfEmpty(0).Max();
+    static int HighestDistinctCardsForOneGun(IEnumerable<UpgradableOption> cards) =>
+        cards.Distinct().Where(card => card.WeaponName.Length > 0)
+            .GroupBy(card => card.WeaponName).Select(g => g.Count()).DefaultIfEmpty(0).Max();
 
     // The hull grows one way per hand: `Hp` at most once, armour and shield at most once each — and the
     // engine/vacuum filler at most twice, so a hand is never all thrust.
@@ -125,11 +220,11 @@ public class HandCompositionTest
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
             {
-                var cards = Cards(Hand(hull, level));
-                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Hp) <= 1, $"{hull} L{level}: two hull cards in one hand");
-                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Armor) <= 1, $"{hull} L{level}: two armor cards in one hand");
-                Assert.True(cards.Count(card => card.Stat == UpgradeOption.Shield) <= 1, $"{hull} L{level}: two shield cards in one hand");
-                Assert.True(cards.Count(IsUtilityCard) <= 2, $"{hull} L{level}: the hand is mostly filler: {Names(cards)}");
+                var drawn = Cards(Hand(hull, level)).Distinct().ToList();
+                Assert.True(drawn.Count(card => card.Stat == UpgradeOption.Hp) <= 1, $"{hull} L{level}: two hull cards drawn");
+                Assert.True(drawn.Count(card => card.Stat == UpgradeOption.Armor) <= 1, $"{hull} L{level}: two armor cards drawn");
+                Assert.True(drawn.Count(card => card.Stat == UpgradeOption.Shield) <= 1, $"{hull} L{level}: two shield cards drawn");
+                Assert.True(drawn.Count(IsUtilityCard) <= 2, $"{hull} L{level}: the deal drew mostly filler: {Names(drawn)}");
             }
     }
 

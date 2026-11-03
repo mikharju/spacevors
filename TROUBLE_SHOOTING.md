@@ -748,3 +748,20 @@ diagnostic key. Same trap one step later: after taking a bundle whose half is a 
 **turret-mount** screen, where number keys pick mounts and `Esc` leaves — a `key l` sent there is consumed by
 that screen and no level-up is dealt. Read the captured stdout (`[UPGRADE]` / `[MOUNT]` rows) to tell which
 step the game is on, not just whether it is alive.
+
+## 78. xUnit's `Assert` overloads swallow a `because` message into the wrong signature
+
+**Symptom.** A test that reads fine — `Assert.Equal(hand.Length, pairs, "the same pair twice")`, or
+`Assert.Contains(bundles, bundle => IsDamageCard(bundle.Powerful), "no damage card")` — fails to compile with a
+message about an unrelated signature: `Argument 3: cannot convert from 'string' to 'Func<int,int,bool>'`, or
+`cannot convert lambda to IAsyncEnumerable<T>`. The three-argument call *does* exist, just not with a string.
+
+**Cause.** `Assert.Equal` has comparer and tolerance overloads in the third slot, and `Assert.Contains` has a
+comparer there. Neither takes a `because` string, so the compiler binds the message to whatever overload it can
+and reports the mismatch against that instead of saying "no such overload".
+
+**Fix.** Put the message on an assertion that takes one: `Assert.True(pairs == hand.Length, $"…: {Names(hand)}")`,
+`Assert.True(bundles.Any(bundle => IsDamageCard(bundle.Powerful)), "…")`. Keep the interpolated detail — the
+message is what makes a sweep failure debuggable in one read — and note that the collection asserts that *do*
+take a `because` (`Assert.True`, `Assert.False`, `Assert.DoesNotContain`, `Assert.InRange`) are the ones to aim
+the message at.

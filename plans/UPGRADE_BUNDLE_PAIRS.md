@@ -1,6 +1,8 @@
 # UPGRADE_BUNDLE_PAIRS.md — five bundles of one strong and one weak card, pick one bundle
 
-Status: shipped (2026-11-03) — implemented and verified; `## Shipped (2026-11-03)` at the end records
+Status: shipped (2026-11-03), extended the same day by plans/UPGRADE_BUNDLE_DUPLICATES.md — §3's short-hand
+rule ("a pool that runs dry deals fewer bundles") is no longer true: a thin side repeats a half instead.
+`## Shipped (2026-11-03)` at the end records
 what landed and the six places it deviates from the plan below. The §7 balance question is what playtest
 still has to answer. It supersedes the *pick
 mechanic and slot table* of plans/UPGRADE_BUNDLES.md (its §2 and §4) and the shape sections of
@@ -348,7 +350,7 @@ now consumes entries in pairs (strong, weak) and stamps their tier from the leve
 2. **The ceiling rule (§3.6/§5) landed as withdrawal, not relabelling.** A defence card is dealt only while its
    tier's whole step fits under its ceiling; at partial headroom it leaves the deal rather than printing a
    smaller number. That is the rule R19 already applies to pierce and round health, and it needs no per-card
-   step override. So at armour 11 the ordinary +1 card is dealt and the milestone +2 card is not.
+   step override. So at armor 11 the ordinary +1 card is dealt and the milestone +2 card is not.
 3. **The per-gun cap is split by side** (`MaxStrongCardsPerGun = 3`, `MaxWeakCardsPerGun = 2`) instead of a
    single 2. With 2 the strong pool could not fill five bundles for a hull with one kill gun: three of a kill
    gun's four stat cards are the variety a build decision is made of, and repeating a chip gun three times is
@@ -378,16 +380,16 @@ deals: L2 `Range:MachineGun + Range:InterceptorTurret | FireRate:MachineGun + Fi
 ProjectileSpeed:MachineGun + SideThrust`; the L5 milestone `Damage:MachineGun + new:Stiletto | new:RailGun +
 SideThrust | new:ScatterCannon + Damage:InterceptorTurret | new:LaserLance + Range:InterceptorTurret |
 Armor(+2 milestone) + new:Cyclotron`; an ordinary L6 `Armor(+1 ordinary) + ArmorPierce:InterceptorTurret` with
-the card printed `hull armor +1` and the hull ending at armour 2 after the milestone `+2`; the L10 milestone
+the card printed `hull armor +1` and the hull ending at armor 2 after the milestone `+2`; the L10 milestone
 carrying `Shield(+16 milestone) + new:AcidBubbleSpray`, whose pool then shows in the HUD and the `world.shield`
 render pass. Mounting a bundle's new gun still opens the mount screen, displaces into cargo, and `Esc` finishes
 with the weapon stored rather than lost. Perf: `ammo-spray --sim --iters 3` median **1.43 ms**, inside the
 1.38-1.45 ms band of the rows before it, `budget pass`, 0 of 357 frames over — **unchanged, keep**; the offer
 path is not reachable inside a gated sim (#71) and the render change is ten text draws instead of five.
 
-**R11 did not need re-running.** Its through-armour TTK is about the *enemy's* armour and the player's DPS; the
+**R11 did not need re-running.** Its through-armor TTK is about the *enemy's* armor and the player's DPS; the
 player's own defence tiers do not enter that budget, and the suite's TTK tests pass untouched. What is genuinely
-unmeasured is the player's own effective HP: ordinary levels now buy half the armour and half the shield they
+unmeasured is the player's own effective HP: ordinary levels now buy half the armor and half the shield they
 did before, milestones buy the same as before, and milestones no longer buy `Hp`. §7's knob order is unchanged
 and §9's questions 6 and 7 (is the +16 milestone shield too big a step; is `Hp` missing from milestone hands
 felt as a cost) are playtest questions, not code ones.
