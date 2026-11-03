@@ -713,3 +713,21 @@ test never depends on the model's eyes.
   if eyes are needed. Pair the two states (whole vs spent) so "nothing drawn" and "nothing to draw"
   cannot be confused, cross-check the `[RENDER-PASS]` row for the pass, and if two shots hash the same,
   stop and relaunch the game job rather than capturing more frames.
+
+## 76. `FirstOrDefault` on a nullable *struct* never returns null, so every `is { }` guard passes
+
+- **Symptom**: `SPACEVORS_DIAG_UPGRADES="Hp:,FireRate:MachineGun,RailGun"` dealt two cards labelled
+  `new weapon Hp:` and `new weapon FireRate:MachineGun` — the scripted bench looked broken, and its
+  parser looked like the culprit. The parser was fine; its lookup was lying.
+- **Cause**: `WeaponType` is a `readonly record struct`, and `WeaponType.FromName` was
+  `All.FirstOrDefault(w => w.Name == name)` with return type `WeaponType?`. On a miss LINQ returns
+  `default(WeaponType)`, which the compiler *lifts* into `WeaponType?` as a value with `HasValue == true`.
+  So `FromName("Hp") is not null`, `is { } gun` and `?.Stats.Homing == true` all succeeded for a name that
+  names nothing, and `ParseEntry` therefore took its "this entry is a gun name" branch for every entry.
+  Any guard written against null was dead code, which is why the bug hid until a bench fed it unknown names.
+- **Fix / Prevention**: a lookup over a struct collection returns the struct or nothing — write it as a loop
+  that returns `null` on a miss (or return a non-nullable `WeaponType` plus a separate `TryFromName`), and
+  say why in the comment, because `All.FirstOrDefault(...)` reads as the correct idiom. When a guard "never
+  fires", check what the expression it guards actually returns for a miss before blaming the code above it:
+  for `T?` where `T` is a struct, `is null` is only true if someone wrote the null themselves. Same shape of
+  trap in tests: `FromName(x)!.IsSupport` does not compile for a nullable struct — use `is { } gun && gun.…`.

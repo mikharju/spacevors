@@ -15,15 +15,21 @@ namespace Spacevors.Domain.Systems;
 // (plans/ARMOR_AND_PIERCE.md). Balance rules R6/R10/R18/R19/R29/R33 all say a card
 // must never be a lie; that applies to a re-deal too.
 //
-// What the hand is *made of* is the other half of the job (plans/UPGRADE_HAND_COMPOSITION.md). The legal
-// cards are sorted into kinds and the hand is dealt one card per slot: the hull card, one engine/utility
-// card and three weapon cards, or at a milestone the hull card, up to three new guns and a damage card.
-// One shuffled pool used to be able to deal five engine cards to a hull carrying one gun — 40% of a
-// one-gun hull's hands held at most one weapon card — which is the hand players call unfair. A slot whose
-// kind has nothing legal left falls through `SpillOne`'s preference order rather than inventing a card
-// the rules would refuse, and a hand with nothing left to offer stays short, as it always could.
+// What the hand is *made of* is the other half of the job (plans/UPGRADE_BUNDLES.md, which supersedes the
+// hand-shape half of plans/UPGRADE_HAND_COMPOSITION.md). The legal cards are sorted into kinds and a hand
+// is dealt from them by **priority**: the hull card, an engine/utility card, a small-gun upgrade and a
+// large-gun upgrade — the pair a level is built around, so choosing between the classes is never a
+// question of missing out — plus a fifth card for a gun the hand has not named yet. A milestone hand deals
+// a new large gun, a new small gun and a damage card per class. Every priority is a wish, not a promise: a
+// slot whose kind has nothing legal left **leaks** (`LeakOne`) rather than staying empty — cards for the
+// guns the ship is shooting with first, then filler, and the strong cards last, with a defence card behind a
+// rare roll. A hand with nothing left to offer stays short.
 public static class UpgradeOffer
 {
+    // A level spends two of the five cards it is dealt (plans/UPGRADE_BUNDLES.md §2). The XP cost is
+    // deliberately unchanged, so this is a buff, and the buff is the thing playtest is judging.
+    public const int CardsPerLevel = 2;
+
     const int HandSize = 5;
     const int MilestoneLevelInterval = 5;
     // Armor and its counter unlock with tier 2 — the same beat as the `UnlockLevel: 5` guns and the
@@ -32,17 +38,24 @@ public static class UpgradeOffer
     // The shield pool unlocks a tier later than armor (plans/SHIELDS.md): the same beat as the `UnlockLevel:
     // 10` guided guns, which is where a run starts meeting fire heavy enough for a pool to be worth banking.
     const int ShieldUnlockLevel = 10;
-    // A hand never carries more than three new weapons. Whether they fit a free hull mount is the
-    // player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
-    const int MaxNewWeaponCardsPerHand = 3;
+    // A hand never carries more than three new weapons of one class. Whether they fit a free hull mount is
+    // the player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
+    const int MaxNewWeaponCardsPerClass = 3;
+    // How often a defence card leaks into a slot that was not dealt for it. `Hp` and the engine cards are
+    // the ordinary filler; armour and shield should turn up as a find (plans/UPGRADE_BUNDLES.md §2).
+    const int RareDefenceLeakPercent = 20;
 
     // The kinds a hand is dealt from. The two weapon kinds are the balance rules' two classes
     // (R24/R25), keyed on the gun (`WeaponType.IsSupport`), never on the mount it happens to sit in.
-    enum CardKind { Hull, Utility, SupportWeapon, KillWeapon, NewWeapon }
+    // `Damage*` holds the milestone-only damage cards (R33), split by class so a milestone hand grows both
+    // classes; the new-weapon kinds are split by mount size because a milestone hand owes the player a
+    // large gun to switch into even when the hull has exactly one large mount.
+    enum CardKind { Hull, Utility, SupportWeapon, KillWeapon, DamageKill, DamageSupport, NewLargeWeapon, NewSmallWeapon }
 
-    // One entry per slot, so the hand's shape is one readable line per hand shape.
-    static readonly CardKind[] StandardSlots = [CardKind.Hull, CardKind.Utility, CardKind.SupportWeapon, CardKind.SupportWeapon, CardKind.KillWeapon];
-    static readonly CardKind[] MilestoneSlots = [CardKind.Hull, CardKind.NewWeapon, CardKind.NewWeapon, CardKind.NewWeapon, CardKind.KillWeapon];
+    // One entry per slot, in priority order. The fifth card of an ordinary hand comes from
+    // `TakeUpgradeForAnUnnamedGun`, and whatever is still missing leaks.
+    static readonly CardKind[] StandardSlots = [CardKind.Hull, CardKind.Utility, CardKind.SupportWeapon, CardKind.KillWeapon];
+    static readonly CardKind[] MilestoneSlots = [CardKind.Hull, CardKind.NewLargeWeapon, CardKind.NewSmallWeapon, CardKind.DamageKill, CardKind.DamageSupport];
 
     public static bool IsMilestoneLevel(int level) => level % MilestoneLevelInterval == 0;
 
@@ -60,6 +73,47 @@ public static class UpgradeOffer
         return [.. hand];
     }
 
+    /// Spends one pick of the level's bundle: the card leaves the hand and the pick count drops. True while
+    /// the level still owes a pick and has cards left to owe it from; false when the level is done, in which
+    /// case the hand is left for the caller to clear. The bookkeeping lives here rather than in the app layer
+    /// so the two-pick rule is testable without a window (plans/UPGRADE_BUNDLES.md §4) and a re-deal sees the
+    /// same state.
+    public static bool SpendPick(EntityManager em, Entity playerEntity, UpgradableOption taken)
+    {
+        if (!em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pending)) return false;
+
+        var hand = pending.Value2;
+        if (hand.PicksLeft <= 1 || hand.Options.Length <= 1) return false;
+
+        em.AddComponent(pending.Entity, hand with
+        {
+            Options = [.. hand.Options.Where(card => card != taken)],
+            PicksLeft = hand.PicksLeft - 1,
+            Taken = [.. hand.Taken, taken],
+        });
+        return true;
+    }
+
+    /// Drops the cards the hand still holds that can no longer be applied, and clamps the picks to what is
+    /// left. A mount that displaces a gun into cargo takes that gun's cards with it — `ApplyUpgrade` only
+    /// reaches guns that are actually firing — so a card left behind would be a card that does nothing
+    /// (R10's rule: a card is never a lie). True while the hand still has something to pick.
+    public static bool PruneCardsThatNoLongerApply(EntityManager em, Entity playerEntity)
+    {
+        if (!em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var pending)) return false;
+
+        var hand = pending.Value2;
+        var mounted = PlayerTurrets(new WorldView(em)).Select(turret => turret.WeaponName).ToList();
+        var left = hand.Options.Where(card =>
+            card.IsNewWeapon || card.WeaponName.Length == 0 || mounted.Contains(card.WeaponName)).ToArray();
+
+        if (left.Length == hand.Options.Length) return left.Length > 0;
+
+        em.AddComponent(pending.Entity, hand with { Options = left, PicksLeft = Math.Min(hand.PicksLeft, left.Length) });
+        DiagnosticLogger.LogEvent("UPGRADE", $"hand pruned to {left.Length} applicable cards");
+        return left.Length > 0;
+    }
+
     /// Spends one salvage charge and re-deals the hand that is on screen. False — and nothing spent —
     /// when there is no charge or no hand to re-deal. Called from the app layer while the game is paused,
     /// the same sanctioned direct-write path that applies a chosen upgrade.
@@ -70,57 +124,93 @@ public static class UpgradeOffer
 
         var view = new WorldView(em);
         int level = em.GetComponent<Player>(playerEntity).Level;
-        var dealt = Roll(view, playerEntity, level, "reroll");
+        var dealt = WithoutTaken(Roll(view, playerEntity, level, "reroll"), pending.Value2.Taken);
         if (dealt is null) return false;
 
-        // A charge must never buy back exactly the hand already on screen. One retry, then keep what
-        // came: a pool smaller than the hand can genuinely re-deal the same five, and looping on it
-        // would spend unbounded RNG for nothing.
+        // A charge must never buy back a card this level has already spent, nor exactly the hand already
+        // on screen. One retry, then keep what came: a pool smaller than the hand can genuinely re-deal the
+        // same cards, and looping on it would spend unbounded RNG for nothing.
         if (SameHand(dealt, pending.Value2.Options))
-            dealt = Roll(view, playerEntity, level, "reroll retry") ?? dealt;
+            dealt = WithoutTaken(Roll(view, playerEntity, level, "reroll retry"), pending.Value2.Taken) ?? dealt;
 
         em.AddComponent(playerEntity, stock.With(stock.Count - 1));
-        em.AddComponent(pending.Entity, new PendingUpgradeOptions(dealt));
+        em.AddComponent(pending.Entity, pending.Value2 with { Options = dealt });
         return true;
     }
 
-    // Deal one card per slot, then fill whatever the kinds could not supply. The final shuffle is why a
-    // guaranteed slot never becomes a guaranteed card position.
+    // A re-deal may not offer back what this level has already taken. `Roll` does not know about picks, so
+    // the filter sits on this side of the call — and it never leaves an empty hand behind.
+    static UpgradableOption[]? WithoutTaken(UpgradableOption[]? hand, UpgradableOption[] taken)
+    {
+        if (hand is null) return null;
+
+        UpgradableOption[] left = [.. hand.Where(card => !taken.Contains(card))];
+        return left.Length > 0 ? left : hand;
+    }
+
+    // Deal one card per priority slot, then leak whatever the kinds could not supply. The final shuffle is
+    // why a guaranteed slot never becomes a guaranteed card position.
     static List<UpgradableOption> DealHand(Dictionary<CardKind, List<UpgradableOption>> buckets, bool milestone, WorldView view, List<Turret> turrets)
     {
         var hand = new List<UpgradableOption>();
         foreach (var kind in milestone ? MilestoneSlots : StandardSlots)
-            Take(buckets, kind, hand, sameGunAllowed: false);
+            Take(buckets, kind, hand);
 
-        bool starvedForANewGun = StarvedForANewGun(view, turrets);
+        if (!milestone) TakeUpgradeForAnUnnamedGun(buckets, hand);
+
         while (hand.Count < HandSize)
         {
-            if (!SpillOne(buckets, hand, starvedForANewGun)) break;
+            if (!LeakOne(buckets, hand, view, turrets)) break;
         }
 
         Shuffle(hand, view.Rng);
         return hand;
     }
 
-    // One spilled card, in preference order: a weapon card for a gun the hand does not name yet, a new
-    // gun when the hull cannot field one of the two classes at all, a second card on a gun the hand
-    // already names, and only then an engine/utility card — a weapon upgrade beats filler, which is the
-    // whole point of the slots. False means nothing legal is left, which is the honest short hand.
-    static bool SpillOne(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand, bool starvedForANewGun) =>
-        Take(buckets, CardKind.SupportWeapon, hand, sameGunAllowed: false)
-        || Take(buckets, CardKind.KillWeapon, hand, sameGunAllowed: false)
-        || (starvedForANewGun && Take(buckets, CardKind.NewWeapon, hand, sameGunAllowed: false))
+    // The fifth card of an ordinary hand: an upgrade for a gun the hand has not named yet, small class
+    // first. It is what keeps a hand about the guns the player is shooting with.
+    static bool TakeUpgradeForAnUnnamedGun(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand) =>
+        Take(buckets, CardKind.SupportWeapon, hand) || Take(buckets, CardKind.KillWeapon, hand);
+
+    // One leaked card for a slot whose kind has nothing legal left (plans/UPGRADE_BUNDLES.md §2). First the
+    // cards that are about the guns the ship is actually shooting with — a gun the hand has not named, a gun
+    // that fills a class the hull does not mount at all, then a second card on a gun it has named — because
+    // a hand of filler is the hand players call short. Only after those comes the filler itself (engine
+    // cards, then `Hp`), and last of all the strong cards: a `Damage` card, and a defence card behind a rare
+    // roll. False means nothing legal is left, which is the honest short hand.
+    static bool LeakOne(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand, WorldView view, List<Turret> turrets) =>
+        TakeUpgradeForAnUnnamedGun(buckets, hand)
+        || TakeGunForAMissingClass(buckets, hand, view, turrets)
         || Take(buckets, CardKind.SupportWeapon, hand, sameGunAllowed: true)
         || Take(buckets, CardKind.KillWeapon, hand, sameGunAllowed: true)
-        || Take(buckets, CardKind.Utility, hand, sameGunAllowed: true);
+        || Take(buckets, CardKind.Utility, hand, sameGunAllowed: true)
+        || TakeHullCard(buckets, hand, UpgradeOption.Hp)
+        || Take(buckets, CardKind.DamageKill, hand)
+        || Take(buckets, CardKind.DamageSupport, hand)
+        || (RollsRareDefenceLeak(view.Rng) && TakeDefenceCard(buckets, hand))
+        || Take(buckets, CardKind.DamageKill, hand, sameGunAllowed: true)
+        || Take(buckets, CardKind.DamageSupport, hand, sameGunAllowed: true);
+
+    static bool RollsRareDefenceLeak(Random rng) => rng.Next(100) < RareDefenceLeakPercent;
+
+    // `Hp` leaks only while the hand has none — the hull slot may already have spent it — so a leaked
+    // fourth card is health exactly when the hull card was a defence one.
+    static bool TakeHullCard(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand, UpgradeOption stat) =>
+        hand.All(card => card.Stat != stat)
+        && TakeFromBucket(buckets[CardKind.Hull], hand, card => card.Stat == stat);
+
+    static bool TakeDefenceCard(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand) =>
+        TakeFromBucket(buckets[CardKind.Hull], hand, card => card.Stat is UpgradeOption.Armor or UpgradeOption.Shield);
 
     // Take the first card of `kind` into the hand, skipping a gun the hand already names while anything
-    // else is on offer: three cards for one chip gun is the hand this change exists to stop dealing. The
-    // bucket is already shuffled, so "the first one" is a random one.
-    static bool Take(Dictionary<CardKind, List<UpgradableOption>> buckets, CardKind kind, List<UpgradableOption> hand, bool sameGunAllowed)
+    // else is on offer: three cards for one chip gun is the hand this shape exists not to deal. The bucket
+    // is already shuffled, so "the first one" is a random one.
+    static bool Take(Dictionary<CardKind, List<UpgradableOption>> buckets, CardKind kind, List<UpgradableOption> hand, bool sameGunAllowed = false) =>
+        TakeFromBucket(buckets[kind], hand, card => sameGunAllowed || !NamesGunInHand(hand, card));
+
+    static bool TakeFromBucket(List<UpgradableOption> bucket, List<UpgradableOption> hand, Func<UpgradableOption, bool> matches)
     {
-        var bucket = buckets[kind];
-        int index = bucket.FindIndex(card => sameGunAllowed || !NamesGunInHand(hand, card));
+        int index = bucket.FindIndex(card => matches(card));
         if (index < 0) return false;
 
         hand.Add(bucket[index]);
@@ -131,53 +221,72 @@ public static class UpgradeOffer
     static bool NamesGunInHand(List<UpgradableOption> hand, UpgradableOption card) =>
         card.WeaponName.Length > 0 && hand.Any(other => other.WeaponName == card.WeaponName);
 
-    // A new gun is worth spilling a slot for only when the hull mounts no gun of one class at all and has
-    // a free mount to put it in (plans/WEAPON_IDENTITY_CELLS.md §8 has kept "prefer a gun that fits a free
-    // mount" a nice-to-have, and here it stays one: milestone hands offer new guns regardless of mounts).
-    static bool StarvedForANewGun(WorldView view, List<Turret> turrets) =>
-        TurretMount.FreeSlots(view).Count > 0 &&
-        (turrets.All(t => t.IsSupport) || turrets.All(t => !t.IsSupport));
+    // A leaked slot buys a new gun only when the hull mounts no gun of one class at all and has a free
+    // mount of that size to put it in: a new gun that cannot be mounted is cargo, and cargo does not fire
+    // (plans/UPGRADE_HAND_COMPOSITION.md D5). Milestone hands offer new guns regardless of mounts, because
+    // there they are the swap-into option the player asked for.
+    static bool TakeGunForAMissingClass(Dictionary<CardKind, List<UpgradableOption>> buckets, List<UpgradableOption> hand, WorldView view, List<Turret> turrets)
+    {
+        if (turrets.Any(t => t.IsSupport) && turrets.Any(t => !t.IsSupport)) return false;
+
+        CardKind missingClass = turrets.All(t => t.IsSupport) ? CardKind.NewLargeWeapon : CardKind.NewSmallWeapon;
+        return TurretMount.FreeSlots(view, SizeOf(missingClass)).Count > 0 && Take(buckets, missingClass, hand);
+    }
+
+    static TurretSize SizeOf(CardKind kind) => kind == CardKind.NewLargeWeapon ? TurretSize.Large : TurretSize.Small;
 
     // The legal cards for one hand, sorted into kinds and shuffled inside each kind: random within a slot,
     // never across slots, so a big pool of filler cannot crowd a slot out.
     static Dictionary<CardKind, List<UpgradableOption>> SortIntoKinds(WorldView view, Entity playerEntity, List<Turret> turrets, int level)
     {
+        var owned = OwnedWeaponNames(view, playerEntity, turrets);
         var buckets = new Dictionary<CardKind, List<UpgradableOption>>
         {
             [CardKind.Hull] = HullOptions(view, playerEntity, level),
-            [CardKind.Utility] =
-            [
-                new UpgradableOption("", UpgradeOption.PickupRadius),
-                new UpgradableOption("", UpgradeOption.ForwardAcceleration),
-                new UpgradableOption("", UpgradeOption.TurnSpeed),
-                new UpgradableOption("", UpgradeOption.SideThrust),
-                new UpgradableOption("", UpgradeOption.BackThrust)
-            ],
+            [CardKind.Utility] = UtilityOptions(),
             [CardKind.SupportWeapon] = [],
             [CardKind.KillWeapon] = [],
-            [CardKind.NewWeapon] = NewWeaponOptions(OwnedWeaponNames(view, playerEntity, turrets), level, view.Rng)
+            [CardKind.DamageKill] = [],
+            [CardKind.DamageSupport] = [],
+            [CardKind.NewLargeWeapon] = NewGunOptions(owned, level, TurretSize.Large, view.Rng),
+            [CardKind.NewSmallWeapon] = NewGunOptions(owned, level, TurretSize.Small, view.Rng)
         };
 
-        if (IsMilestoneLevel(level))
-        {
-            // R33: every mounted gun is dealt its damage card at a milestone. It used to be a kill-gun
-            // card because a flat +1 on a 1-damage chip was a x2 multiplier; as a percent of the base the
-            // support gun buys a quarter and the kill gun a half, so the class line holds without a ban.
-            // The hand has one or two weapon slots left, so which gun is offered the card is chosen rather
-            // than left to a shuffle over a pool bigger than the hand.
-            foreach (var turret in turrets)
-                buckets[KindFor(turret)].Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Damage));
-        }
+        if (IsMilestoneLevel(level)) AddDamageCards(buckets, turrets);
         else
-        {
             foreach (var turret in turrets.DistinctBy(t => t.WeaponName))
                 AddStatCards(buckets, turret, level);
-        }
 
-        foreach (var bucket in buckets.Values)
-            Shuffle(bucket, view.Rng);
+        // The damage buckets keep the order they were built in — kill class before support class — which is
+        // how a milestone hand is seen to grow both classes instead of leaving it to a draw.
+        foreach (var (kind, bucket) in buckets)
+            if (kind is not (CardKind.DamageKill or CardKind.DamageSupport))
+                Shuffle(bucket, view.Rng);
 
         return buckets;
+    }
+
+    // The always-legal engine and vacuum cards. No ceiling can withdraw one, which is why the leak path can
+    // lean on this bucket first and never runs dry.
+    static List<UpgradableOption> UtilityOptions() =>
+        [
+            new UpgradableOption("", UpgradeOption.PickupRadius),
+            new UpgradableOption("", UpgradeOption.ForwardAcceleration),
+            new UpgradableOption("", UpgradeOption.TurnSpeed),
+            new UpgradableOption("", UpgradeOption.SideThrust),
+            new UpgradableOption("", UpgradeOption.BackThrust)
+        ];
+
+    // R33: the damage card is a percent of the gun's **base** damage sized by its mount class — a support
+    // chip +25%, a kill gun +50% — so the class line widens across a run instead of being frozen by a flat
+    // step, and it is dealt only by a milestone hand, which is what makes a step that big affordable. One
+    // card per gun, one bucket per class: a milestone hand with both classes aboard grows both, and a hull
+    // with no chip to spare spends its second damage slot on a second kill gun.
+    static void AddDamageCards(Dictionary<CardKind, List<UpgradableOption>> buckets, List<Turret> turrets)
+    {
+        foreach (var turret in turrets.DistinctBy(t => t.WeaponName))
+            buckets[turret.IsSupport ? CardKind.DamageSupport : CardKind.DamageKill]
+                .Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Damage));
     }
 
     // The guaranteed hull-slot card. `Hp` is always there; `Armor` joins the draw from level 5
@@ -265,15 +374,16 @@ public static class UpgradeOffer
         return owned;
     }
 
-    // New-weapon cards: anything the ship does not already own, mounted or in cargo, drawn from the pool
-    // this level has unlocked. Capping the bucket is what makes "at most three new weapons in a hand"
-    // structural rather than a matter of luck.
-    private static List<UpgradableOption> NewWeaponOptions(List<string> ownedNames, int level, Random rng)
+    // New-weapon cards for one mount class: anything the ship does not already own, mounted or in cargo,
+    // drawn from the pool this level has unlocked. Capping the bucket is what makes "a hand never carries
+    // more than three new guns of a class" structural rather than a matter of luck. Splitting it by size is
+    // what lets a milestone hand promise a large gun to switch into on a hull with one large mount.
+    private static List<UpgradableOption> NewGunOptions(List<string> ownedNames, int level, TurretSize size, Random rng)
     {
-        var pool = WeaponType.NewWeaponPoolFor(level).Where(w => !ownedNames.Contains(w.Name)).ToList();
+        var pool = WeaponType.NewWeaponPoolFor(level).Where(w => w.Size == size && !ownedNames.Contains(w.Name)).ToList();
         Shuffle(pool, rng);
 
-        return [.. pool.Take(MaxNewWeaponCardsPerHand).Select(w => new UpgradableOption(w.Name, UpgradeOption.Damage, IsNewWeapon: true))];
+        return [.. pool.Take(MaxNewWeaponCardsPerClass).Select(w => new UpgradableOption(w.Name, UpgradeOption.Damage, IsNewWeapon: true))];
     }
 
     static bool SameHand(UpgradableOption[] a, UpgradableOption[] b) =>

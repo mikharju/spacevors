@@ -9,7 +9,14 @@ public readonly record struct PendingChoice;
 // IsNewWeapon: the card offers the weapon itself, so the player then picks the hull slot to mount it in.
 public readonly record struct UpgradableOption(string WeaponName, UpgradeOption Stat, bool IsNewWeapon = false);
 
-public readonly record struct PendingUpgradeOptions(UpgradableOption[] Options);
+// The hand on screen and what it still owes. A level spends `PicksLeft` cards out of `Options`
+// (plans/UPGRADE_BUNDLES.md), and `Taken` holds the ones already spent, so a re-deal cannot sell one of
+// them back. Both travel with the hand rather than with the app layer because a reroll re-deals through
+// the same domain call and must see the state a level-up left behind.
+public readonly record struct PendingUpgradeOptions(UpgradableOption[] Options, int PicksLeft, UpgradableOption[] Taken)
+{
+    public static PendingUpgradeOptions Deal(UpgradableOption[] hand, int picks) => new(hand, Math.Min(picks, hand.Length), []);
+}
 
 // Charges spent to re-deal the upgrade hand, collected from ship salvage (`RerollToken`). It is a
 // component on the player rather than a `Player` field: `PickupMagnetSystem` ref-writes `Player.Xp`

@@ -378,3 +378,12 @@ count under `LV n` in the HUD, and a reroll swapping the whole hand. A deliberat
 
 The two deferred items from this survey — **salvage field** and **ECM pulse** — are written up in
 `plans/LOOT_ITEMS.md`.
+
+## Follow-up (2026-11-03): a re-deal may not resell a card this level already took
+
+plans/UPGRADE_BUNDLES.md made a level spend two cards, so the pending hand now carries `Taken` as well as
+`PicksLeft`, and `TryReroll` filters the re-dealt hand through it: a charge may not hand back a card the
+player has already spent this level, which one card a level could only do by accident and two cards a level
+does routinely. Everything else here stands — the same `Roll` deals the re-deal, the shape rules are the
+same rules, and the one-retry "do not pay for the same hand twice" rule is unchanged (it now compares the
+hand against what is on screen, not against the level's single card).

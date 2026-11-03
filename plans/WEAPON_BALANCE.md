@@ -817,3 +817,14 @@ What that does to this file's prices, in the order §6 said to do them:
   (owner decision), and HeavyCannon's slug (+4 damage, wider, slowest) is the fleet's only
   armour-walking round. A future armoured hull or elite buys its armour against the *player's*
   ladder; the answer is never to hand an enemy a pierce stat.
+
+## Follow-up (2026-11-03): R33 under plans/UPGRADE_BUNDLES.md
+
+R33 itself is untouched — `Damage` is still a percent of the table base, additive on the base, milestone
+only, +25 % for a support chip and +50 % for a kill gun. What changed is how many such cards a hand may
+hold: a milestone hand now carries **one damage card per class** (kill class first), instead of one damage
+card plus new-gun slots. The rule still cannot leak into an ordinary level — the damage buckets are built
+empty for every non-milestone hand, so a standard hand is dealt no `Damage` card at all
+(`HandCompositionTest.StandardHand_NeverCarriesADamageCard`). §9's knob of a second `Damage` card per gun
+is still unexercised: the leak's last step can take a second damage card for a gun already named, but only
+after every ordinary card in the hand has run out.

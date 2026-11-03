@@ -1,7 +1,9 @@
 # UPGRADE_HAND_COMPOSITION.md — tighter upgrade schedule
 
 Status: shipped (2026-11-02) — see `## Shipped` at the end for what landed, the deviations, and the
-perf verdict.
+perf verdict. **Its hand shape is superseded** (2026-11-03) by plans/UPGRADE_BUNDLES.md — the card-kind
+buckets, the legality gates and the shared `Roll` all still stand; the five hard slots became priorities
+with a leak order, and a level now takes two cards. Read `## Follow-up (2026-11-03)` at the end.
 
 ## 1. The complaint, measured from the shipped code
 
@@ -361,3 +363,23 @@ guaranteed weapon slots read as too strong (knob: a wildcard slot, or the capped
 card of plans/WEAPON_BALANCE.md §8); hp every hand or every other hand; `PickupRadius` in its own
 slot; whether a reroll charge is still worth a capsule; and the real level-vs-minute curve, which the
 `[UPGRADE]` rows can now answer — the game's own log lines, not an estimate.
+
+## Follow-up (2026-11-03): hand shape superseded by plans/UPGRADE_BUNDLES.md
+
+Playtest on the shipped shape said the ramp still outran the upgrades and that the kill-weapon card was
+the only pick worth taking, so the plan's own knob (§10's "three weapon slots read as too strong?") was
+answered from the other side: a level now takes **two** cards out of the same five, and the five hard
+slots became **priorities with a leak order**.
+
+What still stands from this plan, unchanged: the card-kind buckets (`SortIntoKinds`), every legality gate
+(R10 never a lie, R17/R18 volley budget, R19 ceilings, R23 one copy per type, R29 support range roof, R33
+milestone-only class-sized `Damage`), the single `Roll` shared by level-up and reroll, the hull-slot
+`Hp`/`Armor`/`Shield` draw, and the "no new gun unless a class is missing and a mount of that size is
+free" rule — which is now leak step 2 instead of spill step D5.
+
+What changed: `CardsPerLevel = 2` and `PendingUpgradeOptions(Options, PicksLeft, Taken)`; a slot with
+nothing legal leaks in a fixed order instead of taking the next hard slot; the new-weapon pool is split by
+mount size (three per class still) so a milestone hand can promise a large gun to switch into on a hull
+with one large mount; `Damage` is dealt one card per class at a milestone; and the leak keeps `Damage` and
+defence at the end of its list, defence behind a 20 % roll. §2's slot table and §5's spill order should be
+read against plans/UPGRADE_BUNDLES.md §2, which supersedes them.

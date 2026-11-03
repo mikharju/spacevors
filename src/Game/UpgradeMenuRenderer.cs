@@ -51,7 +51,11 @@ public static class UpgradeMenuRenderer
             DrawCard((int)topLeft.X, (int)topLeft.Y, w, h, GetUpgradeLabel(opt), GetUpgradeValue(opt), NewWeaponSpecs(opt), (i + 1).ToString(), i == hoveredIndex, fade, scale);
         }
 
-        string hint = "Click a card or press keys";
+        // A level spends two of the cards it is dealt (plans/UPGRADE_BUNDLES.md), so the hint row says how
+        // many picks this hand still owes.
+        string hint = options.PicksLeft > 1
+            ? $"Click a card or press keys — {options.PicksLeft} to pick"
+            : "Click a card or press keys — last pick";
         int font = (int)(HintFontSize * scale);
         Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font,
             Ui.WithAlpha(Palette.TextMuted, fade));

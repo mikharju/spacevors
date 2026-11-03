@@ -262,7 +262,17 @@ public readonly record struct WeaponType(
     public static WeaponType[] NewWeaponPoolFor(int level) =>
         [.. All.Where(w => w.Name != LoadTestWeapon.Name && w.UnlockLevel <= level)];
 
-    public static WeaponType? FromName(string name) => All.FirstOrDefault(w => w.Name == name);
+    // The gun a name refers to, or null when nothing is named that. Written as a loop, not
+    // `All.FirstOrDefault(...)`: `WeaponType` is a struct, so a LINQ miss returns a *default* gun, and lifted
+    // into `WeaponType?` that is a value — every `is { }` and `?.` guard at the call sites would then pass
+    // for a name that names nothing.
+    public static WeaponType? FromName(string name)
+    {
+        foreach (var weapon in All)
+            if (weapon.Name == name) return weapon;
+
+        return null;
+    }
 
     static float TurnDeg(float degrees) => Angle.FromDeg(degrees);
 }

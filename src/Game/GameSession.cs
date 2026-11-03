@@ -93,6 +93,9 @@ public sealed class GameSession
     bool _cardResolved;
     // The mount screen was opened from the stats screen instead of from a card.
     bool _mountsFromStats;
+    // Which card of the level's bundle the weapon in hand was paid for, so leaving the mount screen spends
+    // exactly that one. Null when the mount screen came from the stats screen, or once the card is spent.
+    UpgradableOption? _cardInHand;
 
     // Salvage (reroll) spend is edge-triggered: raylib's IsKeyPressed reports X11 auto-repeat as fresh
     // presses, so a held `R` — or one of `.tools/input.sh`'s deliberately long 0.4 s holds — would drain
@@ -821,7 +824,21 @@ public sealed class GameSession
         bool hoveredReroll = hasCards && StatsScreenRenderer.IsRerollHovered(screen, mouseX, mouseY, windowWidth, windowHeight);
 
         int selectedIndex = ReadChoiceSelection(hoveredIndex);
-        if (selectedIndex >= 0) ChooseUpgrade(selectedIndex, autoMountInSlot: _scenario is not null);
+        if (selectedIndex >= 0)
+        {
+            ChooseUpgrade(selectedIndex, autoMountInSlot: _scenario is not null);
+
+            // A bundle spends one pick and leaves the rest on screen, so this frame has to draw the hand the
+            // pick just changed — the same re-read a bought hand gets.
+            screen = PrepareCardScreen(windowWidth, windowHeight);
+            hasPending = _em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out pendingTuple);
+            upgradeOptions = hasPending ? pendingTuple.Value2 : null;
+            hasCards = upgradeOptions is { Options.Length: > 0 };
+            hoveredIndex = hasCards
+                ? StatsScreenRenderer.GetHoveredCardIndex(screen, upgradeOptions!.Value, mouseX, mouseY, windowWidth, windowHeight)
+                : -1;
+            hoveredReroll = hasCards && StatsScreenRenderer.IsRerollHovered(screen, mouseX, mouseY, windowWidth, windowHeight);
+        }
 
         RenderCardScreen(screen, upgradeOptions, hoveredIndex, hoveredReroll, windowWidth, windowHeight);
     }
@@ -918,10 +935,10 @@ public sealed class GameSession
         else if (Raylib.IsKeyPressed(KeyboardKey.Escape)) LeaveMountsScreen();
         else if (Raylib.IsKeyPressed(KeyboardKey.C)) StoreHeldInCargo();
 
-        // The card has been paid for and nothing is left in hand: the choice is done.
-        if (!_mountsFromStats && _cardResolved && _heldWeapon.Length == 0)
+        // The card has been paid for and nothing is left in hand: that pick of the bundle is done.
+        if (_cardInHand is { } placedCard && _cardResolved && _heldWeapon.Length == 0)
         {
-            ClearPendingChoices();
+            FinishPick(placedCard);
             return;
         }
 
@@ -1046,17 +1063,15 @@ public sealed class GameSession
 
     private void LeaveMountsScreen()
     {
-        if (!_mountsFromStats && _cardResolved)
+        if (_cardInHand is { } card && _cardResolved)
         {
-            ClearPendingChoices();
+            FinishPick(card);
             return;
         }
 
-        _upgradeStep = UpgradeStep.Cards;
-        _heldWeapon = "";
-        _heldIsCardWeapon = false;
-        _cardResolved = false;
-        _mountsFromStats = false;
+        // The card's weapon was never placed, so the card goes back to the hand unchanged.
+        _cardInHand = null;
+        ReturnToCards();
     }
 
     private void OpenMountsFromStats()
@@ -1066,6 +1081,7 @@ public sealed class GameSession
         _heldWeapon = "";
         _heldIsCardWeapon = false;
         _cardResolved = false;
+        _cardInHand = null;
     }
 
     private WeaponCargo ReadCargo() =>
@@ -1119,19 +1135,18 @@ public sealed class GameSession
         if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple)) return;
 
         var options = choiceTuple.Value2.Options;
-        if (selectedIndex >= options.Length)
-        {
-            ClearPendingChoices();
-            return;
-        }
+        // A key outside the hand that is on screen now takes nothing and loses nothing: the hand shrinks as
+        // the bundle spends its picks, so a stale number must not stand for "abandon the level".
+        if (selectedIndex < 0 || selectedIndex >= options.Length) return;
 
         var option = options[selectedIndex];
 
         // A new weapon is only half a choice: it goes into hand and the player puts it on the hull or
-        // leaves it in cargo. The pending choice stays up until that is settled, so backing out of the
-        // mount screen hands the cards straight back.
+        // leaves it in cargo. The pick is not spent until that is settled, so backing out of the mount
+        // screen hands the card straight back.
         if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage && WeaponType.FromName(option.WeaponName) is { } weapon)
         {
+            _cardInHand = option;
             _heldWeapon = weapon.Name;
             _heldIsCardWeapon = true;
             _cardResolved = false;
@@ -1141,7 +1156,7 @@ public sealed class GameSession
             if (autoMountInSlot)
             {
                 MountIntoFirstFit(weapon);
-                ClearPendingChoices();
+                FinishPick(option);
             }
             else
             {
@@ -1152,7 +1167,40 @@ public sealed class GameSession
         }
 
         ApplyUpgrade(_em, _playerEntity, option);
-        ClearPendingChoices();
+        FinishPick(option);
+    }
+
+    // One pick of the level's bundle is spent. The bookkeeping is the domain's (`UpgradeOffer.SpendPick`,
+    // so the two-pick rule is testable without a window); this is the app half: clear the choice when the
+    // level is done, otherwise put the shortened hand back on screen for the next pick. A card that was just
+    // mounted may have displaced a gun into cargo, which retires that gun's cards from the hand.
+    private void FinishPick(UpgradableOption taken)
+    {
+        _cardInHand = null;
+        if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out _)) return;
+
+        bool owesAnotherPick = UpgradeOffer.SpendPick(_em, _playerEntity, taken)
+            && UpgradeOffer.PruneCardsThatNoLongerApply(_em, _playerEntity);
+
+        if (!owesAnotherPick)
+        {
+            ClearPendingChoices();
+            return;
+        }
+
+        DiagnosticLogger.LogEvent("UPGRADE", $"bundle pick spent: {UpgradeOffer.FormatChoice(taken)}");
+        ReturnToCards();
+    }
+
+    // The mount screen is done with. Whatever was in hand is already in cargo, so dropping the hold loses
+    // nothing the player owns.
+    private void ReturnToCards()
+    {
+        _upgradeStep = UpgradeStep.Cards;
+        _heldWeapon = "";
+        _heldIsCardWeapon = false;
+        _cardResolved = false;
+        _mountsFromStats = false;
     }
 
     // Perf scenarios never pause: fit the weapon into the first mount that is free, and if the hull is
@@ -1184,11 +1232,8 @@ public sealed class GameSession
         foreach (var (entity, _) in _em.GetEntitiesWithComponents<PendingChoice>().ToList())
             _em.DestroyEntity(entity);
 
-        _upgradeStep = UpgradeStep.Cards;
-        _heldWeapon = "";
-        _heldIsCardWeapon = false;
-        _cardResolved = false;
-        _mountsFromStats = false;
+        _cardInHand = null;
+        ReturnToCards();
     }
 
     private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)

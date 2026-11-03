@@ -29,8 +29,10 @@ Keys (in-game):
 Environment variables:
 
 - `SPACEVORS_DIAGNOSTIC=1` — enables everything above
-- `SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun"` — scripted upgrade choices, one
-  entry per level-up; entry is a weapon name or `Stat:WeaponName`; falls back to the random
+- `SPACEVORS_DIAG_UPGRADES="RailGun,Range:MachineGun,Hp:,FireRate:MachineGun"` — scripted upgrade choices,
+  one entry per **card taken**: a level-up spends two cards (plans/UPGRADE_BUNDLES.md), so two entries buy
+  one level; entry is a weapon name or `Stat:WeaponName`. A hull card needs its empty weapon name — `Hp:`,
+  `Armor:`, `Shield:` — because a bare word is read as a new weapon's name. Falls back to the random
   pool when exhausted. Armor cards work the same way: `Armor:` for the hull card (empty weapon
   name) and `ArmorPierce:RailGun` for a gun — both are only dealt from level 5, so script the
   early levels around them. The shield card works the same way (`Shield:`, empty weapon name) and is

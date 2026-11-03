@@ -23,16 +23,26 @@ public class LevelUpScriptTest
         Assert.True(options[0].IsNewWeapon);
     }
 
+    // The bench is consumed two entries per level-up — one per pick of the bundle
+    // (plans/UPGRADE_BUNDLES.md) — and a script shorter than the level's picks deals what it has: a bench
+    // that cannot fill every pick is not benching the real thing, so it says so in the hand it deals.
     [Fact]
     public void ScriptedUpgradesAreConsumedInOrder()
     {
         var (em, player) = CreatePlayerWithTurret(xp: 15);
         var system = new LevelUpSystem([
             new UpgradableOption("", UpgradeOption.Hp),
-            new UpgradableOption("TestWeapon", UpgradeOption.FireRate)]);
+            new UpgradableOption("TestWeapon", UpgradeOption.FireRate),
+            new UpgradableOption("TestWeapon", UpgradeOption.Range)]);
 
         RunLevelUp(system, em);
-        Assert.Equal(UpgradeOption.Hp, GetChoiceOptions(em)[0].Stat);
+
+        var first = GetChoiceOptions(em);
+        Assert.Equal(2, first.Length);
+        Assert.Equal(UpgradeOption.Hp, first[0].Stat);
+        Assert.Equal("TestWeapon", first[1].WeaponName);
+        Assert.Equal(UpgradeOption.FireRate, first[1].Stat);
+        Assert.Equal(2, PicksLeft(em));
 
         DestroyChoices(em);
         SetXp(em, player, UpgradeStats.XpForLevel(2));
@@ -42,7 +52,8 @@ public class LevelUpScriptTest
         var options = GetChoiceOptions(em);
         Assert.Single(options);
         Assert.Equal("TestWeapon", options[0].WeaponName);
-        Assert.Equal(UpgradeOption.FireRate, options[0].Stat);
+        Assert.Equal(UpgradeOption.Range, options[0].Stat);
+        Assert.Equal(1, PicksLeft(em));
     }
 
     [Fact]
@@ -115,6 +126,13 @@ public class LevelUpScriptTest
         var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
         Assert.Single(choices);
         return em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).Options;
+    }
+
+    private static int PicksLeft(EntityManager em)
+    {
+        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
+        Assert.Single(choices);
+        return em.GetComponent<PendingUpgradeOptions>(choices[0].Entity).PicksLeft;
     }
 
     private static void DestroyChoices(EntityManager em)
