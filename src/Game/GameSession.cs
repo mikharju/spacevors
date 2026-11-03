@@ -1226,6 +1226,20 @@ public sealed class GameSession
                 em.AddComponent(playerEntity, playerStats with { MaxHealth = newMaxHealth });
                 break;
 
+            case UpgradeOption.Armor:
+                // plans/ARMOR_AND_PIERCE.md: one hull, +2 a card, walking to ArmorRules.ArmorCeiling.
+                // The offer withdraws the card at the ceiling; the clamp keeps the apply honest too.
+                int currentArmor = em.TryGetComponent<Armor>(playerEntity, out var armorComp) ? armorComp.Value : 0;
+                em.AddComponent(playerEntity, new Armor(Math.Min(currentArmor + def.Additive, ArmorRules.ArmorCeiling)));
+                break;
+
+            case UpgradeOption.ArmorPierce:
+                // The card names a gun; every mount of it pierces the same. Flat +4 on the live copy,
+                // cards adding on each other — the ceiling guard lives in the offer (R19's rule).
+                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
+                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Pierce = turret.Weapon.Pierce + def.Additive } });
+                break;
+
             case UpgradeOption.ForwardAcceleration:
                 em.AddComponent(playerEntity, playerStats with { Thrust = playerStats.Thrust * def.Multiplier });
                 break;

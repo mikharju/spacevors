@@ -56,7 +56,9 @@ public class EnemyTierStatsTest
 
         var (hpHeavy, turretHeavy) = Spawn(EnemyShipType.HeavyCannon, 120f);
         Assert.Equal(ExpectedHealth(EnemyShipType.HeavyCannon, 2), hpHeavy);
-        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2), turretHeavy.Weapon.Damage);
+        // HeavyCannon's slug rides the shared ladder plus its hull bonus — the anti-armored-hull
+        // threat (plans/ARMOR_AND_PIERCE.md).
+        Assert.Equal(baseDamage + EnemyShipStats.DamageAdd(2) + EnemyShipType.HeavyCannon.TurretDamageBonus, turretHeavy.Weapon.Damage);
     }
 
     [Fact]

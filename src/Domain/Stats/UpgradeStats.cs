@@ -21,7 +21,7 @@ public static class UpgradeStats
     }
 }
 
-public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth }
+public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce }
 
 // A card's effect on one stat. `Multiplier` scales the live value; `Additive` shifts it; `PercentOfBase`
 // adds a share of the stat's table value, so the step never grows with the cards already bought.
@@ -73,7 +73,16 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
     // cards are +100% of the base, never +125%. Rounds that cannot be shot down ignore the stat.
     public static UpgradeDefinition MissileHealth { get; } = new(UpgradeOption.MissileHealth, PercentOfBase: 50);
 
-    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth];
+    // plans/ARMOR_AND_PIERCE.md: one hull, so the armor card is small (+2) and walks the ceiling (12)
+    // slowly; it competes with `Hp` in the guaranteed hull slot and is offered only from level 5.
+    public static UpgradeDefinition Armor { get; } = new(UpgradeOption.Armor, Additive: 2);
+
+    // Many weapons each buy their own line against the one armored hull, and pierce is worthless
+    // against unarmored targets, so the step is a flat +4 (§6: against armor, +1 pierce ≈ +1 damage —
+    // the right shape for a situational card, no multiplier to compound).
+    public static UpgradeDefinition ArmorPierce { get; } = new(UpgradeOption.ArmorPierce, Additive: 4);
+
+    public static readonly UpgradeDefinition[] All = [FireRate, ProjectileSpeed, PickupRadius, Range, Damage, Hp, ForwardAcceleration, TurnSpeed, SideThrust, BackThrust, MissileHealth, Armor, ArmorPierce];
 
     public static UpgradeDefinition For(UpgradeOption stat) => All.First(d => d.Stat == stat);
 }

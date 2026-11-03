@@ -23,6 +23,9 @@ public static class EnemyShipFactory
         AddWeapons(em, entity, type, armament, tier);
         int health = TieredHealth(type, tier);
         em.AddComponent(entity, new Health(health, health));
+        // Only the armored hull gets the component (plans/ARMOR_AND_PIERCE.md): an entity without
+        // Armor is read as unarmored at the hit site, so the majority pay nothing for the rule.
+        if (type.Armor > 0) em.AddComponent(entity, new Armor(type.Armor));
     }
 
     public static IInitialComponent[] CreateComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, EnemyArmament armament, float elapsedTime = 0f)
@@ -46,6 +49,7 @@ public static class EnemyShipFactory
         }
 
         components.Add(new InitialComponent<Health>(new Health(health, health)));
+        if (type.Armor > 0) components.Add(new InitialComponent<Armor>(new Armor(type.Armor)));
         return [.. components];
     }
 
@@ -70,9 +74,10 @@ public static class EnemyShipFactory
         new(type.Radius, EnemyShipStats.SpeedFor(type, tier), EnemyShipStats.TurnRateFor(type, tier), EnemyShipStats.FiringRangeFor(type, tier), type.TurretFireRate, EnemyShipStats.AmmoSpeedFor(type, tier), type.Acceleration, type.GraphicsId);
 
     // Public for the perf scenarios: they arm a hull with exactly the gun the game gives this type
-    // at this tier (plans/MISSILE_PERF.md), not a copy of the ladder.
+    // at this tier (plans/MISSILE_PERF.md), not a copy of the ladder. HeavyCannon's slug carries its
+    // hull's damage bonus and fatter radius — the anti-armored-hull threat, plans/ARMOR_AND_PIERCE.md.
     public static Turret BuildTurret(EnemyShipType type, int tier) =>
-        new(Weapon: new WeaponStats(type.TurretFireRate * EnemyShipStats.FireRateMultiplier(tier), EnemyShipStats.AmmoSpeedFor(type, tier), KickbackForce: EnemyShipStats.WeaponKickbackForce, PelletCount: EnemyShipStats.WeaponPelletCount, Scatter: EnemyShipStats.WeaponScatter, Damage: EnemyShipStats.BaseDamage + EnemyShipStats.DamageAdd(tier)), WeaponName: EnemyShipStats.WeaponName, ArcAngle: EnemyShipStats.WeaponArcAngle, Range: EnemyShipStats.FiringRangeFor(type, tier), IsEnemy: true);
+        new(Weapon: new WeaponStats(type.TurretFireRate * EnemyShipStats.FireRateMultiplier(tier), EnemyShipStats.AmmoSpeedFor(type, tier), KickbackForce: EnemyShipStats.WeaponKickbackForce, PelletCount: EnemyShipStats.WeaponPelletCount, Scatter: EnemyShipStats.WeaponScatter, Damage: EnemyShipStats.BaseDamage + EnemyShipStats.DamageAdd(tier) + type.TurretDamageBonus), WeaponName: EnemyShipStats.WeaponName, ArcAngle: EnemyShipStats.WeaponArcAngle, Range: EnemyShipStats.FiringRangeFor(type, tier), IsEnemy: true, AmmoRadius: type.TurretAmmoRadius);
 
     // The rack is a second gun with its own ring, its own slower damage ladder and its own reload, so
     // arming a hull changes what it throws without touching the hull's gun or how it flies.

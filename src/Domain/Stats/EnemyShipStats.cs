@@ -49,7 +49,18 @@ public readonly record struct EnemyShipType(
     // hull's spawns. Null means "guns, always".
     EnemyArmamentRow[]? Armaments = null,
     // What the hull's rack throws, or null when the hull never carries one.
-    EnemyMissileSpec? Missiles = null)
+    EnemyMissileSpec? Missiles = null,
+    // Hull armor (plans/ARMOR_AND_PIERCE.md): gunfire subtracts this before damage, floored at 1.
+    // Only HeavyCannon — the largest, slowest hull — carries it: the armored hull is the one the
+    // player learns to answer with pierce and big rounds instead of chips.
+    int Armor = 0,
+    // Extra damage on this hull's turret round, on top of the shared damage ladder. HeavyCannon's is
+    // the anti-armored-hull threat: the only enemy shot that walks through player armor 4 while
+    // every chip floors to 1 (and it is the slowest round in the fleet, so a hull that can move
+    // dances around it).
+    int TurretDamageBonus = 0,
+    // Capsule radius of the hull's turret round; HeavyCannon throws a visibly fatter slug.
+    float TurretAmmoRadius = EnemyShipStats.AmmoRadius)
 {
     public static EnemyShipType Default { get; } = new(0, "enemy-1", 20f, 65f, 1.0f, 700f, 1.5f, 200f, 45.0f, 60,
         RangePerTier: 10f, SpeedPerTier: 2f, AmmoSpeedPerTier: 2f,
@@ -70,7 +81,11 @@ public readonly record struct EnemyShipType(
 
     // The large hull gets the rack last and gets it alongside its guns: it is the slow long firing
     // line, so a missile on it reads as the execution of a role the player already knows.
-    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 160f, 45.0f, 120,
+    // It is also the fleet's armored hull and its heavy gunner: armor 4 against its 120 hp, and a
+    // turret slug with +4 damage over every other hull on the shared ladder, a wider round and the
+    // slowest flight (140 px/s) — the roadmap's "slow powerful shot that threatens the armored hull
+    // and is easy to dodge for a fast one" (plans/ARMOR_AND_PIERCE.md).
+    public static EnemyShipType HeavyCannon { get; } = new(2, "heavy-cannon", 78f, 50f, 1.0f, 700f, 0.8f, 140f, 45.0f, 120,
         RangePerTier: 25f, AmmoSpeedPerTier: 1.6f,
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
@@ -78,7 +93,10 @@ public readonly record struct EnemyShipType(
             // From composition tier 10 the long firing line almost always carries its rack: 4 to 1 over
             // gun-only heavies, so a bare heavy is the rare sight rather than the norm.
             new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f)],
-        Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 12, DamageBonus: 4));
+        Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 12, DamageBonus: 4),
+        Armor: 4,
+        TurretDamageBonus: 4,
+        TurretAmmoRadius: 4f);
 
     // Streak: the dart. The fastest and flimsiest gunner in the fleet — it trades all its reach (the
     // shortest firing ring, so it must cross the whole no-man's land to shoot) for closing speed and a
@@ -111,8 +129,9 @@ public static class EnemyShipStats
     public const float WeaponKickbackForce = 0f;
     public const float AmmoRadius = 2.5f;
 
-    // Base damage of enemy turret ammo (all types); tiers add on top via DamageAdd. 4 at the ×4 scale
-    // (R32): the same bite against four times the hull, and a hull round still eats four of them.
+    // Base damage of enemy turret ammo; tiers add on top via DamageAdd and one hull adds via its
+    // TurretDamageBonus (HeavyCannon's slug — plans/ARMOR_AND_PIERCE.md). 4 at the ×4 scale (R32):
+    // the same bite against four times the hull, and a hull round still eats four of them.
     public const int BaseDamage = 4;
 
     // Tiers are applied at spawn time only, so existing entities are never mutated mid-run.

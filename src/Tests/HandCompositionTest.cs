@@ -16,11 +16,18 @@ public class HandCompositionTest
     static readonly ShipType[] Hulls = [ShipType.Scout, ShipType.Fighter, ShipType.Shadow, ShipType.Falcon, ShipType.Eagle, ShipType.Manta, ShipType.Raptor, ShipType.Heavy];
 
     [Fact]
-    public void Hand_AlwaysCarriesAnHpCard()
+    public void Hand_AlwaysCarriesOneHullCard()
     {
+        // The hull slot always carries exactly one hull card: `Hp` alone below level 5, and `Hp` or
+        // `Armor` from level 5 (plans/ARMOR_AND_PIERCE.md) — the fixture hulls start unarmored, so
+        // the armor card is always in the draw there.
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
-                Assert.Contains(Hand(hull, level), o => o.Stat == UpgradeOption.Hp);
+            {
+                var hullCards = Hand(hull, level).Where(o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor).ToList();
+                Assert.Single(hullCards);
+                if (level < 5) Assert.Equal(UpgradeOption.Hp, hullCards[0].Stat);
+            }
     }
 
     // The complaint this change answers: a hand used to be able to carry almost nothing for the guns the
@@ -132,7 +139,7 @@ public class HandCompositionTest
         var offered = DealHand(em, 5);
 
         Assert.Equal(5, offered.Length);
-        Assert.Contains(offered, o => o.Stat == UpgradeOption.Hp);
+        Assert.Contains(offered, o => o.Stat is UpgradeOption.Hp or UpgradeOption.Armor);
         Assert.DoesNotContain(offered, o => o.IsNewWeapon);
         Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon);
     }
@@ -175,9 +182,70 @@ public class HandCompositionTest
         }
     }
 
-    static bool NamesAGun(UpgradableOption option) => option.WeaponName.Length > 0;
+    // Armor and its counter unlock with tier 2 — no hand below level 5 carries either card
+    // (plans/ARMOR_AND_PIERCE.md).
+    [Fact]
+    public void NoArmorOrPierceCardBeforeLevelFive()
+    {
+        foreach (var hull in Hulls)
+            for (int level = 2; level <= 4; level++)
+                Assert.DoesNotContain(Hand(hull, level), o => o.Stat is UpgradeOption.Armor or UpgradeOption.ArmorPierce);
+    }
 
-    static bool IsUtilityCard(UpgradableOption option) =>
+    // From level 5 the Armor card is in the hull slot's draw and shows across a run — deterministic
+    // seeds, so this proves the bucket is wired into the slot, not a probability claim.
+    [Fact]
+    public void ArmorCard_IsDealtSomewhereInAFullRunFromLevelFive()
+    {
+        for (int level = 5; level <= 21; level++)
+            if (Hand(ShipType.Fighter, level).Any(o => o.Stat == UpgradeOption.Armor))
+                return;
+
+        Assert.Fail("no hand from level 5 up offered Armor");
+    }
+
+    // Pierce is a per-gun stat card, dealt for a mounted gun from level 5 in ordinary hands.
+    [Fact]
+    public void PierceCard_IsDealtForAMountedGun_FromLevelFive()
+    {
+        for (int level = 6; level <= 21; level++)
+        {
+            var offered = Hand(ShipType.Fighter, level);
+            if (offered.Any(o => o.Stat == UpgradeOption.ArmorPierce && o.WeaponName == WeaponType.MachineGun.Name))
+                return;
+        }
+
+        Assert.Fail("no hand from level 6 up offered MachineGun armor pierce");
+    }
+
+    // The ceiling withdraws its card instead of dealing a lie (R19's rule): a hull at armor 12 is
+    // dealt `Hp` alone again, and a gun at the pierce ceiling is never named for another one.
+    // The ceiling is per-gun — the Shotgun beside the maxed MachineGun keeps its own draw.
+    [Fact]
+    public void ArmorCardsAtTheirCeilings_AreWithdrawn()
+    {
+        var (em, player) = CreateHull(ShipType.Fighter, xp: UpgradeStats.XpForLevel(6), level: 6);
+        em.AddComponent(player, new Armor(ArmorRules.ArmorCeiling));
+
+        var maxedMachineGuns = new List<Entity>();
+        foreach (var (turretEntity, turret) in em.GetEntitiesWithComponents<Turret>())
+            if (turret.WeaponName == WeaponType.MachineGun.Name) maxedMachineGuns.Add(turretEntity);
+        foreach (var turretEntity in maxedMachineGuns)
+        {
+            var turret = em.GetComponent<Turret>(turretEntity);
+            em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Pierce = WeaponStats.PierceCeiling } });
+        }
+
+        for (int attempt = 0; attempt < 12; attempt++)
+        {
+            var offered = DealHand(em, 7);
+            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.Armor);
+            Assert.Contains(offered, o => o.Stat == UpgradeOption.Hp);
+            Assert.DoesNotContain(offered, o => o.Stat == UpgradeOption.ArmorPierce && o.WeaponName == WeaponType.MachineGun.Name);
+        }
+    }
+
+    static bool NamesAGun(UpgradableOption option) => option.WeaponName.Length > 0;    static bool IsUtilityCard(UpgradableOption option) =>
         option.Stat is UpgradeOption.PickupRadius or UpgradeOption.ForwardAcceleration
             or UpgradeOption.TurnSpeed or UpgradeOption.SideThrust or UpgradeOption.BackThrust;
 

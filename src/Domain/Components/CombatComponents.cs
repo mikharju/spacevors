@@ -7,7 +7,15 @@ public enum AmmoColor { Yellow, Green, DarkGreen, Blue, Red, Cyan, Violet, Orang
 
 // Radius is the capsule half-thickness: collision and rendering treat the bullet as the
 // segment [Position - Velocity*dt, Position] inflated by it, so wide shots score grazing hits.
-public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetime, bool IsEnemy = false, int Damage = 1, AmmoColor Color = AmmoColor.Yellow);
+// Pierce is the round's armor-piercing value (plans/ARMOR_AND_PIERCE.md): it cancels the target's
+// Armor before subtraction. Player rounds buy it as a card; enemy rounds never carry it.
+public readonly record struct Ammo(Vector2 Velocity, float Radius, float Lifetime, bool IsEnemy = false, int Damage = 1, AmmoColor Color = AmmoColor.Yellow, int Pierce = 0);
+
+// Hull armor (plans/ARMOR_AND_PIERCE.md): flat subtraction from every gunfire hit, floored at 1
+// (ArmorRules). Only hulls carry it — Heavy and Eagle at the start, HeavyCannon on the enemy
+// side, and the `Armor` upgrade card anywhere from level 5. Mines, asteroids and rounds never do,
+// and impact and mine-contact damage ignore it.
+public readonly record struct Armor(int Value);
 
 public readonly record struct FireCooldown(float Timer);
 
@@ -52,6 +60,9 @@ public readonly record struct MissileStunned(float DetonateIn);
 // The two class flags are copied from the WeaponType when a gun is mounted or picked up (R24/R28): a
 // support gun is the hull's missile defence and never takes the clicked-reach premium. Both default to
 // the kill class, which is what a hand-built test turret is.
+// AmmoRadius is the spawned round's capsule radius for an **enemy** turret — the hull table gives it
+// (HeavyCannon's slug is wider, plans/ARMOR_AND_PIERCE.md); a player turret's radius comes from its
+// WeaponType and ignores this field.
 public readonly record struct Turret(
     WeaponStats Weapon,
     string WeaponName,
@@ -60,7 +71,8 @@ public readonly record struct Turret(
     bool AutoTarget = true,
     bool IsEnemy = false,
     bool IsSupport = false,
-    bool InterceptsRounds = false);
+    bool InterceptsRounds = false,
+    float AmmoRadius = 2.5f);
 
 // One turret mount point on the player hull. A slot holding a weapon also carries
 // Turret, TurretAim, Position and Rotation; an empty slot carries only this.
@@ -95,7 +107,8 @@ public readonly record struct LaserBeam(
     AmmoColor Color,
     float Lifetime,
     float InitialLifetime,
-    bool DamagePending = true)
+    bool DamagePending = true,
+    int Pierce = 0)
 {
     // How long the visible flash lingers; damage always lands on the first tick.
     public const float FlashLifetime = 0.12f;

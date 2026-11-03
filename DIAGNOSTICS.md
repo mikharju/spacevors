@@ -27,7 +27,9 @@ Environment variables:
 - `SPACEVORS_DIAGNOSTIC=1` — enables everything above
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Hp,FireRate:MachineGun"` — scripted upgrade choices, one
   entry per level-up; entry is a weapon name or `Stat:WeaponName`; falls back to the random
-  pool when exhausted
+  pool when exhausted. Armor cards work the same way: `Armor:` for the hull card (empty weapon
+  name) and `ArmorPierce:RailGun` for a gun — both are only dealt from level 5, so script the
+  early levels around them
 - `SPACEVORS_DIAG_REROLLS=<n>` — start the run holding n reroll charges, so the card screen's reroll is
   testable without farming a ship kill (a capsule only drops from a dying ship, 6 % of them)
 - `SPACEVORS_SCENARIO_SHOTS=start,mid,end` (or frame numbers) — the game writes

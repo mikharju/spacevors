@@ -41,7 +41,12 @@ public readonly record struct ShipType(
     byte DrawR,
     byte DrawG,
     byte DrawB,
-    float PickupRadius)
+    float PickupRadius,
+    // Starting hull armor (plans/ARMOR_AND_PIERCE.md): flat subtraction from every gunfire hit,
+    // floored at 1 (ArmorRules). Only the two Slow-engine hulls have it at the start — armor is the
+    // compensation for the hull that cannot dodge; the big-but-nimble hulls buy survival with
+    // movement instead. Any hull may *buy* more from the level-5 `Armor` card up to the ceiling.
+    int Armor = 0)
 {
     public static ShipType Scout { get; } = new(
         Name: "Scout",
@@ -76,7 +81,7 @@ public readonly record struct ShipType(
     public static ShipType Heavy { get; } = new(
         Name: "Heavy",
         TextureKey: "heavy",
-        Description: "Slow engines, machinegun and a scatter cannon, shotgun and flak as support",
+        Description: "Slow engines, armor, machinegun and a scatter cannon, shotgun and flak as support",
         Engine: EngineLayout.Slow,
         Loadout: WeaponLoadout.HeavyFlak,
         Slots: TurretLayouts.Heavy,
@@ -86,7 +91,8 @@ public readonly record struct ShipType(
         DrawR: 230,
         DrawG: 80,
         DrawB: 70,
-        PickupRadius: 230f);
+        PickupRadius: 230f,
+        Armor: 4);
 
     public static ShipType Shadow { get; } = new(
         Name: "Shadow",
@@ -129,7 +135,7 @@ public readonly record struct ShipType(
     public static ShipType Eagle { get; } = new(
         Name: "Eagle",
         TextureKey: "eagle",
-        Description: "Slow engines, a scatter cannon, 150° flanks and a full aft arc",
+        Description: "Slow engines, armor, a scatter cannon, 150° flanks and a full aft arc",
         Engine: EngineLayout.Slow,
         Loadout: WeaponLoadout.ScatterCannonFlank,
         Slots: TurretLayouts.Eagle,
@@ -139,7 +145,8 @@ public readonly record struct ShipType(
         DrawR: 235,
         DrawG: 205,
         DrawB: 140,
-        PickupRadius: 185f);
+        PickupRadius: 185f,
+        Armor: 4);
 
     // Manta (R 111): the crab. 1.57 R across against 1.13 R long — 174 px of wing, wider than the Heavy is
     // long — and every mount points ahead: the hull aims by sliding sideways on the Crab engine, so its guns

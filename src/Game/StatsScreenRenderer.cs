@@ -228,6 +228,9 @@ public static class StatsScreenRenderer
         var shipRows = new List<StatRow>
         {
             new("Health", $"{currentHp}/{maxHp}", CountOf(em, playerEntity, UpgradeOption.Hp)),
+            // plans/ARMOR_AND_PIERCE.md: gunfire subtracts this per hit, floored at 1. Shown even at 0 —
+            // the difference between the Slow hulls' 4 and the rest is the hull choice the screen teaches.
+            new("Armor", $"{(em.TryGetComponent<Armor>(playerEntity, out var armorComp) ? armorComp.Value : 0)}", CountOf(em, playerEntity, UpgradeOption.Armor)),
             new("Forward thrust", FormatInt(player.Thrust), CountOf(em, playerEntity, UpgradeOption.ForwardAcceleration)),
             new("Side thrust", FormatInt(player.SideThrust), CountOf(em, playerEntity, UpgradeOption.SideThrust)),
             new("Back thrust", FormatInt(player.BackThrust), CountOf(em, playerEntity, UpgradeOption.BackThrust)),
@@ -259,6 +262,10 @@ public static class StatsScreenRenderer
                 new("Mount / firing arc", mount is { } m ? $"{m.Name} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "—", -1),
                 new("Turret turn speed", $"{(int)MathF.Round(Angle.ToDeg(turret.Weapon.TurnSpeed))}°/s", -1),
             };
+            // Pierce only earns a row once bought — every gun starts at 0 and a wall of zeros would
+            // pad the panel (plans/ARMOR_AND_PIERCE.md).
+            if (turret.Weapon.Pierce > 0)
+                rows.Add(new("Armor pierce", FormatInt(turret.Weapon.Pierce), CountOf(em, playerEntity, UpgradeOption.ArmorPierce, weaponName)));
             weaponSections.Add(new StatsSection(weaponName.ToUpper(), [.. rows]));
         }
 

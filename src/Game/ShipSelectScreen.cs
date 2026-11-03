@@ -87,7 +87,10 @@ public sealed class ShipSelectScreen
             if (y + height < ListTopMargin || y > windowHeight - ListBottomMargin) continue; // off-screen
 
             var ship = ships[i];
-            string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}\n{ship.Engine.Name} engines · {ship.Loadout.Mounts.Count}/{ship.Slots.Count} turret mounts";
+            // Armor earns its spot on the card only when the hull starts with some — the Slow hulls'
+            // 4 against everyone else's nothing is the hull difference shown before the run (plans/ARMOR_AND_PIERCE.md).
+            string armorNote = ship.Armor > 0 ? $" · Armor: {ship.Armor}" : "";
+            string stats = $"HP: {ship.MaxHealth} · Radius: {(int)ship.Radius}{armorNote}\n{ship.Engine.Name} engines · {ship.Loadout.Mounts.Count}/{ship.Slots.Count} turret mounts";
             var borderColor = i == _highlightedIndex ? new Color(255, 255, 255, 255) : new Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
             DrawShipCard(x, y, width, height, ship.Name, stats, borderColor, i < DigitKeys.Length ? $"{i + 1}" : "", i == _highlightedIndex);
 

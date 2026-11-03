@@ -23,7 +23,6 @@ public class CollisionSystem : GameSystem
     private readonly HashSet<(Vector2 Position, MineType Type)> _effectsToSpawn = new();
     private readonly List<(Entity ammo, Entity target, Contact hit, Vector2 minePos, MineSize mineSize, int ammoDamage, Vector2 ammoVel)> _ammoToMineHits = new();
     private readonly List<(Entity ammo, Entity target, Vector2 hitPoint, Vector2 shipCenter, int ammoDamage, float shipRadius, byte graphicsId)> _ammoToShipHits = new();
-    private readonly List<(int ammoDamage, int playerHealth)> _ammoToPlayerHits = new();
 
     // Per-frame collision state accumulators (fixes deferred command overwrite bug)
     private readonly Dictionary<Entity, Vector2> _collisionVelocities = new();
@@ -46,7 +45,6 @@ public class CollisionSystem : GameSystem
         _effectsToSpawn.Clear();
         _ammoToMineHits.Clear();
         _ammoToShipHits.Clear();
-        _ammoToPlayerHits.Clear();
         _collisionVelocities.Clear();
         _positionCorrections.Clear();
         _angularVelocityAccumulator.Clear();
@@ -372,10 +370,11 @@ public class CollisionSystem : GameSystem
                     h = shipHealth;
                     _frameRemainingHealth[earliestShipHit.Value] = h;
                 }
-                _frameRemainingHealth[earliestShipHit.Value] -= ammo.Damage;
+                int shipDealt = MitigatedGunfireDamage(view, earliestShipHit.Value, ammo.Damage, ammo.Pierce);
+                _frameRemainingHealth[earliestShipHit.Value] -= shipDealt;
                 var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
                 var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
-                _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, ammo.Damage, enemyShip.Radius, enemyShip.GraphicsId));
+                _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, shipDealt, enemyShip.Radius, enemyShip.GraphicsId));
                 // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
                 _entitiesToDestroy.Add(ammoEntity);
             }
@@ -405,7 +404,7 @@ public class CollisionSystem : GameSystem
                 remaining = playerHealth.Current;
                 _frameRemainingHealth[playerEntity] = remaining;
             }
-            _frameRemainingHealth[playerEntity] -= ammo.Damage;
+            _frameRemainingHealth[playerEntity] -= MitigatedGunfireDamage(view, playerEntity, ammo.Damage, ammo.Pierce);
             _effectsToSpawn.Add((playerPos.Value, MineType.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
@@ -438,7 +437,7 @@ public class CollisionSystem : GameSystem
                         remaining = beamPlayerHealth.Current;
                         _frameRemainingHealth[playerEntity] = remaining;
                     }
-                    _frameRemainingHealth[playerEntity] -= beam.Damage;
+                    _frameRemainingHealth[playerEntity] -= MitigatedGunfireDamage(view, playerEntity, beam.Damage, beam.Pierce);
 
                     stopLength = BeamEntryLength(playerBody, beamStart, beam.Direction, beam.Width, beam.Length);
                     beamStopped = true;
@@ -530,7 +529,7 @@ public class CollisionSystem : GameSystem
                                     sh = beamShipHealth.Current;
                                     _frameRemainingHealth[firstHit.Value] = sh;
                                 }
-                                _frameRemainingHealth[firstHit.Value] -= beam.Damage;
+                                _frameRemainingHealth[firstHit.Value] -= MitigatedGunfireDamage(view, firstHit.Value, beam.Damage, beam.Pierce);
                                 var beamShip = view.GetComponent<EnemyShip>(firstHit.Value);
                                 var beamShipPos = view.GetComponent<Position>(firstHit.Value);
                                 Vector2 beamHitPoint = beamShipPos.Value + firstContact.Normal * beamShip.Radius;
@@ -1049,8 +1048,14 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    // Impact damage (plans/IMPACT_DAMAGE.md). Damage flows through the same per-frame health
-    // accumulator as bullet damage, so the existing death pass covers impact kills.
+    // Armor mitigation for gunfire hits (plans/ARMOR_AND_PIERCE.md): Ammo and LaserBeam only, in
+    // either direction. Only hulls carry an Armor component, so the mine, asteroid and round hit
+    // sites skip this by rule, and impact and mine-contact damage bypass it entirely. Unarmored
+    // targets pay one failed lookup and the formula's identity.
+    private int MitigatedGunfireDamage(WorldView view, Entity target, int damage, int pierce) =>
+        ArmorRules.EffectiveDamage(damage, view.TryGetComponent<Armor>(target, out var armor) ? armor.Value : 0, pierce);
+
+    // Impact damage (plans/IMPACT_DAMAGE.md). Damage flows through the same per-frame health    // accumulator as bullet damage, so the existing death pass covers impact kills.
     private void ApplyImpactDamage(
         WorldView view,
         Entity aEntity,

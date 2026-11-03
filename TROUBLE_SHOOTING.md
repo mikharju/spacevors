@@ -657,3 +657,28 @@ test never depends on the model's eyes.
   buffered stdout. Capture the game's rows yourself (`.tools/game.sh 2>&1 | tee my.log`) when you really
   need them, and check the file's mtime before believing any log: a 40-minute-old `app.log` will happily
   confirm that your change "did nothing".
+
+## 72. A hand-built firing-test fixture fires for a hitscan gun but silently not for a projectile gun
+
+- **Symptom**: A new test copied the LaserTest fixture — player, turret, clicked asteroid, one
+  `TurretFiringSystem.Update` — and asserted a spawned `Ammo`. Zero rounds, no error. The same
+  fixture asserted a `LaserBeam` fine.
+- **Cause**: A clicked target is solved two ways. Hitscan takes `EvaluateStaticTarget` (position
+  only); a travelling round takes `EvaluateMovingTarget`, which **requires a `Velocity` component**
+  on the target (`TryGetComponent<Velocity>` → no selection). The passing beam fixture had no
+  `Velocity` on its asteroid, so copying it built a fixture that could never shoot a gun.
+- **Fix / Prevention**: Hand-built firing fixtures give the target `Velocity(Vector2.Zero)` even
+  when nothing moves. `ArmorCombatTest` and `TurretFiringTest` both do; copy those, not LaserTest,
+  when the assertion is about `Ammo`.
+
+## 73. A balance-budget test that models raw DPS goes on lying the day a mitigation stat ships
+
+- **Symptom**: `EnemyDifficultyTest.ToughestTierHullDiesInsideTheTtkBudget` stayed green after armor
+  shipped — while the real starter-kit TTK against the new armored hull had nearly doubled, because
+  the test multiplied `FireRate × PelletCount × Damage` and armor subtracts per hit.
+- **Cause**: The budget test models damage as the table number, not as the number that reaches hp.
+  Any per-hit mitigation (armor, shields) silently re-prices the stat the test computes.
+- **Fix / Prevention**: When a mitigation stat ships, route every budget/balance test's damage
+  through the same rule combat uses (`ArmorRules.EffectiveDamage`) and re-set the budget honestly —
+  the armor-tax budget widened 7 s → 12 s in the same commit as the armor, not in a later "fix the
+  red test" patch.

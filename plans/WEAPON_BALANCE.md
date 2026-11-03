@@ -788,3 +788,32 @@ no rule number moves.
   3.33 → 3 on the Heavy), so §8's knob about five `FireRate` cards lifting FlakCurtain over the kill
   class's floor is now live tuning ground rather than a hypothetical. If playtest says the run compounds
   too fast, that is the card to shrink — or make the third weapon slot a wildcard.
+
+## Follow-up (2026-11-03): armour shipped — §6 is spent, corrosion is still open
+
+plans/ARMOR_AND_PIERCE.md landed: `max(1, damage − max(0, armour − pierce))` on every gunfire hit.
+What that does to this file's prices, in the order §6 said to do them:
+
+- **Decision 1 landed** — flat subtraction per hit, floor 1 (`ArmorRules.EffectiveDamage`).
+- **Decision 2 landed, with a bigger step than §6 sketched**: `ArmorPierce` is a `Damage`-shaped
+  card, but +4 not +1 — that was §6's pre-×4-scale number; at the ×4 scale +1 pierce is +1 damage
+  against armour, so +4 cancels HeavyCannon's armour 4 flat. `Armor` (+2, ceiling 12) shares the
+  guaranteed hull slot with `Hp` from level 5.
+- **Decision 3 landed** — the fast guns pay for armour in card slots, not base DPS: no gun's table
+  number moved, R30 held to the day.
+- **Decision 4 landed at 4**: HeavyCannon is armour 4 — under what a kill round lands, above what a
+  chip is, exactly as §6 sized it.
+- **Decision 5 is open**: corrosion (acid stripping armour) did not ship; it is the support class's
+  answer to armour and stays planned in plans/ARMOR_AND_PIERCE.md §7. Until it lands, support guns
+  pay the armour tax down to the floor and buy back only through `ArmorPierce` — §6's invariant (c)
+  holds because pierce is worth 0 against armour 0, asserted in
+  `ArmorCombatTest.PierceCardsCannotMoveTheClassLineAgainstUnarmoredHulls`.
+- **The §6 invariants are asserted**: (a) the kill class still leads the table against armour
+  (`KillClassStillLeadsTheTableAgainstHeavyCannonArmor`), (b) every gun lands ≥ 1 at the ceiling,
+  (c) above. `EnemyDifficultyTest`'s TTK budget is now read through armour — the starter Scout
+  pays 72 → 38 DPS against HeavyCannon and its budget widened 7 s → 12 s, which is the tax §6
+  predicted for the slowest kit.
+- **New enemy-side rule to remember when pricing future hulls**: enemies never carry pierce
+  (owner decision), and HeavyCannon's slug (+4 damage, wider, slowest) is the fleet's only
+  armour-walking round. A future armoured hull or elite buys its armour against the *player's*
+  ladder; the answer is never to hand an enemy a pierce stat.

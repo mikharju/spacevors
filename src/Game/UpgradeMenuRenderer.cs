@@ -214,6 +214,8 @@ public static class UpgradeMenuRenderer
             return option.Stat switch
             {
                 UpgradeOption.Hp => "hit points",
+                // plans/ARMOR_AND_PIERCE.md: gunfire subtracts this from every hit, floored at 1.
+                UpgradeOption.Armor => "hull armor",
                 UpgradeOption.ForwardAcceleration => "forward acceleration",
                 UpgradeOption.TurnSpeed => "turn speed",
                 UpgradeOption.SideThrust => "side thrust",
@@ -250,6 +252,8 @@ public static class UpgradeMenuRenderer
         {
             UpgradeOption.Range => $"{o.WeaponName} range",
             UpgradeOption.Damage => $"{o.WeaponName} damage",
+            // plans/ARMOR_AND_PIERCE.md: the gun's line against the one armored hull.
+            UpgradeOption.ArmorPierce => $"{o.WeaponName} armor pierce",
             // R19: the rounds are what carry the hit points, so the card says whose rounds get tougher.
             UpgradeOption.MissileHealth => $"{o.WeaponName} missile health",
             UpgradeOption.PickupRadius => "pickup radius",

@@ -47,7 +47,12 @@ public readonly record struct WeaponStats(
     // guided round is a body with health; dumb ammo is not, and this is unused there. 4 at the ×4 scale
     // (R32) is what a `MissileHealth` card's +50% is taken against, so it buys a whole 2 and not a
     // rounded-up half.
-    int MissileHealth = 4)
+    int MissileHealth = 4,
+    // Armor piercing of one round of this gun (plans/ARMOR_AND_PIERCE.md): it cancels the target's
+    // Armor before subtraction, so a pierce card is +4 damage only against an armored hull and worth
+    // nothing elsewhere — the honest shape for a situational card. No gun starts with pierce (R30:
+    // the bonus arrives as the card, never pre-charged or pre-granted in the table).
+    int Pierce = 0)
 {
     // R17: how many guided rounds one mount may put in flight per second. Guided rounds live for
     // seconds and cannot be dodged by luck, so their budget is far tighter than the 12 rounds/s of
@@ -77,6 +82,16 @@ public readonly record struct WeaponStats(
     // the gun's percent-of-base step (`WeaponType.MissileHealthStep`), not a percent of this live copy,
     // which is what stops the card compounding with itself.
     public bool CanToughenRound(int step) => Homing && step > 0 && MissileHealth + step <= MissileHealthCeiling;
+
+    // The most armor-pierce one gun can reach with `ArmorPierce` cards (+4, plans/ARMOR_AND_PIERCE.md).
+    // Pierce 4 already cancels HeavyCannon's armor 4 flat; the ceiling stops the card stacking into a
+    // stat no enemy armor exists to spend it on — the same honesty rule as the missile-health ceiling.
+    public const int PierceCeiling = 8;
+
+    // R19's rule again: a `ArmorPierce` card is withdrawn at the ceiling, never dealt as a card the
+    // rules would refuse to honour. The step is the flat card step, read the same way in the offer
+    // (UpgradeOffer) and the apply (GameSession), so the card is never a lie.
+    public bool CanPierceMore(int step) => step > 0 && Pierce + step <= PierceCeiling;
 
     // R18: whether a `FireRate` card on this gun still has somewhere to go as "+1 shot". Volley guns
     // grow forever as they always have; a guided volley stops when the next shot would break the

@@ -27,6 +27,9 @@ public static class WorldFactory
 
         em.AddComponent(playerEntity, new Player(Thrust: shipType.Engine.ForwardThrust, SideThrust: shipType.Engine.SideThrust, BackThrust: shipType.Engine.BackThrust, Boost: PlayerShipStats.Boost, Radius: shipType.Radius, Shape: shipType.Shape, Xp: 0, Level: 1, PickupRadius: shipType.PickupRadius + shipType.Radius, RotationSpeed: shipType.Engine.TurnRate, MaxHealth: shipType.MaxHealth));
         em.AddComponent(playerEntity, new Health(shipType.MaxHealth, shipType.MaxHealth));
+        // Only the armored hulls (Heavy, Eagle — the Slow engines) carry the component at the start
+        // (plans/ARMOR_AND_PIERCE.md); the `Armor` upgrade card adds one to any hull from level 5.
+        if (shipType.Armor > 0) em.AddComponent(playerEntity, new Armor(shipType.Armor));
         // Guns not on the hull ride in the cargo: inactive, mountable later.
         em.AddComponent(playerEntity, WeaponCargo.Empty);
 

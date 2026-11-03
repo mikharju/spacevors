@@ -11,7 +11,8 @@ namespace Spacevors.Domain.Systems;
 // cannot invent a card a level-up would have withdrawn — no card naming a cargo gun, no projectile-speed
 // card on a hitscan beam, no "+1 shot" past the guided volley budget (R17/R18), no missile-health card
 // past its ceiling (R19), no weapon the ship already owns, at most three new-weapon cards in a hand, and
-// a damage card sized by the mount's class (R33). Balance rules R6/R10/R18/R19/R29/R33 all say a card
+// a damage card sized by the mount's class (R33), and no Armor or ArmorPierce card below level 5
+// (plans/ARMOR_AND_PIERCE.md). Balance rules R6/R10/R18/R19/R29/R33 all say a card
 // must never be a lie; that applies to a re-deal too.
 //
 // What the hand is *made of* is the other half of the job (plans/UPGRADE_HAND_COMPOSITION.md). The legal
@@ -25,6 +26,9 @@ public static class UpgradeOffer
 {
     const int HandSize = 5;
     const int MilestoneLevelInterval = 5;
+    // Armor and its counter unlock with tier 2 — the same beat as the `UnlockLevel: 5` guns and the
+    // first milestone hand (plans/ARMOR_AND_PIERCE.md). Before it, no hand may deal either card.
+    const int ArmorUnlockLevel = 5;
     // A hand never carries more than three new weapons. Whether they fit a free hull mount is the
     // player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
     const int MaxNewWeaponCardsPerHand = 3;
@@ -137,7 +141,7 @@ public static class UpgradeOffer
     {
         var buckets = new Dictionary<CardKind, List<UpgradableOption>>
         {
-            [CardKind.Hull] = [new UpgradableOption("", UpgradeOption.Hp)],
+            [CardKind.Hull] = HullOptions(view, playerEntity, level),
             [CardKind.Utility] =
             [
                 new UpgradableOption("", UpgradeOption.PickupRadius),
@@ -164,7 +168,7 @@ public static class UpgradeOffer
         else
         {
             foreach (var turret in turrets.DistinctBy(t => t.WeaponName))
-                AddStatCards(buckets, turret);
+                AddStatCards(buckets, turret, level);
         }
 
         foreach (var bucket in buckets.Values)
@@ -173,9 +177,24 @@ public static class UpgradeOffer
         return buckets;
     }
 
+    // The guaranteed hull-slot card. `Hp` is always there; `Armor` joins the draw from level 5
+    // (plans/ARMOR_AND_PIERCE.md) while the hull still has room under the ceiling — at the ceiling
+    // it is withdrawn, never dealt as a lie (R19's rule), and `Hp` goes back to guaranteed.
+    static List<UpgradableOption> HullOptions(WorldView view, Entity playerEntity, int level)
+    {
+        var cards = new List<UpgradableOption> { new("", UpgradeOption.Hp) };
+        if (level >= ArmorUnlockLevel && CurrentArmor(view, playerEntity) < ArmorRules.ArmorCeiling)
+            cards.Add(new UpgradableOption("", UpgradeOption.Armor));
+
+        return cards;
+    }
+
+    static int CurrentArmor(WorldView view, Entity playerEntity) =>
+        view.TryGetComponent<Armor>(playerEntity, out var armor) ? armor.Value : 0;
+
     // The per-gun stat cards, gated exactly as they always were — a card the rules would refuse to honour
     // is never dealt, so an empty slot is honest rather than a bug.
-    static void AddStatCards(Dictionary<CardKind, List<UpgradableOption>> buckets, Turret turret)
+    static void AddStatCards(Dictionary<CardKind, List<UpgradableOption>> buckets, Turret turret, int level)
     {
         var stats = turret.Weapon;
         var cards = buckets[KindFor(turret)];
@@ -203,6 +222,13 @@ public static class UpgradeOffer
         // which is the same reason the card is withdrawn at R18/R19: never a card the rules would refuse.
         if (!turret.IsSupport || turret.Range * UpgradeDefinition.Range.Multiplier <= WeaponType.SupportRangeCeiling)
             cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Range));
+
+        // plans/ARMOR_AND_PIERCE.md: pierce is the level-5 answer to the armored hull. Against
+        // unarmored targets it is worth nothing, so it cannot move R25's class line, and at the
+        // ceiling it is withdrawn rather than dealt as a lie (R19's rule). Both classes may buy it —
+        // a screened chip is the one that most often wants the armored heavy dead fast.
+        if (level >= ArmorUnlockLevel && stats.CanPierceMore(UpgradeDefinition.ArmorPierce.Additive))
+            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.ArmorPierce));
     }
 
     static CardKind KindFor(Turret turret) => turret.IsSupport ? CardKind.SupportWeapon : CardKind.KillWeapon;

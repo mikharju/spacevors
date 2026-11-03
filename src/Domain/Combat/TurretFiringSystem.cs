@@ -573,11 +573,11 @@ public class TurretFiringSystem : GameSystem
                 commands.AddEntity(
                     new Position(beamStart),
                     new LaserBeam(beamStart, pelletDir, turret.Range, ammoRadius, damage, turret.IsEnemy, ammoColor,
-                        LaserBeam.FlashLifetime, LaserBeam.FlashLifetime));
+                        LaserBeam.FlashLifetime, LaserBeam.FlashLifetime, Pierce: turret.Weapon.Pierce));
                 continue;
             }
 
-            var ammo = new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor);
+            var ammo = new Ammo(ammoVel, ammoRadius, turret.Weapon.ShotLifetime, turret.IsEnemy, damage, ammoColor, turret.Weapon.Pierce);
 
             // A guided round carries its lock and its own flight numbers, so nothing downstream has to
             // find the gun back. The locked entity may be gone when the round arrives; guidance treats a
@@ -649,7 +649,9 @@ public class TurretFiringSystem : GameSystem
 
     private static float GetAmmoRadius(Turret turret)
     {
-        if (turret.IsEnemy) return EnemyShipStats.AmmoRadius;
+        // Enemy hulls carry their round's radius on the turret (HeavyCannon's slug is wider,
+        // plans/ARMOR_AND_PIERCE.md); player mounts read it off the WeaponType.
+        if (turret.IsEnemy) return turret.AmmoRadius;
 
         var type = WeaponType.FromName(turret.WeaponName);
         return type?.AmmoRadius ?? DefaultAmmoRadius;

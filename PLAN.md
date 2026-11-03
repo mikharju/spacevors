@@ -84,6 +84,11 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
   card, a missile-agility card — proposed — plans/WEAPON_BALANCE.md
 - Weapon identity cells; R23 one gun of each type aboard, FlechetteFan/Stiletto/SiegeSalvo/FarlockSalvo, deduped Shadow and Heavy loadouts — shipped — plans/WEAPON_IDENTITY_CELLS.md
 - Impact damage — shipped — plans/IMPACT_DAMAGE.md
+- Armor and armor piercing: gunfire minus armor floored at 1, pierce cancels armor first; Heavy and
+  Eagle (the Slow hulls) and enemy HeavyCannon start armored 4; `Armor` (+2) / `ArmorPierce` (+4)
+  cards from level 5 only, ceilings 12/8; HeavyCannon throws the fleet's heavy slow slug (+4 damage,
+  wider, 140 px/s) — the only enemy round that walks through armor, enemies never pierce — shipped
+  2026-11-03 — plans/ARMOR_AND_PIERCE.md
 - Primary target lock and enemy hp bars — shipped — plans/TARGETING_HP_BARS.md
 
 ### Enemies and difficulty
@@ -136,7 +141,6 @@ plans/functional-ecs.md.
   already shipped — plans/TURRET_LAYOUTS.md)
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
-- Armor and armor piercing bullets: 
 - Shields absorp a hit go on cooldown
 
 ## Roadmap — future (new systems)
@@ -151,9 +155,12 @@ plans/functional-ecs.md.
 
 ## Roadmap - future (longer ideas)
 
-### Armor and armor piercing bullets
+### Armor and armor piercing bullets — shipped 2026-11-03
 
-Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage. Enemy weapons update to account for armor: Heavy is armored so light enemies do not hurt it at start, but mix in enemies with slower more powerful shots that are a threat to heavy armored player ships but easy to dodge for fast small ships. — not built; how it would be priced (flat subtraction, pierce as a `Damage`-shaped card, corrosion as the support answer, no pre-charge for a bonus that does not exist yet) is settled in plans/WEAPON_BALANCE.md §6.
+Built as plans/ARMOR_AND_PIERCE.md (read its `## Shipped`): flat per-hit subtraction floored at 1,
+pierce cards on the player side only, HeavyCannon's heavy slug as the anti-armored-hull threat.
+The corrosion answer (acid stripping armor) is still open there; the idea's "mix in slower more
+powerful shots" shipped as that slug, not as enemy pierce — enemies never pierce, by rule.
 
 ## Roadmap — infrastructure / QA
 

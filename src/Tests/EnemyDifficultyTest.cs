@@ -15,8 +15,11 @@ public class EnemyDifficultyTest
     // FiringRange + the player's hull radius, so the ring the tier ladder produces has to stay inside it.
     const float PlayerMidBandRange = 1350f;
 
-    // A starter Scout's sustained fire has to drop the toughest hull in single-digit seconds.
-    const float ToughestHullTtkBudgetSeconds = 7f;
+    // A starter Scout's sustained fire has to drop the toughest hull in low double-digit seconds.
+    // The budget is read through armor (plans/ARMOR_AND_PIERCE.md): HeavyCannon's armor taxes the
+    // starter kit down to 38 DPS from 72 — that tax is exactly what the player buys back with
+    // `Damage` and `ArmorPierce` cards, and this floor only guards the starter kit against a wall.
+    const float ToughestHullTtkBudgetSeconds = 12f;
 
     [Fact]
     public void EnemiesNeverOutReachThePlayersMidBand()
@@ -48,8 +51,12 @@ public class EnemyDifficultyTest
     [Fact]
     public void ToughestTierHullDiesInsideTheTtkBudget()
     {
+        // The armor is part of the bill: the starter chips floor to 1 against it, the MachineGun
+        // still lands 8 a round (plans/ARMOR_AND_PIERCE.md).
+        int armor = EnemyShipType.HeavyCannon.Armor;
         float scoutDps = ShipType.Scout.Loadout.Mounts
-            .Sum(m => m.Weapon.Stats.FireRate * m.Weapon.Stats.PelletCount * m.Weapon.Stats.Damage);
+            .Sum(m => m.Weapon.Stats.FireRate * m.Weapon.Stats.PelletCount
+                * ArmorRules.EffectiveDamage(m.Weapon.Stats.Damage, armor, pierce: 0));
         int toughestHp = (int)MathF.Round(
             EnemyShipType.HeavyCannon.Health * EnemyShipStats.HpMultiplier(EnemyShipStats.MaxTier),
             MidpointRounding.AwayFromZero);
