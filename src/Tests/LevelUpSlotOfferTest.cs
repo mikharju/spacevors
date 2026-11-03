@@ -186,18 +186,15 @@ public class LevelUpSlotOfferTest
     }
 
     // R33 (it supersedes R29's ban): the damage card is a percent of the gun's **base** damage, sized by its
-    // mount class, so a support chip is no longer doubled by a flat +1 and the milestone hand deals the card
-    // to every mounted gun. The hand is checked on a hull that carries both classes at once, so the card is
-    // shown to be class-sized rather than class-banned.
+    // mount class, so a support chip is no longer doubled by a flat +1 and a milestone hand may deal one to
+    // a support gun as well as a kill gun. The five slots show one gun's card per milestone — that shape is
+    // `HandCompositionTest.MilestoneHand_DealsOneDamageCard_KillClassFirst` — so the support half is checked
+    // here on a hull that flies nothing but support.
     [Fact]
-    public void MilestoneHand_DealsADamageCardToEveryMountedGun()
+    public void MilestoneHand_DealsADamageCardToASupportGunToo()
     {
-        WeaponMount[] mixed =
-        [
-            new(TurretSlotName.MainGun, WeaponType.MachineGun),
-            new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain),
-        ];
-        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, mixed);
+        WeaponMount[] supportOnly = [new(TurretSlotName.SmallLeft, WeaponType.FlakCurtain)];
+        var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4, supportOnly);
 
         RunLevelUp(em); // level 5: the milestone hand, which is the only hand that carries Damage cards
 
@@ -207,7 +204,6 @@ public class LevelUpSlotOfferTest
         foreach (var (_, _, options) in em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>())
             offered.AddRange(options.Options);
 
-        Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.MachineGun.Name);
         Assert.Contains(offered, o => o.Stat == UpgradeOption.Damage && !o.IsNewWeapon && o.WeaponName == WeaponType.FlakCurtain.Name);
     }
 

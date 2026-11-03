@@ -338,3 +338,22 @@ tolerances at `Combat/TurretFiringSystem.cs:34-35`, one `MountMenuRenderer` scre
 - Line 56 asked for a note that `TwinChainGun` was deleted to be written in plans/SHIP_TYPES.md — it
   was never written there; it now is (see that file's 2026-10-31 follow-up).
 
+
+## Follow-up (2026-11-02): the hand shape moved to plans/UPGRADE_HAND_COMPOSITION.md
+
+The "Level-up offers" section above is superseded on two points, and nothing there was ever built as
+written:
+
+- **Hand = 1 Hp + up to 3 new-weapon cards + existing-weapon damage cards, filled to 5** is now the
+  shipped slot table: a non-milestone hand is `Hp · engine/utility · support weapon · support weapon ·
+  kill weapon`, a milestone hand is `Hp · up to 3 new guns · one damage card`. Weapon slots are keyed on
+  the gun's class, not the mount it sits in.
+- The *fitting size* preference this section asked for is built only in the starved case: a new-weapon
+  card spills into an unfilled weapon slot when the hull mounts no gun of that class at all **and** has a
+  free mount. A two-gun hull with free mounts is not handed a gun on levels 2-4 — that would spend the
+  milestone pool early.
+- The shuffle is no longer one Fisher-Yates over the whole pool: each kind is shuffled as it is built and
+  the assembled hand is shuffled once, so a level-up draws fewer RNG numbers than before and a seeded run
+  that levels up shifts its later stream (same rule as everywhere else: fewer draws, different run).
+
+Full design, deviations and the measured verdict: plans/UPGRADE_HAND_COMPOSITION.md.

@@ -635,3 +635,25 @@ test never depends on the model's eyes.
   that must not move pixels, keep the default `AB_PIXELS=same` — then a probe FAIL really is the batching
   bug of entry 14. Judge the cost by the `flat-200` control first (entry 69): if the control moved, the
   subject's delta means nothing.
+
+## 71. An upgrade-offer change cannot be priced by the perf gate, and `app.log` is not the game's log
+
+- **Symptom**: Changing `UpgradeOffer`/`LevelUpSystem` and running `.tools/scenario.sh … --sim` moves
+  nothing, and `grep UPGRADE .tools/run/app.log` prints zero rows even in a run whose HUD clearly reads
+  `LV 3` — so either the code never ran or the logging is broken.
+- **Cause**: Two separate harness facts. (1) A gated scenario runs 120-357 ticks; the player never picks
+  up enough XP in that window to leave level 1, so with `SPACEVORS_DIAGNOSTIC=1` the sim logs carry
+  `[SYSTEM]` rows and **zero** `[UPGRADE]` rows (checked on `hull-stream`, `ammo-spray`, `missile-384`).
+  The offer path is genuinely not executed, so its cost is not measurable there — it is 0% by inspection.
+  (2) `.tools/README.md` says the game logs to `.tools/run/app.log`, but `game.sh` is an `exec dotnet
+  Game.dll` with no `tee`, so a fresh run's rows go to the **background job's stdout** (and stdout is
+  block-buffered off a TTY, so the job can show nothing for minutes). The `app.log` that sits there is a
+  stale file from some earlier run, and grepping it silently answers about that old process.
+- **Fix / Prevention**: To price an offer/upgrade change, do not reach for the gate — read the code path
+  (`grep -c UPGRADE` in a diagnostics sim log proves whether it runs) and report the medians as unchanged
+  with that reason. To *see* what the game deals, drive a window run: `.tools/xvfb.sh` + `.tools/game.sh`
+  as background jobs, `.tools/input.sh key 1` to pick a hull, `key l` to force a level-up, then
+  `.tools/shot.sh <name>` and read the PNG — the card screen is the evidence, and it does not depend on
+  buffered stdout. Capture the game's rows yourself (`.tools/game.sh 2>&1 | tee my.log`) when you really
+  need them, and check the file's mtime before believing any log: a 40-minute-old `app.log` will happily
+  confirm that your change "did nothing".

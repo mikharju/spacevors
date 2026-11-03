@@ -237,3 +237,17 @@ Two consequences worth knowing:
 
 Tests: `src/Tests/XpCurveTest.cs` pins the curve and the per-level progress; the offer tests read their
 "enough XP to level" from `UpgradeStats.XpForLevel(level)` instead of a hard-coded number.
+
+## Follow-up (2026-11-02): the XP step is a knob, so the test pins the shape
+
+`quicker level ups` halved `UpgradeStats.XpStepPerLevel` 10 → 5, which left `XpCurveTest` asserting the
+old absolute numbers (10/30/60/100/550) and this file's 2026-11-02 XP follow-up stale.
+
+- Live thresholds are `step · level(level+1)/2` with step 5: **5 / 15 / 30 / 50 / 75**, level 10 at
+  **275 XP**. The 10-based numbers quoted above (level 2 = four ship kills, level 10 ≈ 550 XP ≈ 180
+  kills) are now twice as far away in kills; treat them as the ×10 era.
+- `src/Tests/XpCurveTest.cs` no longer hard-codes a step. It reads the scale off `XpForLevel(1)` and
+  asserts the shape: thresholds only rise, **each level costs more XP than the one before**, and the
+  total is triangular in whatever the step is. Re-tuning the knob needs no test edit.
+- What the step does to pacing is measured, not assumed: see the `[UPGRADE] level=…` rows and the level
+  readout in a run (plans/UPGRADE_HAND_COMPOSITION.md §10 asks for that histogram).

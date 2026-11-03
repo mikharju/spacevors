@@ -92,6 +92,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Reroll-token loot: salvage capsules off killed ships stock charges that re-deal the upgrade hand — shipped — plans/REROLL_TOKENS.md
 - Salvage field and ECM pulse drops: one-shot field sweep (all XP, all currency, nearest health up to full hp) and a 5 s world-wide jam of ships, mines and missiles; the ECM capsule never expires — shipped — plans/ECM_PULSE_AND_SALVAGE_FIELD.md
 - Difficulty scaling and threat readout; open items remain — active — plans/DIFFICULTY_SCALING.md
+- Upgrade hand composition: every hand dealt from card-kind slots (hp + 1 engine/utility + 2 support + 1 kill; milestone hp + ≤3 new guns + damage) — shipped 2026-11-02 — plans/UPGRADE_HAND_COMPOSITION.md
 
 ### Physics and sim
 - Capsule collision: hulls and lumpy rocks as their shape — shipped — plans/NON_CIRCLE_COLLISION.md
@@ -135,7 +136,8 @@ plans/functional-ecs.md.
   already shipped — plans/TURRET_LAYOUTS.md)
 - Run modifiers / seed flags: spawn-table toggles
 - Asset nit: regenerate the four mismatched lit depth maps (`small-1`, `interceptor`, `fighter`, `heavy`) so the load-time warnings stop firing (plans/GRAPHICS_REVIEW.md)
-- Armor and armor piercing bullets: Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage. Enemy weapons update to account for armor: Heavy is armored so light enemies do not hurt it at start, but mix in enemies with slower more powerful shots that are a threat to heavy armored player ships but easy to dodge for fast small ships. — not built; how it would be priced (flat subtraction, pierce as a `Damage`-shaped card, corrosion as the support answer, no pre-charge for a bonus that does not exist yet) is settled in plans/WEAPON_BALANCE.md §6.
+- Armor and armor piercing bullets: 
+- Shields absorp a hit go on cooldown
 
 ## Roadmap — future (new systems)
 
@@ -146,6 +148,12 @@ plans/functional-ecs.md.
 - Deterministic replays before save/load
 - 100k prep: SoA audit + a 50k scenario, before parallel sim (plans/PARALLEL_SIM.md)
 - Mod-friendly stats: Domain/Stats tables exported to JSON/TOML
+
+## Roadmap - future (longer ideas)
+
+### Armor and armor piercing bullets
+
+Ships get armor value which reduces damage by small amount. Can make small weapons completely in effective. Large ships get more armor. Some weapons get reduced damage, but also armor piercing value which first decreases armor value. Large damage may still penetrate just by sheer amount of damage. Enemy weapons update to account for armor: Heavy is armored so light enemies do not hurt it at start, but mix in enemies with slower more powerful shots that are a threat to heavy armored player ships but easy to dodge for fast small ships. — not built; how it would be priced (flat subtraction, pierce as a `Damage`-shaped card, corrosion as the support answer, no pre-charge for a bonus that does not exist yet) is settled in plans/WEAPON_BALANCE.md §6.
 
 ## Roadmap — infrastructure / QA
 

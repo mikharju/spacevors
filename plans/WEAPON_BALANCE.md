@@ -765,3 +765,26 @@ repeated twice more and came out the other way (median 0.92 → 0.84 and 0.86 ms
 **Supersedes two lines above.** The missile-health record said `Damage` and `Hp` were "the two cards left with a
 flat step" and described the ×4 scale as something that would land later: `Damage` is a percent now, and the
 scale has landed. `Hp` remains the game's only additive card.
+
+## Follow-up (2026-11-02): the milestone hand shows one `Damage` card, and cards now have kinds
+
+The hand-shape work shipped in plans/UPGRADE_HAND_COMPOSITION.md touches two things this file prices, and
+no rule number moves.
+
+- **R33 stands; its availability shrank by the hand.** A milestone hand is `Hp · up to 3 new guns · one
+  damage card`, so it shows **one** mounted gun's damage card (kill class first) instead of one per gun
+  with a shuffle deciding which the player sees — a Heavy at level 5 already had 8 candidates for 5 slots,
+  so nothing was being withheld that was ever on screen. The card is still percent-of-base, still
+  +25%/+50% by class, still milestone-only; `MilestoneHand_DealsADamageCardToEveryMountedGun` became
+  `HandCompositionTest.MilestoneHand_DealsOneDamageCard_KillClassFirst`, and
+  `MilestoneHand_DealsADamageCardToASupportGunToo` keeps R33's withdrawal of R29's support ban honest.
+- **Every card now belongs to a kind** — Hull (`Hp`), Engine/utility (`PickupRadius` + 4 thrust),
+  Support weapon, Kill weapon, New weapon — and a non-milestone hand is dealt one Hull, one Engine/utility
+  and three weapon cards. **R34/R35/R36 must be bucketed when they land**: `Scatter` goes in the class
+  bucket of the gun it names, `MissileAgility` in Kill/Support by the same key, and band-scaled `Range`
+  stays where `Range` is today. A new card that is not bucketed cannot be dealt at all, which is the
+  honest failure — it is never silently dealt as filler.
+- **Weapon cards per hand went up** (2.5 expected → 3 on a two-gun hull, 1.67 → 3 on the one-gun hull,
+  3.33 → 3 on the Heavy), so §8's knob about five `FireRate` cards lifting FlakCurtain over the kill
+  class's floor is now live tuning ground rather than a hypothetical. If playtest says the run compounds
+  too fast, that is the card to shrink — or make the third weapon slot a wildcard.
