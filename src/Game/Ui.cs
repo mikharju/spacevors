@@ -40,6 +40,43 @@ public static class Ui
     public static Color WithAlpha(Color color, float alpha)
         => new(color.R, color.G, color.B, (byte)(color.A * Math.Clamp(alpha, 0f, 1f)));
 
+    // Word wrap for the instruction blocks: greedy on spaces, one very long word stays on its own
+    // line rather than being cut. Shared by the ship cards and the upgrade screen.
+    public static string[] WrapText(string text, int maxWidth, int fontSize)
+    {
+        var lines = new List<string>();
+        string current = "";
+
+        foreach (var word in text.Split(' '))
+        {
+            string candidate = current.Length == 0 ? word : $"{current} {word}";
+            if (current.Length == 0 || Raylib.MeasureText(candidate, fontSize) <= maxWidth)
+                current = candidate;
+            else
+            {
+                lines.Add(current);
+                current = word;
+            }
+        }
+
+        if (current.Length > 0) lines.Add(current);
+        return lines.ToArray();
+    }
+
+    // A key cap: the key's label in a small bordered box. The shape is what makes a control list
+    // skimmable in a second — the eye finds the boxes and reads only the words beside them.
+    // Returns the x just past the cap so a row can chain several caps without tracking widths.
+    public static int DrawKeyCap(int x, int y, string label, int font, Color text, Color fill)
+    {
+        int padX = Math.Max(4, font / 3);
+        int width = Raylib.MeasureText(label, font) + 2 * padX;
+        int height = font + font / 4;
+
+        DrawPanel(x, y, width, height, 4, fill, Palette.PanelEdge, shadow: false);
+        Raylib.DrawText(label, x + padX, y + (height - font) / 2, font, text);
+        return x + width;
+    }
+
     // Frame-rate independent smoothing toward a target value.
     public static float EaseToward(float current, float target, float perSecond, float frameTime)
         => current + (target - current) * Math.Clamp(perSecond * frameTime, 0f, 1f);

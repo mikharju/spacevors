@@ -30,6 +30,15 @@ public static class MountMenuRenderer
     const int CargoRowPaddingX = 10;
     const int CargoRowPaddingY = 5;
 
+    // The rules panel, opposite the cargo column. It holds what never changes about this screen, which
+    // leaves the line at the bottom free to say only what to do right now.
+    const int HelpPanelWidth = 440; // wide enough that no row wraps: a help list that wraps reads as a wall
+    const int HelpPanelMargin = 40;
+    const int HelpPanelGap = 24;
+    const float HelpPanelTopFraction = 0.2f;
+
+    static readonly ControlPanel.Section[] HelpSections = [new("Mounting", MenuCopy.MountingRows)];
+
     public readonly record struct SlotMarker(
         Entity SlotEntity,
         TurretSlotDefinition Slot,
@@ -114,7 +123,8 @@ public static class MountMenuRenderer
 
         foreach (string name in cargoNames)
         {
-            float width = Raylib.MeasureText(name, rowFont) + 2f * CargoRowPaddingX * scale;
+            // The row is measured against the two-word name it draws, so the box always holds the text.
+            float width = Raylib.MeasureText(MenuCopy.FriendlyWeaponName(name), rowFont) + 2f * CargoRowPaddingX * scale;
             cargo.Add(new CargoItem(name, cargoX, cargoY, width, rowPitch, name == heldWeapon));
             cargoY += rowPitch;
         }
@@ -170,10 +180,23 @@ public static class MountMenuRenderer
         }
 
         DrawCargo(prepared, hoveredCargo);
+        DrawHelpPanel(prepared, windowWidth, windowHeight);
 
         int font = (int)(UpgradeMenuRenderer.HintFontSize * prepared.Scale);
         Raylib.DrawText(prepared.Hint, windowWidth / 2 - Raylib.MeasureText(prepared.Hint, font) / 2,
             UpgradeMenuRenderer.GetHintY(windowHeight, prepared.Scale), font, Palette.TextMuted);
+    }
+
+    // Skipped when the hull is wide enough to reach the panel's slot — the hull and its arcs are the
+    // point of this screen, and text never earns the right to sit on top of them.
+    static void DrawHelpPanel(Prepared prepared, int windowWidth, int windowHeight)
+    {
+        int width = (int)(HelpPanelWidth * prepared.Scale);
+        int x = windowWidth - (int)(HelpPanelMargin * prepared.Scale) - width;
+        int hullRight = (int)(prepared.ShipX + prepared.ShipDiameter / 2f);
+        if (x < hullRight + (int)(HelpPanelGap * prepared.Scale)) return;
+
+        ControlPanel.Draw(x, (int)(windowHeight * HelpPanelTopFraction), width, HelpSections, [], MenuCopy.MountingNote, prepared.Scale);
     }
 
     // Cargo column: inactive weapons, each a click away from being mounted. The one in hand is framed.
@@ -201,7 +224,7 @@ public static class MountMenuRenderer
             }
 
             Color text = item.Held ? Palette.Accent : i == hoveredCargo ? Palette.TextBright : Palette.TextMuted;
-            Raylib.DrawText(item.WeaponName, (int)(item.ScreenX + CargoRowPaddingX * prepared.Scale), (int)item.ScreenY, headerFont, text);
+            Raylib.DrawText(MenuCopy.FriendlyWeaponName(item.WeaponName), (int)(item.ScreenX + CargoRowPaddingX * prepared.Scale), (int)item.ScreenY, headerFont, text);
         }
     }
 

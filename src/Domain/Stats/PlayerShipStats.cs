@@ -9,19 +9,23 @@ public static class PlayerShipStats
 
 public readonly record struct EngineLayout(
     string Name,
+    // One line in the player's terms, shown on the start-screen card. It says what the four numbers
+    // below feel like to fly, which is the ship's actual playstyle: the Manta *is* its engine.
+    // Written against the thrust values here, so a re-tuned engine needs its line re-read.
+    string Blurb,
     float ForwardThrust,
     float SideThrust,
     float BackThrust,
     // Hull turn rate in rad/s. A turret mount rated below this loses its target while the ship spins.
     float TurnRate)
 {
-    public static EngineLayout Balanced { get; } = new("Balanced", 400f, 80f, 80f, 1.33f);
-    public static EngineLayout Pursuit { get; } = new("Pursuit", 400f, 7f, 350f, 1.2f);
-    public static EngineLayout Slow { get; } = new("Slow", 200f, 40f, 100f, 0.67f);
+    public static EngineLayout Balanced { get; } = new("Balanced", "steady in every direction, quick to swing the nose", 400f, 80f, 80f, 1.33f);
+    public static EngineLayout Pursuit { get; } = new("Pursuit", "fast ahead and hard brakes, but it cannot slide sideways", 400f, 7f, 350f, 1.2f);
+    public static EngineLayout Slow { get; } = new("Slow", "heavy and slow to turn, armor buys the time it gives up", 200f, 40f, 100f, 0.67f);
 
     // Crab: the strafing engine. Sideways thrust nearly matches forward — the hull slides out of the
     // line of fire without turning, which is the whole point of the mounts bolted to its wings.
-    public static EngineLayout Crab { get; } = new("Crab", 260f, 210f, 90f, 1.1f);
+    public static EngineLayout Crab { get; } = new("Crab", "slides sideways and aims by drifting, not by turning", 260f, 210f, 90f, 1.1f);
 }
 
 public readonly record struct ShipType(
@@ -29,6 +33,9 @@ public readonly record struct ShipType(
     // Asset stem in assets/player-ships (ShipSpriteRenderer looks up "<key>", "<key>-texture", …).
     // Kept separate from Name so display text and filenames cannot drift together.
     string TextureKey,
+    // The card's one-line role: what this hull is for, in the player's terms. Deliberately not a list
+    // of its engines and guns — the card prints those from the fields below, so this line says what
+    // those numbers mean. Keep it short enough for one line on the start screen.
     string Description,
     EngineLayout Engine,
     WeaponLoadout Loadout,
@@ -51,7 +58,7 @@ public readonly record struct ShipType(
     public static ShipType Scout { get; } = new(
         Name: "Scout",
         TextureKey: "scout",
-        Description: "Balanced engines, a machine gun ahead and a repeater on the flank",
+        Description: "Small and quick. The easiest hull to fly",
         Engine: EngineLayout.Balanced,
         Loadout: WeaponLoadout.MachineGunRepeater,
         Slots: TurretLayouts.Scout,
@@ -66,7 +73,7 @@ public readonly record struct ShipType(
     public static ShipType Fighter { get; } = new(
         Name: "Fighter",
         TextureKey: "fighter",
-        Description: "Pursuit engines, machine gun and a side shotgun",
+        Description: "Fast, tough, and hard to bring around: it cannot slide aside",
         Engine: EngineLayout.Pursuit,
         Loadout: WeaponLoadout.MachineGunShotgun,
         Slots: TurretLayouts.Fighter,
@@ -81,7 +88,7 @@ public readonly record struct ShipType(
     public static ShipType Heavy { get; } = new(
         Name: "Heavy",
         TextureKey: "heavy",
-        Description: "Slow engines, armor, machinegun and a scatter cannon, shotgun and flak as support",
+        Description: "An armored wall of guns. It survives by tanking, not dodging",
         Engine: EngineLayout.Slow,
         Loadout: WeaponLoadout.HeavyFlak,
         Slots: TurretLayouts.Heavy,
@@ -97,7 +104,7 @@ public readonly record struct ShipType(
     public static ShipType Shadow { get; } = new(
         Name: "Shadow",
         TextureKey: "shadow",
-        Description: "Balanced engines, a scatter cannon ahead and a cutter on the flank",
+        Description: "A bench hull for close-range guns. Diagnostics only",
         Engine: EngineLayout.Balanced,
         Loadout: WeaponLoadout.ShadowCloseSuite,
         Slots: TurretLayouts.Shadow,
@@ -116,7 +123,7 @@ public readonly record struct ShipType(
     public static ShipType Falcon { get; } = new(
         Name: "Falcon",
         TextureKey: "falcon",
-        Description: "Pursuit engines, a machine gun, two free 180° flank mounts",
+        Description: "Long and thin: hard to hit, with two wide flanks still empty",
         Engine: EngineLayout.Pursuit,
         Loadout: WeaponLoadout.InMainGun(WeaponType.MachineGun),
         Slots: TurretLayouts.Falcon,
@@ -135,7 +142,7 @@ public readonly record struct ShipType(
     public static ShipType Eagle { get; } = new(
         Name: "Eagle",
         TextureKey: "eagle",
-        Description: "Slow engines, armor, a scatter cannon, 150° flanks and a full aft arc",
+        Description: "An armored gunship that answers from every direction",
         Engine: EngineLayout.Slow,
         Loadout: WeaponLoadout.ScatterCannonFlank,
         Slots: TurretLayouts.Eagle,
@@ -155,7 +162,7 @@ public readonly record struct ShipType(
     public static ShipType Manta { get; } = new(
         Name: "Manta",
         TextureKey: "manta-ray",
-        Description: "Crab engines that strafe, a machine gun and narrow forward mounts",
+        Description: "Aims by sliding sideways. The best dodge in the game",
         Engine: EngineLayout.Crab,
         Loadout: WeaponLoadout.MachineGunRepeater,
         Slots: TurretLayouts.Manta,
@@ -174,7 +181,7 @@ public readonly record struct ShipType(
     public static ShipType Raptor { get; } = new(
         Name: "Raptor",
         TextureKey: "raptor",
-        Description: "Balanced engines, a machine gun, twin 160° broadside mounts — one empty",
+        Description: "Broadside guns. One big mount still waiting for a second",
         Engine: EngineLayout.Balanced,
         Loadout: WeaponLoadout.MachineGunBroadside,
         Slots: TurretLayouts.Raptor,
@@ -222,7 +229,7 @@ public readonly record struct ShipType(
         Shadow with
         {
             Name = $"Shadow {weapon.Name}",
-            Description = $"Balanced engines, {weapon.Name}",
+            Description = $"Bench hull carrying one {weapon.Name}",
             Loadout = loadoutOverride ?? WeaponLoadout.InMainGun(weapon),
         };
 }

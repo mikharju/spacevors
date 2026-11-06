@@ -40,8 +40,14 @@ Goal:
 ## Controls
 
 ### Ship selection (start)
-- Arrows/WASD or mouse wheel: browse the scrollable ship list
+- Up/W, Down/S or mouse wheel: browse the scrollable ship list; moving the mouse over a card highlights
+  it, and Enter then picks that card. A/D are deliberately not browse keys — they strafe in flight
 - Click, Enter, or 1-8: choose ship
+- The screen teaches the rest by itself: a FLYING / IN A FIGHT key-cap panel left of the list (hidden
+  below 1160 px window width, where the hint line carries the same keys), and on every card a role line
+  plus HULL hp and armor, ENGINES with what that engine does, GUNS naming each gun and where it points,
+  and the still-empty mounts. Shift boost is not on the panel — it is a candidate for removal, so the
+  panel does not teach a control the game may stop having
 
 ### In-game
 - W: forward thrust
@@ -120,6 +126,7 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Lit sprite rendering: skip transparent texels, pack depth into the normal map, 512 px mipmapped maps, count/colour the gathered lights, key+fill+rim+spec rig — shipped 2026-11-02 — plans/LIT_SPRITE_RENDERING.md
 - Ship tint palette: neutral fill + cool rim, per-faction hull tint (ivory player, crimson enemies), faction engine glow; magenta reserved for elites, gold for bosses — shipped 2026-11-02 — plans/SHIP_TINT_PALETTE.md
 - Thruster flame anchors: flame/light bases at the hull shape's support along the thrust direction instead of the bounding radius — shipped 2026-11-02 — plans/THRUSTER_FLAME_ANCHORS.md
+- Start-screen onboarding: control panel and role/engine/gun cards on the ship list, instruction blocks on the upgrade and turret-mount screens, two-word gun names everywhere, text blocks scaled with the window and hull previews on one shared scale (R 46 → R 111) — shipped 2026-11-06 — plans/START_SCREEN_ONBOARDING.md
 
 ### Tools
 - Perf scenarios, harness, gates, cost logging — shipped — plans/PERF_SCENARIOS.md

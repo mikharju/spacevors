@@ -35,7 +35,7 @@ public static class UpgradeMenuRenderer
 
     public static int GetHintY(int windowHeight, float scale) => (int)(windowHeight - (BottomMargin + HintFontSize) * scale);
 
-    public static void DrawCards(int windowWidth, int windowHeight, PendingUpgradeOptions options, int hoveredIndex, float scale, int rerollCharges, bool hoveredReroll)
+    public static void DrawCards(int windowWidth, int windowHeight, PendingUpgradeOptions options, int hoveredIndex, float scale, int rerollCharges, bool hoveredReroll, int level)
     {
         if (options.Bundles.Length == 0) return;
 
@@ -52,14 +52,48 @@ public static class UpgradeMenuRenderer
             DrawBundleCard((int)topLeft.X, (int)topLeft.Y, w, h, options.Bundles[i], (i + 1).ToString(), i == hoveredIndex, fade, scale);
         }
 
-        // A level takes one of the five bundles (plans/UPGRADE_BUNDLE_PAIRS.md), so the hint teaches the card
-        // layout rather than a pick count: the strong card is the one on top.
-        string hint = "Click a bundle or press keys — strong card above, weak card below";
+        var (firstCard, _, _) = GetUpgradeCardRect(0, options.Bundles.Length, windowWidth, windowHeight, scale);
+        if (level <= HelpUntilLevel)
+            DrawInstructions(windowWidth, (int)firstCard.Y, InstructionLines(options), fade, scale);
+
+        // A level takes one of the five bundles (plans/UPGRADE_BUNDLE_PAIRS.md), so the hint names the
+        // thing to click rather than a count to pick. The teaching block above the cards carries the rest.
+        string hint = "Click a bundle or press its number";
         int font = (int)(HintFontSize * scale);
         Raylib.DrawText(hint, windowWidth / 2 - Raylib.MeasureText(hint, font) / 2, GetHintY(windowHeight, scale), font,
             Ui.WithAlpha(Palette.TextMuted, fade));
 
         DrawRerollPanel(windowWidth, windowHeight, scale, rerollCharges, hoveredReroll, fade);
+    }
+
+    // The first hands are the ones that need explaining: a bundle is taken whole, and the strong card is
+    // the one on top. After that the block goes away rather than sit over a stats panel that has grown
+    // with the ship's guns (plans/START_SCREEN_ONBOARDING.md).
+    const int HelpUntilLevel = 3;
+    const int InstructionGap = 22;
+
+    static string[] InstructionLines(PendingUpgradeOptions options) =>
+        options.Bundles.Any(b => b.Powerful.IsNewWeapon || b.Weak.IsNewWeapon)
+            ? [.. MenuCopy.UpgradeLines, MenuCopy.UpgradeWeaponLine]
+            : MenuCopy.UpgradeLines;
+
+    static void DrawInstructions(int windowWidth, int cardTop, string[] lines, float fade, float scale)
+    {
+        int font = (int)(HintFontSize * scale);
+        int pitch = font + (int)(6 * scale);
+        int maxWidth = windowWidth - 2 * (int)(UpgradeCardSideMargin * scale);
+        var wrapped = lines.Select(line => Ui.WrapText(line, maxWidth, font)).ToArray();
+        int y = cardTop - (int)(InstructionGap * scale) - wrapped.Sum(w => w.Length) * pitch;
+
+        for (int i = 0; i < wrapped.Length; i++)
+        {
+            Color color = i == 0 ? Palette.TextBright : Palette.TextMuted;
+            foreach (string line in wrapped[i])
+            {
+                Raylib.DrawText(line, windowWidth / 2 - Raylib.MeasureText(line, font) / 2, y, font, Ui.WithAlpha(color, fade));
+                y += pitch;
+            }
+        }
     }
 
     // The salvage panel: how many reroll charges the player holds, and the key that spends one. It rides
@@ -154,7 +188,7 @@ public static class UpgradeMenuRenderer
         int statFont = (int)(UpgradeCardStatFontSize * scale);
         string[] specs = NewWeaponSpecs(option) ?? [];
 
-        string[] labelLines = WrapText(GetUpgradeLabel(option), width - (int)(24 * scale), labelFont);
+        string[] labelLines = Ui.WrapText(GetUpgradeLabel(option), width - (int)(24 * scale), labelFont);
         int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
         int linePitch = labelFont + (int)(3 * scale);
         int labelHeight = numLines * linePitch - (int)(3 * scale);
@@ -187,45 +221,19 @@ public static class UpgradeMenuRenderer
     private static void DrawKeyBadge(int x, int y, string key, float fade, float scale)
     {
         int badgeSize = (int)(24 * scale);
-        Ui.DrawRoundedRect(x, y, badgeSize, badgeSize, (int)(5 * scale), Ui.WithAlpha(new Color(60, 60, 78, 255), fade));
+        Ui.DrawRoundedRect(x, y, badgeSize, badgeSize, (int)(5 * scale), Ui.WithAlpha(Palette.KeyCapFill, fade));
 
         int font = (int)(18 * scale);
         int keyWidth = Raylib.MeasureText(key, font);
         Raylib.DrawText(key, x + (badgeSize - keyWidth) / 2, y + (int)(4 * scale), font, Ui.WithAlpha(Palette.TextBright, fade));
     }
 
-    private static string[] WrapText(string text, int maxWidth, int fontSize)
-    {
-        var lines = new List<string>();
-        string current = "";
-
-        foreach (var word in text.Split(' '))
-        {
-            string candidate = current.Length == 0 ? word : $"{current} {word}";
-            if (current.Length == 0 || Raylib.MeasureText(candidate, fontSize) <= maxWidth)
-            {
-                current = candidate;
-            }
-            else
-            {
-                lines.Add(current);
-                current = word;
-            }
-        }
-
-        if (current.Length > 0) lines.Add(current);
-        return lines.ToArray();
-    }
-
     private static string GetUpgradeLabel(UpgradableOption option)
     {
         if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage)
-        {
-            return $"new weapon {option.WeaponName}";
-        }
+            return $"new weapon {MenuCopy.FriendlyWeaponName(option.WeaponName)}";
 
         if (string.IsNullOrEmpty(option.WeaponName))
-        {
             return option.Stat switch
             {
                 UpgradeOption.Hp => "hit points",
@@ -234,48 +242,30 @@ public static class UpgradeMenuRenderer
                 // plans/SHIELDS.md: the pool drinks a hit whole instead of taxing it, then recharges
                 // behind a short shock. The card's value line is the points it banks: +16.
                 UpgradeOption.Shield => "hull shield",
+                UpgradeOption.PickupRadius => "pickup radius",
                 UpgradeOption.ForwardAcceleration => "forward acceleration",
                 UpgradeOption.TurnSpeed => "turn speed",
                 UpgradeOption.SideThrust => "side thrust",
                 UpgradeOption.BackThrust => "back thrust",
                 _ => $"{option.Stat}"
             };
-        }
 
-        // Bespoke wording for the base-loadout weapons; everything else uses generic templates.
-        string name = option.WeaponName;
-        if (name == WeaponType.MachineGun.Name)
+        // A gun is spelled on the card the way the start screen and the stats panel spell it, so
+        // "MachineGun range" and "Machine Gun ahead" stop being two names for one gun. The bespoke
+        // wording the starting guns had ("side shot attack speed") said less than the gun's own name,
+        // so it is gone rather than translated.
+        string name = MenuCopy.FriendlyWeaponName(option.WeaponName);
+        return option.Stat switch
         {
-            return option.Stat switch
-            {
-                UpgradeOption.FireRate => "machine gun attack speed",
-                UpgradeOption.ProjectileSpeed => "machine gun projectile speed",
-                _ => GenericWeaponLabel(option)
-            };
-        }
-
-        if (name == WeaponType.Shotgun.Name)
-        {
-            return option.Stat switch
-            {
-                UpgradeOption.FireRate => "side shot attack speed",
-                UpgradeOption.ProjectileSpeed => "side shot projectile speed",
-                _ => GenericWeaponLabel(option)
-            };
-        }
-
-        return GenericWeaponLabel(option);
-
-        static string GenericWeaponLabel(UpgradableOption o) => o.Stat switch
-        {
-            UpgradeOption.Range => $"{o.WeaponName} range",
-            UpgradeOption.Damage => $"{o.WeaponName} damage",
+            UpgradeOption.Range => $"{name} range",
+            UpgradeOption.Damage => $"{name} damage",
+            UpgradeOption.FireRate => $"{name} attack speed",
+            UpgradeOption.ProjectileSpeed => $"{name} projectile speed",
             // plans/ARMOR_AND_PIERCE.md: the gun's line against the one armored hull.
-            UpgradeOption.ArmorPierce => $"{o.WeaponName} armor pierce",
+            UpgradeOption.ArmorPierce => $"{name} armor pierce",
             // R19: the rounds are what carry the hit points, so the card says whose rounds get tougher.
-            UpgradeOption.MissileHealth => $"{o.WeaponName} missile health",
-            UpgradeOption.PickupRadius => "pickup radius",
-            _ => $"{o.WeaponName} {o.Stat}"
+            UpgradeOption.MissileHealth => $"{name} missile health",
+            _ => $"{name} {option.Stat}"
         };
     }
 

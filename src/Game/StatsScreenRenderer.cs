@@ -57,7 +57,7 @@ public static class StatsScreenRenderer
 
         if (hasCards)
         {
-            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale, prepared.RerollCount, hoveredReroll);
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale, prepared.RerollCount, hoveredReroll, level);
             return;
         }
 
@@ -71,7 +71,7 @@ public static class StatsScreenRenderer
             int font = (int)(RowFontSize * prepared.Scale);
             Raylib.DrawText(ManageMountsLabel, x + (w - Raylib.MeasureText(ManageMountsLabel, font)) / 2, y + (h - font) / 2, font,
                 hoveredManage ? Palette.TextBright : Palette.TextMuted);
-            DrawHint("Tab to close — the button rearranges turrets and cargo", windowWidth, windowHeight, prepared.Scale);
+            DrawHint("Tab to close · the button rearranges turrets and cargo", windowWidth, windowHeight, prepared.Scale);
         }
         else
             DrawHint("Tab to close", windowWidth, windowHeight, prepared.Scale);
@@ -160,7 +160,7 @@ public static class StatsScreenRenderer
         {
             var section = layout.WeaponSections[i];
             int headerFont = (int)(HeaderFontSize * scale);
-            Raylib.DrawText(section.Title.ToUpper(), rightX + padX, y, headerFont, Palette.Accent);
+            Raylib.DrawText(section.Title.ToUpperInvariant(), rightX + padX, y, headerFont, Palette.Accent);
             Raylib.DrawRectangle(rightX + padX, y + headerFont + 4, rightW - 2 * padX, 1, Palette.PanelEdge);
             y += (int)(HeaderHeight * scale);
             for (int r = 0; r < section.Rows.Length; r++)
@@ -266,14 +266,15 @@ public static class StatsScreenRenderer
                 new("Range / bullet life", $"{FormatInt(turret.Range)} px · {turret.Weapon.ShotLifetime:0.0}s", CountOf(em, playerEntity, UpgradeOption.Range, weaponName)),
                 // The arc belongs to the hull mount, the slew rate to the weapon: together they say
                 // whether this gun keeps its target while the ship turns.
-                new("Mount / firing arc", mount is { } m ? $"{m.Name} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "—", -1),
+                new("Mount / firing arc", mount is { } m ? $"{m.Name} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "-", -1),
                 new("Turret turn speed", $"{(int)MathF.Round(Angle.ToDeg(turret.Weapon.TurnSpeed))}°/s", -1),
             };
             // Pierce only earns a row once bought — every gun starts at 0 and a wall of zeros would
             // pad the panel (plans/ARMOR_AND_PIERCE.md).
             if (turret.Weapon.Pierce > 0)
                 rows.Add(new("Armor pierce", FormatInt(turret.Weapon.Pierce), CountOf(em, playerEntity, UpgradeOption.ArmorPierce, weaponName)));
-            weaponSections.Add(new StatsSection(weaponName.ToUpper(), [.. rows]));
+            // The gun's own id is PascalCase; the panel shows it as two words so it matches the start-screen card.
+            weaponSections.Add(new StatsSection(MenuCopy.FriendlyWeaponName(weaponName), [.. rows]));
         }
 
         return new StatsLayout([.. shipRows], [.. weaponSections]);

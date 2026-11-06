@@ -94,6 +94,10 @@ internal static class Palette
     public static readonly Color Shadow = new(0, 0, 0, 90);
     public static readonly Color TrackDark = new(10, 12, 20, 140);
 
+    // The box a key is written in (`Ui.DrawKeyCap`) and the upgrade-card number badge — one and the
+    // same box, so a key reads as a key whether it is in a control list or on a card.
+    public static readonly Color KeyCapFill = new(60, 60, 78, 255);
+
     // The dim wash behind the paused screens (stats, upgrades, slot picking).
     public static readonly Color ScreenDim = new(15, 15, 25, 215);
 

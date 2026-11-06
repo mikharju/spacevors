@@ -46,7 +46,7 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 
 - **Symptom**: `xdotool click 1` did not register as a selection in the game, while keys and wheel worked fine.
 - **Cause**: The press+release can land between two input polls (frame ~8 ms at 120 fps); per-frame `IsMouseButtonPressed` then never sees the transition.
-- **Fix / Prevention**: Send explicit slow clicks: `xdotool mousemove X Y mousedown 1; sleep 0.3; xdotool mouseup 1`. And take the coordinates from the rendered frame, not from layout constants: the stats screen shrinks its content to fit, so a hand-computed button position can be off by tens of pixels and the click lands harmlessly on nothing.
+- **Fix / Prevention**: Send explicit slow clicks: `xdotool mousemove X Y mousedown 1; sleep 0.3; xdotool mouseup 1` — or use `.tools/input.sh click`, which does that. And take the coordinates from the rendered frame, not from layout constants: the stats screen shrinks its content to fit, so a hand-computed button position can be off by tens of pixels and the click lands harmlessly on nothing. Measure at the window you are shooting: UI scale multiplies every layout number, so a button found at 1920 is elsewhere in a 2560-wide window.
 
 ## 7. Stale binary after a failed rebuild (silent)
 
@@ -765,3 +765,35 @@ and reports the mismatch against that instead of saying "no such overload".
 message is what makes a sweep failure debuggable in one read — and note that the collection asserts that *do*
 take a `because` (`Assert.True`, `Assert.False`, `Assert.DoesNotContain`, `Assert.InRange`) are the ones to aim
 the message at.
+## 79. On-screen text silently loses glyphs the default font has no bitmap for
+
+- **Symptom**: A card line and a hint printed "?" where the copy had an em dash: "Small and quick ? the
+  easiest hull to fly". Nothing in the build, the log or the code says so.
+- **Cause**: raylib's default bitmap font has no em dash (and no other punctuation outside its small
+  ASCII-plus set), and `DrawText` falls back to the missing-glyph box without warning. `MeasureText`
+  measures the "?" just as happily, so the line still lays out as if it were correct.
+- **Fix / Prevention**: on-screen strings use ASCII punctuation, or `·`, which the font does have; a
+  colon or a comma reads as well as a dash in a line of UI copy. Comments and the root docs keep their
+  em dashes — only text handed to `DrawText` goes through the font. Verify rendered copy from a
+  native-scale crop of the shot (entry 46), not from the downscaled full frame, where the "?" is two
+  pixels tall and invisible. `MenuCopy` records the rule where the copy lives.
+- **Related trap when text is scaled up**: the same bitmap font rounds every glyph advance *up* as the
+  size grows, so a line measured to fit at 1x can measure wider than its box at 1.33x and wrap onto a
+  second line. Give a wrapped text column ~15% more than the longest line needs at the design size
+  (the start-screen cards and panel do), and check the layout at a window wider than 1920 — with
+  `SCREEN=2560x1440x24 .tools/xvfb.sh` plus `xdotool windowsize`, since a 1920 display can never show
+  a scale above 1x.
+
+## 80. `Escape` ends the run instead of closing a screen — except on the turret-mount screen
+
+- **Symptom**: A headless test sent `key Escape` on the level-up screen to dismiss it; the process exited
+  with code 0, the log ends at `Window closed successfully`, and there is no `[GAME OVER]`, no quit log
+  line and no clue in the code path being tested. The next `input.sh` reports "no SpaceVors window".
+- **Cause**: `GameSession` calls `Raylib.SetExitKey(onMountsScreen ? NoExitKey : Escape)`, so Escape is
+  raylib's window-close key on every screen *except* the mounts screen, where it is deliberately
+  swallowed and used to leave that screen. Screens without their own Escape handler — ship select,
+  level-up, stats — therefore quit the game.
+- **Fix / Prevention**: never send `Escape` in a test run unless quitting is the point. Dismiss a screen
+  with its own key: a digit or a click takes a bundle, `Tab` toggles the stats panel, `Enter` selects on
+  ship select. When a held-key harness leaves a screen, check `app.log` for the `Window closed` line
+  before concluding the next input did nothing.

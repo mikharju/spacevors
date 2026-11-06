@@ -931,17 +931,20 @@ public sealed class GameSession
         DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
     }
 
+    // Only what to do right now — the keys, the rings and what cargo means are on the panel, so this
+    // line does not have to repeat them every time it changes.
     private string MountsHint(WeaponCargo cargo)
     {
-        if (_heldWeapon.Length == 0)
-            return "Click a mounted turret, or press its number, to take it down into cargo — Esc to go back";
-
         string exit = _mountsFromStats ? "Esc to go back" : "Esc to finish";
+        string gun = MenuCopy.FriendlyWeaponName(_heldWeapon);
+
+        if (_heldWeapon.Length == 0)
+            return $"Nothing in hand: click a mounted turret to take it down · {exit}";
 
         if (_heldIsCardWeapon || !cargo.Holds(_heldWeapon))
-            return $"Green ring = the mount fits {_heldWeapon}: click one, or press its number — C stores it in cargo — {exit}";
+            return $"{gun} in hand: the ringed mounts fit it · {exit}";
 
-        return $"{_heldWeapon} is in hand: click a mount to fit it, a filled mount swaps it into cargo — {exit}";
+        return $"{gun} in hand: click a mount to fit it, a filled mount swaps · {exit}";
     }
 
     // A mount click. With a weapon in hand it goes into that mount, and any gun already there comes
