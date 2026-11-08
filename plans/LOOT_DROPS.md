@@ -251,3 +251,34 @@ old absolute numbers (10/30/60/100/550) and this file's 2026-11-02 XP follow-up 
   total is triangular in whatever the step is. Re-tuning the knob needs no test edit.
 - What the step does to pacing is measured, not assumed: see the `[UPGRADE] level=…` rows and the level
   readout in a run (plans/UPGRADE_HAND_COMPOSITION.md §10 asks for that histogram).
+
+## Follow-up (2026-11-08): one tracking rule, and it covers every pickup
+
+The magnet used to have two pulls. XP and health orbs committed (`Chased`) and closed at a constant
+hull-matched speed; the three capsules used the gentle accelerating pull instead — `MagnetAcceleration`
+800 px/s² capped at `MaxMagnetSpeed` 350 px/s — and never committed on their own. A hull that brushed a
+salvage capsule and kept flying outran 350 px/s, the capsule stopped being pulled once the hull left the
+radius, and it drifted off in whatever direction it had been going until its 90 s clock ran out. Loot the
+player had already earned, lost. The complaint was reported against the salvage field and applied to every
+capsule.
+
+Now every pickup follows the same way, and the rule is the XP orb's:
+
+- It lies where it fell until the hull comes inside `Player.PickupRadius`.
+- Then it **commits** (`Chased`, now on `SalvageField` and `EcmPulse` too) and closes at
+  `LootStats.ChaseSpeedFor(playerSpeed)` — floored at the 1200 px/s XP orbs have always used, matching the
+  hull with margin above it, capped at 2400. The commit is one-way and also freezes the lifetime, so nothing
+  that was briefly in range can escape, expire mid-flight, or fall back to lying still.
+- `PullTowardsPlayer`, `MagnetAcceleration` and `MaxMagnetSpeed` are gone: one motion, one helper
+  (`ChaseTowardsPlayer`), one speed rule. `HealthOrbChaseSpeedFor` became `ChaseSpeedFor`.
+
+Tradeoff accepted: a capsule no longer drifts in like wreckage — once the hull is in range it sprints in.
+The read is the same as the orbs' and it is the only way the guarantee can hold at boost speed.
+
+Verification: `src/Tests/HealthOrbChaseTest.cs` became `src/Tests/PickupChaseTest.cs`, which keeps the
+health-orb cases and adds the graze case for each capsule — a hull already doing 1500 px/s brushes a capsule
+100 px behind it and then never slows down; the reroll token still stocks its charge, the salvage field
+still arrives and still sweeps an orb that was never in range, the ECM capsule still arrives and still jams.
+`dotnet test` 668 passed. `scenario.sh baseline-idle --sim --iters 3` median 0.35 ms against the 0.33 ms row
+above (noise; no scenario seeds pickups, so `PickupMagnetSystem` runs over nothing there), budget pass — the
+change removes a component read per capsule per tick and adds none.

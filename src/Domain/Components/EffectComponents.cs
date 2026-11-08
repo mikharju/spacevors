@@ -34,9 +34,10 @@ public readonly record struct HealSpark(float Lifetime, float InitialLifetime = 
 public readonly record struct SmokePuff(float Lifetime, float InitialLifetime = 1f, float Radius = 6f);
 
 // Loot lifetimes are 90 s — long enough for one wave's scattered loot to outlive the lull that
-// follows it (plans/WAVES_AND_BREATHERS.md). `Chased` means the same thing for all three pickups: the
-// orb or capsule has committed to the hull, so it closes at the committed chase speed and stops aging —
-// a pickup already on its way that expired mid-flight would read as loot the game stole.
+// follows it (plans/WAVES_AND_BREATHERS.md). `Chased` means the same thing for every pickup, capsules
+// included: the hull has come inside its range, so it has committed to the hull — it closes at the
+// committed chase speed and stops aging. A pickup already on its way that expired mid-flight would read
+// as loot the game stole, and one that could fall back to lying still could drift off behind a fast hull.
 public readonly record struct HealthOrb(float Lifetime = 90f, float Radius = 8f, bool Chased = false);
 
 public readonly record struct XpPickup(int XpAmount, float Lifetime = 90f, float Radius = 6f, bool Chased = false);
@@ -48,15 +49,16 @@ public readonly record struct RerollToken(float Lifetime = 90f, float Radius = 8
 
 // A salvage field: the same grey capsule with a slow pulsing ring (plans/ECM_PULSE_AND_SALVAGE_FIELD.md).
 // Touching it sweeps the battlefield once — every XP orb, every currency capsule, and just enough of the
-// nearest health orbs to fill the hull. The sweep is decided on the tick it is touched, so the capsule
-// needs no state beyond its look.
-public readonly record struct SalvageField(float Lifetime = 90f, float Radius = 8f, float Spin = 0f);
+// nearest health orbs to fill the hull. The sweep is decided on the tick it is touched, so beyond the
+// commit flag every pickup carries it needs no state for the sweep itself.
+public readonly record struct SalvageField(float Lifetime = 90f, float Radius = 8f, float Spin = 0f, bool Chased = false);
 
 // The ECM capsule. It has no lifetime: an ECM capsule waits on the field for as long as the run does, and a
 // salvage field deliberately never pulls one in, so using it always means flying somewhere dangerous.
+// Once the hull is inside its range it commits like every other pickup and cannot be shaken off.
 // `Spin` and `Flash` are advanced by PickupMagnetSystem like `RerollToken.Spin`, for the same reason: a
 // seeded run must render the same pose and the same flash phase twice.
-public readonly record struct EcmPulse(float Radius = 8f, float Spin = 0f, float Flash = 0f);
+public readonly record struct EcmPulse(float Radius = 8f, float Spin = 0f, float Flash = 0f, bool Chased = false);
 
 // The ring that fires out of a collected ECM capsule. A cue only — the jam itself is world-wide, so the
 // ring says "that just went off" rather than "this far is affected". It grows from nothing to `MaxRadius`

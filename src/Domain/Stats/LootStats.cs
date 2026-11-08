@@ -46,24 +46,21 @@ public static class LootStats
     public const float FieldCapsuleRadius = RerollTokenRadius;
     public const float EcmCapsuleRadius = RerollTokenRadius;
 
-    // Magnet pull applied while a pickup is inside the player's pickup radius and has not committed yet.
-    // This is the debris pull the salvage capsules use: gentle, capped below hull speed on purpose.
-    public const float MagnetAcceleration = 800f;
-    public const float MaxMagnetSpeed = 350f;
-
-    // Once a pickup has committed to the hull — it came inside the magnet radius, or a salvage field
-    // swept it up — it closes at this constant speed and re-aims every tick instead of accelerating from
-    // rest. `MaxMagnetSpeed` is under most hulls' cruise speed, which is why health orbs used to lose the
-    // chase and read as uncollectable; a committed pickup cannot be outrun, which is what makes XP orbs
-    // effectively unmissable.
+    // The one tracking rule every pickup follows, capsules included (plans/LOOT_DROPS.md, plans/
+    // ECM_PULSE_AND_SALVAGE_FIELD.md). While the hull is outside its range a pickup lies where it fell; once
+    // the hull comes inside that range the pickup **commits** — the `Chased` flag — and closes at a constant
+    // speed re-aimed at the hull every tick instead of accelerating from rest. A committed pickup cannot be
+    // outrun and never expires, so nothing that was briefly in range can drift off and be lost.
+    //
+    // The speed matches the hull with margin (a boosting hull reaches ~1500 px/s) under a cap that stops a
+    // runaway hull being chased by a hypersonic orb. Below `CommittedChaseSpeed / ChasePlayerSpeedFactor`
+    // (960 px/s) of hull speed the floor holds, which is the flat speed XP orbs have always used; above it
+    // every pickup matches the hull, so a boosting hull cannot shake a capsule it has already pulled.
+    // Same shape as `EnemyShipSystem.EffectiveSpeed`.
     public const float CommittedChaseSpeed = 1200f;
+    public const float ChasePlayerSpeedFactor = 1.25f;
+    public const float ChaseSpeedCap = 2400f;
 
-    // A health orb is worth more than a flat chase speed, so it matches the hull it is following with
-    // margin (a boosting hull reaches ~1500 px/s) under a cap that stops a runaway hull being chased by a
-    // hypersonic orb. Same shape as `EnemyShipSystem.EffectiveSpeed`.
-    public const float HealthOrbChasePlayerSpeedFactor = 1.25f;
-    public const float HealthOrbChaseSpeedCap = 2400f;
-
-    public static float HealthOrbChaseSpeedFor(float playerSpeed) =>
-        MathF.Min(MathF.Max(CommittedChaseSpeed, playerSpeed * HealthOrbChasePlayerSpeedFactor), HealthOrbChaseSpeedCap);
+    public static float ChaseSpeedFor(float playerSpeed) =>
+        MathF.Min(MathF.Max(CommittedChaseSpeed, playerSpeed * ChasePlayerSpeedFactor), ChaseSpeedCap);
 }

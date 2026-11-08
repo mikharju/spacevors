@@ -6,15 +6,15 @@ namespace Spacevors.Domain.Systems;
 // Every pickup the hull can collect, plus the two field capsules that change what the rest of the field
 // does (plans/ECM_PULSE_AND_SALVAGE_FIELD.md).
 //
-// Two pulls, on purpose:
-//  - `PullTowardsPlayer` is the debris pull: accelerating, capped below hull speed, so a capsule that fell
-//    inside the magnet radius drifts in like wreckage. Only uncommitted salvage capsules use it.
-//  - `ChaseTowardsPlayer` is the committed pull: a constant speed re-aimed at the hull every tick, so a
-//    pickup already hunting cannot be outrun. XP and health orbs use it, which is what stops a boosting
-//    hull shrugging off a health orb it has already touched.
+// One tracking rule for every pickup, orbs and capsules alike: it lies where it fell until the hull comes
+// inside its range, then it commits (`Chased`) and closes at `LootStats.ChaseSpeedFor`, re-aimed at the hull
+// every tick. The commit is one-way. A capsule that only accelerated and topped out under hull speed could be
+// outflown by a boosting hull right after being touched: it coasted off in whatever direction it was already
+// going, stopped being pulled once the hull left the magnet radius, and was lost. That is what this rule
+// rules out — no pickup escapes a hull that has been inside its range even briefly.
 //
-// A committed pickup (`Chased`) also stops aging: it is on its way, and a 90 s clock running out
-// mid-flight would read as loot the game stole.
+// A committed pickup also stops aging: it is on its way, and a 90 s clock running out mid-flight would read
+// as loot the game stole.
 public class PickupMagnetSystem : GameSystem
 {
     // Reused on the one tick a salvage field is collected, so the sweep decision allocates nothing.
@@ -37,21 +37,22 @@ public class PickupMagnetSystem : GameSystem
         Player player = playerTuple.Value1;
         Vector2 playerPos = playerTuple.Value2.Value;
 
+        float playerSpeed = view.TryGetComponent<Velocity>(playerEntity, out var playerVel) ? playerVel.Value.Magnitude : 0f;
+        float chaseSpeed = LootStats.ChaseSpeedFor(playerSpeed);
+
         // The field capsules go first: their sweep decision has to be in hand while the loot passes below
         // still write each pickup's component exactly once this tick.
-        SalvageSweep sweep = CollectSalvageFields(view, playerEntity, player, playerPos, deltaTime, commands);
-        CollectEcmPulses(view, player, playerPos, deltaTime, commands);
+        SalvageSweep sweep = CollectSalvageFields(view, playerEntity, player, playerPos, deltaTime, commands, chaseSpeed);
+        CollectEcmPulses(view, player, playerPos, deltaTime, commands, chaseSpeed);
 
-        float playerSpeed = view.TryGetComponent<Velocity>(playerEntity, out var playerVel) ? playerVel.Value.Magnitude : 0f;
-
-        ProcessXpPickups(view, playerEntity, player, playerPos, deltaTime, commands, sweep.XpRadius);
-        ProcessHealthOrbs(view, playerEntity, player, playerPos, playerSpeed, deltaTime, commands, sweep.HealthRadius);
-        ProcessRerollTokens(view, playerEntity, player, playerPos, deltaTime, commands, sweep.PullTokens);
+        ProcessXpPickups(view, playerEntity, player, playerPos, deltaTime, commands, sweep.XpRadius, chaseSpeed);
+        ProcessHealthOrbs(view, playerEntity, player, playerPos, deltaTime, commands, sweep.HealthRadius, chaseSpeed);
+        ProcessRerollTokens(view, playerEntity, player, playerPos, deltaTime, commands, sweep.PullTokens, chaseSpeed);
     }
 
-    // XP orbs are the many-entity pass: a constant magnet speed toward the hull rather than an
-    // acceleration, which is what makes them grabbable at any ship speed.
-    private void ProcessXpPickups(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, float magnetRadius)
+    // The many-entity pass: a constant speed toward the hull rather than an acceleration, which is what
+    // makes an orb grabbable at any ship speed.
+    private void ProcessXpPickups(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, float magnetRadius, float chaseSpeed)
     {
         int totalXpGained = 0;
 
@@ -64,7 +65,7 @@ public class PickupMagnetSystem : GameSystem
                 continue;
             }
 
-            float dist = ChaseTowardsPlayer(view, commands, pickupEntity, playerPos, magnetRadius, deltaTime, pickup.Chased, LootStats.CommittedChaseSpeed);
+            float dist = ChaseTowardsPlayer(view, commands, pickupEntity, playerPos, magnetRadius, deltaTime, pickup.Chased, chaseSpeed);
 
             if (dist < player.Radius + pickup.Radius)
             {
@@ -84,12 +85,10 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    // Health orbs hunt the hull at a speed that matches it, so a hull that boosts away cannot shake one
-    // it has already touched — the complaint this pass exists to answer.
-    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float playerSpeed, float deltaTime, CommandBuffer commands, float magnetRadius)
+    // Health orbs use the same rule as every other pickup; what they add is the heal and the sparks.
+    private void ProcessHealthOrbs(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, float magnetRadius, float chaseSpeed)
     {
         int totalHeal = 0;
-        float chaseSpeed = LootStats.HealthOrbChaseSpeedFor(playerSpeed);
 
         foreach (var (orbEntity, orb, pos) in view.GetEntitiesWithComponents<HealthOrb, Position>())
         {
@@ -121,10 +120,10 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    // Ship salvage: the debris pull, and one charge per capsule collected. The stock is a component of its
+    // Ship salvage: one charge per capsule collected. The stock is a component of its
     // own rather than a `Player` field — `ProcessXpPickups` ref-writes `Player.Xp` in this phase, so a
     // queued `Player` write built from a pre-phase copy would drop it.
-    private void ProcessRerollTokens(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, bool swept)
+    private void ProcessRerollTokens(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, bool swept, float chaseSpeed)
     {
         int collected = 0;
 
@@ -137,12 +136,10 @@ public class PickupMagnetSystem : GameSystem
                 continue;
             }
 
-            // A capsule nobody called in is wreckage and drifts; a swept one commits and flies, like
-            // everything else a salvage field pulls.
+            // A capsule the hull has never been near lies where it fell; one the hull has touched, or a
+            // salvage field called in, commits and closes on the hull like every other pickup.
             bool committed = token.Chased || swept;
-            float dist = committed
-                ? ChaseTowardsPlayer(view, commands, tokenEntity, playerPos, float.PositiveInfinity, deltaTime, committed, LootStats.CommittedChaseSpeed)
-                : PullTowardsPlayer(view, commands, tokenEntity, playerPos, player.PickupRadius, deltaTime);
+            float dist = ChaseTowardsPlayer(view, commands, tokenEntity, playerPos, player.PickupRadius, deltaTime, committed, chaseSpeed);
 
             if (dist < player.Radius + token.Radius)
             {
@@ -155,7 +152,7 @@ public class PickupMagnetSystem : GameSystem
             // seeded run draws the same pose in a screenshot twice; a capsule that fell on a later tick
             // starts turning later, so capsules never sit parallel.
             commands.Add(new AddComponentCommand<RerollToken>(
-                tokenEntity, token with { Lifetime = newLifetime, Spin = token.Spin + LootStats.CapsuleSpinRate * deltaTime, Chased = committed }));
+                tokenEntity, token with { Lifetime = newLifetime, Spin = token.Spin + LootStats.CapsuleSpinRate * deltaTime, Chased = committed || dist <= player.PickupRadius }));
         }
 
         if (collected > 0)
@@ -168,21 +165,22 @@ public class PickupMagnetSystem : GameSystem
     // A salvage field is spent on the tick the hull touches it: the sweep is decided there and once, so
     // damage taken while the loot is in flight does not call in a second wave. It pulls every XP orb and
     // every currency capsule in the world and only as many of the nearest health orbs as the hull needs to
-    // come back to full. An ECM capsule is not currency and is not pulled: it waits where it fell.
-    private SalvageSweep CollectSalvageFields(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands)
+    // come back to full. An ECM capsule is not currency and is never swept: it waits where it fell until the
+    // hull comes close enough to take it itself.
+    private SalvageSweep CollectSalvageFields(WorldView view, Entity playerEntity, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, float chaseSpeed)
     {
         SalvageSweep sweep = SalvageSweep.NoSweep(player.PickupRadius);
 
         foreach (var (capsuleEntity, capsule, _) in view.GetEntitiesWithComponents<SalvageField, Position>())
         {
-            float newLifetime = capsule.Lifetime - deltaTime;
+            float newLifetime = capsule.Chased ? capsule.Lifetime : capsule.Lifetime - deltaTime;
             if (newLifetime <= 0f)
             {
                 commands.Add(new DestroyEntityCommand(capsuleEntity));
                 continue;
             }
 
-            float dist = PullTowardsPlayer(view, commands, capsuleEntity, playerPos, player.PickupRadius, deltaTime);
+            float dist = ChaseTowardsPlayer(view, commands, capsuleEntity, playerPos, player.PickupRadius, deltaTime, capsule.Chased, chaseSpeed);
             if (dist < player.Radius + capsule.Radius)
             {
                 commands.Add(new DestroyEntityCommand(capsuleEntity));
@@ -191,8 +189,12 @@ public class PickupMagnetSystem : GameSystem
                 continue;
             }
 
-            commands.Add(new AddComponentCommand<SalvageField>(
-                capsuleEntity, capsule with { Lifetime = newLifetime, Spin = capsule.Spin + LootStats.CapsuleSpinRate * deltaTime }));
+            commands.Add(new AddComponentCommand<SalvageField>(capsuleEntity, capsule with
+            {
+                Lifetime = newLifetime,
+                Spin = capsule.Spin + LootStats.CapsuleSpinRate * deltaTime,
+                Chased = capsule.Chased || dist <= player.PickupRadius,
+            }));
         }
 
         return sweep;
@@ -222,12 +224,13 @@ public class PickupMagnetSystem : GameSystem
     }
 
     // The ECM capsule tumbles and flashes where it lies and never expires, so it stays a choice the player
-    // has to go and take. Touching it jams the whole world at once and fires the ring out from here.
-    private void CollectEcmPulses(WorldView view, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands)
+    // has to go and take — until the hull comes inside its range, after which it closes on the hull like
+    // every other pickup. Touching it jams the whole world at once and fires the ring out from here.
+    private void CollectEcmPulses(WorldView view, Player player, Vector2 playerPos, float deltaTime, CommandBuffer commands, float chaseSpeed)
     {
         foreach (var (capsuleEntity, capsule, pos) in view.GetEntitiesWithComponents<EcmPulse, Position>())
         {
-            float dist = PullTowardsPlayer(view, commands, capsuleEntity, playerPos, player.PickupRadius, deltaTime);
+            float dist = ChaseTowardsPlayer(view, commands, capsuleEntity, playerPos, player.PickupRadius, deltaTime, capsule.Chased, chaseSpeed);
             if (dist < player.Radius + capsule.Radius)
             {
                 commands.Add(new DestroyEntityCommand(capsuleEntity));
@@ -240,6 +243,7 @@ public class PickupMagnetSystem : GameSystem
             {
                 Spin = capsule.Spin + LootStats.CapsuleSpinRate * deltaTime,
                 Flash = capsule.Flash + LootStats.CapsuleFlashRate * deltaTime,
+                Chased = capsule.Chased || dist <= player.PickupRadius,
             }));
         }
     }
@@ -271,10 +275,11 @@ public class PickupMagnetSystem : GameSystem
         }
     }
 
-    // A committed pickup closes on the hull at a constant speed and re-aims every tick, so it neither stalls
-    // short of a fast hull nor orbits it. `magnetRadius` is the acquisition radius; pass infinity for a
-    // salvage field's "from anywhere". It reports the distance so the caller can decide whether the hull has
-    // already swallowed the pickup.
+    // The one motion every pickup makes, and the only one: an uncommitted pickup outside `magnetRadius` is
+    // left exactly where it lies, and anything else closes on the hull at a constant speed re-aimed every
+    // tick, so it neither stalls short of a fast hull nor orbits it. Pass an infinite radius for a salvage
+    // field's "from anywhere". It reports the distance so the caller can decide whether the hull has already
+    // swallowed the pickup, and whether this tick is the one that commits it.
     private static float ChaseTowardsPlayer(WorldView view, CommandBuffer commands, Entity pickup, Vector2 playerPos, float magnetRadius, float deltaTime, bool committed, float speed)
     {
         var pos = view.GetComponent<Position>(pickup).Value;
@@ -286,28 +291,6 @@ public class PickupMagnetSystem : GameSystem
 
         var newVel = diff / dist * speed;
         commands.Add(new AddComponentCommand<Position>(pickup, new Position(pos + newVel * deltaTime)));
-        commands.Add(new AddComponentCommand<Velocity>(pickup, new Velocity(newVel)));
-        return dist;
-    }
-
-    // Accelerates one capsule toward the hull while it is inside the magnet radius, and reports the
-    // distance so the caller can decide whether it has been collected. This is the wreckage pull: capped
-    // below hull speed on purpose, so loot that nobody called in still has to be flown to.
-    private static float PullTowardsPlayer(WorldView view, CommandBuffer commands, Entity pickup, Vector2 playerPos, float magnetRadius, float deltaTime)
-    {
-        var pos = view.GetComponent<Position>(pickup);
-        var diff = playerPos - pos.Value;
-        float dist = (float)Math.Sqrt(diff.X * diff.X + diff.Y * diff.Y);
-
-        if (dist <= 0f || dist >= magnetRadius) return dist;
-
-        Vector2 currentVel = view.TryGetComponent<Velocity>(pickup, out var vel) ? vel.Value : Vector2.Zero;
-        var newVel = currentVel + (diff / dist) * LootStats.MagnetAcceleration * deltaTime;
-
-        float speed = (float)Math.Sqrt(newVel.X * newVel.X + newVel.Y * newVel.Y);
-        if (speed > LootStats.MaxMagnetSpeed) newVel = newVel / speed * LootStats.MaxMagnetSpeed;
-
-        commands.Add(new AddComponentCommand<Position>(pickup, new Position(pos.Value + newVel * deltaTime)));
         commands.Add(new AddComponentCommand<Velocity>(pickup, new Velocity(newVel)));
         return dist;
     }

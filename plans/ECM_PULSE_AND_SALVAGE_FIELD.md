@@ -416,3 +416,27 @@ What the scenarios cannot see, and the honest state of it: the sweep's command b
 ms because nothing was jammed rather than because the pass is cheap. Their cost is bounded by construction
 (24 entities × 3 `DrawLineStrip` calls, 3 rings per wave) and their behaviour is covered by the sim tests.
 To see them: `SPACEVORS_DIAGNOSTIC=1`, press `E` or `F`, and read the `renderPasses` table.
+
+## Follow-up (2026-11-08): the two capsules commit to the hull like every other pickup
+
+D4 and D5 still hold — swept loot still flies in rather than teleporting, and a committed pickup still does
+not age — and D2 is untouched: a field never sweeps an ECM capsule. What changed is the capsules' **own**
+motion. Both field capsules used the debris pull (accelerate at 800 px/s², cap 350 px/s) and only a salvage
+field could commit a reroll token — proximity committed nothing.
+Grazing a capsule at boost speed and flying off therefore lost it: the capsule coasted after the hull at
+350 px/s, stopped being pulled once the hull left the magnet radius, and rotted on its 90 s clock (the ECM
+capsule has no clock, so it simply hung around behind the hull, still waiting to be caught up with). The
+report named the salvage field; the salvage field, the ECM capsule and the reroll token all had it.
+
+All three now do what the XP orb does — commit inside `Player.PickupRadius`, close at the hull-matched chase
+speed, and a committed pickup does not age — so a hull that has briefly been inside a capsule's range cannot
+lose it. plans/LOOT_DROPS.md owns the rule; the sweep's own decisions are unchanged: the field still spends
+itself on the tick the hull touches it, which under this rule may be several ticks after the graze, and an
+ECM capsule is still never swept by a field. That does mean an ECM capsule the hull has brushed now arrives
+whenever the hull next slows down, so the jam is no longer escapable once it has been triggered — accepted,
+since the jam is a boon and the alternative was a capsule that could not be collected at all.
+
+Verification: `src/Tests/PickupChaseTest.cs` grazes each capsule with a hull already doing 1500 px/s that
+never slows, and pins that the token stocks its charge, the field arrives and still sweeps an orb that was
+never in range, the ECM capsule arrives and still jams, and a capsule the hull never comes near stays
+exactly where it fell. `dotnet test` 668 passed.
