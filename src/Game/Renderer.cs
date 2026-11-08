@@ -98,6 +98,9 @@ public static class Renderer
         Raylib.ClearBackground(new Color(15, 15, 25, 255));
         RenderTimings.Pass("clear");
 
+        // Which textures were drawn for the very first time on this frame - the spike log's column.
+        LitGroupRenderer.BeginFrame();
+
         Lighting.BeginFrame(camX, camY, windowWidth, windowHeight);
         RenderTimings.Pass("lighting.begin");
         LightGatherer.Collect(em, camX, camY, windowWidth, windowHeight);

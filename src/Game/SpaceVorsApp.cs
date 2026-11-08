@@ -35,6 +35,7 @@ public static class SpaceVorsApp
 
         ImageLoader.LoadAssets();
         Lighting.Init();
+        SpikeLogger.Open();
 
         if (TryCeilingFromEnvironment(out double ceilingBudgetMs, out int ceilingStart, out int ceilingMax))
             RunCeiling(ceilingBudgetMs, ceilingStart, ceilingMax);
@@ -45,6 +46,7 @@ public static class SpaceVorsApp
 
         Lighting.Shutdown();
         ImageLoader.UnloadAssets();
+        SpikeLogger.Close();
         Raylib.CloseWindow();
     }
 

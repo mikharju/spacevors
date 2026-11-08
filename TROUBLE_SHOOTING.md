@@ -797,3 +797,18 @@ the message at.
   with its own key: a digit or a click takes a bundle, `Tab` toggles the stats panel, `Enter` selects on
   ship select. When a held-key harness leaves a screen, check `app.log` for the `Window closed` line
   before concluding the next input did nothing.
+
+## 81. `--check-baseline` in window mode always fails in the sandbox — the baselines are real-GPU
+
+- **Symptom**: `.tools/scenario.sh baseline-idle --iters 3 --check-baseline` in the sandbox prints
+  `frameMs.median 0.73 baseline vs 4.74 current, factor 6.49, FAIL` under a change that cannot cost
+  anything, and the header still claims `gate vs baseline (same host)`.
+- **Cause**: the committed `.tools/baselines/*.json` were recorded on the real-GPU window host, and the
+  host tag stored in them is the same string the sandbox run gets (`window`). Only the *scenario* is
+  checked, not the hardware. The baseline's 0.73 ms/frame is 1370 fps — unreachable under llvmpipe — and
+  its `simMs` median (0.18) is 5x below the sandbox's (0.9) on byte-identical sim code, which is the tell.
+- **Fix / Prevention**: in the sandbox, `--check-baseline` in window mode is meaningless: use `--sim`
+  for the gate (pure ECS cost, no rasteriser) and A/B the *same host* for render work — run the command
+  twice with the change stashed and unstashed, and read `summary.json`'s `frameMs.median`/`renderMs.median`
+  against each other, not against the baseline. A "regression" that appears only against the committed
+  baseline and not against the stashed control is the host, not the change (see #65).

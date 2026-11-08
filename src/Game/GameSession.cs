@@ -256,7 +256,15 @@ public sealed class GameSession
         // value describes the *previous* frame, which makes `other` land on the wrong row and can
         // even go negative.
         if (_scenario is not null) ReportScenarioFrame(TicksToMs(_frameSw.ElapsedTicks));
+        if (SpikeLogger.IsActive)
+            SpikeLogger.RecordFrame(TicksToMs(_frameSw.ElapsedTicks), TicksToMs(_lastSimTicks), TicksToMs(_lastRenderTicks), SpikeColumns());
     }
+
+    // The world counters of a spike row. A new enemy hull or asteroid type shows up as one of
+    // these counts jumping on exactly the frame that stalled.
+    string SpikeColumns() =>
+        $"t={_em.ElapsedTime:F1} ents={Count<Position>()} ships={Count<EnemyShip>()} " +
+        $"asteroids={Count<Asteroid>()} missiles={Count<Missile>()} ammo={Count<Ammo>()}";
 
     // The threat readout: one row a second saying what the fleet can currently throw at the hull and
     // what the hull can answer with. It prints in every run — it is the tuning record behind the

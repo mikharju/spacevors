@@ -5,7 +5,48 @@ Reference, usage only — no implementation details or history (plan files have 
 All helpers are active only with `SPACEVORS_DIAGNOSTIC=1`. It also turns on the cyan
 collider overlay — over hulls and rocks in flight, and over the hull previews on the ship-select
 cards — the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
-logs, and a fixed test asteroid at (0,-300). Without it the select cards show the ship art alone.
+logs, the spike log file (see below), and a fixed test asteroid at (0,-300). Without it the select
+cards show the ship art alone.
+
+## Spike log
+
+The `[FRAME]`/`[SYSTEM]` flood is ~100 lines per frame (a 4-minute session is ~70 MB of stdout), so
+a freeze you felt is hard to find afterwards. With diagnostics on, the game also writes **one line
+per stalled frame** to a file, so a whole session leaves a handful of rows:
+
+    [SPIKE] log: src/Game/bin/Debug/net10.0/spikes/spikes-20261108T135033Z-p15.log factor=4 floorMs=25 windowFrames=256 keepDays=1
+    [SPIKE] frame=2407 dt=65.7 sim=0.9 render=64.7 other=0.0 median=5.3 t=20.1 ents=53 ships=7 asteroids=35 missiles=0 ammo=1 \
+            worst=world.enemyShips:61.2ms subworst=enemyShips.litDraws:61.0ms litBlock=id=34 draws=1 gap=-1 px=0.01M begin=0.0 draw=0.0 flush=60.9ms \
+            newLit=34,35 gc0=0 gc1=0 gc2=0 allocKb=16
+    [SPIKE-END] frames=3000 spikes=1
+
+- A frame is a spike when `dt` reaches **4× the median of the last 256 frames** *and* 25 ms. The
+  first 64 frames are never judged, so the startup hitch is not reported.
+- `worst=` names the slowest render pass of that frame — `world.enemyShips` — and `subworst=` the
+  slowest part **inside** it. The lit sprite blocks and the collider overlay are timed separately
+  (`asteroids.litDraws`, `asteroids.overlay`, `enemyShips.litDraws`, `enemyShips.overlay`), and also
+  appear as their own `[RENDER-PASS]` rows every frame while the enclosing pass keeps its old total.
+  `other=` is what neither sim nor render accounts for.
+- `litBlock=` is the most expensive **lit sprite block** of the frame — one variant drawn for one
+  faction, the unit the shader is switched for. `id=` its base texture, `draws=` how many sprites it
+  batched, `px=` how much of the screen it painted, `gap=` how many frames since that variant was last
+  drawn (`-1` = never, `3600` ≈ 30 s at 120 fps), then where its milliseconds went: `begin=` shader
+  switch + uniforms + texture bind, `draw=` queueing the sprites, `flush=` the batch flush `EndDraw`
+  triggers — the GPU submission, and where a driver wait shows up. Reading a freeze: large `px` with
+  many `draws` is fill rate; time in `begin` is the bind; time in `flush` with a large `gap` is a
+  texture coming back cold; time in `flush` with `gap=-1` and `newLit` filled is a first-ever draw.
+- `newLit=` lists the texture ids drawn **for the first time ever** on that frame, `-` otherwise. On a
+  machine with a real GPU a first draw is cheap, so an empty `newLit` on a freeze frame rules the
+  first-use story out — under software rendering (llvmpipe) it is exactly what shows up.
+- `gc2=0` rules out a garbage-collection pause; a count that jumped versus the previous row (`ships`,
+  `asteroids`, `missiles`, …) marks the frame where new content first appeared.
+- Files go **inside the project, next to the running binary** — `spikes/` beside `Game.dll`, which for
+  a dev run is `src/Game/bin/Debug/net10.0/spikes/` (gitignored with `bin/`). Override with
+  `SPACEVORS_SPIKE_DIR`; a read-only install (an AppImage) cannot write beside its binary, so there it
+  needs the override or it warns and runs without the log. When a run opens its log it first deletes
+  `spikes-*.log` older than 1 day from that directory. Nothing is written without diagnostics.
+- The `[SPIKE] log:` line prints the exact path at startup, and `[SPIKE-END]` says how many spikes
+  the session found. Unflushed rows survive a crash: the file flushes on every line.
 
 Keys (in-game):
 
@@ -30,6 +71,8 @@ Keys (in-game):
 Environment variables:
 
 - `SPACEVORS_DIAGNOSTIC=1` — enables everything above
+- `SPACEVORS_SPIKE_DIR=<dir>` — send the spike-log files somewhere other than `spikes/` beside the
+  binary — e.g. a `.tools/run/...` dir, to keep a run's spikes with its logs. Only read with diagnostics on
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Range:MachineGun,Hp:,FireRate:MachineGun"` — scripted upgrade choices,
   one entry per **card granted**: a level grants the two cards of one bundle (plans/UPGRADE_BUNDLE_PAIRS.md),
   so entries are consumed **in pairs, strong card then weak card** — an odd leftover entry is not a bundle and

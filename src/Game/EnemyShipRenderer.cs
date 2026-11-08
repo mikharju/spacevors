@@ -93,15 +93,20 @@ public static class EnemyShipRenderer
                 _diagnosticShapes.Add((screenCx, screenCy, angleDeg, enemyShip.GraphicsId, enemyShip.Radius));
         }
 
-        LitGroupRenderer.Draw(_litDraws);
+        // Sub-segmented like the asteroid pass: the lit blocks and the collider overlay have very
+        // different costs, and the spike row names whichever one stalled.
+        RenderTimings.SubPass("enemyShips.litDraws", () => LitGroupRenderer.Draw(_litDraws));
 
         foreach (var (cx, cy) in _turretMarkers)
             RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 
         // After the batch flush, so the collider sits over the sprite it belongs to.
         if (diagnostics)
-            foreach (var (cx, cy, angleDeg, graphicsId, radius) in _diagnosticShapes)
-                ShipSpriteRenderer.DrawHullShape(HullShapes.ForEnemy(graphicsId), radius, cx, cy, angleDeg);
+            RenderTimings.SubPass("enemyShips.overlay", () =>
+            {
+                foreach (var (cx, cy, angleDeg, graphicsId, radius) in _diagnosticShapes)
+                    ShipSpriteRenderer.DrawHullShape(HullShapes.ForEnemy(graphicsId), radius, cx, cy, angleDeg);
+            });
     }
 
     private static void DrawEnemyShipsFallback(EntityManager em, float camX, float camY, int windowWidth, int windowHeight, bool diagnostics)

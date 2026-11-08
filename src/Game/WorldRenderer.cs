@@ -131,11 +131,16 @@ public static class WorldRenderer
                 );
         }
 
-        LitGroupRenderer.Draw(_litDraws);
+        // Two sub-segments of this pass, so a spike row says whether the freeze was the lit sprite
+        // blocks (first draw of a new variant) or the diagnostics collider overlay.
+        RenderTimings.SubPass("asteroids.litDraws", () => LitGroupRenderer.Draw(_litDraws));
 
         if (diagnostics)
-            foreach (var (shape, radius, x, y, angleDeg) in _diagnosticShapes)
-                ShipSpriteRenderer.DrawHullShape(shape, radius, x, y, angleDeg);
+            RenderTimings.SubPass("asteroids.overlay", () =>
+            {
+                foreach (var (shape, radius, x, y, angleDeg) in _diagnosticShapes)
+                    ShipSpriteRenderer.DrawHullShape(shape, radius, x, y, angleDeg);
+            });
     }
 
     private static AsteroidSprite? GetAsteroidSprite(Asteroid asteroid)
