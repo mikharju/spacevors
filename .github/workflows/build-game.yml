@@ -127,13 +127,17 @@ jobs:
 
       - name: Install appimagetool
         run: |
-          wget -q \
+          curl -fL \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-all-errors \
             https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
-            -O appimagetool
+            -o appimagetool
 
           chmod +x appimagetool
 
-          ./appimagetool --version
+          file appimagetool
+          ./appimagetool --version      - name: Install appimagetool
 
       - name: Create AppImage
         run: |
