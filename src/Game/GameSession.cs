@@ -29,6 +29,13 @@ public sealed class GameSession
     // Diagnostics: health of the spawned test enemy (high enough to survive auto-targeting fire until a manual click is tested).
     private const int DiagnosticTestEnemyHealth = 100000;
 
+    // Diagnostics: the Q key spawns one hull carrying the next of these, so each manoeuvre can be
+    // watched on its own (plans/ENEMY_BEHAVIORS.md). Order is the order they enter the ladder.
+    private static readonly EnemyBehavior[] DiagnosticBehaviours =
+        [EnemyBehavior.Spread, EnemyBehavior.Strafe, EnemyBehavior.CoverTuck, EnemyBehavior.Rammer, EnemyBehavior.CutOff, EnemyBehavior.Burst];
+
+    private int _diagnosticBehaviorIndex;
+
     // Diagnostics: player health set by key H so test enemies cannot end the run during visual tests.
     private const int DiagnosticTestPlayerHealth = 10000;
 
@@ -280,7 +287,7 @@ public sealed class GameSession
         // against.
         _threatLine = $"[THREAT] t={s.Elapsed:F0}s tier={s.Tier}/{s.CompositionTier} ships={s.Ships} ring={s.ShipsInRing} " +
                       $"rounds={s.EnemyRounds} missiles={s.EnemyMissiles}/{s.MissileCap} in={s.IncomingDps:F1}/s out={s.PlayerDps:F1}/s " +
-                      $"hp={s.Health}/{s.MaxHealth} lvl={s.Level} mines={s.Mines} rocks={s.SmallRocks}";
+                      $"hp={s.Health}/{s.MaxHealth} lvl={s.Level} mines={s.Mines} rocks={s.SmallRocks} sectors={s.BearingSectors}";
         DiagnosticLogger.LogThreat(_threatLine);
     }
 
@@ -447,9 +454,24 @@ public sealed class GameSession
             var pos = _em.GetComponent<Position>(_playerEntity);
             var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
             var testEnemy = _em.CreateEntity();
-            EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default, EnemyArmament.Guns);
+            EnemyShipFactory.AddComponents(_em, testEnemy, spawnPos, Vector2.Zero, 0f, 0f, EnemyShipType.Default, EnemyArmament.Guns, EnemyBehavior.Chase, pos.Value);
             _em.AddComponent(testEnemy, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
             DiagnosticLogger.LogEvent("target", $"test enemy {testEnemy} at ({spawnPos.X}, {spawnPos.Y})");
+        }
+
+        // Diagnostic only: spawn a hull carrying the next manoeuvre in the ladder, so a behaviour can be
+        // watched on its own instead of waiting for composition tier 5+ to roll one (plans/ENEMY_BEHAVIORS.md).
+        // The hull is a Carmine: big enough to see, and the 88 hp lets a cover-tuck be triggered with K.
+        if (_diagnostics && Raylib.IsKeyPressed(KeyboardKey.Q))
+        {
+            var pos = _em.GetComponent<Position>(_playerEntity);
+            var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
+            var manoeuvre = DiagnosticBehaviours[_diagnosticBehaviorIndex++ % DiagnosticBehaviours.Length];
+            var behavingHull = _em.CreateEntity();
+            EnemyShipFactory.AddComponents(_em, behavingHull, spawnPos, Vector2.Zero, 0f, 0f,
+                EnemyShipType.Carmine, EnemyArmament.Guns, manoeuvre, pos.Value, _em.ElapsedTime);
+            _em.AddComponent(behavingHull, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
+            DiagnosticLogger.LogEvent("diag", $"{manoeuvre} hull {behavingHull} at ({spawnPos.X}, {spawnPos.Y})");
         }
 
         // Diagnostic only: spawn a rack-armed hull, so an enemy missile can be watched without waiting for
@@ -460,7 +482,7 @@ public sealed class GameSession
             var spawnPos = pos.Value + DiagnosticEnemySpawnOffset;
             var rackHull = _em.CreateEntity();
             EnemyShipFactory.AddComponents(_em, rackHull, spawnPos, Vector2.Zero, 0f, 0f,
-                EnemyShipType.Interceptor, EnemyArmament.Missiles, _em.ElapsedTime);
+                EnemyShipType.Interceptor, EnemyArmament.Missiles, EnemyBehavior.Chase, pos.Value, _em.ElapsedTime);
             _em.AddComponent(rackHull, new Health(DiagnosticTestEnemyHealth, DiagnosticTestEnemyHealth));
             DiagnosticLogger.LogEvent("target", $"rack test hull {rackHull} at ({spawnPos.X}, {spawnPos.Y})");
         }

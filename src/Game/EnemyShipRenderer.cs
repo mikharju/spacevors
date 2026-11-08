@@ -13,8 +13,18 @@ public static class EnemyShipRenderer
 
     static readonly Color EnemyTurretColor = new(255, 140, 30, 255);
 
+    // The wind-up tell a Burst hull shows before its volley (plans/ENEMY_BEHAVIORS.md B7): a charge that
+    // grows over the last seconds of the hull's cycle. Warm rather than a beam colour, so it cannot be
+    // misread as incoming fire — what it promises is the wall of slugs a moment later.
+    static readonly Color BurstTellColor = new(255, 214, 96, 255);
+    const float BurstTellBaseRadius = 0.6f;
+    const float BurstTellGrowRadius = 0.9f;
+    const int BurstTellBaseAlpha = 70;
+    const int BurstTellGrowAlpha = 160;
+
     private static readonly Dictionary<LitBlock, List<(Rectangle Dest, float AngleDeg, float Damage)>> _litDraws = new();
     private static readonly List<(float Cx, float Cy)> _turretMarkers = new();
+    private static readonly List<(float Cx, float Cy, float Radius, float Charge)> _burstTells = new();
     private static readonly List<(float Cx, float Cy, float AngleDeg, byte GraphicsId, float Radius)> _diagnosticShapes = new();
 
     // Sprite of one GraphicsId, resolved once per frame. Every enemy of a type shares it, so the
@@ -42,6 +52,7 @@ public static class EnemyShipRenderer
     {
         LitGroupRenderer.Clear(_litDraws);
         _turretMarkers.Clear();
+        _burstTells.Clear();
         _diagnosticShapes.Clear();
         _spritesByGraphicsId.Clear();
 
@@ -89,6 +100,9 @@ public static class EnemyShipRenderer
 
             _turretMarkers.Add((screenCx, screenCy));
 
+            float charge = BurstCharge(em, enemyShip);
+            if (charge > 0f) _burstTells.Add((screenCx, screenCy, enemyShip.Radius, charge));
+
             if (diagnostics)
                 _diagnosticShapes.Add((screenCx, screenCy, angleDeg, enemyShip.GraphicsId, enemyShip.Radius));
         }
@@ -99,6 +113,13 @@ public static class EnemyShipRenderer
 
         foreach (var (cx, cy) in _turretMarkers)
             RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
+
+        // Over the hull, after the batch flush, so the charge reads as the hull charging and not as a
+        // halo sitting behind it.
+        RenderTimings.SubPass("enemyShips.burstTell", () =>
+        {
+            foreach (var (cx, cy, radius, charge) in _burstTells) DrawBurstTell(cx, cy, radius, charge);
+        });
 
         // After the batch flush, so the collider sits over the sprite it belongs to.
         if (diagnostics)
@@ -124,8 +145,23 @@ public static class EnemyShipRenderer
 
             RenderHelpers.DrawTurretDot(cx, cy, EnemyTurretColor);
 
+            float charge = BurstCharge(em, enemyShip);
+            if (charge > 0f) DrawBurstTell(cx, cy, enemyShip.Radius, charge);
+
             if (diagnostics)
                 ShipSpriteRenderer.DrawHullShape(HullShapes.ForEnemy(enemyShip.GraphicsId), enemyShip.Radius, cx, cy, shipRot.Angle * 180f / MathF.PI);
         }
+    }
+
+    // How far through its wind-up a Burst hull is: 0 for every other hull and outside the tell window,
+    // so one value drives both whether anything is drawn and how far it has charged.
+    private static float BurstCharge(EntityManager em, EnemyShip enemyShip) =>
+        enemyShip.Behavior == EnemyBehavior.Burst ? EnemyShipStats.BurstTell(enemyShip.HoldBearing, em.ElapsedTime) : 0f;
+
+    private static void DrawBurstTell(float cx, float cy, float hullRadius, float charge)
+    {
+        float radius = hullRadius * (BurstTellBaseRadius + BurstTellGrowRadius * charge);
+        var color = new Color(BurstTellColor.R, BurstTellColor.G, BurstTellColor.B, (byte)(BurstTellBaseAlpha + BurstTellGrowAlpha * charge));
+        ShapeSprites.DrawGlow(cx, cy, radius, color);
     }
 }

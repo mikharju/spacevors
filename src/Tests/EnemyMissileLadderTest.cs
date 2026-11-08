@@ -58,7 +58,7 @@ public class EnemyMissileLadderTests
         var rng = new Random(1);
         for (int roll = 0; roll < 600; roll++)
         {
-            var (_, armament) = EnemyShipStats.PickComposition(rng, EnemyShipStats.CompositionTierFor(0f));
+            var (_, armament, _) = EnemyShipStats.PickComposition(rng, EnemyShipStats.CompositionTierFor(0f));
             Assert.Equal(EnemyArmament.Guns, armament);
         }
     }

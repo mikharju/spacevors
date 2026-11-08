@@ -21,6 +21,10 @@ public readonly record struct Player(
 }
 
 // Enemy damage lives on the ship's Turret.Weapon (see EnemyShipFactory.BuildTurret).
+// Written once at spawn and never mutated after. `Behavior` is the manoeuvre this hull instance carries
+// (plans/ENEMY_BEHAVIORS.md); `HoldBearing` is the unit direction from the player to where the hull spawned
+// — the bearing a Spread hull holds, and the phase a Burst hull fires on. Zero reads as plain chase and a
+// shared burst beat, so test worlds and perf scenarios need not supply one.
 public readonly record struct EnemyShip(
     float Radius,
     float Speed,
@@ -29,7 +33,9 @@ public readonly record struct EnemyShip(
     float TurretFireRate,
     float TurretAmmoSpeed,
     float Acceleration,
-    byte GraphicsId);
+    byte GraphicsId,
+    EnemyBehavior Behavior = EnemyBehavior.Chase,
+    Vector2 HoldBearing = default);
 
 public readonly record struct EnemyMine(MineSize Size, float Speed, float Angle)
 {

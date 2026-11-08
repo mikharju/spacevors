@@ -101,9 +101,9 @@ public static class WorldFactory
             Vector2 initialVel = (Vector2.Zero - spawnPos).Normalized * SpawnPlacement.DriftSpeed;
 
             // The starting field is built at elapsed 0, so its composition tier is 0: no missile hull can
-            // be in the world before the ladder unlocks one.
-            var (enemyShipType, armament) = EnemyShipFactory.PickRandomType(rand, EnemyShipStats.CompositionTierFor(0f));
-            EnemyShipFactory.AddComponents(em, ship, spawnPos, initialVel, SpawnPlacement.AngleFromTo(spawnPos, Vector2.Zero), 0f, enemyShipType, armament);
+            // be in the world before the ladder unlocks one, and no manoeuvre either.
+            var (enemyShipType, armament, behavior) = EnemyShipFactory.PickRandomType(rand, EnemyShipStats.CompositionTierFor(0f));
+            EnemyShipFactory.AddComponents(em, ship, spawnPos, initialVel, SpawnPlacement.AngleFromTo(spawnPos, Vector2.Zero), 0f, enemyShipType, armament, behavior, Vector2.Zero);
         }
 
         // One entity per turret mount on the hull; the ones the loadout fills also carry the weapon.

@@ -61,6 +61,8 @@ Keys (in-game):
 - K: halve hp of the locked target or nearest enemy (reach damage smoke tiers quickly)
 - J: halve player hp
 - U: spawn a rack-armed test hull (enemy missiles)
+- Q: spawn a Carmine carrying the next enemy manoeuvre — spread, strafe, tuck, ram, cut-off, burst, one per
+  press (plans/ENEMY_BEHAVIORS.md). Press `K` on it a few times to cripple it, which is what starts a tuck
 - B: guided-round bench (8 headings x 2 plume sizes, drawn in screen space)
 - V: plume anchor overlay on every guided round
 - Y: fill the hull's shield pool, giving it one if it has none (the card is gated at level 10)

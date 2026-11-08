@@ -92,7 +92,7 @@ public class EnemyTierStatsTest
     {
         var em = new EntityManager();
         var entity = em.CreateEntity();
-        foreach (var component in EnemyShipFactory.CreateComponents(Vector2.Zero, Vector2.Zero, 0f, 0f, type, EnemyArmament.Guns, elapsed))
+        foreach (var component in EnemyShipFactory.CreateComponents(Vector2.Zero, Vector2.Zero, 0f, 0f, type, EnemyArmament.Guns, elapsedTime: elapsed))
             component.Apply(em, entity);
 
         return (em.GetComponent<Health>(entity).Current, em.GetComponent<Turret>(entity));

@@ -122,6 +122,7 @@ public class CollisionSystem : GameSystem
             {
                 ResolveCollision(view, hull, entity,
                     playerBody, playerEntity, false, commands, EnemyShipMass);
+                SpendTheRam(view, entity, pos.Value);
             });
 
             int asteroidCount = QueryCircle(pos.Value, ship.Radius);
@@ -1177,6 +1178,18 @@ public class CollisionSystem : GameSystem
         if (biggest >= ImpactDamage.SparkDamageThreshold)
             for (int i = 0; i < ImpactDamage.SparkCount(biggest); i++)
                 SpawnSpark(commands, contactPoint, view.Rng);
+    }
+
+    // A ram spends the hull (plans/ENEMY_BEHAVIORS.md B6): the charge is the whole payload, so the contact
+    // that lands on the player ends the hull. Left out, a rammer would bounce off and charge again without
+    // paying anything for the hit — the one part of it the player could not answer. The impact damage it
+    // took on the way in still runs first, so the explosion size follows how much of it survived.
+    private void SpendTheRam(WorldView view, Entity hullEntity, Vector2 at)
+    {
+        if (!view.TryGetComponent<EnemyShip>(hullEntity, out var ship) || ship.Behavior != EnemyBehavior.Rammer) return;
+        if (!view.TryGetComponent<Health>(hullEntity, out var health) || health.Current <= 0) return;
+
+        AccumulateImpactHealth(view, hullEntity, health.Current, at);
     }
 
     // Asteroids and mines (mines have their own contact rule in ResolveMineVsPlayer) never take

@@ -28,7 +28,7 @@ public class EnemyMissileFiringTests
     private static Entity AddHull(EntityManager em, EnemyShipType type, EnemyArmament armament)
     {
         var hull = em.CreateEntity();
-        EnemyShipFactory.AddComponents(em, hull, HullPos, Vector2.Zero, 0f, 0f, type, armament, ElapsedWithRacksUnlocked);
+        EnemyShipFactory.AddComponents(em, hull, HullPos, Vector2.Zero, 0f, 0f, type, armament, elapsedTime: ElapsedWithRacksUnlocked);
         if (em.HasComponent<MissileCooldown>(hull)) em.AddComponent(hull, new MissileCooldown(0f));
         return hull;
     }
@@ -81,7 +81,7 @@ public class EnemyMissileFiringTests
     {
         var em = new EntityManager();
         var hull = em.CreateEntity();
-        EnemyShipFactory.AddComponents(em, hull, HullPos, Vector2.Zero, 0f, 0f, EnemyShipType.Interceptor, EnemyArmament.Missiles, ElapsedWithRacksUnlocked);
+        EnemyShipFactory.AddComponents(em, hull, HullPos, Vector2.Zero, 0f, 0f, EnemyShipType.Interceptor, EnemyArmament.Missiles, elapsedTime: ElapsedWithRacksUnlocked);
 
         Assert.False(em.HasComponent<Turret>(hull), "a missile hull has no gun to watch, which is what makes it readable");
         Assert.True(em.HasComponent<MissileWeapon>(hull));

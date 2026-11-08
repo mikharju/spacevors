@@ -37,7 +37,7 @@ public class EcmJamTest
     private static Entity AddHull(EntityManager em, Vector2 at, EnemyArmament armament = EnemyArmament.Guns, EnemyShipType? type = null)
     {
         var hull = em.CreateEntity();
-        EnemyShipFactory.AddComponents(em, hull, at, Vector2.Zero, 0f, 0f, type ?? EnemyShipType.Default, armament, em.ElapsedTime);
+        EnemyShipFactory.AddComponents(em, hull, at, Vector2.Zero, 0f, 0f, type ?? EnemyShipType.Default, armament, elapsedTime: em.ElapsedTime);
         if (armament != EnemyArmament.Guns && em.HasComponent<MissileCooldown>(hull))
             em.AddComponent(hull, new MissileCooldown(0f));   // the reload is set at spawn; a test wants it spent
         return hull;

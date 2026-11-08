@@ -9,6 +9,9 @@ public readonly record struct Vector2(float X, float Y)
 
     public float Magnitude => (float)Math.Sqrt(X * X + Y * Y);
 
+    // The comparison form of Magnitude: every "is it within this distance" test wants this, not a sqrt.
+    public float LengthSquared => X * X + Y * Y;
+
     public Vector2 Normalized
     {
         get

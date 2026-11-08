@@ -1,4 +1,5 @@
 using Spacevors.Domain.Components;
+using System.Numerics;
 using Spacevors.Domain.Stats;
 
 namespace Spacevors.Domain.Systems;
@@ -28,10 +29,18 @@ public readonly record struct ThreatSnapshot(
     int MaxHealth,
     int Level,
     int Mines,
-    int SmallRocks);
+    int SmallRocks,
+    // How many of the eight bearings around the hull a live ship actually holds: 1 is a tail, 5+ is an
+    // encirclement. The spread behaviours (plans/ENEMY_BEHAVIORS.md B1) are otherwise assumed, not
+    // measured, and this is read about once a second rather than in the hot path.
+    int BearingSectors);
 
 public static class ThreatMeter
 {
+    // Eight bearings is coarse enough to be a legible number on the threat row and fine enough that a
+    // fanned-out fleet reads differently from a tail.
+    private const int BearingSectorCount = 8;
+
     public static ThreatSnapshot Measure(WorldView view)
     {
         if (!view.GetEntitiesWithComponents<Player, Position, Health>().TryFirst(out var playerTuple))
@@ -42,6 +51,7 @@ public static class ThreatMeter
         var health = playerTuple.Value3;
 
         int ships = 0, shipsInRing = 0, enemyRounds = 0, enemyMissiles = 0, mines = 0, smallRocks = 0;
+        int bearingSectors = 0;
         float incomingDps = 0f, playerDps = 0f;
 
         foreach (var (entity, ship, pos) in view.GetEntitiesWithComponents<EnemyShip, Position>())
@@ -58,6 +68,8 @@ public static class ThreatMeter
             if (view.TryGetComponent<MissileWeapon>(entity, out var rack)) reach = Math.Max(reach, rack.Range + player.Radius);
 
             var diff = pos.Value - playerPos;
+            bearingSectors |= 1 << BearingSectorOf(diff);
+
             if (diff.X * diff.X + diff.Y * diff.Y > reach * reach) continue;
 
             shipsInRing++;
@@ -102,6 +114,16 @@ public static class ThreatMeter
             health.Max,
             player.Level,
             mines,
-            smallRocks);
+            smallRocks,
+            BitOperations.PopCount((uint)bearingSectors));
+    }
+
+    // Which of the eight bearings around the player a ship sits at. `Angle.Of` gives (-π, π], so the
+    // shift puts the sector index in [0, count).
+    private static int BearingSectorOf(Vector2 fromPlayer)
+    {
+        float angle = Angle.Of(fromPlayer) + MathF.PI;
+        int sector = (int)(angle / Angle.FullTurn * BearingSectorCount);
+        return Math.Clamp(sector, 0, BearingSectorCount - 1);
     }
 }

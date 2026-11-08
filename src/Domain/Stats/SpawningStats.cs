@@ -72,4 +72,37 @@ public static class SpawningStats
         public const float PlayerSpeedFactor = 0.75f;
         public const float MaxSpeedMultiplier = 2f;
     }
+
+    // Non-chase manoeuvres (EnemySteering, plans/ENEMY_BEHAVIORS.md). Every one of them picks a point to
+    // head for inside the hull's own firing ring: no behaviour changes a range, so the D1 reach ceiling
+    // and the grown rings stay exactly what the difficulty tests assert.
+    public static class Manoeuvre
+    {
+        // How close to its chosen point a hull must get before it stops thrusting there.
+        public const float HoldTolerance = 60f;
+
+        // Strafe: the point it aims at sits this far *around* the ring from its own bearing, so the hull
+        // keeps chasing a point that keeps moving — a circle it never finishes.
+        public const float StrafeLeadAngle = 0.35f;
+
+        // Behaving hulls keep this much clear of each other, so the fleet reads as a formation instead
+        // of a knot. Plain-chase hulls are excluded on purpose: the swarm's tight ball is what the
+        // player's area guns are paid for.
+        public const float SeparationGap = 40f;
+        public const float SeparationThrustFraction = 0.5f;
+
+        // Cut-off: the lead is solved with the hull's own effective top speed, capped so a hull 3000 px
+        // behind a moving player does not aim at where the player will be in a minute.
+        public const float MaxCutOffLeadTime = 3f;
+
+        // Cover-tuck: the crippled hull follows the biggest hull that still has this much of its hp and
+        // sits within this bearing cone of its own, as seen from the player. The cone is what keeps a
+        // tuck from routing across the field to reach a friend on the far side.
+        public const float CrippleHpFraction = 0.25f;
+        public const float HealthyHpFraction = 0.6f;
+        public const float CoverCone = 0.35f;
+
+        // The tuck point is this far behind the cover hull, measured from its outer edge.
+        public const float CoverGap = 30f;
+    }
 }

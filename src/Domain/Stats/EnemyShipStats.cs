@@ -5,10 +5,22 @@ namespace Spacevors.Domain.Stats;
 // its armament changes (plans/MISSILES.md §9).
 public enum EnemyArmament { Guns, Missiles, GunsAndMissiles }
 
-// One rung of that ladder: from this composition tier on, this armament takes this share of that hull's
-// spawns. Rows are read in tier order and a later row for the same armament replaces the earlier one,
-// which is how "a few" turns into "an even mix" without a second table.
-public readonly record struct EnemyArmamentRow(EnemyArmament Armament, int MinCompositionTier, float Weight);
+// What a hull does instead of the plain chase (plans/ENEMY_BEHAVIORS.md): hold the bearing it arrived
+// on, circle the ring, cut the player off, tuck behind a fitter friend, charge in, or save its shells
+// for a burst. One value per hull — a hull carries exactly one of these, picked by the same weighted
+// draw that picks its armament, so unlocking a behaviour costs no extra rng draw.
+public enum EnemyBehavior { Chase, Spread, Strafe, CutOff, CoverTuck, Rammer, Burst }
+
+// One rung of the ladder: from this composition tier on, this armament and behaviour pair takes this
+// share of that hull's spawns. Rows are read in tier order and a later row for the same
+// (armament, behaviour) pair replaces the earlier one, which is how "a few" turns into "an even mix"
+// without a second table.
+//
+// Behaviour rows split the hull's *gun* budget, they do not add to it: the sum of the gun weights at
+// any tier stays what it was before behaviours existed, so the rack shares plans/MISSILES.md R20
+// documents keep meaning exactly what they say. EnemyMissileLadderTests is the guard.
+public readonly record struct EnemyArmamentRow(
+    EnemyArmament Armament, int MinCompositionTier, float Weight, EnemyBehavior Behavior = EnemyBehavior.Chase);
 
 // One hull's missile rack. Damage is not here: it follows the shared enemy damage ladder, so a missile
 // can never out-damage the bullet its hull fires at the same tier.
@@ -66,7 +78,13 @@ public readonly record struct EnemyShipType(
         RangePerTier: 10f, SpeedPerTier: 2f, AmmoSpeedPerTier: 2f,
         // The swarmer stays un-armed: with up to 100 of them live it is the one armament no weight
         // table tames, so the missile never comes from the smallest, fastest hull.
-        Armaments: [new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f)]);
+        // A fifth of them hold a spread bearing from composition tier 8 (plans/ENEMY_BEHAVIORS.md B1);
+        // four fifths still converge, because the tight ball is what PrismLance, FlakCurtain and
+        // RippleCutter are paid for. Never the majority.
+        Armaments: [
+            new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.8f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.Spread)]);
 
     // The middle hull is the first missile carrier: it already stands off, and 28 hp makes it something
     // the player can kill before it launches. 0.43 against the guns' 1 is ~30 % of its spawns; from
@@ -76,7 +94,22 @@ public readonly record struct EnemyShipType(
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
             new EnemyArmamentRow(EnemyArmament.Missiles, 3, 0.43f),
-            new EnemyArmamentRow(EnemyArmament.Missiles, 5, 1f)],
+            new EnemyArmamentRow(EnemyArmament.Missiles, 5, 1f),
+            // The stand-off hull is the first to spread: it already holds a ring, so holding *its own*
+            // bearing instead of joining the chase line is the same role, one bearing wider
+            // (plans/ENEMY_BEHAVIORS.md B1). Gun weights sum to 1 at every tier, so the rack share
+            // stays 0.30 at tier 3 and an even mix from tier 5.
+            new EnemyArmamentRow(EnemyArmament.Guns, 3, 0.8f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 3, 0.2f, EnemyBehavior.Spread),
+            // From tier 5 some of it stops shooting and drives in instead (B6): it is fast enough to
+            // reach the hull and 28 hp means the player can still kill it on the way in.
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.65f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.15f, EnemyBehavior.Rammer),
+            // From tier 8 it also aims where the player is going (B4), which is the cheap answer to
+            // the ~290 px/s escape valve.
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.1f, EnemyBehavior.Rammer),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f, EnemyBehavior.CutOff)],
         Missiles: new EnemyMissileSpec(165f, 4f, Angle.FromDeg(70f), 6f, RoundHealth: 8, DamageBonus: 0));
 
     // The large hull gets the rack last and gets it alongside its guns: it is the slow long firing
@@ -92,7 +125,17 @@ public readonly record struct EnemyShipType(
             new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 8, 1f),
             // From composition tier 10 the long firing line almost always carries its rack: 4 to 1 over
             // gun-only heavies, so a bare heavy is the rare sight rather than the norm.
-            new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f)],
+            new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f),
+            // The two hulls with hp to spare (B5): below a quarter of its hp a heavy stops trading,
+            // tucks behind the biggest fit hull it can reach, and keeps firing from there. Its own gun
+            // budget still sums to 1 at every tier, so the rack shares are untouched.
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.8f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.2f, EnemyBehavior.CoverTuck),
+            // From tier 8 the long line fans out (B1) and spends its shells in a telegraphed burst
+            // (B7) instead of a drizzle. The rack hulls keep firing normally: a rack is a rack.
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.4f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.Burst)],
         Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 12, DamageBonus: 4),
         Armor: 4,
         TurretDamageBonus: 4,
@@ -103,7 +146,15 @@ public readonly record struct EnemyShipType(
     // spray rate that punishes standing still. It survives by out-flying shots, never by eating them.
     public static EnemyShipType Streak { get; } = new(3, "streak", 36f, 115f, 1.15f, 520f, 2.0f, 170f, 110f, 20,
         RangePerTier: 12f, SpeedPerTier: 3f, AmmoSpeedPerTier: 3f,
-        SpawnWeight: 0.8f);
+        SpawnWeight: 0.8f,
+        // The dart never parks (B3): 20 hp means a still Streak is a dead Streak, so from tier 5 it
+        // circles the ring facing the player, and from tier 8 some of it cuts off the escape line (B4).
+        Armaments: [
+            new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.6f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.4f, EnemyBehavior.Strafe),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.25f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f, EnemyBehavior.CutOff)]);
 
     // Carmine: the line-breaker. A wide gunship that trades the HeavyCannon's reach and bulk for a
     // faster hull and a busier gun: it marches the firing line inward to just past the point-blank
@@ -111,7 +162,16 @@ public readonly record struct EnemyShipType(
     // Gun-only — the missile ladder stays with the two hulls that introduced it (plans/MISSILES.md R20).
     public static EnemyShipType Carmine { get; } = new(4, "carmine", 62f, 55f, 0.8f, 640f, 1.3f, 160f, 40f, 88,
         RangePerTier: 18f, AmmoSpeedPerTier: 2f,
-        SpawnWeight: 0.6f);
+        SpawnWeight: 0.6f,
+        // The line-breaker has 88 hp, so it has a crippled phase worth using: tuck (B5) from tier 5,
+        // then fan out and burst with the heavies from tier 8. Gun weights still sum to 1 per tier.
+        Armaments: [
+            new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.75f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.25f, EnemyBehavior.CoverTuck),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.15f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f, EnemyBehavior.Burst)]);
 
     public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon, Streak, Carmine];
 
@@ -177,45 +237,46 @@ public static class EnemyShipStats
     // The composition draw: every hull × armament this tier has unlocked, weighted by the hull's spawn
     // share × the armament's share of that hull. Unlocking an armament is therefore the same act as
     // drifting the composition, which is what plans/DIFFICULTY_SCALING.md P6 was holding back.
-    public static (EnemyShipType Type, EnemyArmament Armament) PickComposition(Random rng, int compositionTier)
+    public static (EnemyShipType Type, EnemyArmament Armament, EnemyBehavior Behavior) PickComposition(Random rng, int compositionTier)
     {
         float total = 0f;
         foreach (var type in EnemyShipType.All)
-            foreach (var (_, weight) in UnlockedArmaments(type, compositionTier))
+            foreach (var (_, _, weight) in UnlockedArmaments(type, compositionTier))
                 total += type.SpawnWeight * weight;
 
         float roll = (float)rng.NextDouble() * total;
         foreach (var type in EnemyShipType.All)
         {
-            foreach (var (armament, weight) in UnlockedArmaments(type, compositionTier))
+            foreach (var (armament, behavior, weight) in UnlockedArmaments(type, compositionTier))
             {
                 roll -= type.SpawnWeight * weight;
-                if (roll < 0f) return (type, armament);
+                if (roll < 0f) return (type, armament, behavior);
             }
         }
 
-        return (EnemyShipType.Default, EnemyArmament.Guns);
+        return (EnemyShipType.Default, EnemyArmament.Guns, EnemyBehavior.Chase);
     }
 
-    // One entry per armament: the highest row this composition tier has unlocked. Relies on the rows
-    // being written in tier order, which is how the ladders above are written. Public because the ladder
-    // rules (plans/MISSILES.md R20) are asserted against these weights rather than against a dice roll.
-    public static IEnumerable<(EnemyArmament Armament, float Weight)> UnlockedArmaments(EnemyShipType type, int compositionTier)
+    // One entry per armament-and-behaviour pair: the highest row this composition tier has unlocked.
+    // Relies on the rows being written in tier order, which is how the ladders above are written.
+    // Public because the ladder rules are asserted against these weights rather than against a dice
+    // roll (plans/MISSILES.md R20, plans/ENEMY_BEHAVIORS.md).
+    public static IEnumerable<(EnemyArmament Armament, EnemyBehavior Behavior, float Weight)> UnlockedArmaments(EnemyShipType type, int compositionTier)
     {
         if (type.Armaments is not { } rows)
         {
-            yield return (EnemyArmament.Guns, 1f);
+            yield return (EnemyArmament.Guns, EnemyBehavior.Chase, 1f);
             yield break;
         }
 
-        var shares = new Dictionary<EnemyArmament, float>();
+        var shares = new Dictionary<(EnemyArmament, EnemyBehavior), float>();
         foreach (var row in rows)
         {
             if (row.MinCompositionTier > compositionTier) continue;
-            shares[row.Armament] = row.Weight;
+            shares[(row.Armament, row.Behavior)] = row.Weight;
         }
 
-        foreach (var (armament, weight) in shares) yield return (armament, weight);
+        foreach (var ((armament, behavior), weight) in shares) yield return (armament, behavior, weight);
     }
 
     // R22: how many enemy guided rounds may be in the air at once. One step at a time, four minutes
@@ -264,4 +325,36 @@ public static class EnemyShipStats
     // gun range × 1.4: missiles launch from outside the gun line without the hull behaving differently.
     public static float MissileRangeFor(EnemyShipType type, int tier) =>
         Math.Min(FiringRangeFor(type, tier) * MissileReachMultiplier, MaxMissileFiringRange);
+
+    // B7 volley cadence (plans/ENEMY_BEHAVIORS.md): a Burst hull holds fire for most of its cycle and
+    // spends the whole allotment inside the window, so the rounds/s budget is redistributed and never
+    // raised — the rate inside the window is exactly the ratio that makes the average come out equal.
+    public const float BurstPeriod = 3f;
+    public const float BurstWindow = 0.5f;
+    public const float BurstRateMultiplier = BurstPeriod / BurstWindow;
+
+    // How far before the window the wind-up glow starts charging: the tell that makes a burst fair.
+    // An even drizzle cannot be read; a wall you can see coming can be dodged.
+    public const float BurstTellLead = 0.6f;
+
+    // The phase comes from the bearing the hull spawned on, which is why heavies spread around the ring
+    // open up as a wave instead of all on one beat. No per-hull state and no rng draw.
+    public static float BurstPhaseSeconds(Vector2 holdBearing) =>
+        (Angle.Of(holdBearing) + MathF.PI) / Angle.FullTurn * BurstPeriod;
+
+    public static bool InBurstWindow(Vector2 holdBearing, float elapsedTime) =>
+        BurstPhase(elapsedTime, holdBearing) <= BurstWindow;
+
+    // 0 outside the wind-up, 0 → 1 across the tell just before the window. What the renderer charges.
+    public static float BurstTell(Vector2 holdBearing, float elapsedTime)
+    {
+        float phase = BurstPhase(elapsedTime, holdBearing);
+        return phase < BurstPeriod - BurstTellLead ? 0f : (phase - (BurstPeriod - BurstTellLead)) / BurstTellLead;
+    }
+
+    private static float BurstPhase(float elapsedTime, Vector2 holdBearing)
+    {
+        float phase = (elapsedTime + BurstPhaseSeconds(holdBearing)) % BurstPeriod;
+        return phase < 0f ? phase + BurstPeriod : phase;
+    }
 }

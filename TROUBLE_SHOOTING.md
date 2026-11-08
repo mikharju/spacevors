@@ -173,7 +173,7 @@ Each entry: **Symptom** → **Cause** → **Fix / Prevention**.
 
 - **Symptom**: A full `dotnet test` run fails with "5k ammo + 100 ships: average frame time 12.55ms exceeds budget 8.33ms" right after adding tests, while the same test passes on the untouched tree and passes again on re-run.
 - **Cause**: That scenario measures 7.9-8.1 ms against an 8.33 ms budget, so it fails whenever the machine is busy (parallel test collections, cold JIT on the first run after a build). The reported number is not reproducible run to run.
-- **Fix / Prevention**: Before blaming a change for a benchmark failure, re-run the benchmark alone (`dotnet test src/Tests/Tests.csproj --filter "FullyQualifiedName~PerformanceBenchmark"`) three times with the change and three times with it stashed, and compare the same scenario line. Only a stable difference across runs counts.
+- **Fix / Prevention**: Before blaming a change for a benchmark failure, re-run the benchmark alone (`dotnet test src/Tests/Tests.csproj --filter "FullyQualifiedName~PerformanceBenchmark"`) three times with the change and three times with it stashed, and compare the same scenario line. Only a stable difference across runs counts. Measure on a **quiet** machine: the few seconds after another job finishes (a `dotnet test` run, a build) inflate the next `scenario.sh` medians by 2-4× — `ammo-spray-miss` read 3.00 and 1.88 ms back to back, then 0.85/0.82/0.79 ms on the same tree once the machine was idle.
 
 ## 29. `.tools/env.sh` cannot be sourced under `set -u`
 

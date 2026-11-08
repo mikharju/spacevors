@@ -72,12 +72,13 @@ public class EnemyShipSpawnSystem : GameSystem
 
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
-        var (enemyShipType, armament) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
+        var (enemyShipType, armament, behavior) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
         Vector2 initialVel = playerVel * SpawningStats.EnemyShips.FollowFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
         float facingAngle = SpawnPlacement.AngleFromTo(testSpawnPos, playerPos.Value);
 
-        // Tier stats are derived from elapsed time at spawn (plans/DIFFICULTY_SCALING.md P5).
-        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType, armament, view.ElapsedTime);
+        // Tier stats are derived from elapsed time at spawn (plans/DIFFICULTY_SCALING.md P5), and so is
+        // the manoeuvre: the spawn position relative to the player is the bearing a Spread hull holds.
+        IInitialComponent[] components = EnemyShipFactory.CreateComponents(testSpawnPos, initialVel, facingAngle, 0f, enemyShipType, armament, behavior, playerPos.Value, view.ElapsedTime);
 
         commands.AddEntity(components);
 

@@ -108,6 +108,10 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Reroll-token loot: salvage capsules off killed ships stock charges that re-deal the upgrade hand — shipped — plans/REROLL_TOKENS.md
 - Salvage field and ECM pulse drops: one-shot field sweep (all XP, all currency, nearest health up to full hp) and a 5 s world-wide jam of ships, mines and missiles; the ECM capsule never expires — shipped — plans/ECM_PULSE_AND_SALVAGE_FIELD.md
 - Difficulty scaling and threat readout; open items remain — active — plans/DIFFICULTY_SCALING.md
+- Enemy behaviours: bearing spread, gap between behaving hulls, tangential hold, cut-off pursuit, a crippled
+  hull tucking behind a fit friend, the rammer charge, and a telegraphed volley cadence on the heavies — dealt
+  on the composition ladder's existing roll, no new hulls, no stat creep — shipped 2026-11-08
+  — plans/ENEMY_BEHAVIORS.md
 - Upgrade hand composition: every hand dealt from card-kind slots with legality gates per card kind — shipped 2026-11-02, hand shape superseded by plans/UPGRADE_BUNDLES.md and again by plans/UPGRADE_BUNDLE_PAIRS.md — plans/UPGRADE_HAND_COMPOSITION.md
 - Upgrade bundles: a level took two cards out of the five it was dealt, dealt from priorities that leak — shipped 2026-11-03, **superseded the same day** by plans/UPGRADE_BUNDLE_PAIRS.md (the card kinds, the gates and two cards a level survived) — plans/UPGRADE_BUNDLES.md
 - Upgrade bundle pairs: a level is dealt five bundles of one powerful + one weak card and takes one bundle, granting both; armor and shield come in an ordinary and a milestone tier — shipped 2026-11-03 — plans/UPGRADE_BUNDLE_PAIRS.md

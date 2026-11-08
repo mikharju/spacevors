@@ -6,20 +6,20 @@ namespace Spacevors.Domain.Systems;
 
 public static class EnemyShipFactory
 {
-    // Weighted pick over hull × armament for this composition tier (one RNG draw per call). Unlocking an
-    // armament and drifting the composition are the same draw, so the ladder in EnemyShipType is the
-    // only place the late-game mix is written.
-    public static (EnemyShipType Type, EnemyArmament Armament) PickRandomType(Random rng, int compositionTier) =>
+    // Weighted pick over hull × armament × behaviour for this composition tier (one RNG draw per call).
+    // Unlocking an armament and drifting the composition and granting a manoeuvre are the same draw, so
+    // the ladder in EnemyShipType is the only place the late-game mix is written.
+    public static (EnemyShipType Type, EnemyArmament Armament, EnemyBehavior Behavior) PickRandomType(Random rng, int compositionTier) =>
         EnemyShipStats.PickComposition(rng, compositionTier);
 
-    public static void AddComponents(EntityManager em, Entity entity, Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, EnemyArmament armament, float elapsedTime = 0f)
+    public static void AddComponents(EntityManager em, Entity entity, Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, EnemyArmament armament, EnemyBehavior behavior = EnemyBehavior.Chase, Vector2 playerPos = default, float elapsedTime = 0f)
     {
         int tier = EnemyShipStats.TierFor(elapsedTime);
         em.AddComponent(entity, new Position(position));
         em.AddComponent(entity, new Velocity(velocity));
         em.AddComponent(entity, new Rotation(rotation));
         em.AddComponent(entity, new AngularVelocity(angularVelocity));
-        em.AddComponent(entity, BuildEnemyShip(type, tier));
+        em.AddComponent(entity, BuildEnemyShip(type, tier, behavior, position, playerPos));
         AddWeapons(em, entity, type, armament, tier);
         int health = TieredHealth(type, tier);
         em.AddComponent(entity, new Health(health, health));
@@ -28,7 +28,7 @@ public static class EnemyShipFactory
         if (type.Armor > 0) em.AddComponent(entity, new Armor(type.Armor));
     }
 
-    public static IInitialComponent[] CreateComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, EnemyArmament armament, float elapsedTime = 0f)
+    public static IInitialComponent[] CreateComponents(Vector2 position, Vector2 velocity, float rotation, float angularVelocity, EnemyShipType type, EnemyArmament armament, EnemyBehavior behavior = EnemyBehavior.Chase, Vector2 playerPos = default, float elapsedTime = 0f)
     {
         int tier = EnemyShipStats.TierFor(elapsedTime);
         int health = TieredHealth(type, tier);
@@ -38,7 +38,7 @@ public static class EnemyShipFactory
             new InitialComponent<Velocity>(new Velocity(velocity)),
             new InitialComponent<Rotation>(new Rotation(rotation)),
             new InitialComponent<AngularVelocity>(new AngularVelocity(angularVelocity)),
-            new InitialComponent<EnemyShip>(BuildEnemyShip(type, tier))
+            new InitialComponent<EnemyShip>(BuildEnemyShip(type, tier, behavior, position, playerPos))
         };
 
         if (armament != EnemyArmament.Missiles) components.Add(new InitialComponent<Turret>(BuildTurret(type, tier)));
@@ -69,9 +69,17 @@ public static class EnemyShipFactory
         (int)MathF.Round(type.Health * EnemyShipStats.HpMultiplier(tier), MidpointRounding.AwayFromZero);
 
     // The hull and its gun must carry the same grown range: the chase system brakes the hull at
-    // FiringRange and the turret fires at it, so a drift on one alone would split the two.
-    private static EnemyShip BuildEnemyShip(EnemyShipType type, int tier) =>
-        new(type.Radius, EnemyShipStats.SpeedFor(type, tier), EnemyShipStats.TurnRateFor(type, tier), EnemyShipStats.FiringRangeFor(type, tier), type.TurretFireRate, EnemyShipStats.AmmoSpeedFor(type, tier), type.Acceleration, type.GraphicsId);
+    // FiringRange and the turret fires at it, so a drift on one alone would split the two. The bearing
+    // it spawned on travels with it: Spread holds that bearing and Burst fires the beat it implies
+    // (plans/ENEMY_BEHAVIORS.md), so neither needs state written after spawn.
+    private static EnemyShip BuildEnemyShip(EnemyShipType type, int tier, EnemyBehavior behavior, Vector2 spawnPos, Vector2 playerPos)
+    {
+        var away = spawnPos - playerPos;
+        Vector2 holdBearing = away.LengthSquared > 0.01f ? away.Normalized : Vector2.Zero;
+        return new EnemyShip(type.Radius, EnemyShipStats.SpeedFor(type, tier), EnemyShipStats.TurnRateFor(type, tier),
+            EnemyShipStats.FiringRangeFor(type, tier), type.TurretFireRate, EnemyShipStats.AmmoSpeedFor(type, tier),
+            type.Acceleration, type.GraphicsId, behavior, holdBearing);
+    }
 
     // Public for the perf scenarios: they arm a hull with exactly the gun the game gives this type
     // at this tier (plans/MISSILE_PERF.md), not a copy of the ladder. HeavyCannon's slug carries its

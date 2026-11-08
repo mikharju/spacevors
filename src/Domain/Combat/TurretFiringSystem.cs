@@ -77,6 +77,18 @@ public class TurretFiringSystem : GameSystem
             }
 
             if (!selection.HasValue) continue;
+            // B7 volley cadence (plans/ENEMY_BEHAVIORS.md): a Burst hull holds fire outside its window and
+            // spends the whole allotment inside it, so the rounds/s budget is redistributed and never
+            // raised. The cooldown is ticked above either way, so the first round leaves the instant the
+            // window opens, and the wind-up glow the renderer draws is the same phase.
+            float cooldownSeconds = 1f / turret.Weapon.FireRate;
+            if (turret.IsEnemy && view.TryGetComponent<EnemyShip>(turretEntity, out var firingHull)
+                && firingHull.Behavior == EnemyBehavior.Burst)
+            {
+                if (!EnemyShipStats.InBurstWindow(firingHull.HoldBearing, view.ElapsedTime)) continue;
+                cooldownSeconds = 1f / (turret.Weapon.FireRate * EnemyShipStats.BurstRateMultiplier);
+            }
+
             // Being inside the arc is not enough: a mount still travelling to a solution holds its fire.
             if (mount is not null && !AimOnTarget(aimAngle, selection.Value.AimDirection)) continue;
 
@@ -88,7 +100,7 @@ public class TurretFiringSystem : GameSystem
                 : selection.Value;
 
             FireAtTarget(view, turretEntity, turret, turretPos.Value, aimAngle, shot, commands);
-            commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(1f / turret.Weapon.FireRate)));
+            commands.Add(new AddComponentCommand<FireCooldown>(turretEntity, new FireCooldown(cooldownSeconds)));
 
             if (Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1")
             {
