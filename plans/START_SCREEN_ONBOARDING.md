@@ -313,3 +313,17 @@ together, and the block still sits clear of the stats panel above the cards; `sc
 — the MOUNTING panel scales too and every row stays on one line. Getting there cost two near-misses
 documented in TROUBLE_SHOOTING: `Escape` quits the game outside the mounts screen (entry 80), and click
 coordinates must be measured in the scaled window, not carried over from 1920 (entry 6).
+
+## Follow-up (2026-11-08): the preview overlays are diagnostics-only
+
+A normal run now draws a card's ship art alone: the **bounding circle** and the cyan collider moved behind
+`SPACEVORS_DIAGNOSTIC=1` (`ShipSelectScreen.DrawShipPreview`). To a player picking a hull they read as
+decoration over the card rather than as a measurement of it.
+
+The cost is the one §"Honest hull sizes" already priced: with the circle gone, the size gap between hulls
+rests on the sprites alone, and each sprite carries its own transparent margins, so the paint still
+understates it. Accepted — the circle stays available to anyone tuning hulls, which is who needs it.
+
+Verified headless: `select-no-diag` (no circle on any card) against `select-diag` (circle plus dimmed
+collider on every card). `dotnet test` 664 passed. `scenario.sh baseline-idle --sim --iters 3` median
+0.33 ms against the 0.32 ms row above — the ship-select screen is not on the measured path, budget pass.

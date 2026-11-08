@@ -678,3 +678,11 @@ never pixel-derived; reach ≤ 1.001 R is pinned by `HullShapesTest`, `PlayerHul
 `AsteroidShapesTest`; the "shape only ever takes hits away" gap/tip pairs are pinned with circle
 controls in `HullShapeCollisionTest` / `PlayerHullCollisionTest`.
 
+
+## Follow-up (2026-11-08): the capsule overlay is dimmer
+
+`ShipSpriteRenderer`'s collider colour went from `(0, 255, 255, 110)` to `(0, 200, 210, 70)`: full-bright
+cyan over a lit hull washed out the art it is drawn to be judged against, and a composite's capsules
+overlap, so their alphas stacked (~0.27 over bare art, ~0.47 where two cover the same pixel). Verified
+headless: `game-diag` with `SPACEVORS_DIAGNOSTIC=1` (crop `hull-crop-diag`) — the shape still reads clearly,
+the hull plating shows through it. Draw-only; no radius, collision or broad-phase change.

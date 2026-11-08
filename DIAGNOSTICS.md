@@ -3,8 +3,9 @@
 Reference, usage only — no implementation details or history (plan files have those).
 
 All helpers are active only with `SPACEVORS_DIAGNOSTIC=1`. It also turns on the cyan
-collider overlay, the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
-logs, and a fixed test asteroid at (0,-300).
+collider overlay — over hulls and rocks in flight, and over the hull previews on the ship-select
+cards — the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
+logs, and a fixed test asteroid at (0,-300). Without it the select cards show the ship art alone.
 
 Keys (in-game):
 

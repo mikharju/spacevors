@@ -391,16 +391,15 @@ public sealed class ShipSelectScreen
             S(CardHeight - 2 * PreviewPadding));
         ShipSpriteRenderer.DrawShipSprite(ship, cx, cy, width, 0f);
 
-        // The hull's bounding circle, at the same scale and in the card's own colour. Every sprite has
-        // its own transparent margins, so the paint alone does not say how much bigger one hull is than
-        // another — the circle does, and it is the radius a hit is judged against in flight.
+        // The measurement overlay, diagnostics only. The bounding circle is the honest size comparison —
+        // every sprite has its own transparent margins, so the paint alone understates the gap — and the
+        // cyan collider is the fit between paint and hitbox. Both are for judging a hull, not for showing
+        // a player a card, so a normal run draws the art alone.
+        if (!_diagnostics) return;
+
         var hullColor = new Color((int)ship.DrawR, (int)ship.DrawG, (int)ship.DrawB, 255);
         Raylib.DrawCircleLines((int)cx, (int)cy, width / 2f, Ui.WithAlpha(hullColor, 0.55f));
-
-        // The same cyan collider the game draws over a hull, so the fit between paint and hitbox can be
-        // judged before a run starts.
-        if (_diagnostics)
-            ShipSpriteRenderer.DrawHullShape(ship.Shape, width / 2f, cx, cy, 0f);
+        ShipSpriteRenderer.DrawHullShape(ship.Shape, width / 2f, cx, cy, 0f);
     }
 
     int DrawWrapped(int x, int y, int width, string text, Color color, int font, int maxLines)

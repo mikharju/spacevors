@@ -138,7 +138,10 @@ public static class ShipSpriteRenderer
             Raylib.DrawTriangle(outline[0], outline[i + 1], outline[i], ColliderColor);
     }
 
-    static readonly Color ColliderColor = new(0, 255, 255, 110);
+    // Dim on purpose. A full-bright cyan hides the art it is meant to be judged against, and a
+    // composite's capsules overlap so their alphas stack: ~0.27 over bare art, ~0.47 where two of them
+    // cover the same pixel. The sprite still shows through both.
+    static readonly Color ColliderColor = new(0, 200, 210, 70);
 
     // Shape units to screen: scale by the hull radius, then rotate by the hull's heading — the same
     // frame DrawTexturePro draws the sprite in, so an authored capsule lines up with the art.
