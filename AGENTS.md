@@ -123,6 +123,14 @@ plans/ holds one file per feature with all feature detail.
 Save plan files under plans.
 - When user asks for plan, only make plan file, do not implement, change code, run tests.
 - Start every new plan file with a `Status:` header line under the title.
+- Every new plan file has two parts: **Part 1 — the plan** (the problem, the insight and the
+  decisions, readable in two minutes) and **Part 2 — implementation memo** (mechanics, invariants
+  to keep, code shape, tests, measurement). Part 2 is written for the implementer — usually an LLM
+  with no memory of the planning conversation — so a human may skip it. Ownership rule: a decision
+  appears only in Part 1, a mechanic only in Part 2, Part 1 points at Part 2 and never summarizes
+  it, or one copy drifts.
+- Existing plans keep their current shape. Convert a plan to the two-part split only when it is
+  next edited; never batch-convert.
 - Web search is ok when planning
 - If web search fails, report to user in reply which sites were not reachable
 
