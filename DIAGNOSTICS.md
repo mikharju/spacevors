@@ -40,6 +40,9 @@ what the player meets:
 - A `[BEHAVIOUR-TOTAL]` line repeats the running totals once a minute, because a run that is killed rather
   than quit never reaches the end; `[BEHAVIOUR-END]` is the same line at a clean exit and prints to stdout as
   well. A new run from the same process (game over → ship select) restarts the tally.
+- A row whose lanes suddenly double is a **flanker wave** (`Spread +12 hulls …` where a normal window gives
+  `+2`): every other hull of such a wave arrives holding a lane (plans/ENEMY_BEHAVIORS.md). Cross-check the
+  `sectors=` of the `[THREAT]` rows around the same time — a flank wave should push it up.
 - A hull counts once however long it lives. Entity ids are recycled without a generation, so `hulls` is a
   floor: a hull replaced by the same behaviour within one 0.25 s sample counts once.
 

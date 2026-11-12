@@ -427,19 +427,60 @@ the arithmetic above delivers when only tier 2 has runged. The ladder now climbs
 | 8:00–9:00 | 8–9 | 16.8 % | the rack enters and dilutes every row; HeavyCannon 0.30 absorbs most of it |
 | 10:00+ | 10+ | 11.5 % | the firing line: the rack is 4 of the heavy's spawns |
 
-`TheFlankerRampClimbsAcrossTheRun` pins the shape — nothing before 2:00, a climb rung by rung to 7:00, held
-through the rack at 8:00, and never back below the 2:00 figure. The 10:00 dilution is still there (11.5 %
-against the old 9.4 %, better but still a fall): the HeavyCannon's rack rows carry no behaviour row, so a
-lane would need either the rack ratio down or rack lanes, and the rack ratio is pinned by plans/MISSILES.md
-R20 (`TheLargeHullCarriesItsRackLastAndThenAlmostAlways` asserts 0.50 at tier 8) — so that stays open, now
-measured rather than assumed.
+`TheFlankerRampClimbsAcrossTheRun` pins the shape: nothing before 2:00, a climb rung by rung to 7:00, held
+through the rack's arrival at 8:00, and never back below the 2:00 figure. The 10:00 fall (11.5 %) is the rack
+dilution again, still open — see below.
+
+### Flanker waves (2026-11-08)
+
+A ramp still only ever makes *lone* flankers: they arrive scattered through a wave, one or two at a time, so a
+formation never arrives as a formation. Now some waves are **flanker waves** — every other hull of such a wave
+holds a lane instead of joining the chase line, so the wave reads as arriving from the side.
+
+- **6:00 every 4th wave, 8:00 every other wave** (`WaveSchedule.IsFlankerWave`). Nothing before 6:00: a wave of
+  flankers in the opening is the whole encounter rather than a variation on it, and lanes need a fleet that
+  already has lanes to hold.
+- **A clock, not dice.** The ask was "a small chance, then a bigger chance"; a pattern over the wave index
+  gives the same "not every wave" and stays a clock, so the spawner, the mines and the tests read one schedule
+  without consuming the rng — a roll would make the schedule depend on how many draws the spawner happened to
+  spend first. `FlankerWavesGetMoreFrequentFromEightMinutes` pins 3 of 12 waves at 6:00, 6 of 12 at 8:00, and
+  never all of them.
+- **Half a wave, never the wave.** Parity of the remaining quota picks which hulls hold lanes: no new rng draw,
+  no new per-hull state, and the cap is structural — at most half of one wave, and half of a 24-hull wave among
+  up to 100 live hulls is still a minority of the fleet. `AFlankerWaveHandsEveryOtherHullToALane` compares wave
+  10 at 9:20 (a flank wave: at least half lanes) with wave 9 at 8:20 (ordinary: under a sixth).
+- The override lands before the spawn bearing is drawn, so a flank wave's lane holders also come from the wider
+  ±60° arc. A wave that arrives holding lanes should not arrive from one bearing.
+
+### Measured in a logged session (2026-11-08)
+
+The manoeuvre log, same build, an unattended run to 6:23 of game time:
+
+| clock | hulls seen | of them lanes | lane seconds on screen / alive |
+|---|---|---|---|
+| 3:02 | 45 | 2 | 9.1 / 37.8 |
+| 4:02 | 76 | 7 | 21.5 / 98.8 |
+| 5:03 | 116 | 9 | 25.6 / 118.7 |
+| 6:03 | 149 | 15 (4 live at once) | 41.6 / 198.1 |
+
+The 2:49 run on the previous build logged **one** lane hull for the whole session; this one had 15 by 6:03, and
+CoverTuck (4 hulls) and Rammer (2) were in the log by 6:03 as well.
+
+The ratio worth watching: lanes were visible for 21 % of their alive time, chase hulls for 31 %. A lane point is
+0.55 × the hull's firing range — 360–430 px — and the visible box is the window's half-size, so a lane along the
+vertical axis sits just outside the screen. That is a tuning knob (`SpawningStats.Manoeuvre.SpreadHoldFraction`),
+not a fault in the steering, and it wants a real-GPU read before it is moved.
 
 ### Still open
 
+- **No flanker wave has been seen in a played session yet.** The earliest one that can fire is wave 10, at
+  9:20 of a run; the logged session above reached 6:23. The rule is pinned by tests, not by play — read the
+  window rows around 9:20 and 10:30 of a long run and expect the lanes to double for one wave.
 - **The tier-10 dilution is untouched**: the HeavyCannon's `GunsAndMissiles 4 : 1` rows still swamp every
-  behaviour row, so spread falls from 13.8 % to 9.4 % at 10:00. Either the rack ratio comes down or a rack
-  hull is allowed a lane too (the original memo said a rack is a rack, which forbids a firing pattern, not a
-  bearing). Deliberately left for a read run, not guessed at.
+  behaviour row, so spread falls from 17.2 % at 7:00 to 11.5 % at 10:00. Either the rack ratio comes down or a
+  rack hull is allowed a lane too (the original memo said a rack is a rack, which forbids a firing pattern,
+  not a bearing) — but the 0.50 rack share at tier 8 is pinned by plans/MISSILES.md R20, so the lane would
+  have to come from the rack rows. Deliberately left for a read run, not guessed at.
 - **The metric to watch in a real session is `sectors=` on `[THREAT]`** (DIAGNOSTICS.md). It should climb
   from the 1–2 a trailing ball gives toward 4–5 once the flanks hold lanes. Nobody has read it yet; the
-  numbers above are all arithmetic and screenshots, not a played session.
+  numbers above are arithmetic, a log and screenshots.

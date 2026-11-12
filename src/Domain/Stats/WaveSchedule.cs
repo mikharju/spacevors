@@ -35,4 +35,22 @@ public static class WaveSchedule
 
     public static int WaveSize(int waveIndex) =>
         Math.Min(WaveStats.WaveStartSize + WaveStats.WaveGrowth * (waveIndex - 1), WaveStats.WaveMaxSize);
+
+    // Which waves are **flanker waves**: the wave that arrives holding lanes instead of joining the chase
+    // line (plans/ENEMY_BEHAVIORS.md B1 and its follow-up). A pattern over the wave index rather than a dice
+    // roll, because this clock is read by several systems and by tests without touching the rng — a roll
+    // would make the schedule depend on how many draws the spawner happened to spend first. A pattern gives
+    // the same "not every wave" feel and stays a clock.
+    //
+    // Not before 6:00: lanes only mean something once the fleet has lanes to hold them with, and a wave of
+    // flankers in the opening would be the whole encounter rather than a variation on it.
+    public const int FlankerWaveTier = 6;
+    public const int FlankerWaveFrequentTier = 8;
+    public const int FlankerWaveEvery = 4;
+    public const int FlankerWaveFrequentEvery = 2;
+
+    public static bool IsFlankerWave(int waveIndex, int compositionTier) =>
+        compositionTier >= FlankerWaveFrequentTier ? waveIndex % FlankerWaveFrequentEvery == 0
+      : compositionTier >= FlankerWaveTier ? waveIndex % FlankerWaveEvery == 0
+      : false;
 }

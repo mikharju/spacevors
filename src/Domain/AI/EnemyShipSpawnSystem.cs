@@ -10,6 +10,7 @@ public class EnemyShipSpawnSystem : GameSystem
     private int _waveIndex;
     private int _quotaLeft;
     private float _timer;
+    private bool _flankerWave;
 
     public static float SpeedFactor(float playerSpeed) => Math.Clamp(playerSpeed / SpawningStats.EnemyShips.ReferenceSpeed, 1f, SpawningStats.EnemyShips.MaxSpeedFactor);
 
@@ -49,6 +50,9 @@ public class EnemyShipSpawnSystem : GameSystem
         {
             _waveIndex = phase.WaveIndex;
             _quotaLeft = WaveQuota(phase.WaveIndex, playerVel.Magnitude);
+            // Decided once when the wave opens, so a wave cannot turn into a flank wave halfway through
+            // because the clock crossed a composition tier.
+            _flankerWave = WaveSchedule.IsFlankerWave(phase.WaveIndex, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
             _timer = 0f;
         }
 
@@ -67,6 +71,11 @@ public class EnemyShipSpawnSystem : GameSystem
         // it is: a spreading hull comes from a wider arc than a chasing one (plans/ENEMY_BEHAVIORS.md
         // follow-up). Both paths consume one rng draw, so the run stays seed-reproducible either way.
         var (enemyShipType, armament, behavior) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
+
+        // In a flanker wave every **other** hull holds a lane (plans/ENEMY_BEHAVIORS.md B1): the wave reads
+        // as a formation arriving from the side, and half of one wave among the up-to-100 hulls already live
+        // is still a minority of the fleet. Parity of the remaining quota, so no rng draw and no new state.
+        if (_flankerWave && _quotaLeft % 2 == 0) behavior = EnemyBehavior.Spread;
 
         float velMagnitude = playerVel.Magnitude;
         Vector2 spawnDir = velMagnitude >= SpawnPlacement.MinDirectionalSpeed
