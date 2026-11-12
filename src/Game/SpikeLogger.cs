@@ -5,13 +5,9 @@ namespace Spacevors.Game;
 
 // The spike log: one line per frame that took far longer than the frames around it, so a long
 // session leaves a dozen lines instead of two million stdout rows. Diagnostics mode only: Open()
-// runs at startup, creates its directory if needed, and deletes spike files older than KeepFor
-// from that directory before the run starts writing.
-//
-// The default directory is inside the project - next to the running binary, under gitignored bin/ -
-// rather than a temp directory: a temp dir is invisible to the tooling and to whoever asks "what did
-// my run leave behind", and it is cleared on reboot. A read-only install (an AppImage) cannot write
-// next to its binary, so point SPACEVORS_SPIKE_DIR at a writable directory there.
+// runs at startup and Close() prints the tally. Where the file lives — beside the binary by default,
+// SPACEVORS_SPIKE_DIR over it, files older than KeepFor deleted before the run starts writing — is
+// DiagnosticsFile's rule, shared with every other diagnostics file the game writes.
 static class SpikeLogger
 {
     // A frame is a spike when it reaches this multiple of the window median **and** the floor:
@@ -28,7 +24,6 @@ static class SpikeLogger
     const int WarmupFrames = 64;
 
     const string DirEnvVar = "SPACEVORS_SPIKE_DIR";
-    const string FilePattern = "spikes-*.log";
     static readonly TimeSpan KeepFor = TimeSpan.FromDays(1);
 
     static readonly double[] _window = new double[WindowFrames];
@@ -45,26 +40,12 @@ static class SpikeLogger
     {
         if (!DiagnosticLogger.IsEnabled) return;
 
-        string dir = Environment.GetEnvironmentVariable(DirEnvVar)
-            ?? Path.Combine(AppContext.BaseDirectory, "spikes");
-        try
-        {
-            Directory.CreateDirectory(dir);
-            PruneOldFiles(dir);
+        _file = DiagnosticsFile.Open(DirEnvVar, "spikes", KeepFor, out string? path);
+        if (_file == null) return;
 
-            // One file per run, with the pid so two runs started in the same second cannot clobber
-            // each other. AutoFlush, so a session that ends in a crash keeps its spikes.
-            string path = Path.Combine(dir, $"spikes-{DateTime.UtcNow:yyyyMMddTHHmmss}Z-p{Environment.ProcessId}.log");
-            _file = new StreamWriter(path) { AutoFlush = true };
-            Console.WriteLine(
-                $"[SPIKE] log: {path} factor={SpikeFactor:F0} floorMs={SpikeFloorMs:F0} " +
-                $"windowFrames={WindowFrames} keepDays={KeepFor.TotalDays:F0}");
-        }
-        catch (Exception e)
-        {
-            DiagnosticLogger.LogWarning($"spike log disabled: {e.Message}");
-            _file = null;
-        }
+        Console.WriteLine(
+            $"[SPIKE] log: {path} factor={SpikeFactor:F0} floorMs={SpikeFloorMs:F0} " +
+            $"windowFrames={WindowFrames} keepDays={KeepFor.TotalDays:F0}");
     }
 
     public static void Close()
@@ -121,21 +102,5 @@ static class SpikeLogger
         _lastGc1 = GC.CollectionCount(1);
         _lastGc2 = GC.CollectionCount(2);
         _lastAllocBytes = GC.GetTotalAllocatedBytes(precise: false);
-    }
-
-    static void PruneOldFiles(string dir)
-    {
-        DateTime cutoff = DateTime.UtcNow - KeepFor;
-        foreach (string file in Directory.GetFiles(dir, FilePattern))
-        {
-            try
-            {
-                if (File.GetLastWriteTimeUtc(file) < cutoff) File.Delete(file);
-            }
-            catch (IOException)
-            {
-                // A file another run still holds stays; the next open tries it again.
-            }
-        }
     }
 }

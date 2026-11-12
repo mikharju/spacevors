@@ -144,6 +144,10 @@ public sealed class GameSession
 
     public GameSession(ShipType ship, ScenarioSpec? scenario = null)
     {
+        // A new session is a new run, so the manœuvre tally starts from zero — a second run out of the same
+        // process must not report the first one's hulls.
+        BehaviourLog.StartRun();
+
         _scenario = scenario;
 
         // A scenario pins the viewport: world generation places mines and ships relative to the
@@ -246,6 +250,11 @@ public sealed class GameSession
         StepSimulation();
 
         UpdateThreatReadout();
+
+        // The manœuvre tally rides the same clock as the threat readout: sampled a few times a second and
+        // written once every ten, so a whole run leaves a page of rows instead of a row per hull per frame.
+        // It stops with the hull's death, so the death animation is not counted as play.
+        if (BehaviourLog.IsActive && !_gameOver) BehaviourLog.Sample(_worldView);
 
         // Death animation: keep simulating (smoke, sparks, embers, hull shading) for a
         // moment after the fatal hit, then freeze into game over.

@@ -21,6 +21,28 @@ fleet holding flanks should climb toward 4–5 (plans/ENEMY_BEHAVIORS.md follow-
 enemy's guided rounds in the air against what the ladder allows, the number the missile knobs are tuned
 against.
 
+## Manœuvre log
+
+Diagnostics also writes `behaviours/behaviours-<utc>Z-p<pid>.log` beside the binary, timing what each enemy
+manœuvre actually delivered — the armament ladder only says what share of spawns is *dealt* one, which is not
+what the player meets:
+
+    [BEHAVIOUR] log: …/behaviours-20261112T172614Z-p9.log sample=0.25s window=10s totals every=60s keepDays=1
+    [BEHAVIOUR] t=20s win=10s Chase +1 hulls 61.0s alive 5.2s on-screen; Spread +0 hulls 10.1s alive 10.1s on-screen; CoverTuck +1 hulls 8.5s alive 8.5s on-screen;
+    [BEHAVIOUR-TOTAL] t=60s Chase hulls=18 alive=512.3s onscreen=210.4s peak=6; Spread hulls=2 alive=41.0s onscreen=30.2s peak=2; Rammer hulls=0 alive=0.0s onscreen=0.0s peak=0; …
+    [BEHAVIOUR-END] t=612s …
+
+- One row per 10 s of play, **deltas since the previous row**: `+N hulls` new arrivals, `alive` hull-seconds
+  anywhere in the world, `on-screen` hull-seconds inside the viewport box — a flanker still crossing the
+  field is alive but not yet something you met. A row that says `none` is a lull.
+- `peak=` is how many were alive at once. Every behaviour is listed in the totals, including ones that never
+  happened, so a zero is a measurement rather than an omission.
+- A `[BEHAVIOUR-TOTAL]` line repeats the running totals once a minute, because a run that is killed rather
+  than quit never reaches the end; `[BEHAVIOUR-END]` is the same line at a clean exit and prints to stdout as
+  well. A new run from the same process (game over → ship select) restarts the tally.
+- A hull counts once however long it lives. Entity ids are recycled without a generation, so `hulls` is a
+  floor: a hull replaced by the same behaviour within one 0.25 s sample counts once.
+
 ## Spike log
 
 The `[FRAME]`/`[SYSTEM]` flood is ~100 lines per frame (a 4-minute session is ~70 MB of stdout), so
@@ -89,6 +111,7 @@ Environment variables:
 - `SPACEVORS_DIAGNOSTIC=1` — enables everything above
 - `SPACEVORS_SPIKE_DIR=<dir>` — send the spike-log files somewhere other than `spikes/` beside the
   binary — e.g. a `.tools/run/...` dir, to keep a run's spikes with its logs. Only read with diagnostics on
+- `SPACEVORS_BEHAVIOUR_DIR=<dir>` — same, for the manœuvre log (`behaviours/` beside the binary by default)
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Range:MachineGun,Hp:,FireRate:MachineGun"` — scripted upgrade choices,
   one entry per **card granted**: a level grants the two cards of one bundle (plans/UPGRADE_BUNDLE_PAIRS.md),
   so entries are consumed **in pairs, strong card then weak card** — an odd leftover entry is not a bundle and

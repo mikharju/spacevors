@@ -395,6 +395,21 @@ the screen, which is the complaint — against **418 px** with the lane. `hull-c
 `impact-storm` 2.27/2.28/2.24 ms against the recorded 0.45/0.50/0.56 and 2.26/2.31/2.33: **~0 %, keep**.
 713 green.
 
+### Measured with a log, not a feeling (2026-11-08)
+
+The first long playtest left nothing behind but a spike log: `[THREAT]` goes to stdout, and nothing in the
+game had ever *counted* a manœuvre. So the run now writes its own answer. `BehaviourTally` (Domain,
+read-only, sampled at 4 Hz off the sim clock — no state written, no rng drawn) feeds `BehaviourLog` (Game,
+diagnostics only), which logs one delta row per 10 s of play, a totals row every minute, and
+`[BEHAVIOUR-END]` at a clean exit: per behaviour, hulls seen, hull-seconds alive, hull-seconds on screen, and
+peak alive at once. A ten-minute session is ~60 short rows and ~10 total rows, around 10 KB. Format in
+DIAGNOSTICS.md.
+
+The distinction worth having is `alive` against `on-screen`: a flanker dealt by the ladder spawns outside the
+screen and crosses it, so it is *alive* for seconds before it is anything the player met — and "I saw one,
+far away" is exactly that gap. Nothing here is in the sim path: with diagnostics off the cost is one null
+check per frame.
+
 ### Still open
 
 - **The tier-10 dilution is untouched**: the HeavyCannon's `GunsAndMissiles 4 : 1` rows still swamp every
