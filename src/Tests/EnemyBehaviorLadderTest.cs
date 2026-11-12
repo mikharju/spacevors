@@ -87,8 +87,9 @@ public class EnemyBehaviorLadderTest
     }
 
     // The tight ball is what the player's area guns are paid for, so the manœuvres stay a clear minority of
-    // every spawn at every tier — the user's rule: never all, never even a majority. Measured peak is 13.8 %
-    // of spawns at tier 8 (plans/ENEMY_BEHAVIORS.md follow-up), so a fifth is real slack, not a rounding.
+    // every spawn at every tier — the user's rule: never all, never even a majority. Measured peak is 17.2 %
+    // of spawns at tier 7, 420 s (plans/ENEMY_BEHAVIORS.md follow-up), so a fifth is real slack, not a
+    // rounding room to grow into.
     [Theory]
     [InlineData(2)]
     [InlineData(5)]
@@ -108,6 +109,30 @@ public class EnemyBehaviorLadderTest
     public void TheSwarmerNeverHandsAwayItsMajority(int compositionTier)
         => Assert.True(BehaviorWeight(EnemyShipType.Default, compositionTier, EnemyBehavior.Spread) / HullWeight(EnemyShipType.Default, compositionTier) <= 0.25f + Epsilon,
             $"the swarmer hands away {BehaviorWeight(EnemyShipType.Default, compositionTier, EnemyBehavior.Spread) / HullWeight(EnemyShipType.Default, compositionTier):P0} of itself at tier {compositionTier}");
+
+    // The ramp the follow-up asked for: flankers start at 2:00 and get denser every minute or two until
+    // 8:00, so a run *builds* a formation instead of meeting one near the end. Pinned against the table, so a
+    // rung that flattens the ramp fails here instead of twenty minutes into someone's session.
+    [Fact]
+    public void TheFlankerRampClimbsAcrossTheRun()
+    {
+        var share = Enumerable.Range(0, 13).Select(tier => FleetShare(tier, EnemyBehavior.Spread)).ToArray();
+
+        Assert.Equal(0f, share[0] + share[1], precision: 4);   // the opening is still nothing but chase
+        Assert.True(share[2] >= 0.06f, $"2:00 should already be a formation, not a curiosity: {share[2]:P1}");
+
+        for (int tier = 3; tier <= 7; tier++)
+            Assert.True(share[tier] > share[tier - 1],
+                $"the ramp has to climb at {tier * 60} s: {share[tier]:P1} after {share[tier - 1]:P1}");
+
+        // 8:00 is where the heavy's rack enters and dilutes every behaviour row at once. The lanes may thin
+        // a little there, but they must not slide back down the ramp.
+        Assert.True(share[8] >= share[7] * 0.95f && share[9] >= share[7] * 0.95f,
+            $"8:00 and 9:00 hold the line against the rack: {share[8]:P1} and {share[9]:P1} against {share[7]:P1}");
+
+        Assert.True(share[10] >= share[2],
+            $"the firing-line tiers may thin the lanes, not erase them: {share[10]:P1} against {share[2]:P1}");
+    }
 
     [Theory]
     [InlineData(5)]

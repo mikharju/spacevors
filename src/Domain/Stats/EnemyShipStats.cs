@@ -78,16 +78,19 @@ public readonly record struct EnemyShipType(
         RangePerTier: 10f, SpeedPerTier: 2f, AmmoSpeedPerTier: 2f,
         // The swarmer stays un-armed: with up to 100 of them live it is the one armament no weight
         // table tames, so the missile never comes from the smallest, fastest hull.
-        // A sixth of them hold a spread lane from composition tier 5, a quarter from tier 8
-        // (plans/ENEMY_BEHAVIORS.md B1 and its follow-up: at 0.2 from tier 8 the behaviour was one hull per
-        // wave, which is a curiosity rather than a formation). Five sixths still converge, because the tight
-        // ball is what PrismLance, FlakCurtain and RippleCutter are paid for — never the majority.
+        // A fifteenth of them hold a spread lane from composition tier 3, a fifth from tier 5, a quarter
+        // from tier 7 — a ramp rather than one late rung, because one rung means one flanker per wave and a
+        // flanker per wave is a curiosity, not a formation (plans/ENEMY_BEHAVIORS.md follow-up). Three
+        // quarters still converge at the widest rung: the tight ball is what PrismLance, FlakCurtain and
+        // RippleCutter are paid for — never the majority.
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.85f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.15f, EnemyBehavior.Spread),
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.75f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.25f, EnemyBehavior.Spread)]);
+            new EnemyArmamentRow(EnemyArmament.Guns, 3, 0.85f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 3, 0.15f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.8f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.2f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 7, 0.75f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 7, 0.25f, EnemyBehavior.Spread)]);
 
     // The middle hull is the first missile carrier: it already stands off, and 28 hp makes it something
     // the player can kill before it launches. 0.43 against the guns' 1 is ~30 % of its spawns; from
@@ -98,23 +101,23 @@ public readonly record struct EnemyShipType(
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
             new EnemyArmamentRow(EnemyArmament.Missiles, 3, 0.43f),
             new EnemyArmamentRow(EnemyArmament.Missiles, 5, 1f),
-            // The stand-off hull is the first to spread, and it starts a full minute earlier than the
-            // original ladder: it already holds a ring, so holding *its own lane* is the same role, one
-            // bearing wider. From tier 5 a quarter of it holds a lane, which is where it stays so the hull's
-            // later roles (ram, cut-off) can be added without the spread share drifting again.
+            // The stand-off hull is the first to spread, from tier 2: it already holds a ring, so holding
+            // *its own lane* is the same role, one bearing wider. A third of it holds a lane and stays at
+            // a third through its later roles (ram at tier 5, cut-off at tier 8) — the lane is what makes
+            // those arrive from the side instead of out of the ball.
             // Gun weights sum to 1 at every tier, so the rack share stays 0.30 at tier 3 and an even mix
             // from tier 5 (plans/MISSILES.md R20).
             new EnemyArmamentRow(EnemyArmament.Guns, 2, 0.7f),
             new EnemyArmamentRow(EnemyArmament.Guns, 2, 0.3f, EnemyBehavior.Spread),
             // From tier 5 some of it stops shooting and drives in instead (B6): it is fast enough to
             // reach the hull and 28 hp means the player can still kill it on the way in.
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.6f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.25f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.55f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.3f, EnemyBehavior.Spread),
             new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.15f, EnemyBehavior.Rammer),
             // From tier 8 it also aims where the player is going (B4), which is the cheap answer to
             // the ~290 px/s escape valve.
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.25f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f, EnemyBehavior.Spread),
             new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.1f, EnemyBehavior.Rammer),
             new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f, EnemyBehavior.CutOff)],
         Missiles: new EnemyMissileSpec(165f, 4f, Angle.FromDeg(70f), 6f, RoundHealth: 8, DamageBonus: 0));
@@ -134,14 +137,19 @@ public readonly record struct EnemyShipType(
             // gun-only heavies, so a bare heavy is the rare sight rather than the norm.
             new EnemyArmamentRow(EnemyArmament.GunsAndMissiles, 10, 4f),
             // The two hulls with hp to spare (B5): below a quarter of its hp a heavy stops trading,
-            // tucks behind the biggest fit hull it can reach, and keeps firing from there. Its own gun
-            // budget still sums to 1 at every tier, so the rack shares are untouched.
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.8f),
+            // tucks behind the biggest fit hull it can reach, and keeps firing from there. It also starts
+            // holding a lane at tier 5 and widens it at tier 6 — a slow hull is a better flanker than a
+            // chaser, because the player catches up with it either way. Its own gun budget still sums to 1
+            // at every tier, so the rack shares are untouched.
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.65f),
             new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.2f, EnemyBehavior.CoverTuck),
+            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.15f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 6, 0.6f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 6, 0.2f, EnemyBehavior.Spread),
             // From tier 8 the long line fans out (B1) and spends its shells in a telegraphed burst
             // (B7) instead of a drizzle. The rack hulls keep firing normally: a rack is a rack.
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.4f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f, EnemyBehavior.Spread),
             new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.Burst)],
         Missiles: new EnemyMissileSpec(200f, 5f, Angle.FromDeg(50f), 6f, RoundHealth: 12, DamageBonus: 4),
         Armor: 4,
@@ -170,19 +178,22 @@ public readonly record struct EnemyShipType(
     public static EnemyShipType Carmine { get; } = new(4, "carmine", 62f, 55f, 0.8f, 640f, 1.3f, 160f, 40f, 88,
         RangePerTier: 18f, AmmoSpeedPerTier: 2f,
         SpawnWeight: 0.6f,
-        // The line-breaker has 88 hp, so it has a crippled phase worth using: tuck (B5) from tier 5,
-        // then fan out and burst with the heavies from tier 8. It spreads from tier 5 as well, and that is
-        // the point: a spread hull is the nearest thing to the player's guns, so the flank that is worth
-        // *seeing* needs hp behind it — 154 at tier 5 against the Interceptor's 49. Gun weights still sum to
-        // 1 per tier.
+        // The line-breaker has 88 hp, so it has a crippled phase worth using: tuck (B5) and a lane from
+        // tier 4, then burst with the heavies from tier 8. It spreads from tier 4 and that is the point: a
+        // lane holder is the nearest thing to the player's guns, so the flank worth *seeing* needs hp behind
+        // it — 176 at tier 4 against the Interceptor's 42. Its tuck gives up a twentieth at tier 8 to make
+        // room for the burst row. Gun weights still sum to 1 per tier.
         Armaments: [
             new EnemyArmamentRow(EnemyArmament.Guns, 0, 1f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.5f),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.25f, EnemyBehavior.CoverTuck),
-            new EnemyArmamentRow(EnemyArmament.Guns, 5, 0.25f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 4, 0.5f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 4, 0.25f, EnemyBehavior.CoverTuck),
+            new EnemyArmamentRow(EnemyArmament.Guns, 4, 0.25f, EnemyBehavior.Spread),
+            new EnemyArmamentRow(EnemyArmament.Guns, 7, 0.45f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 7, 0.3f, EnemyBehavior.Spread),
             new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.15f),
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.2f, EnemyBehavior.CoverTuck),
             new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f, EnemyBehavior.Spread),
-            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.3f, EnemyBehavior.Burst)]);
+            new EnemyArmamentRow(EnemyArmament.Guns, 8, 0.35f, EnemyBehavior.Burst)]);
 
     public static readonly EnemyShipType[] All = [Default, Interceptor, HeavyCannon, Streak, Carmine];
 

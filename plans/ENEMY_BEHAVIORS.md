@@ -410,6 +410,30 @@ screen and crosses it, so it is *alive* for seconds before it is anything the pl
 far away" is exactly that gap. Nothing here is in the sim path: with diagnostics off the cost is one null
 check per frame.
 
+### Ramped again (2026-11-08, second pass)
+
+A 2:49 session logged `Spread hulls=1 alive=28.2s onscreen=15.5s` — one flanker in a whole run, which is what
+the arithmetic above delivers when only tier 2 has runged. The ladder now climbs instead of stepping once:
+
+| clock | comp. tier | spread | from whom |
+|---|---|---|---|
+| 0:00–2:00 | 0–1 | 0 % | — |
+| 2:00 | 2 | 6.8 % | Interceptor 0.30 of its guns |
+| 3:00 | 3 | 9.3 % | + swarmer 0.15 |
+| 4:00 | 4 | 12.4 % | + Carmine 0.25 (and its tuck arrives here now, not at 5:00) |
+| 5:00 | 5 | 14.8 % | + HeavyCannon 0.15, swarmer 0.20, Interceptor holds 0.30 |
+| 6:00 | 6 | 15.7 % | HeavyCannon 0.20 |
+| 7:00 | 7 | 17.2 % | swarmer 0.25 (its cap), Carmine 0.30 |
+| 8:00–9:00 | 8–9 | 16.8 % | the rack enters and dilutes every row; HeavyCannon 0.30 absorbs most of it |
+| 10:00+ | 10+ | 11.5 % | the firing line: the rack is 4 of the heavy's spawns |
+
+`TheFlankerRampClimbsAcrossTheRun` pins the shape — nothing before 2:00, a climb rung by rung to 7:00, held
+through the rack at 8:00, and never back below the 2:00 figure. The 10:00 dilution is still there (11.5 %
+against the old 9.4 %, better but still a fall): the HeavyCannon's rack rows carry no behaviour row, so a
+lane would need either the rack ratio down or rack lanes, and the rack ratio is pinned by plans/MISSILES.md
+R20 (`TheLargeHullCarriesItsRackLastAndThenAlmostAlways` asserts 0.50 at tier 8) — so that stays open, now
+measured rather than assumed.
+
 ### Still open
 
 - **The tier-10 dilution is untouched**: the HeavyCannon's `GunsAndMissiles 4 : 1` rows still swamp every
