@@ -4,9 +4,22 @@ Reference, usage only — no implementation details or history (plan files have 
 
 All helpers are active only with `SPACEVORS_DIAGNOSTIC=1`. It also turns on the cyan
 collider overlay — over hulls and rocks in flight, and over the hull previews on the ship-select
-cards — the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
+cards — the manoeuvre brackets on enemy hulls (green diamond: holding a spread lane, yellow diamond:
+a crippled hull hiding behind a healthier one), the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
 logs, the spike log file (see below), and a fixed test asteroid at (0,-300). Without it the select
 cards show the ship art alone.
+
+## Threat readout
+
+Once a second, with diagnostics on, the game logs a `[THREAT]` line and shows it in the overlay:
+
+    [THREAT] t=312s tier=5/5 ships=61 ring=44 rounds=38 missiles=6/12 in=14.2/s out=51.0/s hp=88/120 lvl=9 mines=14 rocks=22 sectors=3
+
+`sectors=` is how many of the eight bearing sectors around the player hold a live ship — the number to
+watch when judging a formation change rather than guessing from feel: a swarm trailing you reads 1–2, a
+fleet holding flanks should climb toward 4–5 (plans/ENEMY_BEHAVIORS.md follow-up). `missiles=` is the
+enemy's guided rounds in the air against what the ladder allows, the number the missile knobs are tuned
+against.
 
 ## Spike log
 
@@ -62,7 +75,8 @@ Keys (in-game):
 - J: halve player hp
 - U: spawn a rack-armed test hull (enemy missiles)
 - Q: spawn a Carmine carrying the next enemy manoeuvre — spread, strafe, tuck, ram, cut-off, burst, one per
-  press (plans/ENEMY_BEHAVIORS.md). Press `K` on it a few times to cripple it, which is what starts a tuck
+  press (plans/ENEMY_BEHAVIORS.md). Press `K` on it a few times to cripple it, which is what starts a tuck.
+  Its bracket says which manoeuvre it holds: green for a spread lane, yellow once a tuck hull is crippled
 - B: guided-round bench (8 headings x 2 plume sizes, drawn in screen space)
 - V: plume anchor overlay on every guided round
 - Y: fill the hull's shield pool, giving it one if it has none (the card is gated at level 10)
