@@ -81,6 +81,19 @@ public static class SpawningStats
         // How close to its chosen point a hull must get before it stops thrusting there.
         public const float HoldTolerance = 60f;
 
+        // Spread: the hull holds a **lane** partway in from its firing ring rather than the ring itself.
+        // The original held the ring, and play (2026-11-08) found that inert: the whole swarm already parks
+        // at 650-780 px, so the manoeuvre was a second of radial shuffle at the same distance as everything
+        // else, threatening nothing. A fraction of the ring puts the flank inside gun range, where holding a
+        // bearing means something — and holding *closer* can never extend anyone's reach (D1).
+        public const float SpreadHoldFraction = 0.55f;
+
+        // And the lane is aimed where the player is **going**. A flanker's speed is capped by
+        // EffectiveSpeed — 188 px/s for an Interceptor against a ~290 px/s player — so it cannot hold a
+        // frozen bearing by chasing a point that outruns it; it can only cut toward where that point will be.
+        // A fixed lead, bounded by the player's own speed rather than by a distance solved from it.
+        public const float SpreadLeadSeconds = 1.2f;
+
         // Strafe: the point it aims at sits this far *around* the ring from its own bearing, so the hull
         // keeps chasing a point that keeps moving — a circle it never finishes.
         public const float StrafeLeadAngle = 0.35f;

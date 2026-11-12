@@ -26,7 +26,7 @@ public static class EnemySteering
     {
         return ship.Behavior switch
         {
-            EnemyBehavior.Spread => SpreadPlan(ship, playerPos),
+            EnemyBehavior.Spread => SpreadPlan(ship, playerPos, playerVelocity),
             EnemyBehavior.Strafe => new SteerPlan(RingPoint(position, playerPos, SpawningStats.Manoeuvre.StrafeLeadAngle, ship.FiringRange), -1f),
             EnemyBehavior.CutOff => CutOffPlan(ship, distance, playerPos, playerVelocity, speedCap),
             EnemyBehavior.Rammer => new SteerPlan(playerPos, -1f),
@@ -38,13 +38,21 @@ public static class EnemySteering
     // inside the firing ring, close on the player outside it.
     private static SteerPlan ChasePlan(EnemyShip ship, Vector2 playerPos) => new(playerPos, ship.FiringRange);
 
-    // Hold the bearing the hull spawned on, at its own ring, instead of joining the chase line
-    // (plans/ENEMY_BEHAVIORS.md B1). Without a recorded bearing — test worlds, seeded scenarios — a
-    // spread hull is simply a chasing hull.
-    private static SteerPlan SpreadPlan(EnemyShip ship, Vector2 playerPos)
+    // Hold the lane its spawn bearing names, partway in from its own ring, aimed where the player is going
+    // (plans/ENEMY_BEHAVIORS.md B1 and the 2026-11-08 follow-up). Holding the ring itself turned out to be
+    // invisible in play: the whole swarm parks at that distance too, so the manoeuvre was one second of
+    // radial shuffle and nothing that threatened anybody. Holding inside it puts the flank in gun range, and
+    // leading the point is the only way a hull slower than the player can keep a lane at all. Without a
+    // recorded bearing — test worlds, seeded scenarios — a spread hull is simply a chasing hull.
+    private static SteerPlan SpreadPlan(EnemyShip ship, Vector2 playerPos, Vector2 playerVelocity)
     {
         if (ship.HoldBearing.LengthSquared < 0.01f) return ChasePlan(ship, playerPos);
-        return new SteerPlan(playerPos + ship.HoldBearing * ship.FiringRange, SpawningStats.Manoeuvre.HoldTolerance);
+
+        var lane = playerPos
+            + playerVelocity * SpawningStats.Manoeuvre.SpreadLeadSeconds
+            + ship.HoldBearing * (ship.FiringRange * SpawningStats.Manoeuvre.SpreadHoldFraction);
+
+        return new SteerPlan(lane, SpawningStats.Manoeuvre.HoldTolerance);
     }
 
     // Aim where the player is **going**, not where they are (B4). This is the cheap half of closing the

@@ -310,3 +310,61 @@ limit on that number: the scenarios seed plain-chase hulls, so what was measured
 per-tick pre-pass and the dispatch, not spread/separation/tuck at 100 behaving hulls. The first real look at
 those paths is a `Q`-key walk, or a scenario that seeds behaving hulls — the gap the dropped `encircle-64`
 left behind.
+
+## Follow-up (2026-11-08): the spread read as nothing in play
+
+Playtest: over a several-minute run hardly any hull spread out, and the one that did sat far away and never
+moved fast enough to matter. That is exactly what the shipped ladder does. Spread share of every spawn, with
+the wave quota a ~250 px/s player actually gets:
+
+| clock | comp. tier | spread | wave quota |
+|---|---|---|---|
+| 0:00–2:00 | 0–2 | 0 % | 15–25 |
+| 3:00–4:00 | 3–4 | 4.1 % | 30–35 |
+| 5:00–7:00 | 5–7 | 3.7 % | 40–50 |
+| 8:00–9:00 | 8–9 | 12.2 % | 55–60 |
+| 10:00+ | 10+ | 8.3 % | 65–80 |
+
+Before 8:00 the only spreading hull in the game is the Interceptor's, one or two per wave. From 10:00 the
+HeavyCannon's `GunsAndMissiles 4 : 1` rows dilute every behaviour row and the share falls again.
+
+Four causes, and only two of them are numbers:
+
+- **The manoeuvre had almost no motion by construction.** `HoldBearing` is the spawn bearing and the hold point
+  was `player + bearing × FiringRange` — the same ray the hull spawned along. So it could only shuffle
+  radially, from its spawn distance (572–1020 px, screen edge + margin) to its ring (655 px for an Interceptor
+  at tier 3): a few hundred px, about a second, then nothing. No tangential force exists beyond separation.
+- **"Far away" is the ring, not the behaviour.** Every hull parks at its own ring, 655–900 px, so a spreader is
+  at the same distance as the ball the player is already shooting.
+- **"Not fast enough" is `EffectiveSpeed`.** 188 px/s for an Interceptor against a ~290 px/s player: chasing a
+  point that travels with the player loses the bearing, so the flank trails instead of holding it.
+- **It dies first.** Player guns take the nearest enemy in range, and an isolated hull on a lone bearing at
+  655 px is nearer than the swarm — about 2 s of visibility on 49 hp.
+- Spawns come from a ±45° cone of the player's heading, so every spreader in a wave freezes a bearing inside
+  the same forward arc: fan-out in front of the player, never around them.
+
+### Landed: a lane, not the ring (geometry only)
+
+`SpreadPlan` now aims at `player + playerVelocity × SpreadLeadSeconds + bearing × (ring ×
+SpreadHoldFraction)`, with `SpreadHoldFraction = 0.55` and `SpreadLeadSeconds = 1.2`:
+
+- Holding at ~0.55 of the ring (360–430 px at these tiers) puts the flank **inside gun range**, so its bearing
+  is something the player answers rather than background scenery. Reaching a point *inside* the ring cannot
+  extend anyone's reach, so D1 holds and no stat moves.
+- Leading the lane by 1.2 s fixes the speed problem without touching speed: a hull capped below the player
+  cannot hold a frozen bearing by chasing it, only by cutting toward where it will be. The lead is bounded by
+  the player's own speed, so nobody aims a minute ahead.
+
+`ASpreadHullClosesIntoGunRangeWhereAChaserParks` is the pair that prices the fraction — the chaser in the same
+place does not move at all; `ASpreadHullLeadsThePlayerIntoItsLane` is the same hull with a still player and a
+player running crosswise. 708 green. Perf unchanged (`hull-crowding` 0.43/0.41/0.43 ms against the 0.45/0.50/0.56
+recorded before; `impact-storm` 2.26/2.25/2.20 against 2.26/2.31/2.33) — the scenarios seed chase hulls, and the
+change is one vector add per spreading hull.
+
+### Not landed yet: how many, how soon, and which bearings
+
+More of them sooner (Interceptor spread from tier 2, the swarmer from tier 5 at 0.15 rising to 0.25 at tier 8,
+Carmine's spread at tier 5 where its 154–264 hp means it lives long enough to be read), undoing the tier-10
+dilution, and a **wider forward cone** for spreading hulls — not any bearing, because a flanker born behind a
+fast player simply falls behind. Order matters: this commit made each flanker matter, so its share can be
+raised against a read `sectors=` on `[THREAT]` rather than guessed at.

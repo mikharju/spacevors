@@ -50,20 +50,56 @@ public class EnemyManoeuvreTest
         return em.TryGetComponent<Acceleration>(hull, out var accel) ? accel.Value : Vector2.Zero;
     }
 
-    // B1: a spreading hull holds the bearing it spawned on instead of joining the chase line. It is
-    // already on its ring, so a chaser parks; the spread hull slides along the ring to its own bearing.
+    // B1: a spreading hull leaves the chase line and holds the lane its spawn bearing names. It is already
+    // on its ring, where a chaser brakes and parks; the spread hull slides along to its own lane.
     [Fact]
-    public void ASpreadHullSlidesToItsOwnBearingWhereAChaserParks()
+    public void ASpreadHullSlidesToItsOwnLaneWhereAChaserParks()
     {
         var (em, _) = World(Vector2.Zero);
         Entity hull = Hull(em, OnTheRing, EnemyBehavior.Spread, holdBearing: new Vector2(1f, 0f));
 
         var thrust = Thrust(em, hull);
-        Assert.True(thrust.X > 30f && thrust.Y > 30f, $"spread thrust {thrust} should slide toward the bearing's ring point");
+        Assert.True(thrust.X > 15f && thrust.Y > 30f, $"spread thrust {thrust} should slide toward the lane its bearing names");
 
         var (chaseEm, _) = World(Vector2.Zero);
         Entity chaser = Hull(chaseEm, OnTheRing);
         Assert.Equal(0f, Thrust(chaseEm, chaser).Magnitude, 3);
+    }
+
+    // The lane is **inside** the ring, which is the whole 2026-11-08 change: holding the ring put a spread
+    // hull at the same 650-780 px as the rest of the swarm, and it read as a hull that had stopped to
+    // think. Here the bearing points at the player, so the only way to the lane is inward — and the chaser
+    // in the same place does not move at all.
+    [Fact]
+    public void ASpreadHullClosesIntoGunRangeWhereAChaserParks()
+    {
+        var (em, _) = World(Vector2.Zero);
+        Entity hull = Hull(em, OnTheRing, EnemyBehavior.Spread, holdBearing: new Vector2(0f, -1f));
+
+        var thrust = Thrust(em, hull);
+        Assert.True(thrust.Y > 40f, $"a spread hull should close to its lane inside the ring, got {thrust}");
+
+        var (chaseEm, _) = World(Vector2.Zero);
+        Assert.Equal(0f, Thrust(chaseEm, Hull(chaseEm, OnTheRing)).Magnitude, 3);
+    }
+
+    // A flanker cannot outrun the player, so it must not have to: leading the lane is what keeps a hull
+    // capped below the player's speed on its bearing instead of trailing their exhaust forever. The pair
+    // here is the same hull with a still player and with one running crosswise — the moving case must put
+    // more of its thrust along the player's heading.
+    [Fact]
+    public void ASpreadHullLeadsThePlayerIntoItsLane()
+    {
+        var crosswise = new Vector2(0f, 250f);
+
+        var (stillEm, _) = World(Vector2.Zero);
+        var still = Thrust(stillEm, Hull(stillEm, OnTheRing, EnemyBehavior.Spread, holdBearing: new Vector2(1f, 0f))).Normalized;
+
+        var (leadEm, _) = World(crosswise);
+        var lead = Thrust(leadEm, Hull(leadEm, OnTheRing, EnemyBehavior.Spread, holdBearing: new Vector2(1f, 0f))).Normalized;
+
+        Assert.True(lead.Y > still.Y, $"a leading flanker should aim further along the player's heading: still {still}, leading {lead}");
+        Assert.True(lead.X < still.X, $"and less of it should be spent on the bearing itself: still {still}, leading {lead}");
     }
 
     // B3: the dart never parks. Inside its own ring a chaser stops; a strafing hull keeps circling, and
