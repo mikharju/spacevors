@@ -104,6 +104,12 @@ public static class SpawningStats
         public const float SeparationGap = 40f;
         public const float SeparationThrustFraction = 0.5f;
 
+        // Where a spreading hull may be born. Wider than the wave's own ±45° cone, because a flanker that
+        // spawns inside the chase line has to run around the player to reach its lane and loses it; wider
+        // than a right angle, because a hull born behind a fast player simply falls behind and never
+        // arrives. ±60° of the heading is the arc a hull can cross in a couple of seconds.
+        public const float SpreadSpawnCone = MathF.PI / 3f;
+
         // Cut-off: the lead is solved with the hull's own effective top speed, capped so a hull 3000 px
         // behind a moving player does not aim at where the player will be in a minute.
         public const float MaxCutOffLeadTime = 3f;

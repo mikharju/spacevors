@@ -5,7 +5,9 @@ public static class SpawnPlacement
     public const float ScreenMargin = 60f;
     public const float DriftSpeed = 40f;
     public const float MinDirectionalSpeed = 0.1f;
-    private const float ForwardConeHalfAngle = MathF.PI / 4f;
+    // Where a wave's ships come from relative to the player's heading (EnemyShipSpawnSystem). Public
+    // because a spreading hull deliberately spawns from a wider arc than this one.
+    public const float ForwardConeHalfAngle = MathF.PI / 4f;
 
     // Point just outside the screen rectangle (centered on `center`) along unit vector `direction`.
     public static Vector2 OutsideScreen(Vector2 center, Vector2 viewportSize, Vector2 direction)
@@ -16,10 +18,11 @@ public static class SpawnPlacement
         return center + direction * Math.Min(tx, ty);
     }
 
-    // Random unit vector within +/-45 degrees of `velocityDir`.
-    public static Vector2 ForwardDirection(Vector2 velocityDir, Random rng)
+    // Random unit vector within `halfAngle` of `velocityDir`, one rng draw however wide the arc is — so a
+    // caller that widens the arc for one behaviour spends exactly the same number of draws as before.
+    public static Vector2 ForwardDirection(Vector2 velocityDir, Random rng, float halfAngle = ForwardConeHalfAngle)
     {
-        float angle = (float)(rng.NextDouble() * 2f * ForwardConeHalfAngle - ForwardConeHalfAngle);
+        float angle = (float)(rng.NextDouble() * 2f * halfAngle - halfAngle);
         return Rotate(velocityDir, angle);
     }
 

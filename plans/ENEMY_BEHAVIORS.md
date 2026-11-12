@@ -1,6 +1,8 @@
 # ENEMY_BEHAVIORS.md
 
 Status: shipped (2026-11-08) — B1-B7 all landed; `## Shipped` below says what deviated and why.
+`## Follow-up (2026-11-08)` re-tunes the spread after play: it holds a lane inside its ring, it starts at
+2:00 instead of 8:00, and it is born from a wider arc.
 
 Two parts: **Part 1 is the plan** — decisions and why, for a human to read in two minutes. **Part 2 is the
 implementation memo** — mechanics, invariants, tests, measurement. A decision lives only in Part 1, a mechanic
@@ -361,10 +363,44 @@ player running crosswise. 708 green. Perf unchanged (`hull-crowding` 0.43/0.41/0
 recorded before; `impact-storm` 2.26/2.25/2.20 against 2.26/2.31/2.33) — the scenarios seed chase hulls, and the
 change is one vector add per spreading hull.
 
-### Not landed yet: how many, how soon, and which bearings
+### Landed the same day: how many, how soon, and from where
 
-More of them sooner (Interceptor spread from tier 2, the swarmer from tier 5 at 0.15 rising to 0.25 at tier 8,
-Carmine's spread at tier 5 where its 154–264 hp means it lives long enough to be read), undoing the tier-10
-dilution, and a **wider forward cone** for spreading hulls — not any bearing, because a flanker born behind a
-fast player simply falls behind. Order matters: this commit made each flanker matter, so its share can be
-raised against a read `sectors=` on `[THREAT]` rather than guessed at.
+Ladder, and the new spread share of **every** spawn (fleet-wide, not of one hull):
+
+| clock | comp. tier | spread | per wave @250 px/s |
+|---|---|---|---|
+| 0:00–2:00 | 0–1 | 0 % | 0 |
+| 2:00–4:00 | 2–4 | 6.2–6.8 % | 1.7 → 2.4 |
+| 5:00–7:00 | 5–7 | 10.2 % | 4.1 → 5.1 |
+| 8:00–9:00 | 8–9 | 13.8 % | 7.6 |
+| 10:00+ | 10+ | 9.4 % | 6.1 |
+
+- Interceptor spread from **tier 2** at 0.3 of its guns, 0.25 from tier 5 (it held 0.2 from tier 3).
+- The swarmer spreads from **tier 5** (0.15) and a quarter of itself from tier 8 — it had nothing before 8:00.
+- Carmine spreads from tier 5: a flanker is the nearest thing to the player's guns, so the flank worth
+  *seeing* needs hp behind it — 154 there against the Interceptor's 49, which is why the old ladder showed
+  one 2-second hull per wave.
+- Gun rows still sum to 1 per hull per tier, so the missile shares of plans/MISSILES.md R20 are untouched,
+  and the fleet's spread share peaks at 13.8 % — a fifth is the asserted ceiling, not a rounding.
+- Spreading hulls are **born from a wider arc**: ±60° of the player's heading against the wave's ±45°
+  (`Manoeuvre.SpreadSpawnCone`, passed as `SpawnPlacement.ForwardDirection`'s half-angle). Not any bearing:
+  a hull born behind a fast player falls behind and never arrives, and past a right angle it is not a flank,
+  it is an ambush from the rear. The composition is now drawn **before** the placement, since where a hull
+  may be born is part of what it is; either order consumes one rng draw, so a seed still replays the same
+  run. `SpreadingHullsSpawnFromAWiderArcThanTheWaveDoes` asserts both the bound and that the arc is real.
+
+Measured on the headless run, same procedure both sides (a `Q`-spawned Carmine, player idle, bracket centre
+from screen centre): **642 px** with `SpreadHoldFraction = 1`, `SpreadLeadSeconds = 0` — at the top edge of
+the screen, which is the complaint — against **418 px** with the lane. `hull-crowding` 0.43/0.43/0.46 ms and
+`impact-storm` 2.27/2.28/2.24 ms against the recorded 0.45/0.50/0.56 and 2.26/2.31/2.33: **~0 %, keep**.
+713 green.
+
+### Still open
+
+- **The tier-10 dilution is untouched**: the HeavyCannon's `GunsAndMissiles 4 : 1` rows still swamp every
+  behaviour row, so spread falls from 13.8 % to 9.4 % at 10:00. Either the rack ratio comes down or a rack
+  hull is allowed a lane too (the original memo said a rack is a rack, which forbids a firing pattern, not a
+  bearing). Deliberately left for a read run, not guessed at.
+- **The metric to watch in a real session is `sectors=` on `[THREAT]`** (DIAGNOSTICS.md). It should climb
+  from the 1–2 a trailing ball gives toward 4–5 once the flanks hold lanes. Nobody has read it yet; the
+  numbers above are all arithmetic and screenshots, not a played session.

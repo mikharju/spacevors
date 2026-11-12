@@ -42,6 +42,29 @@ public class OffScreenSpawnTest
         }
     }
 
+    // A spreading hull is born from a wider arc than the wave's own ±45°, so that it can hold a lane
+    // without running around the player to get there (plans/ENEMY_BEHAVIORS.md follow-up). Still bounded:
+    // past a right angle a hull would spawn behind a fast player and never catch up.
+    [Fact]
+    public void SpreadingHullsSpawnFromAWiderArcThanTheWaveDoes()
+    {
+        var rng = new Random(11);
+        var velDir = new Vector2(0f, 1f);
+        float wideMinDot = MathF.Cos(SpawningStats.Manoeuvre.SpreadSpawnCone) - Eps;
+        float waveMinDot = MathF.Cos(SpawnPlacement.ForwardConeHalfAngle) - Eps;
+
+        int outsideWaveCone = 0;
+        for (int i = 0; i < 1000; i++)
+        {
+            var dir = SpawnPlacement.ForwardDirection(velDir, rng, SpawningStats.Manoeuvre.SpreadSpawnCone);
+            float dot = Vector2.Dot(dir, velDir);
+            Assert.True(dot >= wideMinDot, $"flank spawn {dir} is outside the ±60° arc (dot={dot})");
+            if (dot < waveMinDot) outsideWaveCone++;
+        }
+
+        Assert.True(outsideWaveCone > 50, $"a ±60° arc should put some flankers outside the ±45° wave cone, got {outsideWaveCone}/1000");
+    }
+
     [Fact]
     public void ForwardDirection_StaysWithinForwardCone()
     {

@@ -63,16 +63,20 @@ public class EnemyShipSpawnSystem : GameSystem
 
         // No meaningful "front" while the player is stationary: spawn in any direction, the same rule
         // MineRespawnSystem uses. Refusing instead would silently spend none of the wave's quota.
+        // The composition is drawn before the placement, because where a hull may be born is part of what
+        // it is: a spreading hull comes from a wider arc than a chasing one (plans/ENEMY_BEHAVIORS.md
+        // follow-up). Both paths consume one rng draw, so the run stays seed-reproducible either way.
+        var (enemyShipType, armament, behavior) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
+
         float velMagnitude = playerVel.Magnitude;
         Vector2 spawnDir = velMagnitude >= SpawnPlacement.MinDirectionalSpeed
-            ? SpawnPlacement.ForwardDirection(playerVel / velMagnitude, rng)
+            ? SpawnPlacement.ForwardDirection(playerVel / velMagnitude, rng, behavior == EnemyBehavior.Spread ? SpawningStats.Manoeuvre.SpreadSpawnCone : SpawnPlacement.ForwardConeHalfAngle)
             : SpawnPlacement.AnyDirection(rng);
 
         Vector2 testSpawnPos = SpawnPlacement.OutsideScreen(playerPos.Value, view.ViewportSize, spawnDir);
 
         if (!IsSpawnClear(view, testSpawnPos)) return;
 
-        var (enemyShipType, armament, behavior) = EnemyShipFactory.PickRandomType(rng, EnemyShipStats.CompositionTierFor(view.ElapsedTime));
         Vector2 initialVel = playerVel * SpawningStats.EnemyShips.FollowFactor + (playerPos.Value - testSpawnPos).Normalized * SpawnPlacement.DriftSpeed;
         float facingAngle = SpawnPlacement.AngleFromTo(testSpawnPos, playerPos.Value);
 

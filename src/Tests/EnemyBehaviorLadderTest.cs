@@ -61,12 +61,13 @@ public class EnemyBehaviorLadderTest
         }
     }
 
-    // The opening fleet is untouched: nothing manoeuvres until the third composition tier, so the first
-    // minutes stay the game the existing difficulty tests describe.
+    // The opening fleet is untouched: nothing manoeuvres until the second composition tier, so the first
+    // two minutes stay the game the existing difficulty tests describe. The first flanker arrives at 2:00
+    // rather than 3:00 (plans/ENEMY_BEHAVIORS.md follow-up), because at 3:00 and 4 % of spawns the whole
+    // behaviour was one hull per wave — a thing you notice once in a run, not a thing the fleet does.
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    [InlineData(2)]
     public void NothingManoeuvresInTheOpening(int compositionTier)
     {
         foreach (var type in EnemyShipType.All)
@@ -85,16 +86,28 @@ public class EnemyBehaviorLadderTest
         }
     }
 
-    // The tight ball is what the player's area guns are paid for, so the swarmer never hands away more
-    // than a fifth of itself to the spread (plans/ENEMY_BEHAVIORS.md, the user's rule: never all, never
-    // even a majority).
+    // The tight ball is what the player's area guns are paid for, so the manœuvres stay a clear minority of
+    // every spawn at every tier — the user's rule: never all, never even a majority. Measured peak is 13.8 %
+    // of spawns at tier 8 (plans/ENEMY_BEHAVIORS.md follow-up), so a fifth is real slack, not a rounding.
     [Theory]
+    [InlineData(2)]
+    [InlineData(5)]
     [InlineData(8)]
     [InlineData(12)]
     [InlineData(20)]
-    public void TheSwarmerNeverHandsAwayItsMajority(int compositionTier)
+    public void TheFleetNeverLosesItsMajorityToSpread(int compositionTier)
         => Assert.True(FleetShare(compositionTier, EnemyBehavior.Spread) <= 0.2f + Epsilon,
             $"spread holds {FleetShare(compositionTier, EnemyBehavior.Spread):P0} of every spawn at tier {compositionTier}");
+
+    // And the swarmer, the hull the ball is made of, keeps three quarters of itself converging even at the
+    // widest rung of its own ladder.
+    [Theory]
+    [InlineData(5)]
+    [InlineData(8)]
+    [InlineData(20)]
+    public void TheSwarmerNeverHandsAwayItsMajority(int compositionTier)
+        => Assert.True(BehaviorWeight(EnemyShipType.Default, compositionTier, EnemyBehavior.Spread) / HullWeight(EnemyShipType.Default, compositionTier) <= 0.25f + Epsilon,
+            $"the swarmer hands away {BehaviorWeight(EnemyShipType.Default, compositionTier, EnemyBehavior.Spread) / HullWeight(EnemyShipType.Default, compositionTier):P0} of itself at tier {compositionTier}");
 
     [Theory]
     [InlineData(5)]
