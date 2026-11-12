@@ -5,6 +5,11 @@ your guns fire themselves. Destroyed enemies leave behind loot. Pick it up for l
 and other goodies. Every level choose from upgrade bundles. Between the
 enemy waves there are lulls to loot. Survive as long as you can.
 
+## Gameplay example
+
+Example from release 0.1.0:
+https://www.youtube.com/watch?v=1bZUn7LFekw
+
 ## Install
 
 Grab the build for your system from the
