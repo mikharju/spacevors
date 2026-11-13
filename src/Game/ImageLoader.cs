@@ -172,14 +172,18 @@ public static class ImageLoader
         int depthStride = BytesPerTexel(depth.Format);
         bool normalHasRgb = normalStride >= 3;
 
+        // A normal map with fewer than three channels cannot carry a normal; a flat one is drawn rather
+        // than a wrong one. The condition is the same for every texel, so the warning that names it is
+        // issued once per map — inside the texel loop it printed one identical line per texel.
+        if (!normalHasRgb)
+            DiagnosticLogger.LogWarning($"normal map format {normals.Format} has no colour channels; drawing a flat normal");
+
         byte* dst = (byte*)packed.Data;
         byte* n = (byte*)normals.Data;
         byte* d = (byte*)depth.Data;
 
         for (int t = 0, i = 0; t < texels; t++, i += 4)
         {
-            // A normal map with fewer than three channels cannot carry a normal; a flat one is drawn
-            // rather than a wrong one, and the warning below names it.
             if (normalHasRgb)
             {
                 dst[i] = n[t * normalStride];
@@ -188,7 +192,6 @@ public static class ImageLoader
             }
             else
             {
-                DiagnosticLogger.LogWarning($"normal map format {normals.Format} has no colour channels; drawing a flat normal");
                 dst[i] = 128;
                 dst[i + 1] = 128;
                 dst[i + 2] = 255;
