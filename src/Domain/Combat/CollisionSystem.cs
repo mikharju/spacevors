@@ -648,8 +648,11 @@ public class CollisionSystem : GameSystem
             }
 
             float j = -(1 + AmmoRestitution) * velAlongNormal / totalInvMass;
+            // TrySweep's normal runs target → mover's path, the reverse of TryCollide's A → B, so the
+            // separating impulse on the target is along −normal — the same sign ResolveCollision uses
+            // for body A. Pushing it along +normal would knock mines toward the shooter.
             var impulse = normal * j;
-            mineVel += impulse * (1f / mineMass);
+            mineVel -= impulse * (1f / mineMass);
             SetCollisionVelocity(mineEntity, mineVel);
 
             _entitiesToDestroy.Add(ammoEntity);
@@ -1253,9 +1256,10 @@ public class CollisionSystem : GameSystem
         float totalInvMass = 1f / AmmoMass + 1f / asteroidMass;
 
         float j = -(1 + AmmoRestitution) * velAlongNormal / totalInvMass;
+        // Sweep normal runs target → mover, so the target separates along −normal (see the mine pass).
         var impulse = normal * j;
 
-        asteroidVel += impulse * (1f / asteroidMass);
+        asteroidVel -= impulse * (1f / asteroidMass);
         SetCollisionVelocity(asteroidEntity, asteroidVel);
 
         const float Friction = 0.2f;

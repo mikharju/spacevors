@@ -47,7 +47,7 @@ public class CollisionSystemTests
 
         Assert.True(em.HasComponent<Velocity>(asteroid), "Asteroid should have Velocity component after collision");
         var asteroidVel = em.GetComponent<Velocity>(asteroid);
-        Assert.True(asteroidVel.Value.X < -0.1f, $"Expected negative X velocity (hit from left), got {asteroidVel.Value.X}");
+        Assert.True(asteroidVel.Value.X > 0.1f, $"Expected positive X velocity (pushed along the shot, away from the shooter), got {asteroidVel.Value.X}");
     }
 
     [Fact]
@@ -157,15 +157,27 @@ public class CollisionSystemTests
         em.AddComponent(ammo, new Position(new Vector2(-5f, 0f)));
         em.AddComponent(ammo, new Ammo(Velocity: new Vector2(200f, 0f), Radius: 3f, Lifetime: 10f));
 
+        // Static control through ResolveCollision: an identical rock driven from the left into an
+        // identical stationary rock must push the struck rock the same way a bullet does.
+        var driver = em.CreateEntity();
+        em.AddComponent(driver, new Position(new Vector2(-38f, 200f)));
+        em.AddComponent(driver, new Asteroid(IsSmall: false, Radius: 20f));
+        em.AddComponent(driver, new Velocity(new Vector2(200f, 0f)));
+
+        var struck = em.CreateEntity();
+        em.AddComponent(struck, new Position(new Vector2(0f, 200f)));
+        em.AddComponent(struck, new Asteroid(IsSmall: false, Radius: 20f));
+
         var commands = new CommandBuffer();
         system.Update(view, 1 / 120f, commands);
         commands.Apply(em);
 
-        var asteroidVel = em.GetComponent<Velocity>(asteroid);
+        var sweptVel = em.GetComponent<Velocity>(asteroid).Value;
+        var staticVel = em.GetComponent<Velocity>(struck).Value;
 
-        // Impulse should push asteroid to the LEFT (normal = ammoPos - asteroidPos points toward ammo)
-        Assert.True(asteroidVel.Value.X < -0.1f,
-            $"Asteroid impulse direction inconsistent: expected negative X velocity, got {asteroidVel.Value.X}");
+        // Both pushes run along the shot direction, away from the shooter: positive X here.
+        Assert.True(sweptVel.X > 0.1f, $"Swept bullet push should be +X, got {sweptVel.X}");
+        Assert.True(staticVel.X > 0.1f, $"Static pair push should be +X, got {staticVel.X}");
     }
 
     [Fact]
@@ -189,9 +201,9 @@ public class CollisionSystemTests
         Assert.True(em.HasComponent<Velocity>(asteroid), "Asteroid should have Velocity component after collision");
         var asteroidVel = em.GetComponent<Velocity>(asteroid);
 
-        // Asteroid hit from the right must be pushed RIGHT (positive X) — away from incoming projectile
-        Assert.True(asteroidVel.Value.X > 0.05f,
-            $"Expected positive X velocity when hit from right, got {asteroidVel.Value.X}");
+        // Asteroid hit from the right must be pushed LEFT (negative X) — along the shot, away from the shooter
+        Assert.True(asteroidVel.Value.X < -0.05f,
+            $"Expected negative X velocity when hit from right, got {asteroidVel.Value.X}");
     }
 
     [Fact]
@@ -356,7 +368,7 @@ public class CollisionSystemTests
 
         Assert.True(em.HasComponent<Velocity>(mine), "Mine should have Velocity after being hit by ammo");
         var mineVel = em.GetComponent<Velocity>(mine);
-        Assert.True(mineVel.Value.X < -0.1f, $"Mine should be pushed left (negative X) when hit from left, got {mineVel.Value.X}");
+        Assert.True(mineVel.Value.X > 0.1f, $"Mine should be pushed right (positive X, along the shot) when hit from the left, got {mineVel.Value.X}");
     }
 
     [Fact]
