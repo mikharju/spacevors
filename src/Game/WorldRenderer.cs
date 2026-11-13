@@ -371,6 +371,11 @@ public static class WorldRenderer
     // beam is gone.
     private static void DrawBeamImpacts(EntityManager em, float camX, float camY, int windowWidth, int windowHeight)
     {
+        // One blend-mode switch for the whole pass: Begin/EndBlendMode each flush raylib's 2D batch,
+        // and switching them per impact paid two flushes per glow. The hotspots go in a reused buffer
+        // and draw additively after all base glows; additive glows commute, so overlap order is free.
+        _impactHotspots.Clear();
+
         foreach (var (entity, impact, pos) in em.GetEntitiesWithComponents<BeamImpact, Position>())
         {
             var (cx, cy) = RenderHelpers.ToScreen(pos.Value, camX, camY, windowWidth, windowHeight);
@@ -390,14 +395,21 @@ public static class WorldRenderer
             // White-hot spot at the centre, added on top so it reads brighter than the beam itself -
             // a laser spot off solid metal, not an ionised haze.
             Color hot = MixTowardWhite(baseColor, BeamImpactHotspotWhiteMix);
-            Raylib.BeginBlendMode(BlendMode.Additive);
-            ShapeSprites.DrawGlow(cx, cy, impact.Radius * BeamImpactHotspotFraction,
-                new Color(hot.R, hot.G, hot.B, (byte)alpha));
-            Raylib.EndBlendMode();
+            _impactHotspots.Add((cx, cy, impact.Radius * BeamImpactHotspotFraction,
+                new Color(hot.R, hot.G, hot.B, (byte)alpha)));
 
             if (BeamImpactDebug) Mark(cx, cy, Color.Red);
         }
+
+        if (_impactHotspots.Count == 0) return;
+
+        Raylib.BeginBlendMode(BlendMode.Additive);
+        foreach (var (cx, cy, radius, hot) in _impactHotspots)
+            ShapeSprites.DrawGlow(cx, cy, radius, hot);
+        Raylib.EndBlendMode();
     }
+
+    private static readonly List<(float Cx, float Cy, float Radius, Color Tint)> _impactHotspots = new();
 
     const float BeamImpactHotspotFraction = 0.4f;
     const float BeamImpactHotspotWhiteMix = 0.6f;
