@@ -204,3 +204,15 @@ the integers are not exactly four times the old ones: a 200 px/s touch 0 → 2, 
 400 px/s pilot's ram 1 → 3, and the tuned 800 px/s big hit 3 → 12, which now lands on the per-hit allowance.
 An enemy driven into an asteroid reads 11, not 12, because its heavier partner absorbs the rest. Full record:
 `plans/WEAPON_BALANCE.md`, `## Shipped (2026-11-02): pass 3 steps 1-2`.
+
+## Follow-up (2026-11-13): enemy hulls weigh what their radius says
+
+The `EnemyShipMass = 3000` override (line 36's "override for ships") is **gone**: every body, ships
+included, now masses as `pi*r^2` — in impulse resolution and in impact damage. The constant made an
+R18 swarmer weigh 2.4x a Scout while ship-vs-ship already solved by radius; a hull's weight now
+follows its size everywhere, small enemies light, big ones heavy. Consequence worth knowing when
+balancing: a light hull *absorbs a larger share* of a shared impact (the rule's inverse-mass split),
+so swarmer rams against rocks and mines now cost the swarmer more, while ramming the player with a
+light hull costs the player much less than under the flat 3000 (less reduced mass to spend). Ship
+`SpendTheRam` contact damage is untouched — it never used mass. No change to the rule itself;
+`ImpactDamage.ForMasses` is exactly as shipped above.

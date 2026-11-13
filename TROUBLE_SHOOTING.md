@@ -845,3 +845,19 @@ the message at.
   correct call and the swap was reverted. If a future host can clear the artefacts, the shape belongs
   on `ShapeSprites.DrawPlume`-style shared quads; verify with a before/after frame diff over empty
   sky, not by eye.
+
+## 84. `TrySweep`'s contact normal runs the opposite way to `TryCollide`'s — apply impulses to the target along −normal
+
+- **Symptom**: rounds that hit rocks and mines pushed them *back toward the shooter*. Lived unnoticed
+  since the non-circle seam landed; two tests named "PushedAway" and "PushedLeft" pinned the wrong
+  signs, one of them contradicting its own name, so the suite could not catch it.
+- **Cause**: `NarrowPhase.TryCollide(A, B)` returns a normal pointing **A → B**, and resolution
+  subtracts it from A / adds it to B. `TrySweep` returns a normal pointing **target → the mover's
+  path** — the reverse. Both swept resolutions (`ResolveAmmoVsAsteroid`, the ammo-vs-mine impulse
+  loop) applied `+normal` to the target, separating the pair the wrong way.
+- **Fix / Prevention**: fixed in the swept paths (apply −normal, i.e. ResolveCollision's body-A
+  convention) and pinned by a static-control test
+  (`AmmoVsAsteroid_ConsistentImpulseDirection_WithResolveCollision`): a swept push must point the
+  same way as the same pair resolved statically. Any future sweep-based resolution (debris,
+  tractors, new round kinds) must remember the two seams point opposite. Cheap check for any new
+  impulse code: after the hit, the target's velocity change must be along the bullet's travel.
