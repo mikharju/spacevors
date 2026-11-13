@@ -541,17 +541,19 @@ public static class WorldRenderer
                     Color.White
                 );
 
-                Raylib.DrawCircle((int)cx, (int)cy, mine.Radius * 0.4f, new Color(255, 200, 200, healthAlpha));
+                // Batched discs (ShapeSprites), not Raylib.DrawCircle: mines run in the hundreds in
+                // jam scenarios and each immediate-mode circle costs its own batch flush (#61 class).
+                ShapeSprites.DrawCircle(cx, cy, mine.Radius * 0.4f, new Color(255, 200, 200, healthAlpha));
             }
             else
             {
                 // No-texture fallback: red disc plus a bright core so mines stay readable.
                 if (hasHealth)
-                    Raylib.DrawCircle((int)cx, (int)cy, mine.Radius, new Color(255, 60, 60, healthAlpha));
+                    ShapeSprites.DrawCircle(cx, cy, mine.Radius, new Color(255, 60, 60, healthAlpha));
                 else
-                    Raylib.DrawCircle((int)cx, (int)cy, mine.Radius, new Color(255, 100, 100, 200));
+                    ShapeSprites.DrawCircle(cx, cy, mine.Radius, new Color(255, 100, 100, 200));
 
-                Raylib.DrawCircle((int)cx, (int)cy, mine.Radius * 0.4f, new Color(255, 200, 200, 255));
+                ShapeSprites.DrawCircle(cx, cy, mine.Radius * 0.4f, new Color(255, 200, 200, 255));
             }
         }
     }
@@ -564,7 +566,7 @@ public static class WorldRenderer
 
             if (RenderHelpers.IsOffScreen(cx, cy, pickup.Radius, windowWidth, windowHeight)) continue;
 
-            Raylib.DrawCircle((int)cx, (int)cy, pickup.Radius, Ui.WithAlpha(Palette.XpPickup, pickup.Chased ? 1f : 0.7f));
+            ShapeSprites.DrawCircle(cx, cy, pickup.Radius, Ui.WithAlpha(Palette.XpPickup, pickup.Chased ? 1f : 0.7f));
         }
     }
 
@@ -577,7 +579,7 @@ public static class WorldRenderer
             if (RenderHelpers.IsOffScreen(cx, cy, orb.Radius, windowWidth, windowHeight)) continue;
 
             // Bright mint at full alpha: health must never be mistaken for the acid spray's dark bubbles.
-            Raylib.DrawCircle((int)cx, (int)cy, orb.Radius, Palette.HealthOrb);
+            ShapeSprites.DrawCircle(cx, cy, orb.Radius, Palette.HealthOrb);
         }
     }
 

@@ -27,7 +27,9 @@ public static class BackgroundRenderer
             cx = ((cx % windowWidth) + windowWidth) % windowWidth;
             cy = ((cy % windowHeight) + windowHeight) % windowHeight;
 
-            Raylib.DrawCircle((int)cx, (int)cy, Math.Max(1f, size), color);
+            // A batched disc, not Raylib.DrawCircle: 300 immediate-mode circles per frame measured as
+            // the whole 0.3 ms `background` pass (TROUBLE_SHOOTING: ~1.1 µs batch flush each).
+            ShapeSprites.DrawCircle(cx, cy, MathF.Max(1f, size), color);
         }
     }
 
