@@ -140,3 +140,26 @@ edge for Manta, Falcon, Raptor, Streak and the screenshot's Heavy.
   so keep; the crowding delta is run-to-run noise. Both gates pass.
 - Visual check under Xvfb: the Manta (R 111, the worst old float — 0.46 R of empty air behind the
   tail) thrusts with the plume starting at the engine-pod tails, the base hidden under the paint.
+
+## Follow-up (2026-11-13): plume sizing rebalanced — thin, output-proportionate
+
+User report: the largest enemy hulls threw plumes like signal flares (a HeavyCannon at R≈90 burned
+108x63 px). Decisions, all in `ThrusterFlameRenderer`:
+
+- Main plume width `ThrustFlameHalfWidthRatio` 0.35 -> 0.15 and max length ratio 1.2 -> 1.0: much
+  thinner, slightly shorter. The plume is exhaust, not a hull-shaped fan.
+- Length now tracks the engine's actual output (`min(force/maxForce, 1)`, not the intensity clamped
+  up to 0.2): part throttle shows a stub, full burn the full length. Width and colour stay on the
+  clamped intensity so weak fire still reads as fire.
+- The sim has no per-hull mass — every enemy hull collides as one constant mass (CollisionSystem),
+  and enemy intensity is accel-relative so mass cancels. The hull radius stays the mass proxy:
+  bigger engine, longer flame, never fatter per unit length.
+- The turn RCS pair gets absolute caps (`TurnFlameMaxLength` 10 px, `TurnFlameMaxHalfWidth` 2.5 px):
+  an RCS puff is a puff at any hull size; a dreadnought's turn read comes from the pair's placement
+  at the hull corners, not from puff size.
+
+Measured (same host, llvmpipe): flame-coloured pixels in the hull-crowding frame 31 935 -> 11 158
+(−65 %); `world.thrusters` pass unchanged at 0.023 ms (same draw calls — this was never a flush
+story); frame median 8.42 -> 7.61 ms is the software rasteriser enjoying the lost overdraw.
+Visual A/B: `.tools/run/plume-{old,new}-crop.png` — wide cone to slim spike, base still anchored on
+the shaped hull.

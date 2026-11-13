@@ -12,13 +12,20 @@ public static class ThrusterFlameRenderer
     // the hull, so an inset base hides under the paint and only the plume shows; without it the base
     // floats wherever the hurtbox reaches past the paint (plans/THRUSTER_FLAME_ANCHORS.md).
     const float FlameBaseInsetRatio = 0.10f;
-    const float MaxThrustFlameLengthRatio = 1.2f;
-    const float ThrustFlameHalfWidthRatio = 0.35f;
+    const float MaxThrustFlameLengthRatio = 1.0f;
+    const float ThrustFlameHalfWidthRatio = 0.15f;
     const float TurnSideOffsetRatio = 0.6f;
     const float TurnFrontOffsetRatio = 0.8f;
     const float TurnRearOffsetRatio = 0.7f;
     const float MaxTurnFlameLengthRatio = 0.25f;
     const float TurnFlameHalfWidthRatio = 0.07f;
+
+    // Absolute ceilings on the RCS pair. Their authored ratios look proportionate on a fighter and
+    // shout from a dreadnought: an RCS puff is a puff at any hull size, so it stops growing at a
+    // fixed screen size instead of at a fraction of the hull.
+    const float TurnFlameMaxLength = 10f;
+    const float TurnFlameMaxHalfWidth = 2.5f;
+
     const float MinFlameIntensity = 0.05f;
     const float MinVisibleFlameIntensity = 0.2f;
     const int FlameAlpha = 230;
@@ -134,9 +141,11 @@ public static class ThrusterFlameRenderer
         var forward = new Vector2(sin, -cos);
         var right = new Vector2(cos, sin);
 
-        // Diagonal RCS pair: front thruster on the side opposite the turn, rear thruster on the turn's side.
-        float length = radius * MaxTurnFlameLengthRatio * turnIntensity;
-        float halfWidth = radius * TurnFlameHalfWidthRatio * turnIntensity;
+        // Diagonal RCS pair: front thruster on the side opposite the turn, rear thruster on the turn's
+        // side. Capped absolutely (see TurnFlameMaxLength): a big hull's turn read comes from the pair's
+        // placement at the hull corners, never from the puffs' size.
+        float length = MathF.Min(radius * MaxTurnFlameLengthRatio, TurnFlameMaxLength) * turnIntensity;
+        float halfWidth = MathF.Min(radius * TurnFlameHalfWidthRatio, TurnFlameMaxHalfWidth) * turnIntensity;
         var color = FlameColor(faction, turnIntensity);
 
         // The authored mount directions survive; only their length becomes the hull's surface distance,
@@ -157,9 +166,16 @@ public static class ThrusterFlameRenderer
         if (ratio < MinFlameIntensity) return;
         float intensity = Math.Clamp(ratio, MinVisibleFlameIntensity, 1f);
 
+        // The plume's **length** tracks the engine's actual output, unclamped at the bottom: leaning
+        // on the throttle shows a stub and only a full burn reaches the full length, which is what
+        // makes acceleration strength legible from the plume alone. **Width** and colour stay on the
+        // clamped intensity: even the weakest flame has to read as fire, and a plume that narrowed
+        // with output too would leave nothing to see at part throttle. The sim has no per-hull mass
+        // (every enemy hull collides as one mass), so the hull's radius stays the size scale —
+        // mass-proportionate means "the bigger engine, the longer the flame", never "the fatter".
         DrawFlame(
             basePos, dir,
-            radius * MaxThrustFlameLengthRatio * intensity,
+            radius * MaxThrustFlameLengthRatio * MathF.Min(ratio, 1f),
             radius * ThrustFlameHalfWidthRatio * intensity,
             FlameColor(faction, intensity), camX, camY, windowWidth, windowHeight);
     }
