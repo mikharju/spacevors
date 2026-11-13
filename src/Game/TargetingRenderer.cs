@@ -66,10 +66,12 @@ public static class TargetingRenderer
         int x = (int)(centerX - halfSize);
         int y = (int)(centerY - BarHeight / 2f);
         int width = (int)(halfSize * 2f);
-        int radius = (int)(BarHeight / 2f);
+        int barHeight = (int)BarHeight;
 
-        Ui.DrawRoundedRect(x, y, width, (int)BarHeight, radius, Palette.TrackDark);
-        Ui.DrawRoundedRect(x, y, Math.Max((int)BarHeight, (int)(width * ratio)), (int)BarHeight, radius, Palette.HealthColor(ratio));
+        // Two plain rects, not Ui.DrawRoundedRect: a rounded rect is four Raylib.DrawCircle corners,
+        // and each one flushes the 2D batch. At 3 px tall the 1 px corner radius is invisible anyway.
+        Raylib.DrawRectangle(x, y, width, barHeight, Palette.TrackDark);
+        Raylib.DrawRectangle(x, y, Math.Max(barHeight, (int)(width * ratio)), barHeight, Palette.HealthColor(ratio));
     }
 
     private static float GetRadius(EntityManager em, Entity target)
@@ -79,14 +81,31 @@ public static class TargetingRenderer
         return 0f;
     }
 
+    // Four corners, two arms each. Batched quads, not DrawLineEx: every DrawLineEx flushes the 2D
+    // batch and issues its own draw call, and this runs once per marked hull, which scales with the
+    // number of turrets' targets. The arms are axis-aligned, so a plain centred rect is the same
+    // segment at the same thickness.
     private static void DrawBrackets(float cx, float cy, float halfSize, Color color)
     {
         for (int sx = -1; sx <= 1; sx += 2)
             for (int sy = -1; sy <= 1; sy += 2)
             {
-                var corner = new System.Numerics.Vector2(cx + sx * halfSize, cy + sy * halfSize);
-                Raylib.DrawLineEx(corner, new System.Numerics.Vector2(corner.X - sx * ArmLength, corner.Y), Thickness, color);
-                Raylib.DrawLineEx(corner, new System.Numerics.Vector2(corner.X, corner.Y - sy * ArmLength), Thickness, color);
+                float cornerX = cx + sx * halfSize;
+                float cornerY = cy + sy * halfSize;
+                DrawSegmentQuad(cornerX - sx * ArmLength / 2f, cornerY, ArmLength, color);
+                DrawSegmentQuad(cornerX, cornerY - sy * ArmLength / 2f, Thickness, color);
             }
+    }
+
+    // A bracket arm as one quad: `width`/`height` swap between the horizontal and vertical arm, the
+    // thicker dimension is the line's thickness. DrawRectanglePro places its centre at (cx, cy) when
+    // the origin is the rect's half-size (the same anchor RenderHelpers.CenterOrigin enforces).
+    static void DrawSegmentQuad(float cx, float cy, float extent, Color color)
+    {
+        bool horizontal = extent >= Thickness;
+        float width = horizontal ? extent : Thickness;
+        float height = horizontal ? Thickness : extent;
+        var rect = new Rectangle(cx, cy, width, height);
+        Raylib.DrawRectanglePro(rect, RenderHelpers.CenterOrigin(rect), 0f, color);
     }
 }
