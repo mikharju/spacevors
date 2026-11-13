@@ -112,11 +112,11 @@ public class ImpactDamageTest
         return player;
     }
 
-    private static Entity AddEnemyShip(EntityManager em, Vector2 pos, Vector2 vel, int hp)
+    private static Entity AddEnemyShip(EntityManager em, Vector2 pos, Vector2 vel, int hp, float radius = 18f)
     {
         var ship = em.CreateEntity();
         em.AddComponent(ship, new Position(pos));
-        em.AddComponent(ship, new EnemyShip(Radius: 18f, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
+        em.AddComponent(ship, new EnemyShip(Radius: radius, Speed: 50f, TurnRate: 1f, FiringRange: 300f, TurretFireRate: 2f, TurretAmmoSpeed: 150f, Acceleration: 30f, GraphicsId: 0));
         em.AddComponent(ship, new Rotation(0f));
         em.AddComponent(ship, new Health(hp, 30));
         em.AddComponent(ship, new Velocity(vel));
@@ -144,14 +144,15 @@ public class ImpactDamageTest
     {
         var (em, view, system) = Setup();
         AddPlayer(em, Vector2.Zero, Vector2.Zero, 10);
-        var ship = AddEnemyShip(em, new Vector2(-500f, 0f), new Vector2(800f, 0f), 30);
+        var ship = AddEnemyShip(em, new Vector2(-500f, 0f), new Vector2(800f, 0f), 30, radius: 30f);
         AddAsteroid(em, new Vector2(-465f, 0f), 40f);
 
         var commands = new CommandBuffer();
         system.Update(view, 1 / 120f, commands);
         commands.Apply(em);
 
-        // 800 px/s closing, ship mass 3000 vs asteroid 5027: the big impact, 11 damage.
+        // 800 px/s closing, big hull π·30² ≈ 2827 vs asteroid 5027: the big impact, 11 damage.
+        // (A light R18 hull on the same course would take only 7 with no sparks — weight follows radius.)
         Assert.Equal(19, em.GetComponent<Health>(ship).Current);
         Assert.Equal(5, CountSparks(view)); // damage 11 >= SparkDamageThreshold -> 2 + 11/3 sparks
     }
@@ -282,8 +283,10 @@ public class ImpactDamageTest
         system.Update(view, 1 / 120f, commands);
         commands.Apply(em);
 
-        // Mines keep their own contact rule: the ship absorbs the hit, the mine does not.
-        Assert.Equal(23, em.GetComponent<Health>(ship).Current);
+        // Mines keep their own contact rule: the ship absorbs the hit, the mine does not. The light
+        // R18 hull (π·18² ≈ 1018 against the mine's π·15² ≈ 707) now takes most of a 2000 px/s slam:
+        // 10 of its 30 hp. Weight following radius means small hulls feel impacts harder.
+        Assert.Equal(20, em.GetComponent<Health>(ship).Current);
         Assert.Equal(50, em.GetComponent<Health>(mine).Current);
     }
 }

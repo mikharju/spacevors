@@ -16,8 +16,6 @@ public class CollisionSystem : GameSystem
     private const float CorrectionPercent = 0.4f;
     private const float Slop = 1.0f;
 
-    private const float EnemyShipMass = 3000f;
-
     // How much of the hull's own velocity a shatter shard inherits, so the pieces trail behind a moving
     // hull the way a damage spark does (DamageEffectSystem.FollowFactor is the same idea at 0.5).
     private const float ShardVelocityInherit = 0.4f;
@@ -121,7 +119,7 @@ public class CollisionSystem : GameSystem
             CheckPlayerCollision(pos.Value, ship.Radius, () =>
             {
                 ResolveCollision(view, hull, entity,
-                    playerBody, playerEntity, false, commands, EnemyShipMass);
+                    playerBody, playerEntity, false, commands);
                 SpendTheRam(view, entity, pos.Value);
             });
 
@@ -135,7 +133,7 @@ public class CollisionSystem : GameSystem
 
                 ResolveCollision(view, hull, entity,
                     AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)),
-                    candidate.Id, true, commands, EnemyShipMass);
+                    candidate.Id, true, commands);
             }
         }
 
@@ -219,7 +217,7 @@ public class CollisionSystem : GameSystem
                 var bPos = view.GetComponent<Position>(candidate.Id);
                 var mine = view.GetComponent<EnemyMine>(candidate.Id);
                 ResolveCollision(view, hull, sEntity,
-                    CircleBody(bPos.Value, mine.Radius), candidate.Id, true, commands, EnemyShipMass);
+                    CircleBody(bPos.Value, mine.Radius), candidate.Id, true, commands);
             }
         }
 
@@ -993,15 +991,16 @@ public class CollisionSystem : GameSystem
         NarrowPhase.CollisionBody b,
         Entity bEntity,
         bool isAsteroidVsAsteroid,
-        CommandBuffer commands,
-        float? aOverrideMass = null)
+        CommandBuffer commands)
     {
         if (!NarrowPhase.TryCollide(a, b, out Contact contact)) return;
 
         var normal = contact.Normal;
         float penetration = contact.Depth;
 
-        float aMass = aOverrideMass ?? (MathF.PI * a.Scale * a.Scale);
+        // Mass and MOI are radius-derived for every body, hulls included: a small enemy is light and a
+        // big one heavy. The old fixed EnemyShipMass = 3000 made a 20 px swarmer weigh 2.4x a Scout.
+        float aMass = MathF.PI * a.Scale * a.Scale;
         float bMass = MathF.PI * b.Scale * b.Scale;
         float invMassA = 1f / aMass;
         float invMassB = 1f / bMass;
