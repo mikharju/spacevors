@@ -52,10 +52,70 @@ public class CollisionSystem : GameSystem
     private readonly HashSet<Entity> _hitMissiles = new();
     private readonly Dictionary<Entity, (Vector2 hitPoint, Vector2 shipPos, float shipRadius, byte graphicsId)> _shipDeathData = new();
 
+    // One tick, in order: find everything touching everything else, spend each round and beam on
+    // what it hit, then write every accumulated result back once. Order within each pass is part of
+    // the contract: RNG draws for sparks and loot follow collection insertion order (determinism).
     public override void Update(WorldView view, float deltaTime, CommandBuffer commands)
     {
         var sw = Stopwatch.StartNew();
 
+        ResetPerFrameState(view);
+
+        var gridBuildSw = Stopwatch.StartNew();
+        BuildBroadPhaseAndResolveVsPlayer(view, commands);
+        gridBuildSw.Stop();
+
+        var asteroidSw = Stopwatch.StartNew();
+        ResolveRockPairs(view, commands);
+        asteroidSw.Stop();
+
+        var shipSw = Stopwatch.StartNew();
+        ResolveShipPairs(view, commands);
+        shipSw.Stop();
+
+        var ammoDetectionSw = Stopwatch.StartNew();
+        DetectRoundHits(view, deltaTime, commands);
+        DetectBeamHits(view, commands);
+        ammoDetectionSw.Stop();
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: grid build", gridBuildSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: asteroid collisions", asteroidSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: ship collisions", shipSw.ElapsedTicks);
+        DiagnosticLogger.LogSystem("Collision: detection", ammoDetectionSw.ElapsedTicks);
+
+        sw.Restart();
+        ApplyMineKnockback(view);
+        WriteBackDeaths(view, commands);
+        WriteBackShields(view, commands);
+
+        foreach (var entity in _entitiesToDestroy)
+        {
+            commands.Add(new DestroyEntityCommand(entity));
+        }
+
+        foreach (var (position, mineType) in _effectsToSpawn)
+        {
+            SpawnExplosion(commands, position, mineType);
+            for (int i = 0; i < mineType.HitSparkCount; i++)
+            {
+                SpawnSpark(commands, position, view.Rng);
+            }
+        }
+
+        FlushCollisions(commands, view);
+
+        sw.Stop();
+        DiagnosticLogger.LogSystem("Collision: resolution", sw.ElapsedTicks);
+    }
+
+    // The player as the tick sees it, resolved once: every pass asks the same body.
+    private Entity _playerEntity;
+    private NarrowPhase.CollisionBody _playerBody;
+    private bool _hasPlayer;
+
+    private void ResetPerFrameState(WorldView view)
+    {
         _grid.Clear();
         _asteroidPositions.Clear();
         _shipPositions.Clear();
@@ -74,22 +134,23 @@ public class CollisionSystem : GameSystem
         _hitAsteroids.Clear();
         _hitMissiles.Clear();
         _shipDeathData.Clear();
-        bool hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
-        Entity playerEntity = playerTuple.Entity;
 
+        _hasPlayer = view.GetEntitiesWithComponents<Player, Position>().TryFirst(out var playerTuple);
+        _playerEntity = playerTuple.Entity;
         // The player's body, built once per tick: its shape turns with the hull, so every test the player is
         // in reads the same transformed primitives instead of re-deriving them.
-        NarrowPhase.CollisionBody playerBody = hasPlayer ? PlayerBody(view, playerEntity, playerTuple.Value1) : default;
+        _playerBody = _hasPlayer ? PlayerBody(view, _playerEntity, playerTuple.Value1) : default;
+    }
 
-        // The player's collision circle is the conservative reject in front of its shape, exactly as a hull's
-        // circle is in front of a bullet's sweep: the shape never reaches past the radius, so a body that
-        // misses the circle cannot touch the shape either. A plain test, not a callback: a closure per
-        // asteroid per tick in the build pass is exactly the allocation the hot path must not make.
-        bool TouchesPlayerBody(Vector2 entityPos, float entityRadius) =>
-            hasPlayer && NarrowPhase.TryCollide(playerTuple.Value2.Value, playerTuple.Value1.Radius, entityPos, entityRadius, out _);
+    // The player's collision circle is the conservative reject in front of its shape, exactly as a hull's
+    // circle is in front of a bullet's sweep: the shape never reaches past the radius, so a body that
+    // misses the circle cannot touch the shape either. A plain test, not a callback: a closure per
+    // asteroid per tick in the build pass is exactly the allocation the hot path must not make.
+    private bool TouchesPlayerBody(Vector2 entityPos, float entityRadius) =>
+        _hasPlayer && NarrowPhase.TryCollide(_playerBody.Position, _playerBody.Scale, entityPos, entityRadius, out _);
 
-        var gridBuildSw = Stopwatch.StartNew();
-
+    private void BuildBroadPhaseAndResolveVsPlayer(WorldView view, CommandBuffer commands)
+    {
         foreach (var (entity, asteroid) in view.GetEntitiesWithComponents<Asteroid>())
         {
             var pos = view.GetComponent<Position>(entity);
@@ -99,7 +160,7 @@ public class CollisionSystem : GameSystem
 
             if (TouchesPlayerBody(pos.Value, asteroid.Radius))
                 ResolveCollision(view, _asteroidBodies[entity.Value], entity,
-                    playerBody, playerEntity, false, commands);
+                    _playerBody, _playerEntity, false, commands);
         }
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
@@ -108,7 +169,7 @@ public class CollisionSystem : GameSystem
             _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, mine.Size);
 
             if (TouchesPlayerBody(pos.Value, mine.Radius))
-                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerBody);
+                ResolveMineVsPlayer(view, entity, mine, _playerEntity, commands, _playerBody);
         }
 
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
@@ -122,7 +183,7 @@ public class CollisionSystem : GameSystem
             if (TouchesPlayerBody(pos.Value, ship.Radius))
             {
                 ResolveCollision(view, hull, entity,
-                    playerBody, playerEntity, false, commands);
+                    _playerBody, _playerEntity, false, commands);
                 SpendTheRam(view, entity, pos.Value);
             }
 
@@ -147,11 +208,10 @@ public class CollisionSystem : GameSystem
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, SpatialGrid.CollisionKind.Missile, pos.Value, round.Radius);
         }
+    }
 
-        gridBuildSw.Stop();
-
-        var asteroidSw = Stopwatch.StartNew();
-
+    private void ResolveRockPairs(WorldView view, CommandBuffer commands)
+    {
         foreach (var (aEntity, aPos) in _asteroidPositions)
         {
             var rock = _asteroidBodies[aEntity.Value];
@@ -185,10 +245,10 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        asteroidSw.Stop();
+    }
 
-        var shipSw = Stopwatch.StartNew();
-
+    private void ResolveShipPairs(WorldView view, CommandBuffer commands)
+    {
         foreach (var (sEntity, sPos) in _shipPositions)
         {
             var hull = _shipBodies[sEntity.Value];
@@ -221,222 +281,232 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        shipSw.Stop();
+    }
 
-        var ammoDetectionSw = Stopwatch.StartNew();
-
+    private void DetectRoundHits(WorldView view, float deltaTime, CommandBuffer commands)
+    {
         foreach (var (ammoEntity, ammo, ammoPos) in view.GetEntitiesWithComponents<Ammo, Position>())
+            ResolveOneRound(view, ammoEntity, ammo, ammoPos.Value, deltaTime, commands);
+    }
+
+    // One round's whole tick: sweep it, find what it met first, spend it there. Deliberately one
+    // method with plain locals: an earlier split into a found-targets struct cost ~9% on ammo-spray,
+    // because the struct was copied per round at ~5.5k rounds a tick.
+    //
+    // Swept capsule: ammo velocity is constant (ammo never gets Acceleration), so the
+    // position at the start of the tick is exactly pos - vel*dt. The bullet is the
+    // segment [sweepFrom, sweepTo] inflated by its radius, so a bullet that jumps over
+    // a target between ticks still intersects it. t orders hits along travel.
+    private void ResolveOneRound(WorldView view, Entity ammoEntity, Ammo ammo, Vector2 ammoPos, float deltaTime, CommandBuffer commands)
+    {
+        float ammoRadius = ammo.Radius;
+
+        Vector2 sweepFrom = ammoPos - ammo.Velocity * deltaTime;
+        Vector2 sweepTo = ammoPos;
+        var boxMin = new Vector2(
+            MathF.Min(sweepFrom.X, sweepTo.X) - ammoRadius,
+            MathF.Min(sweepFrom.Y, sweepTo.Y) - ammoRadius);
+        var boxMax = new Vector2(
+            MathF.Max(sweepFrom.X, sweepTo.X) + ammoRadius,
+            MathF.Max(sweepFrom.Y, sweepTo.Y) + ammoRadius);
+
+        Entity? earliestAsteroidHit = null;
+        Contact asteroidHit = default;
+        float asteroidT = float.MaxValue;
+
+        Entity? earliestMineHit = null;
+        MineSize? mineHitSize = null;
+        Vector2 mineHitPos = default;
+        Contact mineHit = default;
+        float mineT = float.MaxValue;
+
+        Entity? earliestShipHit = null;
+        Vector2 shipHitPos = default;
+        float shipT = float.MaxValue;
+
+        Entity? earliestMissileHit = null;
+        Contact missileHit = default;
+        float missileT = float.MaxValue;
+
+        int count = QueryBox(boxMin, boxMax);
+        var queryBuffer = _queryBuffer;
+
+        for (int i = 0; i < count; i++)
         {
-            float ammoRadius = ammo.Radius;
+            ref readonly var candidate = ref queryBuffer[i];
 
-            // Swept capsule: ammo velocity is constant (ammo never gets Acceleration), so the
-            // position at the start of the tick is exactly pos - vel*dt. The bullet is the
-            // segment [sweepFrom, sweepTo] inflated by its radius, so a bullet that jumps over
-            // a target between ticks still intersects it. t orders hits along travel.
-            Vector2 sweepFrom = ammoPos.Value - ammo.Velocity * deltaTime;
-            Vector2 sweepTo = ammoPos.Value;
-            var boxMin = new Vector2(
-                MathF.Min(sweepFrom.X, sweepTo.X) - ammoRadius,
-                MathF.Min(sweepFrom.Y, sweepTo.Y) - ammoRadius);
-            var boxMax = new Vector2(
-                MathF.Max(sweepFrom.X, sweepTo.X) + ammoRadius,
-                MathF.Max(sweepFrom.Y, sweepTo.Y) + ammoRadius);
+            // The bounding circle is a conservative reject: a hull's shape never reaches past the
+            // radius the grid indexed it by, so anything that misses the circle cannot touch the
+            // shape either. Only a candidate the circle cannot reject is tested against its shape,
+            // which keeps a volley through empty space exactly as cheap as it was.
+            if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, candidate.Position, candidate.Radius, out Contact hit, out float t))
+                continue;
 
-            Entity? earliestAsteroidHit = null;
-            Contact asteroidHit = default;
-            float asteroidT = float.MaxValue;
+            if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
+                && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
+                    _shipBodies[candidate.Id.Value], out hit, out t))
+                continue;
 
-            Entity? earliestMineHit = null;
-            MineSize? mineHitSize = null;
-            Vector2 mineHitPos = default;
-            Contact mineHit = default;
-            float mineT = float.MaxValue;
+            // A rock gets the same treatment: its art's lumps are inside the circle the grid indexed
+            // it by, so a round that survives the circle is asked again against the rock's shape.
+            if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
+                && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
+                    _asteroidBodies[candidate.Id.Value], out hit, out t))
+                continue;
 
-            Entity? earliestShipHit = null;
-            Vector2 shipHitPos = default;
-            float shipT = float.MaxValue;
-
-            Entity? earliestMissileHit = null;
-            Contact missileHit = default;
-            float missileT = float.MaxValue;
-
-            int count = QueryBox(boxMin, boxMax);
-            var queryBuffer = _queryBuffer;
-
-            for (int i = 0; i < count; i++)
+            switch (candidate.Kind)
             {
-                ref readonly var candidate = ref queryBuffer[i];
+                case SpatialGrid.CollisionKind.Asteroid:
+                    if (t < asteroidT)
+                    {
+                        earliestAsteroidHit = candidate.Id;
+                        asteroidHit = hit;
+                        asteroidT = t;
+                    }
+                    break;
 
-                // The bounding circle is a conservative reject: a hull's shape never reaches past the
-                // radius the grid indexed it by, so anything that misses the circle cannot touch the
-                // shape either. Only a candidate the circle cannot reject is tested against its shape,
-                // which keeps a volley through empty space exactly as cheap as it was.
-                if (!NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, candidate.Position, candidate.Radius, out Contact hit, out float t))
-                    continue;
+                case SpatialGrid.CollisionKind.EnemyMine when !ammo.IsEnemy:
+                    if (t < mineT)
+                    {
+                        earliestMineHit = candidate.Id;
+                        mineHitPos = candidate.Position;
+                        mineHit = hit;
+                        mineHitSize = candidate.Size!;
+                        mineT = t;
+                    }
+                    break;
 
-                if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
-                    && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
-                        _shipBodies[candidate.Id.Value], out hit, out t))
-                    continue;
+                case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
+                    // The hit point is the hull surface facing the touch — where the spark, the
+                    // explosion and the wreck placement all go.
+                    if (t < shipT)
+                    {
+                        earliestShipHit = candidate.Id;
+                        shipHitPos = candidate.Position + hit.Normal * candidate.Radius;
+                        shipT = t;
+                    }
+                    break;
 
-                // A rock gets the same treatment: its art's lumps are inside the circle the grid indexed
-                // it by, so a round that survives the circle is asked again against the rock's shape.
-                if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
-                    && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
-                        _asteroidBodies[candidate.Id.Value], out hit, out t))
-                    continue;
-
-                switch (candidate.Kind)
-                {
-                    case SpatialGrid.CollisionKind.Asteroid:
-                        if (t < asteroidT)
-                        {
-                            earliestAsteroidHit = candidate.Id;
-                            asteroidHit = hit;
-                            asteroidT = t;
-                        }
-                        break;
-
-                    case SpatialGrid.CollisionKind.EnemyMine when !ammo.IsEnemy:
-                        if (t < mineT)
-                        {
-                            earliestMineHit = candidate.Id;
-                            mineHitPos = candidate.Position;
-                            mineHit = hit;
-                            mineHitSize = candidate.Size!;
-                            mineT = t;
-                        }
-                        break;
-
-                    case SpatialGrid.CollisionKind.EnemyShip when !ammo.IsEnemy:
-                        // The hit point is the hull surface facing the touch — where the spark, the
-                        // explosion and the wreck placement all go.
-                        if (t < shipT)
-                        {
-                            earliestShipHit = candidate.Id;
-                            shipHitPos = candidate.Position + hit.Normal * candidate.Radius;
-                            shipT = t;
-                        }
-                        break;
-
-                    // A guided round is a body with hit points, and only the other side's fire counts:
-                    // that check is what stops the player's bullets from being eaten by the player's own
-                    // missiles, and it stops a round from colliding with itself.
-                    case SpatialGrid.CollisionKind.Missile:
-                        if (!view.TryGetComponent<Ammo>(candidate.Id, out var candidateRound)
-                            || candidateRound.IsEnemy == ammo.IsEnemy) break;
-                        if (t < missileT)
-                        {
-                            earliestMissileHit = candidate.Id;
-                            missileHit = hit;
-                            missileT = t;
-                        }
-                        break;
-                }
+                // A guided round is a body with hit points, and only the other side's fire counts:
+                // that check is what stops the player's bullets from being eaten by the player's own
+                // missiles, and it stops a round from colliding with itself.
+                case SpatialGrid.CollisionKind.Missile:
+                    if (!view.TryGetComponent<Ammo>(candidate.Id, out var candidateRound)
+                        || candidateRound.IsEnemy == ammo.IsEnemy) break;
+                    if (t < missileT)
+                    {
+                        earliestMissileHit = candidate.Id;
+                        missileHit = hit;
+                        missileT = t;
+                    }
+                    break;
             }
+        }
 
-            // The player is not in the grid, so its touch is found here, beside the grid's
-            // candidates, so it orders against them the same way. The same two steps as against a
-            // hull: the bounding circle rejects a round that cannot reach the player, and only a
-            // round inside it is tested against the hull's shape, which says where it stops.
-            bool playerHit = false;
-            float playerT = float.MaxValue;
-            // The hull-shape contact is kept, not discarded: its point is the direction a soaked hit
-            // came from, which is what the shield's intercept flash is drawn at (plans/SHIELDS.md §7).
-            Contact playerContact = default;
-            if (ammo.IsEnemy && hasPlayer
-                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerTuple.Value2.Value, playerTuple.Value1.Radius, out _, out _)
-                && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, playerBody, out playerContact, out float playerTouchedAt))
-            {
-                playerHit = true;
-                playerT = playerTouchedAt;
-            }
+        // The player is not in the grid, so its touch is found here, beside the grid's
+        // candidates, so it orders against them the same way. The same two steps as against a
+        // hull: the bounding circle rejects a round that cannot reach the player, and only a
+        // round inside it is tested against the hull's shape, which says where it stops.
+        bool playerHit = false;
+        float playerT = float.MaxValue;
+        // The hull-shape contact is kept, not discarded: its point is the direction a soaked hit
+        // came from, which is what the shield's intercept flash is drawn at (plans/SHIELDS.md §7).
+        Contact playerContact = default;
+        if (ammo.IsEnemy && _hasPlayer
+            && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, _playerBody.Position, _playerBody.Scale, out _, out _)
+            && NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius, _playerBody, out playerContact, out float playerTouchedAt))
+        {
+            playerHit = true;
+            playerT = playerTouchedAt;
+        }
 
-            // One round, one hit: each kind used to keep its own earliest `t`, so a single round
-            // chipped a rock, a mine, a hull and a downed round in the same tick, and an enemy round
-            // could clip a rock on its way into the player. The round is spent at the earliest touch
-            // along its segment — bodies met at exactly that distance all take it, nothing met later
-            // does, so a round that shot a missile down never carries on into the hull that missile
-            // was covering. A body the round cannot damage (a wreck past its Health) still spends
-            // the tick's hit: the round survives and reaches what is behind it one tick later.
-            float spentT = MathF.Min(MathF.Min(MathF.Min(asteroidT, mineT), MathF.Min(shipT, missileT)), playerT);
+        // One round, one hit: each kind used to keep its own earliest `t`, so a single round
+        // chipped a rock, a mine, a hull and a downed round in the same tick, and an enemy round
+        // could clip a rock on its way into the player. The round is spent at the earliest touch
+        // along its segment — bodies met at exactly that distance all take it, nothing met later
+        // does, so a round that shot a missile down never carries on into the hull that missile
+        // was covering. A body the round cannot damage (a wreck past its Health) still spends
+        // the tick's hit: the round survives and reaches what is behind it one tick later.
+        float spentT = MathF.Min(MathF.Min(MathF.Min(asteroidT, mineT), MathF.Min(shipT, missileT)), playerT);
 
-            if (earliestAsteroidHit.HasValue && asteroidT == spentT)
-            {
-                var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
-                ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidHit, commands);
-                if (DamageAsteroid(view, earliestAsteroidHit.Value, ammo.Damage))
-                    _effectsToSpawn.Add((asteroidHit.Point, MineType.Small));
-                _entitiesToDestroy.Add(ammoEntity);
-            }
-
-            if (earliestMineHit.HasValue && mineT == spentT && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
-            {
-                if (!_frameRemainingHealth.TryGetValue(earliestMineHit.Value, out var health))
-                {
-                    health = healthComp.Current;
-                    _frameRemainingHealth[earliestMineHit.Value] = health;
-                }
-                _frameRemainingHealth[earliestMineHit.Value] -= ammo.Damage;
-                _hitMines.Add(earliestMineHit.Value);
-                _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineHit, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
-                _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
-            }
-
-            if (earliestShipHit.HasValue && shipT == spentT && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
-            {
-                var shipHealth = shipHealthComp.Current;
-                if (!_frameRemainingHealth.TryGetValue(earliestShipHit.Value, out var h))
-                {
-                    h = shipHealth;
-                    _frameRemainingHealth[earliestShipHit.Value] = h;
-                }
-                var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
-                var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
-                int shipDealt = MitigatedGunfireHit(view, earliestShipHit.Value, ammo.Damage, ammo.Pierce, shipPos.Value, shipHitPos);
-                _frameRemainingHealth[earliestShipHit.Value] -= shipDealt;
-                _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, shipDealt, enemyShip.Radius, enemyShip.GraphicsId));
-                // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
-                _entitiesToDestroy.Add(ammoEntity);
-            }
-
-            if (earliestMissileHit.HasValue && missileT == spentT && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
-            {
-                if (!_frameRemainingHealth.TryGetValue(earliestMissileHit.Value, out var mHealth))
-                {
-                    mHealth = missileHealthComp.Current;
-                    _frameRemainingHealth[earliestMissileHit.Value] = mHealth;
-                }
-                _frameRemainingHealth[earliestMissileHit.Value] -= ammo.Damage;
-                _hitMissiles.Add(earliestMissileHit.Value);
-                _effectsToSpawn.Add((missileHit.Point, MineType.Small));
-                // The round that shot it down is spent, exactly as against a hull: a bullet that kills
-                // a missile does not carry on into whatever the missile was covering.
-                _entitiesToDestroy.Add(ammoEntity);
-            }
-
-            if (!playerHit || playerT != spentT) continue;
-
-            var playerPos = playerTuple.Value2;
-
-            var playerHealth = view.GetComponent<Health>(playerEntity);
-            if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
-            {
-                remaining = playerHealth.Current;
-                _frameRemainingHealth[playerEntity] = remaining;
-            }
-            // Armor first, then the shield pool. A hit the field fully ate shows only its flash on the
-            // ring; the amber spark is what says "the hull took it", so it is spawned only when damage
-            // got through (plans/SHIELDS.md §7). A partial soak shows both reads at once.
-            int playerDealt = MitigatedGunfireHit(view, playerEntity, ammo.Damage, ammo.Pierce, playerPos.Value, playerContact.Point);
-            _frameRemainingHealth[playerEntity] -= playerDealt;
-            if (playerDealt > 0) _effectsToSpawn.Add((playerPos.Value, MineType.Small));
+        if (earliestAsteroidHit.HasValue && asteroidT == spentT)
+        {
+            var asteroid = view.GetComponent<Asteroid>(earliestAsteroidHit.Value);
+            ResolveAmmoVsAsteroid(view, ammo, earliestAsteroidHit.Value, asteroid, asteroidHit, commands);
+            if (DamageAsteroid(view, earliestAsteroidHit.Value, ammo.Damage))
+                _effectsToSpawn.Add((asteroidHit.Point, MineType.Small));
             _entitiesToDestroy.Add(ammoEntity);
         }
 
-        // Laser beams: static segments, damage applied exactly once (DamagePending) to the
-        // first thing hit. Runs before the mine/ship death loops so damage flows through the
-        // same per-frame health accumulators.
+        if (earliestMineHit.HasValue && mineT == spentT && view.TryGetComponent<Health>(earliestMineHit.Value, out var healthComp))
+        {
+            if (!_frameRemainingHealth.TryGetValue(earliestMineHit.Value, out var health))
+            {
+                health = healthComp.Current;
+                _frameRemainingHealth[earliestMineHit.Value] = health;
+            }
+            _frameRemainingHealth[earliestMineHit.Value] -= ammo.Damage;
+            _hitMines.Add(earliestMineHit.Value);
+            _ammoToMineHits.Add((ammoEntity, earliestMineHit.Value, mineHit, mineHitPos, mineHitSize!.Value, ammo.Damage, ammo.Velocity));
+            _effectsToSpawn.Add((mineHitPos!, MineType.FromSize(mineHitSize!.Value)));
+        }
+
+        if (earliestShipHit.HasValue && shipT == spentT && view.TryGetComponent<Health>(earliestShipHit.Value, out var shipHealthComp))
+        {
+            var shipHealth = shipHealthComp.Current;
+            if (!_frameRemainingHealth.TryGetValue(earliestShipHit.Value, out var h))
+            {
+                h = shipHealth;
+                _frameRemainingHealth[earliestShipHit.Value] = h;
+            }
+            var enemyShip = view.GetComponent<EnemyShip>(earliestShipHit.Value);
+            var shipPos = view.GetComponent<Position>(earliestShipHit.Value);
+            int shipDealt = MitigatedGunfireHit(view, earliestShipHit.Value, ammo.Damage, ammo.Pierce, shipPos.Value, shipHitPos);
+            _frameRemainingHealth[earliestShipHit.Value] -= shipDealt;
+            _ammoToShipHits.Add((ammoEntity, earliestShipHit.Value, shipHitPos, shipPos.Value, shipDealt, enemyShip.Radius, enemyShip.GraphicsId));
+            // Consume the bullet on hit so it cannot re-hit the same ship on later frames.
+            _entitiesToDestroy.Add(ammoEntity);
+        }
+
+        if (earliestMissileHit.HasValue && missileT == spentT && view.TryGetComponent<Health>(earliestMissileHit.Value, out var missileHealthComp))
+        {
+            if (!_frameRemainingHealth.TryGetValue(earliestMissileHit.Value, out var mHealth))
+            {
+                mHealth = missileHealthComp.Current;
+                _frameRemainingHealth[earliestMissileHit.Value] = mHealth;
+            }
+            _frameRemainingHealth[earliestMissileHit.Value] -= ammo.Damage;
+            _hitMissiles.Add(earliestMissileHit.Value);
+            _effectsToSpawn.Add((missileHit.Point, MineType.Small));
+            // The round that shot it down is spent, exactly as against a hull: a bullet that kills
+            // a missile does not carry on into whatever the missile was covering.
+            _entitiesToDestroy.Add(ammoEntity);
+        }
+
+        if (!playerHit || playerT != spentT) return;
+
+        var playerPos = _playerBody.Position;
+
+        var playerHealth = view.GetComponent<Health>(_playerEntity);
+        if (!_frameRemainingHealth.TryGetValue(_playerEntity, out var remaining))
+        {
+            remaining = playerHealth.Current;
+            _frameRemainingHealth[_playerEntity] = remaining;
+        }
+        // Armor first, then the shield pool. A hit the field fully ate shows only its flash on the
+        // ring; the amber spark is what says "the hull took it", so it is spawned only when damage
+        // got through (plans/SHIELDS.md §7). A partial soak shows both reads at once.
+        int playerDealt = MitigatedGunfireHit(view, _playerEntity, ammo.Damage, ammo.Pierce, playerPos, playerContact.Point);
+        _frameRemainingHealth[_playerEntity] -= playerDealt;
+        if (playerDealt > 0) _effectsToSpawn.Add((playerPos, MineType.Small));
+        _entitiesToDestroy.Add(ammoEntity);
+    }
+
+    // Laser beams: static segments, damage applied exactly once (DamagePending) to the
+    // first thing hit. Runs before the mine/ship death loops so damage flows through the
+    // same per-frame health accumulators.
+    private void DetectBeamHits(WorldView view, CommandBuffer commands)
+    {
         foreach (var (beamEntity, beam) in view.GetEntitiesWithComponents<LaserBeam>())
         {
             if (!beam.DamagePending) continue;
@@ -454,18 +524,18 @@ public class CollisionSystem : GameSystem
                 // Enemy beams engage only the player, mirroring enemy ammo. A beam is a segment inflated by its
                 // width, so it crosses the swept seam and meets the player's shape instead of its bounding
                 // circle — which is what lets a beam pass through the gap in a hull that has one.
-                if (hasPlayer && NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, playerBody, out Contact beamContact, out _))
+                if (_hasPlayer && NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width, _playerBody, out Contact beamContact, out _))
                 {
-                    var beamPlayerHealth = view.GetComponent<Health>(playerEntity);
-                    if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
+                    var beamPlayerHealth = view.GetComponent<Health>(_playerEntity);
+                    if (!_frameRemainingHealth.TryGetValue(_playerEntity, out var remaining))
                     {
                         remaining = beamPlayerHealth.Current;
-                        _frameRemainingHealth[playerEntity] = remaining;
+                        _frameRemainingHealth[_playerEntity] = remaining;
                     }
-                    _frameRemainingHealth[playerEntity] -= MitigatedGunfireHit(view, playerEntity, beam.Damage, beam.Pierce,
-                        playerTuple.Value2.Value, beamContact.Point);
+                    _frameRemainingHealth[_playerEntity] -= MitigatedGunfireHit(view, _playerEntity, beam.Damage, beam.Pierce,
+                        _playerBody.Position, beamContact.Point);
 
-                    stopLength = BeamEntryLength(playerBody, beamStart, beam.Direction, beam.Width, beam.Length);
+                    stopLength = BeamEntryLength(_playerBody, beamStart, beam.Direction, beam.Width, beam.Length);
                     beamStopped = true;
                 }
             }
@@ -610,21 +680,14 @@ public class CollisionSystem : GameSystem
                 commands.Add(new AddComponentCommand<LaserBeam>(beamEntity, beam with { DamagePending = false }));
             }
         }
+    }
 
-        ammoDetectionSw.Stop();
-
-        sw.Stop();
-        DiagnosticLogger.LogSystem("Collision: grid build", gridBuildSw.ElapsedTicks);
-        DiagnosticLogger.LogSystem("Collision: asteroid collisions", asteroidSw.ElapsedTicks);
-        DiagnosticLogger.LogSystem("Collision: ship collisions", shipSw.ElapsedTicks);
-        DiagnosticLogger.LogSystem("Collision: detection", ammoDetectionSw.ElapsedTicks);
-
-        sw.Restart();
-
+    // Knockback from rounds that struck mines, run after the detection passes so a mine hit by
+    // several rounds in one tick takes their summed impulse exactly once.
+    private void ApplyMineKnockback(WorldView view)
+    {
         foreach (var (ammoEntity, mineEntity, hit, _, mineSize, _, ammoVel) in _ammoToMineHits)
         {
-            var minePosComp = view.GetComponent<Position>(mineEntity);
-
             var mineType = MineType.FromSize(mineSize);
             float mineRadius = mineType.Radius;
             const float AmmoMass = 1f;
@@ -653,7 +716,11 @@ public class CollisionSystem : GameSystem
 
             _entitiesToDestroy.Add(ammoEntity);
         }
+    }
 
+    // Health write-back, death flows and loot for everything the detection passes damaged this tick.
+    private void WriteBackDeaths(WorldView view, CommandBuffer commands)
+    {
         foreach (var mineEntity in _hitMines)
         {
             var remaining = _frameRemainingHealth[mineEntity];
@@ -734,38 +801,41 @@ public class CollisionSystem : GameSystem
             }
         }
 
-        if (hasPlayer && _frameRemainingHealth.TryGetValue(playerEntity, out var playerRemaining))
+        if (_hasPlayer && _frameRemainingHealth.TryGetValue(_playerEntity, out var playerRemaining))
         {
             if (playerRemaining <= 0)
             {
                 // Zero the health on the fatal hit: the hull damage shading reads Health, and
                 // without this write the killing blow from high hp renders a pristine hull.
-                var playerHealth = view.GetComponent<Health>(playerEntity);
-                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(0, playerHealth.Max)));
-                commands.Add(new AddComponentCommand<Dead>(playerEntity, new Dead()));
+                var playerHealth = view.GetComponent<Health>(_playerEntity);
+                commands.Add(new AddComponentCommand<Health>(_playerEntity, new Health(0, playerHealth.Max)));
+                commands.Add(new AddComponentCommand<Dead>(_playerEntity, new Dead()));
 
                 // The run ends with the player blowing up like an enemy hull, only bigger: the
                 // death animation window (1.2 s) covers the full 1.0 s sequence. The guard keeps a
                 // hit landing on the corpse from restarting the blast.
-                if (!view.HasComponent<ShipDeathExplosion>(playerEntity))
+                if (!view.HasComponent<ShipDeathExplosion>(_playerEntity))
                 {
-                    view.TryGetComponent<Velocity>(playerEntity, out var playerDeathVel);
-                    float blastRadius = view.GetComponent<Player>(playerEntity).Radius * PlayerDeathBlastScale;
-                    SpawnDeathBlast(commands, playerEntity, view.GetComponent<Position>(playerEntity).Value,
+                    view.TryGetComponent<Velocity>(_playerEntity, out var playerDeathVel);
+                    float blastRadius = view.GetComponent<Player>(_playerEntity).Radius * PlayerDeathBlastScale;
+                    SpawnDeathBlast(commands, _playerEntity, view.GetComponent<Position>(_playerEntity).Value,
                         blastRadius, 0, playerDeathVel.Value, view.Rng);
                 }
             }
             else
             {
-                var playerHealth = view.GetComponent<Health>(playerEntity);
-                commands.Add(new AddComponentCommand<Health>(playerEntity, new Health(playerRemaining, playerHealth.Max)));
+                var playerHealth = view.GetComponent<Health>(_playerEntity);
+                commands.Add(new AddComponentCommand<Health>(_playerEntity, new Health(playerRemaining, playerHealth.Max)));
             }
         }
+    }
 
-        // Shield write-back (plans/SHIELDS.md): one command per hull whose pool was spent this tick —
-        // the points left, the shock armed by any hit that spent points of it, and the flash's bearing.
-        // A hull whose pool hit zero also gets the shatter ring and its shards. Queued before the
-        // destroy loop, so a hull that died this tick is destroyed after its pool was written.
+    // Shield write-back (plans/SHIELDS.md): one command per hull whose pool was spent this tick —
+    // the points left, the shock armed by any hit that spent points of it, and the flash's bearing.
+    // A hull whose pool hit zero also gets the shatter ring and its shards. Queued before the
+    // destroy loop, so a hull that died this tick is destroyed after its pool was written.
+    private void WriteBackShields(WorldView view, CommandBuffer commands)
+    {
         foreach (var (entity, left) in _frameRemainingShield)
         {
             var shield = view.GetComponent<Shield>(entity);
@@ -783,25 +853,6 @@ public class CollisionSystem : GameSystem
             view.TryGetComponent<Velocity>(entity, out var hullVelocity);
             SpawnShieldShards(commands, view.GetComponent<Position>(entity).Value, hullVelocity.Value, hullRadius, view.Rng);
         }
-
-        foreach (var entity in _entitiesToDestroy)
-        {
-            commands.Add(new DestroyEntityCommand(entity));
-        }
-
-        foreach (var (position, mineType) in _effectsToSpawn)
-        {
-            SpawnExplosion(commands, position, mineType);
-            for (int i = 0; i < mineType.HitSparkCount; i++)
-            {
-                SpawnSpark(commands, position, view.Rng);
-            }
-        }
-
-        FlushCollisions(commands, view);
-
-        sw.Stop();
-        DiagnosticLogger.LogSystem("Collision: resolution", sw.ElapsedTicks);
     }
 
     private SpatialGrid _grid = new(128f);
@@ -946,11 +997,11 @@ public class CollisionSystem : GameSystem
     // `Radius` stays the bounding radius everything else reads — explosion damage, spawn clearance, the pickup
     // ring — and the circle every shape test is queued behind, so a shape can only ever be smaller than the
     // disc the player used to have.
-    static NarrowPhase.CollisionBody PlayerBody(WorldView view, Entity playerEntity, Player player)
+    static NarrowPhase.CollisionBody PlayerBody(WorldView view, Entity _playerEntity, Player player)
     {
         // A world that never gave the player a heading collides with it facing the way it is drawn.
-        view.TryGetComponent<Rotation>(playerEntity, out var rotation);
-        return new(view.GetComponent<Position>(playerEntity).Value, rotation.Angle,
+        view.TryGetComponent<Rotation>(_playerEntity, out var rotation);
+        return new(view.GetComponent<Position>(_playerEntity).Value, rotation.Angle,
             player.Shape ?? HullShape.Circle, player.Radius);
     }
 
@@ -1304,7 +1355,7 @@ public class CollisionSystem : GameSystem
         }
     }
 
-    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity playerEntity, CommandBuffer commands, NarrowPhase.CollisionBody playerBody)
+    private void ResolveMineVsPlayer(WorldView view, Entity mineEntity, EnemyMine mine, Entity _playerEntity, CommandBuffer commands, NarrowPhase.CollisionBody playerBody)
     {
         var minePos = view.GetComponent<Position>(mineEntity);
 
@@ -1321,18 +1372,18 @@ public class CollisionSystem : GameSystem
 
         commands.Add(new DestroyEntityCommand(mineEntity));
 
-        var playerHealth = view.GetComponent<Health>(playerEntity);
-        if (!_frameRemainingHealth.TryGetValue(playerEntity, out var remaining))
+        var playerHealth = view.GetComponent<Health>(_playerEntity);
+        if (!_frameRemainingHealth.TryGetValue(_playerEntity, out var remaining))
         {
             remaining = playerHealth.Current;
-            _frameRemainingHealth[playerEntity] = remaining;
+            _frameRemainingHealth[_playerEntity] = remaining;
         }
-        _frameRemainingHealth[playerEntity] -= MineStats.ContactDamage;
+        _frameRemainingHealth[_playerEntity] -= MineStats.ContactDamage;
 
         var mineType = MineType.FromSize(mine.Size);
-        Vector2 playerVel = GetCollisionVelocity(view, playerEntity, default) + contact.Normal * mineType.PlayerContactForce;
+        Vector2 playerVel = GetCollisionVelocity(view, _playerEntity, default) + contact.Normal * mineType.PlayerContactForce;
 
-        SetCollisionVelocity(playerEntity, playerVel);
+        SetCollisionVelocity(_playerEntity, playerVel);
 
         int sparkCount = mineType.PlayerContactSparkCount;
         for (int i = 0; i < sparkCount; i++)
