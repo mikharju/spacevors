@@ -9,7 +9,30 @@ import json
 import re
 from pathlib import Path
 
-import numpy as np
+
+# Stdlib stand-ins for the handful of numpy calls this used. The percentile must reproduce numpy's
+# default 'linear' interpolation exactly: committed baselines were summarised with it, and a different
+# interpolation moves every p90/p99 by a fraction of a bin and turns --check-baseline into a moving
+# ruler. (numpy's median is the plain middle average, so that one is spelled out too.)
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _percentile(values: list[float], q: float) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        raise ValueError("cannot compute the percentile of an empty sequence")
+    position = (len(ordered) - 1) * q / 100.0
+    lower = int(position)
+    rest = position - lower
+    return ordered[lower] + (ordered[lower + 1] - ordered[lower]) * rest if rest else ordered[lower]
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
 
 ROW = re.compile(r"\[PERF\] (.*)$")
 FIELD = re.compile(r"(\w+)=(-?[\d.]+)")
@@ -108,7 +131,7 @@ def read_passes(run: Path, logs: int) -> list[dict]:
         for name, values in block_passes.items():
             samples.setdefault(name, []).extend(values)
 
-    means = {name: float(np.mean(values)) for name, values in samples.items()}
+    means = {name: _mean(values) for name, values in samples.items()}
     total = sum(means.values()) or 1.0
     return [{"pass": name, "meanMs": round(ms, 3), "shareOfRender": round(ms / total, 4)}
             for name, ms in sorted(means.items(), key=lambda item: -item[1])]
@@ -131,12 +154,12 @@ def gc_summary(frames: list[dict]) -> dict:
         "collections": {label: int(sum(f.get(key, 0) for f in frames))
                         for label, key in [("gen0", "gc0"), ("gen1", "gc1"), ("gen2", "gc2")]},
         "framesWithGc": len(with_gc),
-        "allocKbPerFrame": {"mean": round(float(np.mean(alloc)), 1),
-                            "p99": round(float(np.percentile(alloc, 99)), 1),
-                            "max": round(float(np.max(alloc)), 1)},
+        "allocKbPerFrame": {"mean": round(_mean(alloc), 1),
+                            "p99": round(_percentile(alloc, 99), 1),
+                            "max": round(max(alloc), 1)},
         "frameMsMedian": {
-            "withGc": round(float(np.median(with_gc)), 3) if with_gc else None,
-            "withoutGc": round(float(np.median(without_gc)), 3) if without_gc else None,
+            "withGc": round(_median(with_gc), 3) if with_gc else None,
+            "withoutGc": round(_median(without_gc), 3) if without_gc else None,
         },
     }
 
@@ -158,13 +181,12 @@ def append_index(index: Path, run: Path, summary: dict, host: str) -> None:
 
 
 def stats(values: list[float]) -> dict:
-    a = np.array(values)
     return {
-        "mean": round(float(a.mean()), 3),
-        "median": round(float(np.percentile(a, 50)), 3),
-        "p90": round(float(np.percentile(a, 90)), 3),
-        "p99": round(float(np.percentile(a, 99)), 3),
-        "max": round(float(a.max()), 3),
+        "mean": round(_mean(values), 3),
+        "median": round(_percentile(values, 50), 3),
+        "p90": round(_percentile(values, 90), 3),
+        "p99": round(_percentile(values, 99), 3),
+        "max": round(max(values), 3),
     }
 
 
@@ -174,7 +196,7 @@ def summarize(frames: list[dict], name: str, iterations: int, budget: float, pas
     fps = [1000.0 / f["dt"] for f in frames]
     entities = [f["ents"] for f in frames]
     total = sum(sum(ms[key]) for key in ["sim", "render", "other"]) or 1.0
-    median_ms = float(np.percentile(ms["dt"], 50))
+    median_ms = _percentile(ms["dt"], 50)
 
     # A scenario can be over budget knowingly (impact-storm) or because something regressed. The
     # harness has to tell those apart or the honest worst case makes every run look like a failure.
@@ -189,10 +211,10 @@ def summarize(frames: list[dict], name: str, iterations: int, budget: float, pas
         "discarded": {"iterations": 1, "firstFramePerIteration": True},
         "frameMs": stats(ms["dt"]),
         "fps": {
-            "mean": round(float(np.mean(fps)), 1),
-            "median": round(float(np.percentile(fps, 50)), 1),
-            "low1": round(float(np.percentile(fps, 1)), 1),
-            "low10": round(float(np.percentile(fps, 10)), 1),
+            "mean": round(_mean(fps), 1),
+            "median": round(_percentile(fps, 50), 1),
+            "low1": round(_percentile(fps, 1), 1),
+            "low10": round(_percentile(fps, 10), 1),
         },
         "fraction": {key: round(sum(ms[key]) / total, 4) for key in ["sim", "render", "other"]},
         "simMs": stats(ms["sim"]),
@@ -202,17 +224,17 @@ def summarize(frames: list[dict], name: str, iterations: int, budget: float, pas
         "perShapeNs": shape_costs(passes, frames),
         "gc": gc_summary(frames),
         "perEntityNs": {
-            "sim": round(1e6 * np.mean(ms["sim"]) / np.mean(entities), 1),
-            "render": round(1e6 * np.mean(ms["render"]) / np.mean(entities), 1),
+            "sim": round(1e6 * _mean(ms["sim"]) / _mean(entities), 1),
+            "render": round(1e6 * _mean(ms["render"]) / _mean(entities), 1),
         },
         "entities": {"start": int(entities[0]), "end": int(entities[-1]),
-                     "mean": round(float(np.mean(entities)), 1)},
+                     "mean": round(_mean(entities), 1)},
         "counts": {key: {"start": int(frames[0][key]), "end": int(frames[-1][key]),
-                         "mean": round(float(np.mean([f[key] for f in frames])), 1)}
+                         "mean": round(_mean([f[key] for f in frames]), 1)}
                    for key in COUNTS},
         "budget": {"frameMs": round(budget, 2), "pass": not over_budget, "verdict": verdict,
                    "expectedOverBudget": expected_over_budget, "medianMs": round(median_ms, 2),
-                   "framesOverBudget": int(np.count_nonzero(np.array(ms["dt"]) > budget))},
+                   "framesOverBudget": sum(1 for value in ms["dt"] if value > budget)},
     }
 
 
@@ -223,7 +245,7 @@ def shape_costs(passes: list[dict], frames: list[dict]) -> dict:
     costs = {}
 
     for name, count_key in SHAPE_PASSES.items():
-        count = float(np.mean([frame[count_key] for frame in frames])) if frames else 0.0
+        count = _mean([frame[count_key] for frame in frames]) if frames else 0.0
         if name in means and count >= MIN_SHAPES_FOR_CANARY:
             costs[name] = round(1e6 * means[name] / count, 1)
 
@@ -248,7 +270,7 @@ def read_systems(run: Path, logs: int) -> tuple[list[dict], list[dict], list[dic
                        "sim": row["sim"], "systems": systems, "phases": phases})
 
     def ranked(samples: dict[str, list[float]], name_key: str, share_key: str) -> list[dict]:
-        means = {name: float(np.mean(values)) for name, values in samples.items()}
+        means = {name: _mean(values) for name, values in samples.items()}
         total = sum(means.values()) or 1.0
         return [{name_key: name, "meanMs": round(ms, 3), share_key: round(ms / total, 4)}
                 for name, ms in sorted(means.items(), key=lambda item: -item[1])]
