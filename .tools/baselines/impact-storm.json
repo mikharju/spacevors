@@ -8,110 +8,110 @@
     "firstFramePerIteration": true
   },
   "frameMs": {
-    "mean": 5.008,
-    "median": 5.2,
-    "p90": 5.57,
-    "p99": 7.223,
-    "max": 7.68
+    "mean": 4.72,
+    "median": 4.9,
+    "p90": 5.339,
+    "p99": 7.165,
+    "max": 8.06
   },
   "fps": {
-    "mean": 203.6,
-    "median": 192.3,
-    "low1": 138.5,
-    "low10": 179.5
+    "mean": 217.4,
+    "median": 204.1,
+    "low1": 139.6,
+    "low10": 187.3
   },
   "fraction": {
-    "sim": 0.4039,
-    "render": 0.5938,
-    "other": 0.0023
+    "sim": 0.4266,
+    "render": 0.571,
+    "other": 0.0024
   },
   "simMs": {
-    "mean": 2.022,
-    "median": 2.06,
-    "p90": 2.359,
-    "p99": 3.98,
-    "max": 4.32
+    "mean": 2.013,
+    "median": 2.05,
+    "p90": 2.349,
+    "p99": 3.947,
+    "max": 4.94
   },
   "applyMs": {
-    "mean": 0.848,
-    "median": 0.86,
-    "p90": 0.91,
-    "p99": 1.231,
-    "max": 1.26
+    "mean": 0.82,
+    "median": 0.83,
+    "p90": 0.88,
+    "p99": 1.221,
+    "max": 1.43
   },
   "renderMs": {
-    "mean": 2.973,
-    "median": 3.11,
-    "p90": 3.24,
-    "p99": 3.623,
-    "max": 4.17
+    "mean": 2.695,
+    "median": 2.82,
+    "p90": 3.0,
+    "p99": 3.67,
+    "max": 4.68
   },
   "renderPasses": [
     {
       "pass": "world.sparks",
-      "meanMs": 1.891,
-      "shareOfRender": 0.6617
+      "meanMs": 1.892,
+      "shareOfRender": 0.7257
     },
     {
       "pass": "world.explosions",
-      "meanMs": 0.278,
-      "shareOfRender": 0.0973
-    },
-    {
-      "pass": "background",
-      "meanMs": 0.263,
-      "shareOfRender": 0.0921
+      "meanMs": 0.281,
+      "shareOfRender": 0.1078
     },
     {
       "pass": "world.ammo",
-      "meanMs": 0.175,
-      "shareOfRender": 0.0614
-    },
-    {
-      "pass": "world.asteroids",
-      "meanMs": 0.103,
-      "shareOfRender": 0.036
+      "meanMs": 0.181,
+      "shareOfRender": 0.0692
     },
     {
       "pass": "present",
       "meanMs": 0.074,
-      "shareOfRender": 0.026
+      "shareOfRender": 0.0285
     },
     {
       "pass": "world.player",
-      "meanMs": 0.043,
-      "shareOfRender": 0.015
+      "meanMs": 0.042,
+      "shareOfRender": 0.0163
+    },
+    {
+      "pass": "world.asteroids",
+      "meanMs": 0.038,
+      "shareOfRender": 0.0144
+    },
+    {
+      "pass": "background",
+      "meanMs": 0.03,
+      "shareOfRender": 0.0116
+    },
+    {
+      "pass": "asteroids.litDraws",
+      "meanMs": 0.025,
+      "shareOfRender": 0.0097
+    },
+    {
+      "pass": "world.enemyShips",
+      "meanMs": 0.013,
+      "shareOfRender": 0.0049
     },
     {
       "pass": "hud.health",
       "meanMs": 0.01,
-      "shareOfRender": 0.0036
+      "shareOfRender": 0.004
     },
     {
       "pass": "hud.threat",
       "meanMs": 0.01,
-      "shareOfRender": 0.0035
+      "shareOfRender": 0.0039
     },
     {
       "pass": "world.thrusters",
-      "meanMs": 0.006,
-      "shareOfRender": 0.0022
-    },
-    {
-      "pass": "world.turrets",
-      "meanMs": 0.003,
-      "shareOfRender": 0.0011
-    },
-    {
-      "pass": "world.enemyShips",
-      "meanMs": 0.0,
-      "shareOfRender": 0.0
+      "meanMs": 0.009,
+      "shareOfRender": 0.0034
     }
   ],
   "perShapeNs": {
     "world.sparks": 98.6,
-    "world.ammo": 115.5,
-    "world.explosions": 88.7
+    "world.ammo": 119.5,
+    "world.explosions": 89.7
   },
   "gc": {
     "collections": {
@@ -121,18 +121,18 @@
     },
     "framesWithGc": 35,
     "allocKbPerFrame": {
-      "mean": 754.5,
-      "p99": 1097.7,
+      "mean": 755.7,
+      "p99": 1105.0,
       "max": 1730.0
     },
     "frameMsMedian": {
-      "withGc": 5.58,
-      "withoutGc": 5.19
+      "withGc": 5.56,
+      "withoutGc": 4.88
     }
   },
   "perEntityNs": {
-    "sim": 84.7,
-    "render": 124.5
+    "sim": 84.3,
+    "render": 112.8
   },
   "entities": {
     "start": 25956,
@@ -196,213 +196,213 @@
     "pass": true,
     "verdict": "pass",
     "expectedOverBudget": false,
-    "medianMs": 5.2,
+    "medianMs": 4.9,
     "framesOverBudget": 0
   },
   "systemMs": [
     {
       "system": "EffectSystem",
-      "meanMs": 0.498,
-      "shareOfSim": 0.455
+      "meanMs": 0.511,
+      "shareOfSim": 0.4585
     },
     {
       "system": "PositionIntegrationSystem",
-      "meanMs": 0.316,
-      "shareOfSim": 0.2884
+      "meanMs": 0.317,
+      "shareOfSim": 0.2846
     },
     {
       "system": "CollisionSystem",
-      "meanMs": 0.254,
-      "shareOfSim": 0.2317
+      "meanMs": 0.257,
+      "shareOfSim": 0.2307
     },
     {
       "system": "PhysicsSystem",
-      "meanMs": 0.01,
-      "shareOfSim": 0.0095
+      "meanMs": 0.011,
+      "shareOfSim": 0.0094
     },
     {
       "system": "AmmoLifetimeSystem",
-      "meanMs": 0.006,
-      "shareOfSim": 0.0058
+      "meanMs": 0.007,
+      "shareOfSim": 0.0063
+    },
+    {
+      "system": "TurretFiringSystem",
+      "meanMs": 0.005,
+      "shareOfSim": 0.0042
     },
     {
       "system": "EcmSystem",
       "meanMs": 0.005,
-      "shareOfSim": 0.0043
+      "shareOfSim": 0.0041
     },
     {
-      "system": "TurretFiringSystem",
-      "meanMs": 0.004,
-      "shareOfSim": 0.0039
+      "system": "EnemyShipSystem",
+      "meanMs": 0.001,
+      "shareOfSim": 0.0008
     },
     {
       "system": "EnemyMissileFiringSystem",
-      "meanMs": 0.0,
-      "shareOfSim": 0.0004
+      "meanMs": 0.001,
+      "shareOfSim": 0.0006
     },
     {
       "system": "MissileGuidanceSystem",
       "meanMs": 0.0,
-      "shareOfSim": 0.0004
-    },
-    {
-      "system": "EnemyShipSystem",
-      "meanMs": 0.0,
-      "shareOfSim": 0.0004
+      "shareOfSim": 0.0003
     }
   ],
   "phaseMs": [
     {
       "phase": "Effects: damage spark",
-      "meanMs": 0.415,
-      "shareOfPhases": 0.403
+      "meanMs": 0.399,
+      "shareOfPhases": 0.3818
     },
     {
       "phase": "Position: integration",
-      "meanMs": 0.313,
-      "shareOfPhases": 0.3039
+      "meanMs": 0.314,
+      "shareOfPhases": 0.3003
     },
     {
       "phase": "Collision: detection",
-      "meanMs": 0.173,
-      "shareOfPhases": 0.1687
+      "meanMs": 0.176,
+      "shareOfPhases": 0.169
     },
     {
       "phase": "Effects: explosion",
-      "meanMs": 0.061,
-      "shareOfPhases": 0.0589
+      "meanMs": 0.087,
+      "shareOfPhases": 0.0833
     },
     {
       "phase": "Collision: asteroid collisions",
       "meanMs": 0.03,
-      "shareOfPhases": 0.0294
+      "shareOfPhases": 0.029
     },
     {
       "phase": "Collision: grid build",
       "meanMs": 0.02,
-      "shareOfPhases": 0.0196
+      "shareOfPhases": 0.0195
     },
     {
       "phase": "Collision: resolution",
-      "meanMs": 0.012,
-      "shareOfPhases": 0.0119
+      "meanMs": 0.013,
+      "shareOfPhases": 0.0121
     },
     {
       "phase": "Ammo: lifetime",
-      "meanMs": 0.004,
-      "shareOfPhases": 0.004
+      "meanMs": 0.005,
+      "shareOfPhases": 0.0045
     },
     {
       "phase": "Physics: rotation",
       "meanMs": 0.0,
-      "shareOfPhases": 0.0005
+      "shareOfPhases": 0.0002
     },
     {
       "phase": "Physics: velocity integration",
       "meanMs": 0.0,
-      "shareOfPhases": 0.0001
+      "shareOfPhases": 0.0002
     }
   ],
   "spikeFrames": [
     {
-      "frame": 12,
-      "iteration": 5,
-      "dtMs": 7.62,
-      "simMs": 4.32,
+      "frame": 11,
+      "iteration": 6,
+      "dtMs": 8.06,
+      "simMs": 4.94,
       "systems": [
         {
           "system": "EffectSystem",
-          "ms": 2.55
+          "ms": 3.11
         },
         {
           "system": "CollisionSystem",
-          "ms": 0.46
+          "ms": 0.48
         },
         {
           "system": "PositionIntegrationSystem",
-          "ms": 0.34
+          "ms": 0.38
         }
       ],
       "phases": [
         {
-          "phase": "Effects: damage spark",
-          "ms": 2.44
+          "phase": "Effects: explosion",
+          "ms": 2.51
         },
         {
-          "phase": "Collision: detection",
-          "ms": 0.36
+          "phase": "Effects: damage spark",
+          "ms": 0.55
         },
         {
           "phase": "Position: integration",
-          "ms": 0.33
-        }
-      ]
-    },
-    {
-      "frame": 28,
-      "iteration": 2,
-      "dtMs": 7.68,
-      "simMs": 4.11,
-      "systems": [
-        {
-          "system": "EffectSystem",
-          "ms": 2.29
-        },
-        {
-          "system": "CollisionSystem",
-          "ms": 0.43
-        },
-        {
-          "system": "PositionIntegrationSystem",
-          "ms": 0.35
-        }
-      ],
-      "phases": [
-        {
-          "phase": "Effects: damage spark",
-          "ms": 2.16
-        },
-        {
-          "phase": "Position: integration",
-          "ms": 0.35
-        },
-        {
-          "phase": "Collision: detection",
-          "ms": 0.33
+          "ms": 0.38
         }
       ]
     },
     {
       "frame": 59,
-      "iteration": 4,
-      "dtMs": 7.18,
-      "simMs": 3.98,
+      "iteration": 3,
+      "dtMs": 7.09,
+      "simMs": 4.02,
       "systems": [
         {
           "system": "EffectSystem",
-          "ms": 2.32
+          "ms": 2.38
         },
         {
           "system": "PositionIntegrationSystem",
-          "ms": 0.34
+          "ms": 0.32
         },
         {
           "system": "CollisionSystem",
-          "ms": 0.27
+          "ms": 0.28
         }
       ],
       "phases": [
         {
           "phase": "Effects: damage spark",
-          "ms": 2.21
+          "ms": 2.25
         },
         {
           "phase": "Position: integration",
-          "ms": 0.33
+          "ms": 0.32
         },
         {
           "phase": "Collision: detection",
           "ms": 0.19
+        }
+      ]
+    },
+    {
+      "frame": 28,
+      "iteration": 3,
+      "dtMs": 6.87,
+      "simMs": 3.79,
+      "systems": [
+        {
+          "system": "EffectSystem",
+          "ms": 2.09
+        },
+        {
+          "system": "CollisionSystem",
+          "ms": 0.42
+        },
+        {
+          "system": "PositionIntegrationSystem",
+          "ms": 0.33
+        }
+      ],
+      "phases": [
+        {
+          "phase": "Effects: damage spark",
+          "ms": 1.98
+        },
+        {
+          "phase": "Collision: detection",
+          "ms": 0.34
+        },
+        {
+          "phase": "Position: integration",
+          "ms": 0.33
         }
       ]
     }
