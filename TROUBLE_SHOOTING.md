@@ -812,3 +812,36 @@ the message at.
   twice with the change stashed and unstashed, and read `summary.json`'s `frameMs.median`/`renderMs.median`
   against each other, not against the baseline. A "regression" that appears only against the committed
   baseline and not against the stashed control is the host, not the change (see #65).
+
+## 82. `git checkout <file>` to drop a temp A/B patch also destroys the uncommitted change under test
+
+- **Symptom**: mid-task A/B runs suddenly show the "new" behaviour missing or produce phantom render
+  artefacts; `git status` shows the touched files clean even though the fix being implemented lives
+  only in the working tree. Happened twice in one session: a debug-print revert (`git checkout` of a
+  file that also carried the uncommitted fix) reverted the fix with it, and a cross-command
+  `cp /tmp/x.bak` restore silently failed because /tmp is per-command (#26), then `&&` chains hid it.
+- **Cause**: the temp patch and the work-in-progress share the same file, and `git checkout` restores
+  HEAD, not "HEAD + my WIP". Backup copies in /tmp do not survive to the next command.
+- **Fix / Prevention**: before patching a file for an A/B probe, either commit the WIP first (small
+  commits make this cheap) or keep the pristine copy inside the workspace (`.tools/run/<name>.bak`)
+  and restore it in the same command that ran the probe. Prefer env-gated temp patches over
+  patch/restore cycles where possible, and verify `git diff --stat` after every revert — a half-reverted
+  pair of files compiles and misleads (one caller kept calling a helper its callee no longer had:
+  publish failed only later).
+
+## 83. A batched textured quad is not a visual stand-in for a small immediate-mode triangle
+
+- **Symptom**: replacing `DrawTriangle` thruster flames with one `DrawTexturePro` quad off the shared
+  33x45 plume texture (ShapeSprites) left faint dashed streaks of ~25 %-alpha flame colour along the
+  quad's flank/aft edges, extending past the drawn triangle into empty sky; a 9x12 authored texture
+  additionally enlarged its staircase into notched, fat flame tips.
+- **Cause**: a texture authored at 9 px shows its raster staircase under any magnification, and stretched
+  quads of a triangle texture pick up edge sampling artefacts under llvmpipe that survived every knob
+  tried — mips + trilinear, bilinear without mips, half-texel-inset source rect (all pixel-identical
+  in a dark-sky diff). The artefacts are invisible in normal shots at a glance; the pixel diff against
+  the old triangle frame (frame-diff over empty sky) is what finds them.
+- **Fix / Prevention**: price the primitive swap first: the whole `world.thrusters` pass is 0.024 ms
+  under llvmpipe (~0.03-0.07 ms of flush cost on a real GPU), so keeping `DrawTriangle` there is the
+  correct call and the swap was reverted. If a future host can clear the artefacts, the shape belongs
+  on `ShapeSprites.DrawPlume`-style shared quads; verify with a before/after frame diff over empty
+  sky, not by eye.
