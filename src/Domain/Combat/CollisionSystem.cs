@@ -16,6 +16,10 @@ public class CollisionSystem : GameSystem
     private const float CorrectionPercent = 0.4f;
     private const float Slop = 1.0f;
 
+    // Rock/ship queries reach this far past their own radius to find mines. It must stay the radius
+    // of the widest mine in the game: too small and the broad phase silently drops mine contacts.
+    private static readonly float MaxMineRadius = MineType.Large.Radius;
+
     // How much of the hull's own velocity a shatter shard inherits, so the pieces trail behind a moving
     // hull the way a damage spark does (DamageEffectSystem.FollowFactor is the same idea at 0.5).
     private const float ShardVelocityInherit = 0.4f;
@@ -79,13 +83,10 @@ public class CollisionSystem : GameSystem
 
         // The player's collision circle is the conservative reject in front of its shape, exactly as a hull's
         // circle is in front of a bullet's sweep: the shape never reaches past the radius, so a body that
-        // misses the circle cannot touch the shape either.
-        void CheckPlayerCollision(Vector2 entityPos, float entityRadius, Action onCollision)
-        {
-            if (!hasPlayer) return;
-            if (NarrowPhase.TryCollide(playerTuple.Value2.Value, playerTuple.Value1.Radius, entityPos, entityRadius, out _))
-                onCollision();
-        }
+        // misses the circle cannot touch the shape either. A plain test, not a callback: a closure per
+        // asteroid per tick in the build pass is exactly the allocation the hot path must not make.
+        bool TouchesPlayerBody(Vector2 entityPos, float entityRadius) =>
+            hasPlayer && NarrowPhase.TryCollide(playerTuple.Value2.Value, playerTuple.Value1.Radius, entityPos, entityRadius, out _);
 
         var gridBuildSw = Stopwatch.StartNew();
 
@@ -94,10 +95,11 @@ public class CollisionSystem : GameSystem
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, SpatialGrid.CollisionKind.Asteroid, pos.Value, asteroid.Radius);
             _asteroidPositions.Add((entity, pos));
+            StoreBody(ref _asteroidBodies, entity, AsteroidBody(view, entity, pos.Value, asteroid));
 
-            CheckPlayerCollision(pos.Value, asteroid.Radius, () =>
-                ResolveCollision(view, AsteroidBody(view, entity, pos.Value, asteroid), entity,
-                    playerBody, playerEntity, false, commands));
+            if (TouchesPlayerBody(pos.Value, asteroid.Radius))
+                ResolveCollision(view, _asteroidBodies[entity.Value], entity,
+                    playerBody, playerEntity, false, commands);
         }
 
         foreach (var (entity, mine) in view.GetEntitiesWithComponents<EnemyMine>())
@@ -105,8 +107,8 @@ public class CollisionSystem : GameSystem
             var pos = view.GetComponent<Position>(entity);
             _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyMine, pos.Value, mine.Radius, mine.Size);
 
-            CheckPlayerCollision(pos.Value, mine.Radius, () =>
-                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerBody));
+            if (TouchesPlayerBody(pos.Value, mine.Radius))
+                ResolveMineVsPlayer(view, entity, mine, playerEntity, commands, playerBody);
         }
 
         foreach (var (entity, ship) in view.GetEntitiesWithComponents<EnemyShip>())
@@ -115,13 +117,14 @@ public class CollisionSystem : GameSystem
             _grid.Insert(entity, SpatialGrid.CollisionKind.EnemyShip, pos.Value, ship.Radius);
             _shipPositions.Add((entity, pos));
             var hull = HullBody(view, entity, ship);
+            StoreBody(ref _shipBodies, entity, hull);
 
-            CheckPlayerCollision(pos.Value, ship.Radius, () =>
+            if (TouchesPlayerBody(pos.Value, ship.Radius))
             {
                 ResolveCollision(view, hull, entity,
                     playerBody, playerEntity, false, commands);
                 SpendTheRam(view, entity, pos.Value);
-            });
+            }
 
             int asteroidCount = QueryCircle(pos.Value, ship.Radius);
             var queryBuffer = _queryBuffer;
@@ -132,8 +135,7 @@ public class CollisionSystem : GameSystem
                 if (candidate.Kind != SpatialGrid.CollisionKind.Asteroid) continue;
 
                 ResolveCollision(view, hull, entity,
-                    AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)),
-                    candidate.Id, true, commands);
+                    _asteroidBodies[candidate.Id.Value], candidate.Id, true, commands);
             }
         }
 
@@ -152,9 +154,8 @@ public class CollisionSystem : GameSystem
 
         foreach (var (aEntity, aPos) in _asteroidPositions)
         {
-            var asteroid = view.GetComponent<Asteroid>(aEntity);
-            float aRadius = asteroid.Radius;
-            var rock = AsteroidBody(view, aEntity, aPos.Value, asteroid);
+            var rock = _asteroidBodies[aEntity.Value];
+            float aRadius = rock.Scale;
             int count = QueryCircle(aPos.Value, aRadius);
             var queryBuffer = _queryBuffer;
 
@@ -166,10 +167,10 @@ public class CollisionSystem : GameSystem
 
                 var bEntity = candidate.Id;
                 ResolveCollision(view, rock, aEntity,
-                    AsteroidBody(view, bEntity, candidate.Position, view.GetComponent<Asteroid>(bEntity)), bEntity, true, commands);
+                    _asteroidBodies[bEntity.Value], bEntity, true, commands);
             }
 
-            int count2 = QueryCircle(aPos.Value, aRadius + 15f);
+            int count2 = QueryCircle(aPos.Value, aRadius + MaxMineRadius);
             queryBuffer = _queryBuffer;
 
             for (int i = 0; i < count2; i++)
@@ -190,9 +191,8 @@ public class CollisionSystem : GameSystem
 
         foreach (var (sEntity, sPos) in _shipPositions)
         {
-            var ship = view.GetComponent<EnemyShip>(sEntity);
-            float aRadius = ship.Radius;
-            var hull = HullBody(view, sEntity, ship);
+            var hull = _shipBodies[sEntity.Value];
+            float aRadius = hull.Scale;
             int count = QueryCircle(sPos.Value, aRadius);
             var queryBuffer = _queryBuffer;
 
@@ -203,10 +203,10 @@ public class CollisionSystem : GameSystem
                 if (candidate.Id.Value <= sEntity.Value) continue;
 
                 ResolveCollision(view, hull, sEntity,
-                    HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), candidate.Id, true, commands);
+                    _shipBodies[candidate.Id.Value], candidate.Id, true, commands);
             }
 
-            int count2 = QueryCircle(sPos.Value, aRadius + 15f);
+            int count2 = QueryCircle(sPos.Value, aRadius + MaxMineRadius);
             queryBuffer = _queryBuffer;
 
             for (int i = 0; i < count2; i++)
@@ -276,14 +276,14 @@ public class CollisionSystem : GameSystem
 
                 if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
                     && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
-                        HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t))
+                        _shipBodies[candidate.Id.Value], out hit, out t))
                     continue;
 
                 // A rock gets the same treatment: its art's lumps are inside the circle the grid indexed
                 // it by, so a round that survives the circle is asked again against the rock's shape.
                 if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
                     && !NarrowPhase.TrySweep(sweepFrom, sweepTo, ammoRadius,
-                        AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)), out hit, out t))
+                        _asteroidBodies[candidate.Id.Value], out hit, out t))
                     continue;
 
                 switch (candidate.Kind)
@@ -508,12 +508,12 @@ public class CollisionSystem : GameSystem
                     // circle, so its touch along the beam is never earlier and has to be re-compared.
                     if (candidate.Kind == SpatialGrid.CollisionKind.EnemyShip
                         && (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width,
-                                HullBody(view, candidate.Id, view.GetComponent<EnemyShip>(candidate.Id)), out hit, out t)
+                                _shipBodies[candidate.Id.Value], out hit, out t)
                             || t >= firstT)) continue;
 
                     if (candidate.Kind == SpatialGrid.CollisionKind.Asteroid
                         && (!NarrowPhase.TrySweep(beamStart, beamEnd, beam.Width,
-                                AsteroidBody(view, candidate.Id, candidate.Position, view.GetComponent<Asteroid>(candidate.Id)), out hit, out t)
+                                _asteroidBodies[candidate.Id.Value], out hit, out t)
                             || t >= firstT)) continue;
 
                     firstHit = candidate.Id;
@@ -589,10 +589,8 @@ public class CollisionSystem : GameSystem
                     // beam tip and its glow sit on the first visible contact, grazing hits included.
                     NarrowPhase.CollisionBody hitBody = firstKind switch
                     {
-                        SpatialGrid.CollisionKind.EnemyShip =>
-                            HullBody(view, firstHit.Value, view.GetComponent<EnemyShip>(firstHit.Value)),
-                        SpatialGrid.CollisionKind.Asteroid =>
-                            AsteroidBody(view, firstHit.Value, firstCandidatePos, view.GetComponent<Asteroid>(firstHit.Value)),
+                        SpatialGrid.CollisionKind.EnemyShip => _shipBodies[firstHit.Value.Value],
+                        SpatialGrid.CollisionKind.Asteroid => _asteroidBodies[firstHit.Value.Value],
                         _ => CircleBody(firstCandidatePos, firstCandidateRadius),
                     };
                     stopLength = BeamEntryLength(hitBody, beamStart, beam.Direction, beam.Width, beam.Length);
@@ -807,6 +805,22 @@ public class CollisionSystem : GameSystem
     }
 
     private SpatialGrid _grid = new(128f);
+
+    // Each hull and rock becomes a CollisionBody once per tick, at the build pass, and every pass
+    // (body pairs, bullet sweeps, beams) reads the same cached body. Positions and headings are fixed
+    // through the tick — commands only land at the flush — so a body cannot go stale inside a tick.
+    // Indexed directly by entity id, like ComponentStorage; slots belonging to entities not in this
+    // tick's grid are stale and never read, because every lookup is keyed on an entity the grid or
+    // this tick's build pass just produced.
+    private NarrowPhase.CollisionBody[] _asteroidBodies = Array.Empty<NarrowPhase.CollisionBody>();
+    private NarrowPhase.CollisionBody[] _shipBodies = Array.Empty<NarrowPhase.CollisionBody>();
+
+    static void StoreBody(ref NarrowPhase.CollisionBody[] bodies, Entity entity, NarrowPhase.CollisionBody body)
+    {
+        if (entity.Value >= bodies.Length)
+            Array.Resize(ref bodies, Math.Max(entity.Value + 1, Math.Max(bodies.Length * 2, 64)));
+        bodies[entity.Value] = body;
+    }
 
     // Grid queries fill this buffer. A full buffer makes the grid drop candidates, and dropped
     // candidates are missed collisions, so a truncated query grows the buffer and runs again.
