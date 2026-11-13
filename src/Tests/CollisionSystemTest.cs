@@ -835,4 +835,60 @@ public class CollisionSystemTests
         Assert.Equal(7, em.GetComponent<Health>(rock).Current);   // the round's 3 damage went into the rock
         Assert.Equal(10, em.GetComponent<Health>(player).Current);
     }
+
+    // A flank push on a lumpy rock has to spin it: the normal impulse acts where the bodies touch,
+    // and off a round spot that point sits far from the rock's centre. The player presses straight
+    // into the limb (no sliding), so the only channel that can spin the rock is the normal impulse.
+    [Fact]
+    public void PlayerFlankPush_LumpyRock_SpinsIt()
+    {
+        var (em, view, system) = Setup();
+
+        var rock = em.CreateEntity();
+        em.AddComponent(rock, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(rock, new Asteroid(IsSmall: false, Radius: 20f, Variant: 5)); // large-5: long limb up the frame
+        em.AddComponent(rock, new AngularVelocity(0f));
+
+        // (12,9) sits level with the limb's upper end, whose deepest contact is at (11.6,9) — a lever
+        // arm of 9 px about the rock's centre.
+        var player = em.CreateEntity();
+        em.AddComponent(player, new Position(new Vector2(12f, 9f)));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10, Radius: 10f));
+        em.AddComponent(player, new Health(10, 10));
+        em.AddComponent(player, new Velocity(new Vector2(-200f, 0f)));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        var spin = em.GetComponent<AngularVelocity>(rock).Value;
+        Assert.True(spin > 0.5f, $"Expected the flank push to spin the rock, got {spin}");
+        Assert.True(em.GetComponent<Velocity>(rock).Value.X < -1f, "the rock is still shoved away from the player");
+    }
+
+    // A round rock has no lever arm at all: its every contact point sits on the centre line, so
+    // pushing it off-centre shoves it and never spins it. The spin channel must stay closed there.
+    [Fact]
+    public void PlayerFlankPush_RoundRock_DoesNotSpin()
+    {
+        var (em, view, system) = Setup();
+
+        var rock = em.CreateEntity();
+        em.AddComponent(rock, new Position(new Vector2(0f, 0f)));
+        em.AddComponent(rock, new Asteroid(IsSmall: false, Radius: 20f, Variant: 0)); // a disc
+        em.AddComponent(rock, new AngularVelocity(0f));
+
+        var player = em.CreateEntity();
+        em.AddComponent(player, new Position(new Vector2(12f, 9f)));
+        em.AddComponent(player, new Player(Thrust: 100f, SideThrust: 80f, BackThrust: 50f, Boost: 1.5f, MaxHealth: 10, Radius: 10f));
+        em.AddComponent(player, new Health(10, 10));
+        em.AddComponent(player, new Velocity(new Vector2(-200f, 0f)));
+
+        var commands = new CommandBuffer();
+        system.Update(view, 1 / 120f, commands);
+        commands.Apply(em);
+
+        Assert.True(MathF.Abs(em.GetComponent<AngularVelocity>(rock).Value) < 1e-3f, "a circle has no lever arm");
+        Assert.True(em.GetComponent<Velocity>(rock).Value.X < -1f, "the rock is shoved all the same");
+    }
 }

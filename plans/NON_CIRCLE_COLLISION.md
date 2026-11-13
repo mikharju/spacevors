@@ -686,3 +686,25 @@ cyan over a lit hull washed out the art it is drawn to be judged against, and a 
 overlap, so their alphas stacked (~0.27 over bare art, ~0.47 where two cover the same pixel). Verified
 headless: `game-diag` with `SPACEVORS_DIAGNOSTIC=1` (crop `hull-crop-diag`) — the shape still reads clearly,
 the hull plating shows through it. Draw-only; no radius, collision or broad-phase change.
+
+## Follow-up (2026-11-13): the normal impulse hits at the contact, so off-centre pushes spin
+
+`ResolveCollision` had applied its normal impulse at the bodies' centres: only the friction channel
+(μ = 0.2) used the contact's lever arm, so pushing a lumpy rock off a limb shoved it but never
+turned it. The normal impulse is now a contact-point impulse (standard impulse resolution): the
+closing speed is read at the touch and divided by the effective inverse mass the touch feels
+(`totalInvMass + arm²·invInertia` per body, `arm = Cross(contact.Point − centre, normal)`), and the
+resulting torque `arm · j` is given to each spinning body.
+
+Kept invariants: a body with no `AngularVelocity` component keeps infinite rotational inertia and is
+never spun (input and AI steer their own headings); MOI stays the bounding disc's, unchanged; impact
+damage still gates on the centre-based closing speed; circle-vs-circle resolves bit-identically,
+because a circle's contact point sits on the centre line and its arms are zero. A pair whose contact
+point is already separating (a body spinning away) gets no normal impulse.
+
+Tests: `PlayerFlankPush_LumpyRock_SpinsIt` (a head-on flank press with zero sliding spins the rock —
+only the normal channel can), `PlayerFlankPush_RoundRock_DoesNotSpin` (the circle control: shoved,
+never spun). Perf: scenarios came out at or slightly under the pre-change rows (ammo-spray 1.41,
+impact-storm 2.15, hull-stream 0.85, hull-crowding 0.42 medians vs 1.47-1.50 / 2.21-2.25 / 0.91-0.95 /
+0.43-0.45 before) — within noise, directionally cheaper because the contact-point gate resolves fewer
+pairs into repeated contacts. Verdict: costs nothing measurable, keep.

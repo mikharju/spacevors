@@ -1096,7 +1096,37 @@ public class CollisionSystem : GameSystem
         {
             restitution = 0f;
         }
-        float j = -(1 + restitution) * velAlongNormal / totalInvMass;
+
+        // The normal impulse acts where the bodies touch, not at their centres, so the lever arms
+        // measured from the contact (not from `normal · radius`) decide how much of a shove becomes
+        // spin. A circle's every contact sits on the centre line, so its arms are zero and a circle
+        // pair resolves exactly as the centre-based impulse always resolved it; push a lumpy rock
+        // off a limb and the same impulse now turns it as well as shoving it.
+        var rA = contact.Point - a.Position;
+        var rB = contact.Point - b.Position;
+        float armA = rA.X * normal.Y - rA.Y * normal.X;
+        float armB = rB.X * normal.Y - rB.Y * normal.X;
+
+        float aAngVel = GetCollisionAngularVelocity(view, aEntity, 0f);
+        float bAngVel = GetCollisionAngularVelocity(view, bEntity, 0f);
+
+        // A body with no AngularVelocity component steers its own heading (input, AI) and a contact
+        // cannot spin it: it keeps infinite rotational inertia. The MOI stays the bounding disc's,
+        // as it has always been: the shape decides what a body hits, not how heavy it is, and
+        // changing that is a balance change that has to be measured on its own.
+        float aMOI = view.TryGetComponent<AngularVelocity>(aEntity, out _) ? 0.5f * aMass * a.Scale * a.Scale : 0f;
+        float bMOI = view.TryGetComponent<AngularVelocity>(bEntity, out _) ? 0.5f * bMass * b.Scale * b.Scale : 0f;
+        float armYieldA = armA * armA * (aMOI > 0f ? 1f / aMOI : 0f);
+        float armYieldB = armB * armB * (bMOI > 0f ? 1f / bMOI : 0f);
+
+        // The closing speed is read at the touch: a body already spinning away from the contact is
+        // not being pushed into it. And the impulse is divided by what the touch actually feels —
+        // an off-centre hit on a long body meets less resistance than a head-on one, so its far end
+        // yields into spin instead of the whole body jumping.
+        float closingAtContact = velAlongNormal + bAngVel * armB - aAngVel * armA;
+        if (closingAtContact >= 0f) return;
+
+        float j = -(1 + restitution) * closingAtContact / (totalInvMass + armYieldA + armYieldB);
         var impulse = normal * j;
 
         aVel -= impulse * invMassA;
@@ -1104,6 +1134,17 @@ public class CollisionSystem : GameSystem
 
         SetCollisionVelocity(aEntity, aVel);
         SetCollisionVelocity(bEntity, bVel);
+
+        if (aMOI > 0f)
+        {
+            aAngVel -= armA * j / aMOI;
+            SetCollisionAngularVelocity(aEntity, aAngVel);
+        }
+        if (bMOI > 0f)
+        {
+            bAngVel += armB * j / bMOI;
+            SetCollisionAngularVelocity(bEntity, bAngVel);
+        }
 
         var correctedRelVel = bVel - aVel;
         var velNormalComponent = Vector2.Dot(correctedRelVel, normal);
@@ -1114,17 +1155,6 @@ public class CollisionSystem : GameSystem
 
         if (tangentSpeed > Slop)
         {
-            // Lever arms measured from the contact, not from `normal · radius`: with a circle the two
-            // are the same arm, and only the first one is still true for a shape that is not a circle.
-            var rA = contact.Point - a.Position;
-            var rB = contact.Point - b.Position;
-
-            float aAngVel = GetCollisionAngularVelocity(view, aEntity, 0f);
-            bool hasAAngVel = view.TryGetComponent<AngularVelocity>(aEntity, out _);
-
-            float bAngVel = GetCollisionAngularVelocity(view, bEntity, 0f);
-            bool hasBAngVel = view.TryGetComponent<AngularVelocity>(bEntity, out _);
-
             float contactTangentVelX = relVelTangent.X + aAngVel * rA.Y - bAngVel * rB.Y;
             float contactTangentVelY = relVelTangent.Y - aAngVel * rA.X + bAngVel * rB.X;
             float contactTangentSpeed = MathF.Sqrt(contactTangentVelX * contactTangentVelX + contactTangentVelY * contactTangentVelY);
@@ -1146,18 +1176,13 @@ public class CollisionSystem : GameSystem
                 SetCollisionVelocity(aEntity, aVel);
                 SetCollisionVelocity(bEntity, bVel);
 
-                // Mass and inertia stay what the hull's bounding radius has always given them: the shape
-                // decides what a hull hits, not how heavy it is, and changing that is a balance change
-                // that has to be measured on its own.
-                float aMOI = 0.5f * aMass * a.Scale * a.Scale;
-                if (hasAAngVel)
+                if (aMOI > 0f)
                 {
                     float torqueA = rA.X * frictionImpulse.Y - rA.Y * frictionImpulse.X;
                     SetCollisionAngularVelocity(aEntity, aAngVel + torqueA / aMOI);
                 }
 
-                float bMOI = 0.5f * bMass * b.Scale * b.Scale;
-                if (hasBAngVel)
+                if (bMOI > 0f)
                 {
                     float torqueB = rB.X * (-frictionImpulse.Y) - rB.Y * (-frictionImpulse.X);
                     SetCollisionAngularVelocity(bEntity, bAngVel + torqueB / bMOI);
