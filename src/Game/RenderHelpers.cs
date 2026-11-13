@@ -124,12 +124,12 @@ internal static class RenderHelpers
     // what the rack may cover is still a property of the mount.
     public static void DrawRackMarker(float cx, float cy, float radius, float hullAngleDeg, Color color)
     {
+        // DrawRectanglePro centres on rec.xy when the origin is the rect's half-size, so anchoring the
+        // rect at (cx - half) drew the square half a side up-left of the mount (probe: the placement
+        // trap TROUBLE_SHOOTING #59 records for DrawTexturePro, same family).
         float half = radius * RackMarkerHalfSide;
-        Raylib.DrawRectanglePro(
-            new Rectangle(cx - half, cy - half, half * 2f, half * 2f),
-            new System.Numerics.Vector2(half, half),
-            hullAngleDeg,
-            color);
+        var square = new Rectangle(cx, cy, half * 2f, half * 2f);
+        Raylib.DrawRectanglePro(square, CenterOrigin(square), hullAngleDeg, color);
     }
 
     const float RackMarkerHalfSide = 0.8f;

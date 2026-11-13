@@ -121,14 +121,14 @@ public static class WorldRenderer
             if (baseTex.HasValue && baseTex.Value.Id != 0)
                 DrawAsteroidSprite(sprite, baseTex.Value, cx, cy, asteroid.Radius * 2f, angleDeg);
             else
+            {
                 // Flat sprites draw straight away while lit ones wait for the batch flush below, so a
-                // mixed layer draws flat variants under lit ones.
-                Raylib.DrawRectanglePro(
-                    new Rectangle((int)cx - (int)asteroid.Radius, (int)cy - (int)asteroid.Radius, (int)(asteroid.Radius * 2), (int)(asteroid.Radius * 2)),
-                    new System.Numerics.Vector2(asteroid.Radius, asteroid.Radius),
-                    angleDeg,
-                    new Color(200, 200, 210, 255)
-                );
+                // mixed layer draws flat variants under lit ones. DrawRectanglePro anchors its centre at
+                // rec.xy with a half-size origin, so the rect sits at (cx, cy); anchoring at (cx - radius)
+                // drew the rock one radius up-left of the collider that owns it.
+                var rock = new Rectangle(cx, cy, asteroid.Radius * 2f, asteroid.Radius * 2f);
+                Raylib.DrawRectanglePro(rock, RenderHelpers.CenterOrigin(rock), angleDeg, new Color(200, 200, 210, 255));
+            }
         }
 
         // Two sub-segments of this pass, so a spike row says whether the freeze was the lit sprite
