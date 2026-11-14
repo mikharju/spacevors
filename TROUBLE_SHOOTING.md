@@ -861,3 +861,20 @@ the message at.
   same way as the same pair resolved statically. Any future sweep-based resolution (debris,
   tractors, new round kinds) must remember the two seams point opposite. Cheap check for any new
   impulse code: after the hit, the target's velocity change must be along the bullet's travel.
+
+## 85. A window run silently drives the binary built **before** the change
+
+- **Symptom**: A scripted hand (`SPACEVORS_DIAG_UPGRADES="RailGun+FireRate+Damage,Hp:"`) comes back as an
+  ordinary random hand, and the `[UPGRADE]` row the new code should print is missing — while the suite over the
+  same working tree is green.
+- **Cause**: `.tools/game.sh` runs `src/Game/bin/Debug/net10.0/Game.dll`, i.e. **whatever was built last**. Two
+  ways to be fooled: (1) that build predates the edits; (2) a perf A/B (`git stash push … && .tools/scenario.sh
+  … && git stash pop`) rebuilt the DLL from the stashed tree, so the window run afterwards drives the baseline.
+  Related trap: `git stash push` **without** `-u` leaves untracked new source files in the tree; they reference
+  the stashed-away members, so the scenario's build fails and `grep '^budget:'` over its output prints nothing —
+  the "baseline" numbers were never measured.
+- **Fix / Prevention**: Build `src/Game/Game.csproj` in the same command that starts the game job. Prove the new
+  code is running before believing anything on screen: tee the job's stdout (#71) and grep for a row only the
+  new code prints. Remember that one malformed bench entry makes the whole script fall back to the random pool,
+  so a random hand is evidence about the script *and* about the binary. For a stash A/B use `git stash push -u --
+  <paths>` and check that each run really printed a `budget:` line.

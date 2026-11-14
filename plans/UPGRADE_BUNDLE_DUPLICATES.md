@@ -290,3 +290,15 @@ cross product over at most five halves, which the window run shows is invisible.
 **Still open for playtest:** whether five bundles whose top rows repeat read as padding at levels 1-9. §7 knob 0
 (a `MaxCopiesOfOneCard = 2` in `NextPair`, one `if`) and knob 1 (`MaxStrongCardsPerGun` 3 → 4) are both still
 ahead of the XP-step knob, and nothing about the numbers a card grants moved with this change.
+
+## Follow-up (2026-11-14): what "the same card" means for a new gun
+
+plans/PREUPGRADED_NEW_WEAPONS.md made a new-weapon card a **(gun, arriving upgrade set)** pair instead of a gun
+name, which re-cuts two rules this plan wrote:
+
+- The pairing rule quoted above, "one new gun per bundle", is now one per class — see the same-dated follow-up in
+  plans/UPGRADE_BUNDLE_PAIRS.md.
+- `NextPair`'s refusal "a new gun already on the table is not offered again" is now "never the same gun with the
+  same arriving set twice", so a booked hull may be offered one gun as two or three builds in one hand. The
+  per-gun draw caps (`MaxStrongCardsPerGun`, `MaxWeakCardsPerGun`, counted by weapon name) still bound how many
+  builds of a single gun a pool can hold.

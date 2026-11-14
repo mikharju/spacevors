@@ -118,7 +118,9 @@ Environment variables:
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Range:MachineGun,Hp:,FireRate:MachineGun"` — scripted upgrade choices,
   one entry per **card granted**: a level grants the two cards of one bundle (plans/UPGRADE_BUNDLE_PAIRS.md),
   so entries are consumed **in pairs, strong card then weak card** — an odd leftover entry is not a bundle and
-  falls back to the dealt offer; entry is a weapon name or `Stat:WeaponName`. A hull card needs its empty weapon name — `Hp:`,
+  falls back to the dealt offer; entry is a weapon name or `Stat:WeaponName`. A new-weapon entry may name the upgrades that gun arrives with — `RailGun+FireRate+Damage`
+  prints `new weapon Rail Gun — with rate, damage` on the card and hands over that build (any stat a gun cannot carry,
+  like `Armor`, rejects the entry and falls back to the dealt offer). A hull card needs its empty weapon name — `Hp:`,
   `Armor:`, `Shield:` — because a bare word is read as a new weapon's name. Falls back to the random
   pool when exhausted. Armor cards work the same way: `Armor:` for the hull card (empty weapon
   name) and `ArmorPierce:RailGun` for a gun — both are only dealt from level 5, so script the

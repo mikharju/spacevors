@@ -357,3 +357,11 @@ written:
   that levels up shifts its later stream (same rule as everywhere else: fewer draws, different run).
 
 Full design, deviations and the measured verdict: plans/UPGRADE_HAND_COMPOSITION.md.
+
+## Follow-up (2026-11-14): a paid-for new gun enters cargo at grant time
+
+plans/PREUPGRADED_NEW_WEAPONS.md moved the grant. Taking a bundle that offered a gun now writes that gun into
+`WeaponCargo` — carrying the upgrades its card printed — and only then opens the mount screen. The gun is paid
+for the moment the bundle is taken, so leaving that screen with Esc cannot lose it, and one visit can place both
+guns of a two-new-gun bundle. The R23 refusal (one gun of each type aboard, on the hull or in cargo) is enforced
+inside the grant, `NewWeaponGrant.TryGrant`, rather than in the mount click.

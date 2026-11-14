@@ -32,7 +32,7 @@ command that starts them):
 
 ```bash
 .tools/xvfb.sh           # background job: virtual display :99, 1920x1024x24
-.tools/game.sh           # background job: the game, logs to .tools/run/app.log
+.tools/game.sh           # background job: the game; its rows go to the job's stdout (see TROUBLE_SHOOTING #71)
 ```
 
 Then, from any ordinary command:

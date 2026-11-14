@@ -393,3 +393,16 @@ unmeasured is the player's own effective HP: ordinary levels now buy half the ar
 did before, milestones buy the same as before, and milestones no longer buy `Hp`. §7's knob order is unchanged
 and §9's questions 6 and 7 (is the +16 milestone shield too big a step; is `Hp` missing from milestone hands
 felt as a cost) are playtest questions, not code ones.
+
+## Follow-up (2026-11-14): a bundle may carry two new guns
+
+plans/PREUPGRADED_NEW_WEAPONS.md lifts two rules of this plan. The sections above stay as written and are not
+rewritten:
+
+- §3.7's "a bundle carries **one new gun at most**" — and §8's line resting on it — is now "one new gun **per
+  class**": a milestone bundle may pair a large build on the strong side with a small build on the weak side. The
+  stranding §3.7's Shipped note reasoned about cannot come back: the classification puts a large gun only on the
+  strong side and a chip only on the weak one, so a new+new pair is always one of each.
+- §8's "no pre-upgraded new weapons (§8)" and §10's "deliberately not here" entry is the feature that has since
+  landed: a gun dealt to a hull with no free mount of its size arrives carrying upgrades, and that set is part of
+  the card.
