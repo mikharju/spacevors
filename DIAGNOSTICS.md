@@ -2,10 +2,11 @@
 
 Reference, usage only — no implementation details or history (plan files have those).
 
-All helpers are active only with `SPACEVORS_DIAGNOSTIC=1`. It also turns on the cyan
+One exception, flagged where it appears: the `[STALL]` frame row runs in an ordinary play session until
+silenced. Everything else needs `SPACEVORS_DIAGNOSTIC=1`. It also turns on the cyan
 collider overlay — over hulls and rocks in flight, and over the hull previews on the ship-select
 cards — the manoeuvre brackets on enemy hulls (green diamond: holding a spread lane, yellow diamond:
-a crippled hull hiding behind a healthier one), the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[target]
+a crippled hull hiding behind a healthier one), the [FRAME]/[FPS]/[SIM]/[APPLY]/[RENDER]/[SYSTEM]/[UPGRADE]/[MOUNT]/[STALL]/[target]
 logs, the spike log file (see below), and a fixed test asteroid at (0,-300). Without it the select
 cards show the ship art alone.
 
@@ -86,6 +87,25 @@ per stalled frame** to a file, so a whole session leaves a handful of rows:
 - The `[SPIKE] log:` line prints the exact path at startup, and `[SPIKE-END]` says how many spikes
   the session found. Unflushed rows survive a crash: the file flushes on every line.
 
+The same frames are watched **without diagnostics too**, so a freeze someone felt in an ordinary session brings
+its own evidence — one row to stdout per frame over an absolute threshold:
+
+    [STALL] watching: frames over 250ms (SPACEVORS_STALL_MS=0 to silence)
+    [STALL] dt=312.4 sim=0.0 render=18.9 other=293.5 t=6.5 step=cards ents=103 ships=6 asteroids=35 \
+            missiles=0 ammo=35 worst=present:15.5ms subworst=asteroids.litDraws:0.1ms gc0=0 gc1=0 gc2=0 allocKb=24
+    [STALL-END] frames=3633 stalls=2 thresholdMs=250
+
+- `step=` names the screen the frame belongs to — `run`, `cards` (the upgrade bundles), `stats` (the Tab screen),
+  `mounts` (the hull and cargo screen). On a paused frame `sim=0.0` by definition, so a freeze there reads as a
+  large `render=` or `other=` with `worst=` naming the pass that ate it (`present` is the `EndDrawing` wait).
+- The spike rule ("4× this session's median, at least 25 ms") answers *what was unusual here*; the stall rule
+  ("over 250 ms, always") answers *did the player feel it*. A freeze that happens twice in an hour is not a
+  statistical outlier against frames that are themselves slow, which is why both exist.
+- Both detectors cover **every** frame, the three paused screens included. Before, a hitch behind the upgrade
+  cards or the mount screen was recorded nowhere at all — the frame record lived inside the running path only.
+- `[STALL-END]` prints the session tally on a clean exit; `SPACEVORS_STALL_MS=<n>` moves the threshold, `0`
+  silences the rows. A measured scenario does not print them — it reports every frame through `[PERF]` already.
+
 Keys (in-game):
 
 - L: force level-up
@@ -115,6 +135,8 @@ Environment variables:
 - `SPACEVORS_SPIKE_DIR=<dir>` — send the spike-log files somewhere other than `spikes/` beside the
   binary — e.g. a `.tools/run/...` dir, to keep a run's spikes with its logs. Only read with diagnostics on
 - `SPACEVORS_BEHAVIOUR_DIR=<dir>` — same, for the manœuvre log (`behaviours/` beside the binary by default)
+- `SPACEVORS_STALL_MS=<n>` — the absolute frame threshold for a `[STALL]` row (default 250; `0` turns the rows
+  off). Works without `SPACEVORS_DIAGNOSTIC`, in a played run only
 - `SPACEVORS_DIAG_UPGRADES="RailGun,Range:MachineGun,Hp:,FireRate:MachineGun"` — scripted upgrade choices,
   one entry per **card granted**: a level grants the two cards of one bundle (plans/UPGRADE_BUNDLE_PAIRS.md),
   so entries are consumed **in pairs, strong card then weak card** — an odd leftover entry is not a bundle and

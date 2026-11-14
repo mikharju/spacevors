@@ -878,3 +878,20 @@ the message at.
   new code prints. Remember that one malformed bench entry makes the whole script fall back to the random pool,
   so a random hand is evidence about the script *and* about the binary. For a stash A/B use `git stash push -u --
   <paths>` and check that each run really printed a `budget:` line.
+
+## 86. `global.json` pins an SDK the sandbox does not have, and the build dies with a usage banner
+
+- **Symptom**: Every `dotnet build` / `dotnet test` prints `A compatible .NET SDK was not found — Requested
+  SDK version: 10.0.404 … Installed SDKs: 10.0.112`, and the same commands were green an hour earlier. A grep
+  for `error` can miss it entirely, because the failure text contains no `error` at all — the build simply
+  prints the CLI usage banner and exits.
+- **Cause**: `global.json` (committed) requests `10.0.404` with `"rollForward": "latestFeature"`, which only
+  accepts **newer** feature bands inside the same major.minor. An older installed band never matches. The
+  sandbox's SDK set is fixed; a commit that raises the pin silently raises the floor for every agent box.
+- **Fix / Prevention**: Do not edit the pinned file — the human's toolchain is the point of the pin. Put a
+  scratch pin in the **working directory** instead, since SDK resolution walks up from the cwd: `mkdir -p
+  .tools/run/sdk-scratch && echo '{"sdk":{"version":"10.0.112"}}' > .tools/run/sdk-scratch/global.json`, then
+  `cd .tools/run/sdk-scratch && dotnet build /absolute/path/to/src/Tests/Tests.csproj`. Use absolute project
+  paths (the relative ones resolve against the scratch dir). Delete the scratch dir afterwards and confirm
+  `git status` shows no `global.json` change. When reporting a green suite this way, say which SDK it actually
+  ran on — and if a pin really blocks the work, say so rather than quietly lowering it.

@@ -229,9 +229,7 @@ public sealed class GameSession
         _wasPaused = paused;
 
         if (!paused) UpdateRunning(frameTime);
-        else if (onMountsScreen) HandleMountsScreen();
-        else if (_showStats) HandleStatsScreen();
-        else HandleUpgradeMenu();
+        else StepPaused(onMountsScreen);
 
         return false;
     }
@@ -269,16 +267,50 @@ public sealed class GameSession
         // The frame interval is measured here rather than taken from Raylib.GetFrameTime(): that
         // value describes the *previous* frame, which makes `other` land on the wrong row and can
         // even go negative.
-        if (_scenario is not null) ReportScenarioFrame(TicksToMs(_frameSw.ElapsedTicks));
-        if (SpikeLogger.IsActive)
-            SpikeLogger.RecordFrame(TicksToMs(_frameSw.ElapsedTicks), TicksToMs(_lastSimTicks), TicksToMs(_lastRenderTicks), SpikeColumns());
+        double frameMs = TicksToMs(_frameSw.ElapsedTicks);
+        if (_scenario is not null) ReportScenarioFrame(frameMs);
+        RecordFrame(frameMs, TicksToMs(_lastSimTicks));
     }
 
-    // The world counters of a spike row. A new enemy hull or asteroid type shows up as one of
-    // these counts jumping on exactly the frame that stalled.
+    // A paused frame still draws the whole world plus a panel, and a hitch in it is exactly as visible to the
+    // player as a hitch while flying — so it is timed and recorded like any other frame. Until now the paused
+    // half of the loop was measured nowhere: the spike log was fed only by `UpdateRunning`, so a three-second
+    // freeze behind the upgrade cards or the mount screen left no row anywhere to read.
+    private void StepPaused(bool onMountsScreen)
+    {
+        _frameSw.Restart();
+
+        if (onMountsScreen) HandleMountsScreen();
+        else if (_showStats) HandleStatsScreen();
+        else HandleUpgradeMenu();
+
+        _frameSw.Stop();
+        RecordFrame(TicksToMs(_frameSw.ElapsedTicks), simMs: 0);
+    }
+
+    // One frame, two stall-detectors: the spike log asks "was this frame unusual for this session" and needs
+    // diagnostics mode, the stall row asks "did the player feel this" and runs in a normal play session. `sim`
+    // is zero on a paused frame by definition, which is also why its `other` column is the whole stall.
+    void RecordFrame(double frameMs, double simMs)
+    {
+        if (SpikeLogger.IsActive)
+            SpikeLogger.RecordFrame(frameMs, simMs, TicksToMs(_lastRenderTicks), SpikeColumns());
+
+        StallLogger.RecordIfStalled(frameMs, simMs, TicksToMs(_lastRenderTicks), SpikeColumns());
+    }
+
+    // The world counters of a frame row. A new enemy hull or asteroid type shows up as one of
+    // these counts jumping on exactly the frame that stalled. `step=` names the screen the frame belongs to:
+    // a freeze row that cannot say where it froze is not worth reading.
     string SpikeColumns() =>
-        $"t={_em.ElapsedTime:F1} ents={Count<Position>()} ships={Count<EnemyShip>()} " +
+        $"t={_em.ElapsedTime:F1} step={ScreenName()} ents={Count<Position>()} ships={Count<EnemyShip>()} " +
         $"asteroids={Count<Asteroid>()} missiles={Count<Missile>()} ammo={Count<Ammo>()}";
+
+    // The three paused screens are worth naming; a flying frame is simply "run". `_wasPaused` is what says this
+    // frame is paused, so a `_upgradeStep` left over from a closed mount screen cannot mislabel a running frame.
+    string ScreenName() => _wasPaused
+        ? _upgradeStep == UpgradeStep.Mounts ? "mounts" : _showStats ? "stats" : "cards"
+        : "run";
 
     // The threat readout: one row a second saying what the fleet can currently throw at the hull and
     // what the hull can answer with. It prints in every run — it is the tuning record behind the
@@ -715,15 +747,22 @@ public sealed class GameSession
 
     private int GetPlayerLevel() => _em.TryGetComponent<Player>(_playerEntity, out var player) ? player.Level : 1;
 
+    // Every frame ends its render timing the same way, flying or paused, so the `render` column of a frame row
+    // means the same thing behind the upgrade cards as it does in a fight.
+    void EndRenderTiming()
+    {
+        _renderSw.Stop();
+        _lastRenderTicks = _renderSw.ElapsedTicks;
+        DiagnosticLogger.LogRender(_lastRenderTicks);
+    }
+
     private void RenderGame()
     {
         var renderCam = _em.GetComponent<Camera>(_cameraEntity);
         _renderSw.Restart();
         Renderer.Render(_em, renderCam.Target.X, renderCam.Target.Y, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), _gameOver, _stars, _clutter, _playerEntity, _ship, _diagnostics,
             _diagnostics ? _threatLine : string.Empty);
-        _renderSw.Stop();
-        _lastRenderTicks = _renderSw.ElapsedTicks;
-        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        EndRenderTiming();
         TryTakeBeamShot(renderCam);
         TryTakeExplosionShot(renderCam);
     }
@@ -814,8 +853,7 @@ public sealed class GameSession
         var statsCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderPaused(_em, statsCam.Target.X, statsCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _ship, _diagnostics,
             new Renderer.StatsOverlay(screen, null, GetPlayerLevel(), -1, canManageMounts, buttonHovered, false));
-        _renderSw.Stop();
-        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        EndRenderTiming();
     }
 
     private void HandleUpgradeMenu()
@@ -826,8 +864,7 @@ public sealed class GameSession
 
         _renderSw.Restart();
         HandleCardStep(windowWidth, windowHeight);
-        _renderSw.Stop();
-        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        EndRenderTiming();
     }
 
     private void HandleCardStep(int windowWidth, int windowHeight)
@@ -964,8 +1001,7 @@ public sealed class GameSession
         _renderSw.Restart();
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
         Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mounts, hoveredMount, hoveredCargo);
-        _renderSw.Stop();
-        DiagnosticLogger.LogRender(_renderSw.ElapsedTicks);
+        EndRenderTiming();
     }
 
     // Only what to do right now — the keys, the rings and what cargo means are on the panel, so this

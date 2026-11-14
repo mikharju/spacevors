@@ -60,9 +60,12 @@ public static class Renderer
         StatsOverlay stats)
     {
         Raylib.BeginDrawing();
+        RenderTimings.BeginFrame();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, shipType, diagnostics);
         StatsScreenRenderer.Draw(stats.Screen, shipType.Name, stats.PlayerLevel, windowWidth, windowHeight, stats.Options, stats.HoveredIndex, stats.CanManageMounts, stats.HoveredManage, stats.HoveredReroll);
+        RenderTimings.Pass("ui.panel");
         Raylib.EndDrawing();
+        RenderTimings.Pass("present");
     }
 
     // The hull-slot picking screen: the world behind, the hull drawn large, its mounts and arcs on top.
@@ -79,9 +82,12 @@ public static class Renderer
         int hoveredCargo)
     {
         Raylib.BeginDrawing();
+        RenderTimings.BeginFrame();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, mount.Ship, diagnostics);
         MountMenuRenderer.Draw(mount, hoveredSlot, hoveredCargo, windowWidth, windowHeight);
+        RenderTimings.Pass("ui.hull");
         Raylib.EndDrawing();
+        RenderTimings.Pass("present");
     }
 
     private static void DrawScene(

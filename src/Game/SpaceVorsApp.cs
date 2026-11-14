@@ -56,6 +56,10 @@ public static class SpaceVorsApp
     {
         Raylib.SetTargetFPS(MaxFps);
 
+        // A played run watches for the frame a player feels as a freeze. A measured scenario does not need it:
+        // it already reports every frame through `[PERF]` rows and its own budget gate.
+        StallLogger.Open();
+
         var shipSelect = new ShipSelectScreen(Environment.GetEnvironmentVariable(DiagnosticLogger.EnvVar) == "1");
         GameSession? session = null;
 
@@ -77,6 +81,8 @@ public static class SpaceVorsApp
             if (active.Update())
                 session = null;
         }
+
+        StallLogger.Close();
     }
 
     // Measures the scenario's first MeasureTicks frames from its seeded world, then keeps the window
