@@ -79,10 +79,11 @@ public class LevelUpSlotOfferTest
     }
 
     // R23 — the ship holds one gun of each type, mounted or in cargo — is the two tests above: a card may
-    // never name a gun already on board. This is the other half of the same rule: a hand may hold up to
-    // three new-weapon cards, but never two cards naming the same weapon.
+    // never name a gun already on board. This is the other half of the same rule, and it is about **builds** now
+    // (plans/PREUPGRADED_NEW_WEAPONS.md D8): a hand may offer the same unowned gun in two different builds — that
+    // is two different cards — but never the same build twice, and never any build of a gun the ship owns.
     [Fact]
-    public void AHand_NeverDealsTheSameWeaponTwice()
+    public void AHand_NeverDealsTheSameBuildOfAWeaponTwice()
     {
         var (em, _) = CreateHull(ShipType.Heavy, xp: 999_999, level: 4);
 
@@ -90,8 +91,9 @@ public class LevelUpSlotOfferTest
         for (int levelUp = 0; levelUp < 20; levelUp++)
         {
             RunLevelUp(em);
-            var offered = TakeNewWeaponCards(em);
+            var offered = NewWeaponBuilds(em);
             if (offered.Count > 0) hands.Add(offered);
+            ClearHand(em);
         }
 
         Assert.NotEmpty(hands);
@@ -418,18 +420,32 @@ public class LevelUpSlotOfferTest
             .Select(o => o.WeaponName)];
     }
 
-    // Read the hand and clear it, so the next level-up can offer another one.
+    // Read the hand and clear it, so the next level-up can offer another one. A level that dealt nothing (no
+    // turret) leaves no hand, so the read tolerates an empty one.
     static List<string> TakeNewWeaponCards(EntityManager em)
     {
-        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
-        if (choices.Count == 0) return new List<string>();
-
-        List<string> names = [.. Cards(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity))
-            .Where(o => o.IsNewWeapon)
-            .Select(o => o.WeaponName)];
-
-        foreach (var (entity, _) in choices) em.DestroyEntity(entity);
+        List<string> names = [.. Hand(em).Where(o => o.IsNewWeapon).Select(o => o.WeaponName)];
+        ClearHand(em);
         return names;
+    }
+
+    // New-weapon cards as *builds*: the weapon plus the upgrades it arrives with. Two builds of one gun are two
+    // different cards, so tests about repetition have to compare these and not the names.
+    static List<string> NewWeaponBuilds(EntityManager em) =>
+        [.. Hand(em).Where(o => o.IsNewWeapon).Select(UpgradeOffer.FormatChoice)];
+
+    static void ClearHand(EntityManager em)
+    {
+        foreach (var (entity, _) in em.GetEntitiesWithComponents<PendingChoice>().ToList())
+            em.DestroyEntity(entity);
+    }
+
+    // Both halves of the hand on screen, or none when the level dealt nothing.
+    static UpgradableOption[] Hand(EntityManager em)
+    {
+        var choices = em.GetEntitiesWithComponents<PendingChoice>().ToList();
+        Assert.True(choices.Count <= 1, "more than one pending hand");
+        return choices.Count == 0 ? [] : Cards(em.GetComponent<PendingUpgradeOptions>(choices[0].Entity));
     }
 
     // Both halves of every bundle, in deal order: these tests ask about cards, not about pairs.

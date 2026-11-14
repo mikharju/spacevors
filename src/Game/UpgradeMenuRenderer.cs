@@ -17,8 +17,10 @@ public static class UpgradeMenuRenderer
     const int BundleLabelFontSize = 17;
     const int BundleValueFontSize = 26;
     const int MaxUpgradeLabelLines = 3;
-    // A new-weapon card lists what the gun does at its base level; the block is skipped rather than
-    // squeezed when the window is too narrow for it.
+    // A new-weapon card lists the numbers of the gun **as it arrives** — which is the table's own numbers unless
+    // the hull had no free mount for it and the deal put upgrades on it
+    // (plans/PREUPGRADED_NEW_WEAPONS.md). The block is skipped rather than squeezed when the window is too narrow
+    // for it; the arriving upgrades are in the card's label, so they survive that.
     const int UpgradeCardStatFontSize = 15;
     const int MinCardWidthForStats = 150;
 
@@ -230,8 +232,14 @@ public static class UpgradeMenuRenderer
 
     private static string GetUpgradeLabel(UpgradableOption option)
     {
-        if (option.IsNewWeapon && option.Stat == UpgradeOption.Damage)
-            return $"new weapon {MenuCopy.FriendlyWeaponName(option.WeaponName)}";
+        if (option.IsNewWeapon)
+        {
+            string gun = MenuCopy.FriendlyWeaponName(option.WeaponName);
+            string arriving = ArrivingNames(option.PreApplied);
+            // The set has to be on the card, not only in the spec block below: the block is skipped on a narrow
+            // card, and two bundles offering the same gun in two builds are otherwise indistinguishable here.
+            return arriving.Length == 0 ? $"new weapon {gun}" : $"new weapon {gun} — with {arriving}";
+        }
 
         if (string.IsNullOrEmpty(option.WeaponName))
             return option.Stat switch
@@ -298,19 +306,37 @@ public static class UpgradeMenuRenderer
         return UpgradeDefinition.For(option.Stat).DisplayValue;
     }
 
-    // Base numbers of a new weapon — nothing has upgraded it yet, so these are honest starting values.
+    // The numbers of a new gun as it arrives. A gun the hull can still fit arrives plain, so these are the table's
+    // own; a gun dealt to a full hull arrives carrying upgrades, and the card must print the upgraded numbers —
+    // reading the table there is the lie R10 refuses. `WeaponUpgrade.Apply` is the same call that builds the
+    // turret the player mounts, so the card and the gun cannot disagree.
     private static string[]? NewWeaponSpecs(UpgradableOption option)
     {
         if (!option.IsNewWeapon || WeaponType.FromName(option.WeaponName) is not { } weapon) return null;
+
+        var arriving = WeaponUpgrade.Apply(TurretMount.CarriedTurret(weapon), option.PreApplied);
 
         // A card holds two entries, so the new gun says only what its two numbers are; attack speed and how
         // the round is delivered stay on the stats screen.
         return
         [
-            $"range {Format(weapon.Range)}",
-            $"damage {weapon.Stats.Damage}{(weapon.Stats.PelletCount > 1 ? $" x{weapon.Stats.PelletCount}" : "")}",
+            $"range {Format(arriving.Range)}",
+            $"damage {arriving.Weapon.Damage}{(arriving.Weapon.PelletCount > 1 ? $" x{arriving.Weapon.PelletCount}" : "")}",
         ];
     }
+
+    // The arriving upgrades in the card's own words, shortened so a whole set fits the label of a card that also
+    // carries a second entry: the full wording is what a single-stat card prints, and these are the same six.
+    static string ArrivingNames(WeaponPreUpgrade mask) => string.Join(", ", WeaponUpgrade.StatsOf(mask).Select(ShortStat));
+
+    static string ShortStat(UpgradeOption stat) => stat switch
+    {
+        UpgradeOption.FireRate => "rate",
+        UpgradeOption.ProjectileSpeed => "proj speed",
+        UpgradeOption.MissileHealth => "round hp",
+        UpgradeOption.ArmorPierce => "pierce",
+        _ => stat.ToString().ToLowerInvariant()
+    };
 
     private static string Format(float value) => value < 10f ? $"{value:0.0}" : $"{(int)MathF.Round(value)}";
 }

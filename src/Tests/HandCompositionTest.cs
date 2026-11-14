@@ -73,8 +73,10 @@ public class HandCompositionTest
                     Assert.False(bundle.Powerful == bundle.Weak, $"{hull} L{level}: {Names(bundle)}");
     }
 
-    // A new weapon is offered once per hand, on either side: three bundles offering the same new gun reads as a
-    // bug, and R23 lets the ship own one copy of that gun anyway.
+    // Never the same **build** of a new gun twice in one hand, on either side. Different builds of one gun are
+    // allowed and are the point of plans/PREUPGRADED_NEW_WEAPONS.md: the upgrades a gun arrives with are part of
+    // the card, so `Distinct()` over the cards — not over the gun names — is the rule. R23 still lets the ship own
+    // exactly one copy of that gun, and a level takes one bundle.
     [Fact]
     public void Hand_NeverRepeatsANewWeaponCard()
     {
@@ -82,7 +84,7 @@ public class HandCompositionTest
             for (int level = 2; level <= 21; level++)
             {
                 var newGuns = Cards(Hand(hull, level)).Where(card => card.IsNewWeapon).ToList();
-                Assert.True(newGuns.Count == newGuns.Distinct().Count(), $"{hull} L{level}: a new gun offered twice");
+                Assert.True(newGuns.Count == newGuns.Distinct().Count(), $"{hull} L{level}: the same build of a new gun twice");
             }
     }
 
@@ -136,18 +138,25 @@ public class HandCompositionTest
                 Assert.InRange(Hand(hull, level).Length, 1, UpgradeOffer.BundlesPerLevel);
     }
 
-    // One new gun per bundle: the mount screen settles one weapon, so a pair of two would need two trips
-    // (plans/UPGRADE_BUNDLE_PAIRS.md §3.7). Nothing else can go wrong inside a pair — the weak half is applied
-    // before the strong half is mounted, so an upgrade spent on a gun the new gun displaces rides into cargo
-    // with that gun rather than vanishing.
+    // A bundle may carry two new guns — a large one on the strong half and a small one on the weak — and both are
+    // granted (plans/PREUPGRADED_NEW_WEAPONS.md D5). What is still refused is two of one **class**: the
+    // powerful/weak split makes a new large gun only ever the strong half and a new small gun only ever the weak,
+    // so a same-class pair would also be a powerful+powerful or weak+weak pair. Nothing else can go wrong inside a
+    // pair either: the other half is applied before any new gun is mounted, so an upgrade spent on a gun a new gun
+    // displaces rides into cargo with that gun rather than vanishing.
     [Fact]
-    public void Bundle_NeverCarriesTwoNewGuns()
+    public void Bundle_NeverCarriesTwoNewGunsOfOneClass()
     {
         foreach (var hull in Hulls)
             for (int level = 2; level <= 21; level++)
                 foreach (var bundle in Hand(hull, level))
-                    Assert.False(bundle.Powerful.IsNewWeapon && bundle.Weak.IsNewWeapon,
-                        $"{hull} L{level}: {Names(bundle)} — a bundle carries one new gun at most");
+                {
+                    if (!bundle.Powerful.IsNewWeapon || !bundle.Weak.IsNewWeapon) continue;
+
+                    bool SameClass(UpgradableOption card) => WeaponType.FromName(card.WeaponName)?.IsSupport == true;
+                    Assert.False(SameClass(bundle.Powerful) == SameClass(bundle.Weak),
+                        $"{hull} L{level}: {Names(bundle)} — two new guns of one mount class");
+                }
     }
 
     // A hull with nothing powerful to offer — its only gun is a chip and its large mount is taken — is still

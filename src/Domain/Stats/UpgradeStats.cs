@@ -29,6 +29,23 @@ public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Dama
 // (R10's rule that a card is never a lie).
 public enum DefenceTier { Ordinary, Milestone }
 
+// The upgrades a new gun arrives carrying (plans/PREUPGRADED_NEW_WEAPONS.md D3): the ones this plan can put
+// on a gun before the player ever buys a card for it. A **mask**, not a list, because it rides on
+// `UpgradableOption` — a record struct whose value equality every "same card / same pair / same hand" rule in
+// `UpgradeOffer` depends on. Two builds of one gun must compare unequal while those rules keep working as
+// written, which a list or an array would silently break (reference equality).
+[Flags]
+public enum WeaponPreUpgrade
+{
+    None = 0,
+    FireRate = 1 << 0,
+    ProjectileSpeed = 1 << 1,
+    Range = 1 << 2,
+    MissileHealth = 1 << 3,
+    ArmorPierce = 1 << 4,
+    Damage = 1 << 5
+}
+
 // A card's effect on one stat. `Multiplier` scales the live value; `Additive` shifts it; `PercentOfBase`
 // adds a share of the stat's table value, so the step never grows with the cards already bought.
 public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multiplier = 1f, int Additive = 0, int PercentOfBase = 0)

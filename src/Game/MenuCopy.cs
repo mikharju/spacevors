@@ -50,7 +50,7 @@ public static class MenuCopy
         "Tab reads your ship, guns and mounts. The game waits while you do.",
     ];
 
-    public static string UpgradeWeaponLine => "A new gun goes into your hand, then into a mount.";
+    public static string UpgradeWeaponLine => "A new gun is yours at once: it waits in cargo until you mount it.";
 
     // The mount screen, whose one hint line is about the click in front of the player. These are the
     // rules around it.

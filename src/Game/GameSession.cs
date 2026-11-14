@@ -90,12 +90,10 @@ public sealed class GameSession
 
     UpgradeStep _upgradeStep = UpgradeStep.Cards;
 
-    // The weapon in hand on the mount screen: a new weapon from a card, or one taken down from the
-    // hull (then it is already in cargo). "" means nothing is in hand.
+    // The weapon in hand on the mount screen; "" means nothing is in hand. Every weapon the player can hold is
+    // already in cargo — a bundle's new gun is stored there the moment the bundle is taken — so putting one down
+    // never loses it, and one mount-screen visit can place as many guns as the level paid for.
     string _heldWeapon = "";
-    // The held weapon came from a taken bundle, so it is already paid for: backing out of the mount screen
-    // stores it in cargo rather than handing the card back.
-    bool _heldIsCardWeapon;
     // The mount screen was opened from the stats screen instead of from a bundle.
     bool _mountsFromStats;
 
@@ -959,9 +957,9 @@ public sealed class GameSession
         int picked = ReadMountSelection(hoveredMount, mounts.Markers);
         if (picked >= 0) ApplyMountClick(mounts.Markers[picked]);
         else if (hoveredCargo >= 0 && Raylib.IsMouseButtonPressed(MouseButton.Left)) _heldWeapon = mounts.Cargo[hoveredCargo].WeaponName;
-        else if (Raylib.IsMouseButtonPressed(MouseButton.Right)) DropHold();
-        else if (Raylib.IsKeyPressed(KeyboardKey.Escape)) LeaveMountsScreen();
-        else if (Raylib.IsKeyPressed(KeyboardKey.C)) StoreHeldInCargo();
+        else if (Raylib.IsMouseButtonPressed(MouseButton.Right)) PutHeldWeaponDown();
+        else if (Raylib.IsKeyPressed(KeyboardKey.Escape)) ReturnToCards();
+        else if (Raylib.IsKeyPressed(KeyboardKey.C)) PutHeldWeaponDown();
 
         _renderSw.Restart();
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
@@ -980,9 +978,6 @@ public sealed class GameSession
         if (_heldWeapon.Length == 0)
             return $"Nothing in hand: click a mounted turret to take it down · {exit}";
 
-        if (_heldIsCardWeapon || !cargo.Holds(_heldWeapon))
-            return $"{gun} in hand: the ringed mounts fit it · {exit}";
-
         return $"{gun} in hand: click a mount to fit it, a filled mount swaps · {exit}";
     }
 
@@ -992,15 +987,6 @@ public sealed class GameSession
     private void ApplyMountClick(MountMenuRenderer.SlotMarker marker)
     {
         string placingName = _heldWeapon;
-
-        // R23: one gun of each type aboard, mounted or in cargo. A gun coming out of cargo is a move,
-        // not a copy, so only a fresh one can break the rule — and only a scripted hand can deal a gun
-        // the ship already has. The click is refused and the weapon stays in hand.
-        if (placingName.Length > 0 && FreshCopyAlreadyAboard(placingName))
-        {
-            DiagnosticLogger.LogEvent("MOUNT", $"{placingName} is already aboard — the ship holds one gun of each type");
-            return;
-        }
 
         var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
         float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
@@ -1013,7 +999,6 @@ public sealed class GameSession
             WriteCargo(ReadCargo().With(taken));
             TurretMount.Unmount(_em, marker.SlotEntity);
             _heldWeapon = taken.WeaponName;
-            _heldIsCardWeapon = false;
             DiagnosticLogger.LogEvent("MOUNT", $"{taken.WeaponName} taken off {marker.Slot.Name} into cargo");
             return;
         }
@@ -1023,14 +1008,9 @@ public sealed class GameSession
         {
             WriteCargo(ReadCargo().With(displaced));
             _heldWeapon = displaced.WeaponName;
-            _heldIsCardWeapon = false;
             DiagnosticLogger.LogEvent("MOUNT", $"{displaced.WeaponName} displaced from {marker.Slot.Name} into cargo");
         }
-        else
-        {
-            _heldWeapon = "";
-            _heldIsCardWeapon = false;
-        }
+        else _heldWeapon = "";
 
         if (ReadCargo().TryFind(placingName, out var carried))
         {
@@ -1038,58 +1018,18 @@ public sealed class GameSession
             TurretMount.Mount(_em, marker.SlotEntity, marker.Slot, carried, playerPos, hullRotation);
             DiagnosticLogger.LogEvent("MOUNT", $"{carried.WeaponName} mounted out of cargo in {marker.Slot.Name}");
         }
-        else if (WeaponType.FromName(placingName) is { } fresh)
-        {
-            TurretMount.Mount(_em, marker.SlotEntity, marker.Slot, fresh, playerPos, hullRotation);
-            DiagnosticLogger.LogEvent("MOUNT", $"new weapon {fresh.Name} mounted in {marker.Slot.Name}");
-        }
 
     }
 
-    // Right-click puts the held weapon down. A weapon a bundle paid for cannot simply be dropped: it goes to
-    // cargo, where it waits for a mount.
-    private void DropHold()
-    {
-        if (_heldIsCardWeapon)
-        {
-            StoreHeldInCargo();
-            return;
-        }
-
-        _heldWeapon = "";
-    }
-
-    private void StoreHeldInCargo()
+    // Right-click and C put the held weapon down. It is already in cargo — a bundle's new gun went there when the
+    // bundle was taken, a gun taken off the hull goes there as it comes off — so putting it down costs the player
+    // nothing and leaves it ready to pick up again in the same visit.
+    private void PutHeldWeaponDown()
     {
         if (_heldWeapon.Length == 0) return;
 
-        string stored = _heldWeapon;
-        var cargo = ReadCargo();
-
-        // R23: cargo counts as aboard too, so a fresh copy of a type the ship already holds may not
-        // join it. The weapon stays in hand, the same refusal a mount click gets.
-        if (FreshCopyAlreadyAboard(stored))
-        {
-            DiagnosticLogger.LogEvent("MOUNT", $"{stored} is already aboard — the ship holds one gun of each type");
-            return;
-        }
-
-        // A weapon from a card has never been on the hull, so it enters cargo as a fresh turret; one
-        // taken off the hull is already there with its upgrades.
-        if (!cargo.Holds(stored) && WeaponType.FromName(stored) is { } fresh)
-            WriteCargo(cargo.With(TurretMount.CarriedTurret(fresh)));
-
-        _heldIsCardWeapon = false;
+        DiagnosticLogger.LogEvent("MOUNT", $"{_heldWeapon} put down in cargo");
         _heldWeapon = "";
-        DiagnosticLogger.LogEvent("MOUNT", $"{stored} stored in cargo");
-    }
-
-    // Leaving the mount screen. A bundle's weapon is already paid for, so a weapon still in hand goes to
-    // cargo rather than vanishing with the screen.
-    private void LeaveMountsScreen()
-    {
-        if (_heldIsCardWeapon) StoreHeldInCargo();
-        ReturnToCards();
     }
 
     private void OpenMountsFromStats()
@@ -1097,21 +1037,12 @@ public sealed class GameSession
         _upgradeStep = UpgradeStep.Mounts;
         _mountsFromStats = true;
         _heldWeapon = "";
-        _heldIsCardWeapon = false;
     }
 
     private WeaponCargo ReadCargo() =>
         _em.TryGetComponent<WeaponCargo>(_playerEntity, out var cargo) ? cargo : WeaponCargo.Empty;
 
     private void WriteCargo(WeaponCargo cargo) => _em.AddComponent(_playerEntity, cargo);
-
-    // R23: only a fresh weapon — neither in cargo nor on the hull — can add a second copy of a type.
-    // Cargo↔mount moves relocate the one copy, and a real upgrade hand never names a gun the ship owns,
-    // so this only ever bites for a scripted bench hand.
-    private bool FreshCopyAlreadyAboard(string weaponName) =>
-        !ReadCargo().Holds(weaponName)
-        && WeaponType.FromName(weaponName) is { } weapon
-        && TurretMount.AlreadyAboard(_worldView, weapon.Name);
 
     private static int ReadChoiceSelection(int hoveredIndex)
     {
@@ -1146,10 +1077,13 @@ public sealed class GameSession
         return -1;
     }
 
-    // A bundle is taken whole: the weak half lands at once, and the strong half lands too unless it offers a
-    // new gun, which the player then fits on the hull or leaves in cargo. The level is spent the moment the
-    // bundle is taken, so the pending choice goes before anything is applied — there is no second pick left
-    // to see a half-finished one (plans/UPGRADE_BUNDLE_PAIRS.md §6).
+    // A bundle is taken whole. Everything naming the ship or a gun aboard lands at once, and a new gun — which
+    // either half may offer (plans/PREUPGRADED_NEW_WEAPONS.md D5) — arrives as a turret in cargo carrying the
+    // upgrades its card printed, for the player to fit on the hull or leave there. The other cards land
+    // **first**, so an upgrade spent on a gun a new gun then displaces travels to cargo with that gun instead of
+    // being dropped on the floor. The level is spent the moment the bundle is taken, so the pending choice goes
+    // before anything is applied — there is no second pick left to see a half-finished one
+    // (plans/UPGRADE_BUNDLE_PAIRS.md §6).
     private void ChooseBundle(int selectedIndex, bool autoMountInSlot)
     {
         if (!_em.GetEntitiesWithComponents<PendingChoice, PendingUpgradeOptions>().TryFirst(out var choiceTuple)) return;
@@ -1163,36 +1097,55 @@ public sealed class GameSession
         DiagnosticLogger.LogEvent("UPGRADE",
             $"bundle {selectedIndex + 1} taken: {UpgradeOffer.FormatChoice(bundle.Powerful)} + {UpgradeOffer.FormatChoice(bundle.Weak)}");
 
-        // The new gun of the pair — whichever side it sits on — is only half a grant: it goes into hand for the
-        // player to fit on the hull or leave in cargo. Everything else lands immediately, and it lands **first**,
-        // so an upgrade spent on a gun the new gun then displaces travels to cargo with that gun instead of
-        // being dropped on the floor.
-        var (toMount, toApply) = SplitBundle(bundle);
-        foreach (var card in toApply)
-            ApplyUpgrade(_em, _playerEntity, card);
+        foreach (var card in BundleCards(bundle))
+            if (!card.IsNewWeapon) ApplyUpgrade(_em, _playerEntity, card);
 
-        if (toMount is not { } held) return;
-        if (WeaponType.FromName(held.WeaponName) is not { } gun) return;
+        // In bundle order, so the large gun of a two-gun bundle is the one put in hand and the small one waits in
+        // cargo — where the mount screen lets the player pick it up and fit it in the same visit.
+        foreach (var card in BundleCards(bundle))
+            if (card.IsNewWeapon) TakeNewWeaponCard(card, autoMountInSlot);
+    }
 
-        DiagnosticLogger.LogEvent("UPGRADE", $"weapon {gun.Name} in hand: mount it or store it in cargo");
+    static UpgradableOption[] BundleCards(UpgradeBundle bundle) => [bundle.Powerful, bundle.Weak];
 
-        if (autoMountInSlot)
+    // The grant of a new-weapon card: `NewWeaponGrant` builds the gun with the upgrades its card printed, counts
+    // them on the ship, and puts it in cargo — paid for, so leaving the mount screen must not lose it. Then either
+    // a perf scenario fits it into the first free mount (it never pauses) or the mount screen opens holding it,
+    // while a second new gun of the same bundle waits in the cargo list of that same visit.
+    private void TakeNewWeaponCard(UpgradableOption card, bool autoMountInSlot)
+    {
+        if (WeaponType.FromName(card.WeaponName) is not { } gun) return;
+
+        if (!NewWeaponGrant.TryGrant(_em, _playerEntity, card, out var carried))
         {
-            MountIntoFirstFit(gun);
+            DiagnosticLogger.LogEvent("MOUNT", $"{gun.Name} is already aboard — the ship holds one gun of each type");
             return;
         }
 
-        _heldWeapon = gun.Name;
-        _heldIsCardWeapon = true;
+        DiagnosticLogger.LogEvent("UPGRADE", $"weapon {gun.Name} arrives{UpgradeOffer.FormatArriving(card.PreApplied)}");
+
+        if (autoMountInSlot)
+        {
+            MountInFirstFreeSlot(gun, carried);
+            return;
+        }
+
+        if (_heldWeapon.Length == 0) _heldWeapon = gun.Name;
         _mountsFromStats = false;
         _upgradeStep = UpgradeStep.Mounts;
     }
 
-    // At most one card of a bundle needs the mount screen, because the deal never pairs two new guns.
-    static (UpgradableOption? ToMount, UpgradableOption[] ToApply) SplitBundle(UpgradeBundle bundle) =>
-        bundle.Powerful.IsNewWeapon ? (bundle.Powerful, [bundle.Weak])
-            : bundle.Weak.IsNewWeapon ? (bundle.Weak, [bundle.Powerful])
-            : (null, [bundle.Powerful, bundle.Weak]);
+    // Perf scenarios never pause: fit the arriving gun — already in cargo — into the first mount that is free for
+    // it, which is the same cargo-to-mount move the player makes by hand. A hull that is full keeps it in cargo.
+    private void MountInFirstFreeSlot(WeaponType gun, Turret carried)
+    {
+        var free = TurretMount.FreeSlots(_worldView, gun.Size);
+        if (free.Count == 0 || !TurretMount.TryFindSlot(_worldView, free[0].Name, out var freeSlot)) return;
+
+        WriteCargo(ReadCargo().Without(gun.Name));
+        TurretMount.Mount(_em, freeSlot, free[0], carried,
+            _em.GetComponent<Position>(_playerEntity).Value, _em.GetComponent<Rotation>(_playerEntity).Angle);
+    }
 
     // The mount screen is done with. Whatever was in hand is already mounted or in cargo, so dropping the
     // hold loses nothing the player owns.
@@ -1200,32 +1153,7 @@ public sealed class GameSession
     {
         _upgradeStep = UpgradeStep.Cards;
         _heldWeapon = "";
-        _heldIsCardWeapon = false;
         _mountsFromStats = false;
-    }
-
-    // Perf scenarios never pause: fit the weapon into the first mount that is free, and if the hull is
-    // full let it ride in cargo until the player makes room.
-    private void MountIntoFirstFit(WeaponType weapon)
-    {
-        // R23: neither a mount nor cargo may take a second copy of a type the ship already holds.
-        if (TurretMount.AlreadyAboard(_worldView, weapon.Name))
-        {
-            DiagnosticLogger.LogEvent("MOUNT", $"{weapon.Name} is already aboard — the ship holds one gun of each type");
-            return;
-        }
-
-        var playerPos = _em.GetComponent<Position>(_playerEntity).Value;
-        float hullRotation = _em.GetComponent<Rotation>(_playerEntity).Angle;
-
-        var free = TurretMount.FreeSlots(_worldView, weapon.Size);
-        if (free.Count > 0 && TurretMount.TryFindSlot(_worldView, free[0].Name, out var freeSlot))
-        {
-            TurretMount.Mount(_em, freeSlot, free[0], weapon, playerPos, hullRotation);
-            return;
-        }
-
-        WriteCargo(ReadCargo().With(TurretMount.CarriedTurret(weapon)));
     }
 
     private void ClearPendingChoices()
@@ -1252,53 +1180,17 @@ public sealed class GameSession
 
         switch (upgrade.Stat)
         {
+            // A card that names a gun reaches every mount of it. The math is `WeaponUpgrade.ApplyStat` — the
+            // one function that also builds a gun arriving already upgraded and prints that gun's numbers on
+            // the card, so a bought card and an arriving upgrade cannot disagree (R10).
             case UpgradeOption.FireRate:
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    // A volley gun grows a shot per card; a guided volley stops at the round budget
-                    // (R17/R18), and a gun whose volley never grows takes the card as a faster rate.
-                    bool grows = turret.Weapon.CanGrowSalvo;
-                    int newPelletCount = grows ? turret.Weapon.PelletCount + 1 : turret.Weapon.PelletCount;
-                    float newFireRate = grows ? turret.Weapon.FireRate : turret.Weapon.FireRate * def.Multiplier;
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { FireRate = newFireRate, PelletCount = newPelletCount } });
-                }
-                break;
-
             case UpgradeOption.ProjectileSpeed:
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { AmmoSpeed = turret.Weapon.AmmoSpeed * def.Multiplier } });
-                break;
-
-            case UpgradeOption.MissileHealth:
-                // The card is bought for the mount, so it lands on the rounds the mount fires next and
-                // not on the ones already in the air. Its step is a percent of the gun's **base** round
-                // health, so it is added rather than compounded: a second card buys exactly as much as
-                // the first, and a gun that starts with a tougher round buys more of it.
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    if (WeaponType.FromName(turret.WeaponName) is not { } gun) continue;
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { MissileHealth = turret.Weapon.MissileHealth + gun.MissileHealthStep } });
-                }
-                break;
-
-            case UpgradeOption.PickupRadius:
-                em.AddComponent(playerEntity, playerStats with { PickupRadius = playerStats.PickupRadius * def.Multiplier });
-                break;
-
             case UpgradeOption.Range:
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, turret with { Range = turret.Range * def.Multiplier, Weapon = turret.Weapon with { ShotLifetime = turret.Weapon.ShotLifetime * def.Multiplier } });
-                break;
-
             case UpgradeOption.Damage:
-                // R33: the step is a percent of the gun's **base** damage, sized by mount class, so cards
-                // stack on the table value instead of on each other and a support chip never multiplies
-                // itself the way a flat +1 once did.
+            case UpgradeOption.MissileHealth:
+            case UpgradeOption.ArmorPierce:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                {
-                    if (WeaponType.FromName(turret.WeaponName) is not { } gun) continue;
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Damage = turret.Weapon.Damage + gun.DamageStep } });
-                }
+                    em.AddComponent(turretEntity, WeaponUpgrade.ApplyStat(turret, upgrade.Stat));
                 break;
 
             case UpgradeOption.Hp:
@@ -1329,13 +1221,6 @@ public sealed class GameSession
                     : new Shield(Points: 0f, Max: 0, Offline: 0f);
                 int shieldStep = UpgradeDefinition.DefenceStep(UpgradeOption.Shield, upgrade.Tier);
                 em.AddComponent(playerEntity, ShieldRules.WithCard(boughtShield, shieldStep));
-                break;
-
-            case UpgradeOption.ArmorPierce:
-                // The card names a gun; every mount of it pierces the same. Flat +4 on the live copy,
-                // cards adding on each other — the ceiling guard lives in the offer (R19's rule).
-                foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, turret with { Weapon = turret.Weapon with { Pierce = turret.Weapon.Pierce + def.Additive } });
                 break;
 
             case UpgradeOption.ForwardAcceleration:

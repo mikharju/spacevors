@@ -6,11 +6,18 @@ public readonly record struct Health(int Current, int Max);
 
 public readonly record struct PendingChoice;
 
-// IsNewWeapon: the card offers the weapon itself, so the player then picks the hull slot to mount it in.
+// IsNewWeapon: the card offers the weapon itself, so the player then fits it on the hull or leaves it in cargo.
 // Tier: only `Armor` and `Shield` read it — the step this card grants, stamped when it was dealt
 // (plans/UPGRADE_BUNDLE_PAIRS.md §2). It rides on the card so the label and the grant read one number.
+// PreApplied: what a new gun already carries when the card is dealt to a hull that cannot fit it
+// (plans/PREUPGRADED_NEW_WEAPONS.md). Because the set is part of the card, one gun dealt as two different sets
+// is two different cards — which is what lets a hand offer several builds of the same unowned gun.
 public readonly record struct UpgradableOption(
-    string WeaponName, UpgradeOption Stat, bool IsNewWeapon = false, DefenceTier Tier = DefenceTier.Ordinary);
+    string WeaponName,
+    UpgradeOption Stat,
+    bool IsNewWeapon = false,
+    DefenceTier Tier = DefenceTier.Ordinary,
+    WeaponPreUpgrade PreApplied = WeaponPreUpgrade.None);
 
 // What a level offers: a pair of cards taken together — one powerful (a kill gun's upgrade, a new large gun,
 // a defence card) and one weak (a chip's upgrade, a new small gun, an engine or utility card, `Hp`). The

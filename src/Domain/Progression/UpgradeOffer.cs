@@ -22,7 +22,10 @@ namespace Spacevors.Domain.Systems;
 // more. The pools are built in the order the promises are made, so "a bundle carries a new large gun" and
 // "both classes grow" fall out of the ordering instead of a special case. A side that runs dry repeats a card
 // it has already dealt rather than dealing a short hand (plans/UPGRADE_BUNDLE_DUPLICATES.md) — never a
-// powerful+powerful or weak+weak pair, never the same pair twice, and never a repeated new weapon.
+// powerful+powerful or weak+weak pair, never the same pair twice, and never the same **build** of a new gun
+// twice. A bundle may carry two new guns at once, a large one and a small one, and a new gun dealt to a hull
+// that cannot fit one arrives carrying upgrades — which is what makes it a second build of that gun rather than
+// the same card again (plans/PREUPGRADED_NEW_WEAPONS.md).
 public static class UpgradeOffer
 {
     // A level is dealt five bundles and takes one of them (plans/UPGRADE_BUNDLE_PAIRS.md §1). The XP cost is
@@ -36,8 +39,10 @@ public static class UpgradeOffer
     // The shield pool unlocks a tier later than armor (plans/SHIELDS.md): the same beat as the `UnlockLevel:
     // 10` guided guns, which is where a run starts meeting fire heavy enough for a pool to be worth banking.
     const int ShieldUnlockLevel = 10;
-    // A hand never carries more than three new weapons of one class. Whether they fit a free hull mount is
-    // the player's problem, not the hand's: a weapon that does not fit rides in the cargo until swapped in.
+    // A hand never carries more than three new weapons of one class. Whether they fit a free hull mount used to
+    // be the player's problem and nothing else: a weapon that does not fit rides in the cargo until swapped in.
+    // On a hull that cannot fit one it now also arrives carrying upgrades (plans/PREUPGRADED_NEW_WEAPONS.md), so
+    // the same unowned gun can be on offer two or three times as two different builds of itself.
     const int MaxNewWeaponCardsPerClass = 3;
     // How often one gun may be named on one side of the five bundles. The strong side may name a kill gun
     // three times, because its four legal stat cards are exactly the variety a build decision is made of;
@@ -61,6 +66,11 @@ public static class UpgradeOffer
     enum CardKind { HullHp, HullDefence, Utility, SupportWeapon, KillWeapon, DamageKill, DamageSupport, NewLargeWeapon, NewSmallWeapon }
 
     public static bool IsMilestoneLevel(int level) => level % MilestoneLevelInterval == 0;
+
+    // Whether pierce cards may be dealt at all — the same beat as tier-2 hulls and the first milestone hand
+    // (plans/ARMOR_AND_PIERCE.md). One home for the gate, because a gun's legal upgrade set is asked about both by
+    // the stat cards and by the upgrades an arriving gun carries.
+    public static bool PierceUnlockedAt(int level) => level >= ArmorUnlockLevel;
 
     /// The bundles for `level`, or null when nothing can be offered (a ship with no turret at all), which is
     /// the case where a level-up must not be consumed. `why` labels the diagnostic row.
@@ -146,7 +156,7 @@ public static class UpgradeOffer
         {
             var strong = powerful[0];
             powerful.RemoveAt(0);
-            if (TryTakeWeakFor(weak, strong, out var weakCard)) bundles.Add(new UpgradeBundle(strong, weakCard));
+            if (TryTakeWeak(weak, out var weakCard)) bundles.Add(new UpgradeBundle(strong, weakCard));
         }
 
         return bundles;
@@ -174,9 +184,8 @@ public static class UpgradeOffer
             foreach (var weak in Candidates(hand, weakLeft, powerful: false))
             {
                 if (strong == weak) continue;                                     // one card, granted twice
-                if (strong.IsNewWeapon && weak.IsNewWeapon) continue;             // two new guns, two mount trips
-                if (strong.IsNewWeapon && IsDealt(hand, strong)) continue;        // a new gun is offered once
-                if (weak.IsNewWeapon && IsDealt(hand, weak)) continue;
+                if (strong.IsNewWeapon && IsDealt(hand, strong)) continue;        // one build of a gun per hand
+                if (weak.IsNewWeapon && IsDealt(hand, weak)) continue;            // — per build, not per gun
                 if (hand.Any(dealt => dealt.Powerful == strong && dealt.Weak == weak)) continue;
 
                 return new UpgradeBundle(strong, weak);
@@ -267,21 +276,21 @@ public static class UpgradeOffer
     static bool NamesGunTimes(List<UpgradableOption> pool, string weaponName, int maxPerGun) =>
         weaponName.Length > 0 && pool.Count(other => other.WeaponName == weaponName) >= maxPerGun;
 
-    // Take the first weak half that leaves the bundle carrying one new gun at most. Two new guns would need two
-    // mount trips at once, and the mount screen settles one weapon. Nothing else can go wrong inside a pair:
-    // the weak half is applied **before** the strong half is mounted, so an upgrade spent on a gun that the new
-    // gun then displaces rides into cargo with that gun instead of vanishing (plans/UPGRADE_BUNDLE_PAIRS.md §3.7).
-    static bool TryTakeWeakFor(List<UpgradableOption> weak, UpgradableOption powerful, out UpgradableOption taken)
+    // The weak half a strong half pairs with, in pool order — the order is the promise, so the first card still
+    // in the weak pool is the one that pairs. A bundle may carry two new guns (plans/PREUPGRADED_NEW_WEAPONS.md
+    // D5): a new large gun is always the strong half and a new small one always the weak, so a pair of two new
+    // guns is still one of each side, and both are granted — the mount screen places one and leaves the other in
+    // cargo, where the player may pick it up in the same visit because moving guns is free.
+    static bool TryTakeWeak(List<UpgradableOption> weak, out UpgradableOption taken)
     {
-        int index = weak.FindIndex(candidate => !(powerful.IsNewWeapon && candidate.IsNewWeapon));
-        if (index < 0)
+        if (weak.Count == 0)
         {
             taken = default;
             return false;
         }
 
-        taken = weak[index];
-        weak.RemoveAt(index);
+        taken = weak[0];
+        weak.RemoveAt(0);
         return true;
     }
 
@@ -309,8 +318,8 @@ public static class UpgradeOffer
             [CardKind.KillWeapon] = [],
             [CardKind.DamageKill] = [],
             [CardKind.DamageSupport] = [],
-            [CardKind.NewLargeWeapon] = NewGunOptions(owned, level, TurretSize.Large, view.Rng),
-            [CardKind.NewSmallWeapon] = NewGunOptions(owned, level, TurretSize.Small, view.Rng)
+            [CardKind.NewLargeWeapon] = NewGunOptions(owned, level, TurretSize.Large, view, playerEntity, turrets),
+            [CardKind.NewSmallWeapon] = NewGunOptions(owned, level, TurretSize.Small, view, playerEntity, turrets)
         };
 
         foreach (var turret in turrets.DistinctBy(t => t.WeaponName))
@@ -377,44 +386,18 @@ public static class UpgradeOffer
     static int CurrentShieldMax(WorldView view, Entity playerEntity) =>
         view.TryGetComponent<Shield>(playerEntity, out var shield) ? shield.Max : 0;
 
-    // The per-gun stat cards, gated exactly as they always were — a card the rules would refuse to honour
-    // is never dealt, so an empty pool is honest rather than a bug.
+    // The per-gun stat cards, gated by `WeaponUpgrade.LegalStats` — the same legality an arriving upgrade is
+    // sampled from, so a card the rules would refuse to honour is never dealt and an empty pool is honest rather
+    // than a bug (R18 volley budget, R19 ceilings, R29 support roof, pierce from level 5). `Damage` is not in
+    // this list: R33 keeps it milestone-only, and `AddDamageCards` builds it into its own buckets.
     static void AddStatCards(Dictionary<CardKind, List<UpgradableOption>> buckets, Turret turret, int level)
     {
-        var stats = turret.Weapon;
         var cards = buckets[KindFor(turret)];
 
-        // R18: a guided volley that has reached its round budget (R17) would be offered a "+1 shot" card
-        // it cannot honour, so the card is withdrawn and the gun keeps the others. Guns whose volleys
-        // never grow always have a working rate card.
-        if (!SalvoCardIsDead(stats))
-            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.FireRate));
-
-        // A hitscan beam has no travelling projectile: the card would multiply AmmoSpeed 0 by 1.3 and be
-        // a dead choice.
-        if (!stats.Hitscan)
-            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.ProjectileSpeed));
-
-        // R19: only a guided round has hit points to raise, and only while the next whole step still lands
-        // at or under the ceiling. The step is the gun's percent of its **base** round health (R33's
-        // shape), read off the table, so a mount that already bought a card is offered the same honest
-        // step again.
-        if (WeaponType.FromName(turret.WeaponName) is { } gun && stats.CanToughenRound(gun.MissileHealthStep))
-            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.MissileHealth));
-
-        // R29: a support gun stops at its class roof (R24/R26). The Range card stretches the shot's
-        // lifetime as well as its range, so withdrawing it at the roof caps the chip's live rounds too —
-        // which is the same reason the card is withdrawn at R18/R19: never a card the rules would refuse.
-        if (!turret.IsSupport || turret.Range * UpgradeDefinition.Range.Multiplier <= WeaponType.SupportRangeCeiling)
-            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.Range));
-
-        // plans/ARMOR_AND_PIERCE.md: pierce is the level-5 answer to the armored hull. Against
-        // unarmored targets it is worth nothing, so it cannot move R25's class line, and at the
-        // ceiling it is withdrawn rather than dealt as a lie (R19's rule). Both classes may buy it —
-        // a screened chip is the one that most often wants the armored heavy dead fast.
-        if (level >= ArmorUnlockLevel && stats.CanPierceMore(UpgradeDefinition.ArmorPierce.Additive))
-            cards.Add(new UpgradableOption(turret.WeaponName, UpgradeOption.ArmorPierce));
+        foreach (var stat in WeaponUpgrade.LegalStats(WeaponType.FromName(turret.WeaponName), turret, PierceUnlockedAt(level)))
+            cards.Add(new UpgradableOption(turret.WeaponName, stat));
     }
+
 
     static CardKind KindFor(Turret turret) => turret.IsSupport ? CardKind.SupportWeapon : CardKind.KillWeapon;
 
@@ -438,17 +421,76 @@ public static class UpgradeOffer
         return owned;
     }
 
-    // New-weapon cards for one mount class: anything the ship does not already own, mounted or in cargo,
-    // drawn from the pool this level has unlocked. Capping the bucket is what makes "a hand never carries
-    // more than three new guns of a class" structural rather than a matter of luck. Splitting it by size is
-    // what lets a milestone hand promise a large gun to switch into on a hull with one large mount, and which
+    // New-weapon cards for one mount class: anything the ship does not already own, mounted or in cargo, drawn
+    // from the pool this level has unlocked. R23 cuts both ways here (plans/PREUPGRADED_NEW_WEAPONS.md D8): a gun
+    // the ship owns is never dealt back as a new weapon in any other build — it reaches a hand as its own upgrade
+    // card instead, and at a milestone as its `Damage` card. Capping the bucket is what makes "a hand never
+    // carries more than three new guns of a class" structural rather than a matter of luck. Splitting it by size
+    // is what lets a milestone hand promise a large gun to switch into on a hull with one large mount, and which
     // half of the bundle the gun belongs to.
-    private static List<UpgradableOption> NewGunOptions(List<string> ownedNames, int level, TurretSize size, Random rng)
+    //
+    // A gun dealt to a hull that cannot fit it arrives carrying upgrades (`ArrivingUpgrades` below), and the set
+    // is part of the card — so the same unowned gun may be dealt again as a second build of itself while an
+    // identical build is never dealt twice.
+    private static List<UpgradableOption> NewGunOptions(
+        List<string> ownedNames, int level, TurretSize size, WorldView view, Entity playerEntity, List<Turret> turrets)
     {
         var pool = WeaponType.NewWeaponPoolFor(level).Where(w => w.Size == size && !ownedNames.Contains(w.Name)).ToList();
-        Shuffle(pool, rng);
+        Shuffle(pool, view.Rng);
 
-        return [.. pool.Take(MaxNewWeaponCardsPerClass).Select(w => new UpgradableOption(w.Name, UpgradeOption.Damage, IsNewWeapon: true))];
+        int arriving = ArrivingUpgrades(view, playerEntity, size);
+        var cards = new List<UpgradableOption>();
+        for (int round = 0; round < MaxNewWeaponCardsPerClass && cards.Count < MaxNewWeaponCardsPerClass; round++)
+        {
+            foreach (var gun in pool)
+            {
+                if (cards.Count >= MaxNewWeaponCardsPerClass) break;
+
+                var preApplied = ArrivingSet(gun, arriving, level, view.Rng);
+                if (cards.Exists(card => card.WeaponName == gun.Name && card.PreApplied == preApplied)) continue;
+                cards.Add(new UpgradableOption(gun.Name, UpgradeOption.Damage, IsNewWeapon: true, PreApplied: preApplied));
+            }
+
+            // A plain gun is dealt once per gun, exactly as it always was: only an arriving set makes a second
+            // card for the same weapon a different offer.
+            if (arriving == 0) break;
+        }
+
+        return cards;
+    }
+
+    // How many upgrades a new gun of this size arrives with (plans/PREUPGRADED_NEW_WEAPONS.md D1/D2): none while a
+    // mount the gun fits is free, because a new gun that is pure addition is not a replacement and the punishing
+    // case is only the one where it must displace something. Otherwise half, rounded up, of the upgrades on the
+    // **least** upgraded gun standing in a mount this gun could take. "Least" is what stops a run of swap-after-
+    // swap from compounding, and only mounted guns count: a cargo gun does not fire and is never offered upgrades.
+    static int ArrivingUpgrades(WorldView view, Entity playerEntity, TurretSize size)
+    {
+        if (TurretMount.FreeSlots(view, size).Count > 0) return 0;
+
+        var counts = view.TryGetComponent<UpgradeCounts>(playerEntity, out var held) ? held : UpgradeCounts.Empty;
+        var displaceable = TurretMount.MountedSlots(view).Where(slot => TurretMount.Fits(slot.Slot.Size, size)).ToList();
+        if (displaceable.Count == 0) return 0;
+
+        return (displaceable.Min(slot => WeaponUpgrade.CountOn(counts, slot.WeaponName)) + 1) / 2;
+    }
+
+    // Which upgrades they are (D3): a random sample, without replacement, of the gun's own legal stat cards at its
+    // table stats — the same gates that withdraw a bought card the rules could not honour (R18/R19/R29, pierce
+    // from level 5). `Damage` joins the sample only at a milestone level, which keeps R33 whole: a damage step is a
+    // milestone step, and a new gun with no free mount of its size is only ever dealt by a milestone hand. A gun
+    // has a handful of legal stats, so a big count is capped by that set rather than repeating a stat: 0.5 × N is a
+    // target, and R10 is the bound.
+    static WeaponPreUpgrade ArrivingSet(WeaponType gun, int count, int level, Random rng)
+    {
+        if (count <= 0) return WeaponPreUpgrade.None;
+
+        var legal = WeaponUpgrade.LegalStats(gun, TurretMount.CarriedTurret(gun), PierceUnlockedAt(level));
+        if (IsMilestoneLevel(level)) legal.Add(UpgradeOption.Damage);
+        Shuffle(legal, rng);
+
+        return legal.Take(Math.Min(count, legal.Count))
+            .Aggregate(WeaponPreUpgrade.None, (mask, stat) => mask | WeaponUpgrade.BitOf(stat));
     }
 
     static bool SameBundles(UpgradeBundle[] a, UpgradeBundle[] b) =>
@@ -475,11 +517,27 @@ public static class UpgradeOffer
 
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
-    private static UpgradableOption? ParseEntry(string entry)
+    /// One `SPACEVORS_DIAG_UPGRADES` entry: a gun name (`RailGun`), a gun with the upgrades it arrives with
+    /// (`RailGun+FireRate+Damage`), or a stat card (`FireRate:MachineGun`). Public so a test can pin the syntax the
+    /// bench depends on without setting process-wide environment variables.
+    public static UpgradableOption? ParseEntry(string entry)
     {
-        // A script names a gun directly and ignores its unlock level: the script is a test bench.
-        if (entry != WeaponType.LoadTestWeapon.Name && WeaponType.FromName(entry) is not null)
-            return new UpgradableOption(entry, UpgradeOption.Damage, IsNewWeapon: true);
+        // A script names a gun directly and ignores its unlock level: the script is a test bench. With `+Stat`
+        // after the name it also says what that gun arrives carrying, which is how a scripted hand can put an
+        // arriving build in front of the mount screen (plans/PREUPGRADED_NEW_WEAPONS.md).
+        string[] pieces = entry.Split('+', StringSplitOptions.TrimEntries);
+        if (pieces[0] != WeaponType.LoadTestWeapon.Name && WeaponType.FromName(pieces[0]) is not null)
+        {
+            var mask = WeaponPreUpgrade.None;
+            foreach (string piece in pieces[1..])
+            {
+                if (!Enum.TryParse<UpgradeOption>(piece, ignoreCase: true, out var arriving)) return null;
+                if (WeaponUpgrade.BitOf(arriving) == WeaponPreUpgrade.None) return null;   // not an upgrade a gun carries
+                mask |= WeaponUpgrade.BitOf(arriving);
+            }
+
+            return new UpgradableOption(pieces[0], UpgradeOption.Damage, IsNewWeapon: true, PreApplied: mask);
+        }
 
         var parts = entry.Split(':');
         if (parts.Length != 2 || !Enum.TryParse<UpgradeOption>(parts[0], ignoreCase: true, out var stat))
@@ -489,19 +547,21 @@ public static class UpgradeOffer
         return new UpgradableOption(weaponName, stat);
     }
 
-    // R18: a growing guided volley that has reached the guided-round budget (R17) cannot take another
-    // shot, so the "+1 shot" card is withdrawn instead of being offered as a lie. Guns whose volleys
-    // never grow (SalvoGrows off) keep the card as a plain rate increase.
-    static bool SalvoCardIsDead(WeaponStats weapon) => weapon.SalvoGrows && weapon.PelletCount > 1 && !weapon.CanGrowSalvo;
-
     public static string FormatChoice(UpgradableOption option)
     {
-        if (option.IsNewWeapon) return $"new:{option.WeaponName}";
+        if (option.IsNewWeapon) return $"new:{option.WeaponName}{FormatArriving(option.PreApplied)}";
         if (option.Stat is UpgradeOption.Armor or UpgradeOption.Shield)
             return $"{FormatStat(option)}(+{Step(option.Stat, option.Tier)} {option.Tier.ToString().ToLowerInvariant()})";
 
         return FormatStat(option);
     }
+
+    // What a new gun arrives with, spelled for the `[UPGRADE]` rows and the mount log: nothing for a plain gun,
+    // the stat names otherwise. No numbers — the card and the stats screen print those, from the stats themselves.
+    public static string FormatArriving(WeaponPreUpgrade mask) =>
+        mask == WeaponPreUpgrade.None
+            ? ""
+            : $"({string.Join("+", WeaponUpgrade.StatsOf(mask).Select(stat => stat.ToString()))})";
 
     static string FormatBundles(IEnumerable<UpgradeBundle> bundles) =>
         string.Join(" | ", bundles.Select(bundle => $"{FormatChoice(bundle.Powerful)} + {FormatChoice(bundle.Weak)}"));

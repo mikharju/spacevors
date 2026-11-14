@@ -28,6 +28,27 @@ public class LevelUpScriptTest
         Assert.Equal(UpgradeOption.FireRate, bundle.Weak.Stat);
     }
 
+    // The bench entry syntax, pinned because checking the arriving-upgrade path by hand depends on it: a bare gun
+    // name arrives plain, `+Stat` says what it arrives carrying, and anything that is not an upgrade a gun can
+    // carry is refused rather than half-parsed.
+    [Theory]
+    [InlineData("RailGun", WeaponPreUpgrade.None)]
+    [InlineData("RailGun+FireRate", WeaponPreUpgrade.FireRate)]
+    [InlineData("RailGun+Damage+Range", WeaponPreUpgrade.Damage | WeaponPreUpgrade.Range)]
+    public void ABenchEntry_NamesAGunAndOptionallyWhatItArrivesWith(string entry, WeaponPreUpgrade expected)
+    {
+        var parsed = UpgradeOffer.ParseEntry(entry);
+
+        Assert.NotNull(parsed);
+        Assert.True(parsed!.Value.IsNewWeapon);
+        Assert.Equal("RailGun", parsed.Value.WeaponName);
+        Assert.Equal(expected, parsed.Value.PreApplied);
+    }
+
+    [Fact]
+    public void ABenchEntry_NamingSomethingAGunCannotCarry_IsRefused()
+        => Assert.Null(UpgradeOffer.ParseEntry("RailGun+Armor"));
+
     [Fact]
     public void ScriptedUpgradesAreConsumedInPairs()
     {
