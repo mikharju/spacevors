@@ -154,18 +154,33 @@ Performance goal is to have initially 10k objects at 120 fps and possibly in the
 Avoid yield return in hot path. Do not refactor existing ones out unless specifically asked, but do not make
 new yield returns. 
 
-## Multi agent work
+## Multi-agent work
 
 Multiple agents may work simultaneously on one code base.
 
-One implementer:
-- Wwns all code changes
-- Owns all docs changes except unrelated plans/*.md changes
-- Planner becomes implementer, when user tells it to implement something
+### Implementer
+- Owns all code changes.
+- Owns all documentation changes except unrelated `plans/*.md` changes.
+- A planner becomes an implementer when the user explicitly asks it to implement something.
+- Must not modify another agent's `plans/*.md` file.
+- When temporarily stashing changes for experimentation, restore them promptly after testing.
 
-Multiple planners/investigators:
-- Owns only one plans/SOME.md file, changes no other files
-- Must not trust uncommitted code changes, they may change often
-- May trust uncommitted docs, they can still change, but not often. Recheck uncommitted plans before final reply.
+### Planners/investigators
+- Each planner owns exactly one `plans/*.md` file.
+- May modify only its own plan file; must not modify code or other documentation.
+- Must not rely on uncommitted code changes, as they may change or disappear at any time.
+- May rely on uncommitted documentation provisionally, but should re-check relevant uncommitted documentation before making a final recommendation.
+- Must clearly distinguish findings based on current code from assumptions about uncommitted changes.
+- If the owned plan file unexpectedly disappears or reverts:
+  1. Do not recreate, overwrite, or otherwise modify it immediately.
+  2. Check whether the file is present in any Git stash. Only inspect stashes; never apply, pop, or drop them.
+  3. If found in a stash, wait for the implementer's experiment to finish and the changes to be restored.
+  4. Periodically check whether the file has reappeared.
+  5. Once restored, re-read it before continuing.
+  6. If the file does not reappear within 10 minutes, stop waiting and report the situation rather than guessing or recreating its contents.
+  7. Include the last complete version of the file that was available to you in the report. Clearly distinguish the report from the recovered file contents.
 
-Before beginning implementation, check workspace for uncommitted unrelated code changes. If those are found, stop implementation and ask user what to do with them.
+### Before implementation
+- Check the workspace for uncommitted changes.
+- If unrelated uncommitted code changes are present, stop and ask the user what to do before modifying code.
+- Do not overwrite, revert or otherwise modify another agent's uncommitted changes.
