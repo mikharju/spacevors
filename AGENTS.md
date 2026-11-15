@@ -153,3 +153,19 @@ Optimize only after measuring.
 Performance goal is to have initially 10k objects at 120 fps and possibly in the future 100k objects.
 Avoid yield return in hot path. Do not refactor existing ones out unless specifically asked, but do not make
 new yield returns. 
+
+## Multi agent work
+
+Multiple agents may work simultaneously on one code base.
+
+One implementer:
+- Wwns all code changes
+- Owns all docs changes except unrelated plans/*.md changes
+- Planner becomes implementer, when user tells it to implement something
+
+Multiple planners/investigators:
+- Owns only one plans/SOME.md file, changes no other files
+- Must not trust uncommitted code changes, they may change often
+- May trust uncommitted docs, they can still change, but not often. Recheck uncommitted plans before final reply.
+
+Before beginning implementation, check workspace for uncommitted unrelated code changes. If those are found, stop implementation and ask user what to do with them.
