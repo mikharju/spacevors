@@ -12,12 +12,39 @@ public readonly record struct PendingChoice;
 // PreApplied: what a new gun already carries when the card is dealt to a hull that cannot fit it
 // (plans/PREUPGRADED_NEW_WEAPONS.md). Because the set is part of the card, one gun dealt as two different sets
 // is two different cards — which is what lets a hand offer several builds of the same unowned gun.
+// Power: whether this card is a **super** one, the same upgrade at twice the step, stamped on two halves of
+// every hand (plans/SUPER_UPGRADES.md). Grading a card makes it a different card, so every "same card / same
+// pair / same hand" rule in the offer sees the grade without knowing about it.
 public readonly record struct UpgradableOption(
     string WeaponName,
     UpgradeOption Stat,
     bool IsNewWeapon = false,
     DefenceTier Tier = DefenceTier.Ordinary,
-    WeaponPreUpgrade PreApplied = WeaponPreUpgrade.None);
+    WeaponPreUpgrade PreApplied = WeaponPreUpgrade.None,
+    CardPower Power = CardPower.Base)
+{
+    public bool IsSuper => Power == CardPower.Super;
+
+    /// The one step this card grants: the stat's definition at the defence tier and the power stamped on the
+    /// card. The card's label, the offer's ceiling gates and the grant all read this, so a card can never
+    /// print one number and hand out another (R10). A percent-of-base card still takes its base from the gun —
+    /// `Step.StepForBase(gun.Stats.MissileHealth)` — and a `Damage` card's percent comes from the gun as well.
+    public UpgradeDefinition Step
+    {
+        get
+        {
+            var def = Stat is UpgradeOption.Armor or UpgradeOption.Shield
+                ? UpgradeDefinition.For(Stat) with { Additive = UpgradeDefinition.DefenceStep(Stat, Tier) }
+                : UpgradeDefinition.For(Stat);
+            return def.ScaledBy(Power);
+        }
+    }
+
+    /// A `FireRate` card on a gun whose volley grows buys shots instead of a faster rate, and a super card buys
+    /// two (plans/SUPER_UPGRADES.md D2). Whether the gun can take them is its own budget check; when it cannot,
+    /// the card falls back to the rate multiplier, exactly as an ordinary card does at the budget.
+    public int SalvoShots => IsSuper ? 2 : 1;
+}
 
 // What a level offers: a pair of cards taken together — one powerful (a kill gun's upgrade, a new large gun,
 // a defence card) and one weak (a chip's upgrade, a new small gun, an engine or utility card, `Hp`). The

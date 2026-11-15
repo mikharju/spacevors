@@ -1,9 +1,7 @@
 # SUPER_UPGRADES.md — one super step on each side of every hand
 
-Status: proposed — depends on plans/UPGRADE_BUNDLE_PAIRS.md (shipped, 2026-11-03) for the hand shape and on
-plans/PREUPGRADED_NEW_WEAPONS.md (proposed) for D5; if that plan never ships, D5 falls away and D1-D4, D6-D8 stand
-alone. PLAN.md carries this idea as one line under *Proposed, not implemented*; when this ships, that line becomes
-the index entry and this header becomes `shipped`.
+Status: shipped (2026-11-15) — the `## Shipped` section at the end records what landed, the six places it
+deviates from this memo, and the perf verdict. The decisions below are unchanged.
 
 ## Part 1 — the plan
 
@@ -304,3 +302,74 @@ and the live turret show the doubled step.
   `Damage` cards are excluded from it (D3). New cross-cutting wording goes in that plan, not in ARCHITECTURE.md —
   unless the implementer wants one sentence there that a card's step is resolved once, in Domain.
 - DIAGNOSTICS.md: the `*` suffix and the `(...super)` row format.
+
+## Shipped (2026-11-15)
+
+What landed, in the order the memo asked for it:
+
+- `CardPower { Base, Super }` on `UpgradableOption` as its sixth positional field, defaulting to `Base`, so every
+  existing construction site still compiles and the grade is part of **card identity** for free (record equality →
+  the shipped pair, hand-distinctness and per-gun-cap rules all compare grades).
+- One step resolver: `UpgradableOption.Step` folds the defence tier *and* the grade into the definition the card
+  prints, the deal gates with, and the grant applies. `UpgradeDefinition.Doubled()` doubles the **delta**
+  (`×1.15 → ×1.30`, `+4 pierce → +8`, `+50 % of base → +100 %`), never the factor — so the super step stays inside
+  R10's band instead of inventing a third card size. `SalvoShots` is the same idea for the FireRate card.
+- `MarkSuperHalves` runs after `TopUp` and before `Shuffle`: one powerful half and one weak half, starting the weak
+  walk past the spiked bundle so the two spikes land in different bundles by construction. No new RNG stream, so
+  every seed deals the same hand it dealt before.
+- Every gate is evaluated at the card's own step (D6): support-range roof, guided-volley round budget, round-hp
+  ceiling, pierce ceiling, defence headroom, and the number of upgrades an arriving gun may carry.
+- Defence: a super card on an ordinary level grants exactly the milestone step (+2 armour, +16 shield) and a
+  milestone hand never spikes a defence card (D3). `Damage` cards are never super.
+- New guns: a spiked one arrives with `least` upgrades where an ordinary one brings `⌈least/2⌉` (D5, on top of the
+  now-shipped plans/PREUPGRADED_NEW_WEAPONS.md); `WithBiggerArrivingSet` un-spikes the card when the bigger set is
+  not legal, which is what keeps a plain new gun plain on a hull with a free mount.
+- Bench: a trailing `*` on a `SPACEVORS_DIAG_UPGRADES` stat-card entry benches the grade (`FireRate:MachineGun*`);
+  a `Damage…​*` entry is refused, and `StampDefenceTier` clears the grade at a milestone, so a bench cannot print
+  one step and grant another. `FormatChoice` prints `super ` and the defence step with its tier, e.g.
+  `Armor(+2 milestone)`.
+
+### Deviations from the memo
+
+1. **The highlight is drawn, not spelled.** The plan said print the word in the label. A `super ` prefix pushed
+   long labels past the three-line wrap budget, so words were silently dropped — a card that loses text is a lie.
+   A spiked half is instead marked with a lime band wash, a lime left edge, a small right-aligned `SUPER` tag and a
+   lime value (`Palette.SuperStep/SuperBand/SuperEdge`), and the label is left alone. The word is still there — on
+   the card as a tag and in the log/bench rows as the `super ` prefix. The colour deliberately avoids both existing
+   greens/cyans: the accent means "click this", the mount screen's green means "this gun fits".
+2. **The FireRate card is called "volley size", not "burst size"** (the wording the user suggested). The code and
+   the balance rules already say *volley* (`SalvoGrows`, "growing volley", "+1 shot"), and "Graviton Burst burst
+   size" repeats itself. The value line reads `+1 shot` / `+2 shots`; a gun with a fixed volley still reads
+   "attack speed +15 %".
+3. **A half that is already repeated on its side is never spiked.** Grading a repeated half makes it a *fourth
+   distinct card for one gun on a side capped at three* and hides the repeat a thin pool is supposed to show; the
+   shipped `HandCompositionTest` cap and repeat tests caught it. The spike goes to a half that stands alone
+   (`CopiesOnSide`).
+4. **A milestone hand on a hull with a free mount may carry no spike at all.** Its cards are `Damage` cards and new
+   guns arriving plain, and D3/D5 plus pre-upgrade D1 refuse to double any of them. `SuperUpgradeTest` pins that as
+   the one legitimate exception instead of quietly loosening the rule.
+5. **`GameSession.ApplyUpgrade` is public for the tests.** A hull-wide card whose case goes missing was previously
+   invisible until a run noticed a number never moving — and making it reachable found a live regression: commit
+   `bb5d0df` dropped `case UpgradeOption.PickupRadius:`, so those cards counted but granted nothing. The case is
+   back and pinned by `PickupRadiusCard_GrowsTheMagnetField`.
+6. **The same predicate now decides three things.** `WeaponType.CanGrowSalvoBy(shots)` (with `GrowsVolley` for the
+   label) is read by the grant, the deal's gate and the renderer, so a card cannot be labelled one thing, gated at
+   one step and granted at another.
+
+### Tests
+
+`src/Tests/SuperUpgradeTest.cs` (12 tests): the spike shape over eight hulls × levels 2-21, grade-as-identity,
+each gate at the doubled step (range roof, guided budget, round ceiling, pierce ceiling, defence headroom) both at
+a hand-built turret and against a dealt hand, the defence/milestone rule, the arriving-set rule on a booked hull,
+the bench `*` syntax, and the doubled hull-wide grant. Full suite: **778 green** (766 before), built and run on SDK
+10.0.112 through the scratch-pin recipe of TROUBLE_SHOOTING #86 — the committed `global.json` pin (10.0.404) is
+unreachable in this sandbox.
+
+### Measurement
+
+`.tools/scenario.sh ammo-spray --sim --iters 3`: median **1.39 ms**, p99 **3.92 ms**, 357 frames, budget pass —
+against the previous row's 2.28 ms / 3.99 ms. The median is lower because the machine was idle, not because the
+change is a speed-up (TROUBLE_SHOOTING #28); the deal path runs once per level, not per frame, and the marking pass
+is O(hand). **Verdict: this change costs nothing measurable — keep.** Live check: `.tools/shots/super-cards.png`
+shows a level-up hand whose fourth bundle's top half and fifth bundle's bottom half are spiked, in different
+bundles, with doubled numbers printed on them.

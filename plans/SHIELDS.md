@@ -521,3 +521,10 @@ dealt only while its whole tier step fits under the ceiling, so at 25 pool the o
 milestone +16 card is not. The refill, shock and shatter rules are untouched: a smaller card buys a smaller
 pool, and the pool still refills at 2/s from the frame the damage lands, so nothing about recharge timing moved
 with the step.
+
+## Follow-up (2026-11-15): +16 can now arrive on an ordinary level
+
+The same grade (plans/SUPER_UPGRADES.md) doubles a shield card's step, so an ordinary level may deal +16 — the milestone
+step — while a milestone hand never spikes one. The ceiling (32) and the pool arithmetic did not move: two such cards,
+or four ordinary ones, still fill it, and the headroom gate now reads the card's own step, so at a 25-point pool the
+ordinary +8 card is dealt and neither +16 card is.

@@ -148,6 +148,13 @@ Environment variables:
   name) and `ArmorPierce:RailGun` for a gun — both are only dealt from level 5, so script the
   early levels around them. The shield card works the same way (`Shield:`, empty weapon name) and is
   dealt only from level 10
+- **the `super` grade in a scripted entry** — a trailing `*` on a **stat-card** entry benches it at twice the step,
+   exactly as a dealt super half grants it (plans/SUPER_UPGRADES.md): `FireRate:MachineGun*` is the ×1.30 card, and a
+   hull card carries its empty weapon name as usual (`SideThrust:` becomes `SideThrust:*`). A `*` on a `Damage` entry
+   is refused, because the deal never spikes a `Damage` card, and a new-weapon entry spells its arriving build with
+   `+Stat` instead of taking a grade. In `SPACEVORS_DIAGNOSTIC=1`'s `[UPGRADE]` rows a graded card prints with a
+   `super ` prefix, and a defence row prints the step it grants with its tier — `Armor(+2 milestone)` against
+   `Armor(+1 ordinary)` — which is also what a super card dealt at an ordinary level grants
 - `SPACEVORS_DIAG_REROLLS=<n>` — start the run holding n reroll charges, so the card screen's reroll is
   testable without farming a ship kill (a capsule only drops from a dying ship, 6 % of them)
 - `SPACEVORS_DIAG_SHIELD=<points>` — start the run with a hull shield pool of that size, whole and

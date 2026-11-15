@@ -29,6 +29,12 @@ public enum UpgradeOption { FireRate, ProjectileSpeed, PickupRadius, Range, Dama
 // (R10's rule that a card is never a lie).
 public enum DefenceTier { Ordinary, Milestone }
 
+// Whether a card is a **super** one: the same upgrade at twice the step (plans/SUPER_UPGRADES.md D2/D4). Like
+// the defence tier and the arriving set it rides on the card, because the number the card prints, the step the
+// gates allow and the step the grant applies must be one value — and because grading a card makes it a
+// different card, which is what keeps every "same card / same pair / same hand" rule honest about it.
+public enum CardPower { Base, Super }
+
 // The upgrades a new gun arrives carrying (plans/PREUPGRADED_NEW_WEAPONS.md D3): the ones this plan can put
 // on a gun before the player ever buys a card for it. A **mask**, not a list, because it rides on
 // `UpgradableOption` — a record struct whose value equality every "same card / same pair / same hand" rule in
@@ -124,4 +130,18 @@ public readonly record struct UpgradeDefinition(UpgradeOption Stat, float Multip
 
     public static int DefenceStep(UpgradeOption stat, DefenceTier tier) =>
         tier == DefenceTier.Milestone ? For(stat).Additive : For(stat).Additive / MilestoneDefenceMultiplier;
+
+    // A super card is the same card at twice the step (plans/SUPER_UPGRADES.md D2). What doubles is the
+    // **delta**, never the value: a ×1.15 card becomes exactly ×1.30, which is the top of R10's 15-35 % band
+    // rather than a new band — the arithmetic reason the multiplier is 2 and not 3.
+    public const int SuperStepMultiplier = 2;
+
+    public UpgradeDefinition Doubled() => this with
+    {
+        Multiplier = 1f + (Multiplier - 1f) * SuperStepMultiplier,
+        Additive = Additive * SuperStepMultiplier,
+        PercentOfBase = PercentOfBase * SuperStepMultiplier
+    };
+
+    public UpgradeDefinition ScaledBy(CardPower power) => power == CardPower.Super ? Doubled() : this;
 }

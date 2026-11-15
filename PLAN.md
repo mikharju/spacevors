@@ -139,6 +139,10 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
   (rounded up) of what its least-upgraded replaceable gun has, capped by that gun's legal stat set; the
   arriving set is part of the card, so one gun may appear as several builds, and a milestone bundle may
   carry a large and a small new gun — shipped 2026-11-14 — plans/PREUPGRADED_NEW_WEAPONS.md
+- Super upgrades: two halves of every hand are the same upgrade at **twice** the step — one powerful half and one weak
+  half, in different bundles, marked in lime on the card and printed with their doubled number; the step is resolved
+  once on the card, so the ceilings, the label and the grant all read it (a super defence card is the milestone step,
+  a spiked new gun arrives with the whole least count instead of half) — shipped 2026-11-15 — plans/SUPER_UPGRADES.md
 - Ceiling test: the largest mixed world that still fits 8.33 ms, probed in sim and in window, recorded in `.tools/run/ceiling.tsv`, never gated — shipped 2026-11-02 — plans/CEILING_TEST.md
 - Minor shipped features (camera-follows-mouse, rocks-as-cover, aim-line volley, ...) — record — plans/MINOR.md
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
@@ -147,7 +151,6 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
 - Endless difficulty escalation: behaviour first, distance-driven clock, duty cycle, elites — plans/ENDLESS_DIFFICULTY.md
 - Parallel sim — plans/PARALLEL_SIM.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
-- super upgrades: in each hand one card has more powerful weak side and another card has more powerful strong side, maybe more powerful variant of the upgrade or two different upgrades to that side of the card, more pre upgrades on milestone new weapon cards
 
 Frozen reviews/design notes: plans/CODE_REVIEW.md, plans/GRAPHICS_REVIEW.md,
 plans/functional-ecs.md.

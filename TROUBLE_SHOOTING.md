@@ -895,3 +895,9 @@ the message at.
   paths (the relative ones resolve against the scratch dir). Delete the scratch dir afterwards and confirm
   `git status` shows no `global.json` change. When reporting a green suite this way, say which SDK it actually
   ran on — and if a pin really blocks the work, say so rather than quietly lowering it.
+- **Same pin, quieter symptom in `.tools/`**: `.tools/scenario.sh` runs `dotnet publish` with the **repo** as cwd, so
+  it dies before measuring and only prints `publish failed; see .tools/run/publish.log` — the reason is in that log,
+  and it is this pin again. Publish once from the scratch dir with an absolute project path, then hand the artifact to
+  the script: `APP=$PWD/src/ScenarioBench/bin/Release/net10.0/linux-x64/publish bash .tools/scenario.sh <name> --sim
+  --iters 3`. `APP` being set is what skips the script's own publish step; the outputs land in the normal
+  project-relative `bin/…` paths no matter which cwd built them, so `.tools/game.sh` still finds its Debug build.

@@ -1200,7 +1200,10 @@ public sealed class GameSession
         ReturnToCards();
     }
 
-    private static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)
+    // The grant of one card. Public for the tests: it is the other half of the promise a card makes, and
+    // without reaching it a hull-wide card whose case goes missing — the `PickupRadius` one did during the
+    // pre-upgrade refactor — stays invisible until a run notices the number never moved.
+    public static void ApplyUpgrade(EntityManager em, Entity playerEntity, UpgradableOption upgrade)
     {
         var playerStats = em.GetComponent<Player>(playerEntity);
         var allPlayerTurrets = new List<(Entity Entity, Turret Value)>();
@@ -1209,7 +1212,10 @@ public sealed class GameSession
             if (!t.Value1.IsEnemy) allPlayerTurrets.Add(t);
         }
 
-        var def = UpgradeDefinition.For(upgrade.Stat);
+        // The step this card grants, read off the card itself: its stat's definition folded with its defence
+        // tier and its super grade. Every hull-wide number below and the per-gun math in `WeaponUpgrade` come
+        // from this one value, which is also what the card printed (R10).
+        var def = upgrade.Step;
 
         var counts = em.TryGetComponent<UpgradeCounts>(playerEntity, out var existingCounts) ? existingCounts : UpgradeCounts.Empty;
         em.AddComponent(playerEntity, counts.Increment(upgrade.Stat, upgrade.WeaponName));
@@ -1226,7 +1232,7 @@ public sealed class GameSession
             case UpgradeOption.MissileHealth:
             case UpgradeOption.ArmorPierce:
                 foreach (var (turretEntity, turret) in allPlayerTurrets.Where(t => t.Value.WeaponName == upgrade.WeaponName))
-                    em.AddComponent(turretEntity, WeaponUpgrade.ApplyStat(turret, upgrade.Stat));
+                    em.AddComponent(turretEntity, WeaponUpgrade.ApplyStat(turret, upgrade));
                 break;
 
             case UpgradeOption.Hp:
@@ -1237,12 +1243,18 @@ public sealed class GameSession
                 em.AddComponent(playerEntity, playerStats with { MaxHealth = newMaxHealth });
                 break;
 
+            case UpgradeOption.PickupRadius:
+                // The magnet field every pickup chases. This case rides on the utility card's own multiplier,
+                // which a super card doubles (×1.2 → ×1.4).
+                em.AddComponent(playerEntity, playerStats with { PickupRadius = playerStats.PickupRadius * def.Multiplier });
+                break;
+
             case UpgradeOption.Armor:
                 // plans/ARMOR_AND_PIERCE.md: one hull, walking to ArmorRules.ArmorCeiling. The step is the
-                // card's own defence tier — +1 ordinary, +2 milestone — which is the number the card printed
-                // (plans/UPGRADE_BUNDLE_PAIRS.md §2). The offer withdraws the card once the step no longer
-                // fits under the ceiling; the clamp here keeps the apply honest too.
-                int armorStep = UpgradeDefinition.DefenceStep(UpgradeOption.Armor, upgrade.Tier);
+                // card's own — `+1` ordinary, `+2` at a milestone or on a super card (plans/SUPER_UPGRADES.md
+                // D3) — which is the number the card printed. The offer withdraws the card once the step no
+                // longer fits under the ceiling; the clamp here keeps the apply honest too.
+                int armorStep = def.Additive;
                 int currentArmor = em.TryGetComponent<Armor>(playerEntity, out var armorComp) ? armorComp.Value : 0;
                 em.AddComponent(playerEntity, new Armor(Math.Min(currentArmor + armorStep, ArmorRules.ArmorCeiling)));
                 break;
@@ -1251,11 +1263,11 @@ public sealed class GameSession
                 // plans/SHIELDS.md: the pool grows and the same amount is banked at once, a shock already
                 // running is left running, and the ceiling is clamped on the apply side as well as in the
                 // offer. The rule itself is ShieldRules.WithCard, so it is testable without a window.
-                // The step is the card's tier: +8 on an ordinary level, +16 at a milestone.
+                // The step is the card's own: `+8` ordinary, `+16` at a milestone or on a super card.
                 var boughtShield = em.TryGetComponent<Shield>(playerEntity, out var existingShield)
                     ? existingShield
                     : new Shield(Points: 0f, Max: 0, Offline: 0f);
-                int shieldStep = UpgradeDefinition.DefenceStep(UpgradeOption.Shield, upgrade.Tier);
+                int shieldStep = def.Additive;
                 em.AddComponent(playerEntity, ShieldRules.WithCard(boughtShield, shieldStep));
                 break;
 

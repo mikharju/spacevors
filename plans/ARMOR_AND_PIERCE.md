@@ -263,3 +263,14 @@ only while its whole tier step fits: at armor 11 the ordinary +1 card is dealt a
 not, and at 12 neither is. The card's printed number is always the number it grants — `FormatChoice` and the
 HUD read the card's own tier, not the constant. The arithmetic in this plan's body (`+2` per card) is therefore
 now the **milestone** step; read an ordinary level's card as half that.
+
+## Follow-up (2026-11-15): the step ladder gains a rung, the ceiling does not move
+
+plans/SUPER_UPGRADES.md put the defence tier on the card and added a grade above it. A **super** card dealt at an
+ordinary level grants the milestone step — +2 armour — so the two rungs this plan's shipped section describes are now
+reachable at any level ≥ 5, while a milestone hand never spikes a defence card and the two never stack. The ceiling
+(12) and the headroom rule are unchanged; what moved is where the rule is read from: the card's own step, doubled or
+not. At armor 11 an ordinary +1 card is still dealt and a +2 card — milestone tier or super grade — is not.
+
+`ArmorPierce` gained the same treatment and the same bound: a super pierce card is `+8`, which is the ceiling, so it is
+legal only on a gun sitting at zero pierce. The card is therefore rare rather than absent, and it never overflows.

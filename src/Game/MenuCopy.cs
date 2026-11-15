@@ -42,11 +42,16 @@ public static class MenuCopy
     public static string StartRecommendation => "First flight? The Scout forgives mistakes.";
 
     // The level-up screen, above the five bundles. The one-choice rule is the thing a new player
-    // cannot guess from looking at the cards.
+    // cannot guess from looking at the cards, and neither is the super grade: the green half of a bundle is the
+    // same upgrade at twice the step, and the two green halves of a hand are never in the same bundle
+    // (plans/SUPER_UPGRADES.md D1/D8).
+    public static string UpgradeSuperLine => "A green half is SUPER: that upgrade at twice the step, never both halves of one bundle.";
+
     public static string[] UpgradeLines { get; } =
     [
         "Take ONE bundle: you get both cards inside it.",
-        "The card above is the bigger step, the one below the smaller.",
+        "The card above upgrades your heavy guns, the one below your small ones.",
+        UpgradeSuperLine,
         "Tab reads your ship, guns and mounts. The game waits while you do.",
     ];
 

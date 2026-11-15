@@ -14,7 +14,7 @@ public class WeaponUpgradeTest
     {
         var carried = TurretMount.CarriedTurret(WeaponType.ScatterCannon);
 
-        var upgraded = WeaponUpgrade.ApplyStat(carried, UpgradeOption.FireRate);
+        var upgraded = WeaponUpgrade.ApplyStat(carried, Card(UpgradeOption.FireRate));
 
         Assert.Equal(carried.Weapon.PelletCount + 1, upgraded.Weapon.PelletCount);
         Assert.Equal(carried.Weapon.FireRate, upgraded.Weapon.FireRate);
@@ -27,7 +27,7 @@ public class WeaponUpgradeTest
         var carried = TurretMount.CarriedTurret(WeaponType.LaserLance);
         Assert.False(carried.Weapon.CanGrowSalvo);
 
-        var upgraded = WeaponUpgrade.ApplyStat(carried, UpgradeOption.FireRate);
+        var upgraded = WeaponUpgrade.ApplyStat(carried, Card(UpgradeOption.FireRate));
 
         Assert.Equal(carried.Weapon.FireRate * UpgradeDefinition.FireRate.Multiplier, upgraded.Weapon.FireRate, 3);
         Assert.Equal(carried.Weapon.PelletCount, upgraded.Weapon.PelletCount);
@@ -40,7 +40,7 @@ public class WeaponUpgradeTest
         var carried = TurretMount.CarriedTurret(WeaponType.RailGun);
         float factor = UpgradeDefinition.Range.Multiplier;
 
-        var upgraded = WeaponUpgrade.ApplyStat(carried, UpgradeOption.Range);
+        var upgraded = WeaponUpgrade.ApplyStat(carried, Card(UpgradeOption.Range));
 
         Assert.Equal(carried.Range * factor, upgraded.Range, 3);
         Assert.Equal(carried.Weapon.ShotLifetime * factor, upgraded.Weapon.ShotLifetime, 3);
@@ -53,8 +53,8 @@ public class WeaponUpgradeTest
         var carried = TurretMount.CarriedTurret(WeaponType.RailGun);
         int step = WeaponType.RailGun.DamageStep;
 
-        var once = WeaponUpgrade.ApplyStat(carried, UpgradeOption.Damage);
-        var twice = WeaponUpgrade.ApplyStat(once, UpgradeOption.Damage);
+        var once = WeaponUpgrade.ApplyStat(carried, Card(UpgradeOption.Damage));
+        var twice = WeaponUpgrade.ApplyStat(once, Card(UpgradeOption.Damage));
 
         Assert.Equal(WeaponType.RailGun.Stats.Damage + step, once.Weapon.Damage);
         Assert.Equal(WeaponType.RailGun.Stats.Damage + 2 * step, twice.Weapon.Damage);
@@ -68,11 +68,11 @@ public class WeaponUpgradeTest
         var seeker = TurretMount.CarriedTurret(WeaponType.SeekerPod);
         var shotgun = TurretMount.CarriedTurret(WeaponType.Shotgun);
 
-        Assert.Contains(UpgradeOption.MissileHealth, WeaponUpgrade.LegalStats(WeaponType.SeekerPod, seeker, pierceUnlocked: true));
-        Assert.DoesNotContain(UpgradeOption.MissileHealth, WeaponUpgrade.LegalStats(WeaponType.Shotgun, shotgun, pierceUnlocked: true));
+        Assert.Contains(UpgradeOption.MissileHealth, Legal(WeaponType.SeekerPod, seeker));
+        Assert.DoesNotContain(UpgradeOption.MissileHealth, Legal(WeaponType.Shotgun, shotgun));
 
         Assert.Equal(seeker.Weapon.MissileHealth + WeaponType.SeekerPod.MissileHealthStep,
-            WeaponUpgrade.ApplyStat(seeker, UpgradeOption.MissileHealth).Weapon.MissileHealth);
+            WeaponUpgrade.ApplyStat(seeker, Card(UpgradeOption.MissileHealth)).Weapon.MissileHealth);
     }
 
     // The gates an arriving set must respect, since a build that carried one of these would be a card the
@@ -85,17 +85,17 @@ public class WeaponUpgradeTest
         var stiletto = TurretMount.CarriedTurret(WeaponType.Stiletto);
         var rail = TurretMount.CarriedTurret(WeaponType.RailGun);
 
-        Assert.DoesNotContain(UpgradeOption.ProjectileSpeed, WeaponUpgrade.LegalStats(WeaponType.LaserLance, lance, pierceUnlocked: true));
-        Assert.DoesNotContain(UpgradeOption.Range, WeaponUpgrade.LegalStats(WeaponType.Stiletto, stiletto, pierceUnlocked: true));
-        Assert.DoesNotContain(UpgradeOption.ArmorPierce, WeaponUpgrade.LegalStats(WeaponType.RailGun, rail, pierceUnlocked: false));
-        Assert.Contains(UpgradeOption.ArmorPierce, WeaponUpgrade.LegalStats(WeaponType.RailGun, rail, pierceUnlocked: true));
+        Assert.DoesNotContain(UpgradeOption.ProjectileSpeed, Legal(WeaponType.LaserLance, lance));
+        Assert.DoesNotContain(UpgradeOption.Range, Legal(WeaponType.Stiletto, stiletto));
+        Assert.DoesNotContain(UpgradeOption.ArmorPierce, Legal(WeaponType.RailGun, rail, pierceUnlocked: false));
+        Assert.Contains(UpgradeOption.ArmorPierce, Legal(WeaponType.RailGun, rail));
     }
 
     // A hull-wide card is not a gun card: `ApplyStat` is also what the buy path calls, and it has always
     // left the turret untouched for those.
     [Fact]
     public void AHullWideCard_LeavesTheGunAlone()
-        => Assert.Equal(TurretMount.CarriedTurret(WeaponType.RailGun), WeaponUpgrade.ApplyStat(TurretMount.CarriedTurret(WeaponType.RailGun), UpgradeOption.Hp));
+        => Assert.Equal(TurretMount.CarriedTurret(WeaponType.RailGun), WeaponUpgrade.ApplyStat(TurretMount.CarriedTurret(WeaponType.RailGun), Card(UpgradeOption.Hp)));
 
     // The arriving set is a mask, so it holds each stat once and survives the trip through the card.
     [Fact]
@@ -125,7 +125,9 @@ public class WeaponUpgradeTest
     {
         const WeaponPreUpgrade mask = WeaponPreUpgrade.FireRate | WeaponPreUpgrade.Damage;
 
-        var expected = WeaponUpgrade.ApplyStat(WeaponUpgrade.ApplyStat(TurretMount.CarriedTurret(WeaponType.LaserLance), UpgradeOption.FireRate), UpgradeOption.Damage);
+        var expected = WeaponUpgrade.ApplyStat(
+            WeaponUpgrade.ApplyStat(TurretMount.CarriedTurret(WeaponType.LaserLance), Card(UpgradeOption.FireRate)),
+            Card(UpgradeOption.Damage));
 
         Assert.Equal(expected, WeaponUpgrade.ArrivingTurret(WeaponType.LaserLance, mask));
     }
@@ -143,4 +145,23 @@ public class WeaponUpgradeTest
         Assert.Equal(1, counts.GetCount(UpgradeOption.Damage, WeaponType.RailGun.Name));
         Assert.Equal(0, counts.GetCount(UpgradeOption.FireRate, WeaponType.RailGun.Name));
     }
+
+    // An arriving upgrade is one **ordinary** card of its stat: the mask carries no power, so a swapped-in
+    // build can never double its own steps (plans/SUPER_UPGRADES.md invariant 5).
+    [Fact]
+    public void ArrivingUpgrades_AreAlwaysOneOrdinaryCardOfTheirStat()
+    {
+        var plain = TurretMount.CarriedTurret(WeaponType.RailGun);
+
+        var arriving = WeaponUpgrade.ArrivingTurret(WeaponType.RailGun, WeaponPreUpgrade.Range | WeaponPreUpgrade.ArmorPierce);
+
+        Assert.Equal(plain.Range * UpgradeDefinition.Range.Multiplier, arriving.Range, 3);
+        Assert.Equal(UpgradeDefinition.ArmorPierce.Additive, arriving.Weapon.Pierce);
+    }
+
+    // One ordinary card of this stat, wherever a test names a card rather than a stat.
+    static UpgradableOption Card(UpgradeOption stat) => new("", stat);
+
+    static List<UpgradeOption> Legal(WeaponType gun, Turret live, bool pierceUnlocked = true, CardPower power = CardPower.Base) =>
+        WeaponUpgrade.LegalStats(gun, live, pierceUnlocked, power);
 }

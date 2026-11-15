@@ -89,7 +89,9 @@ public static class UpgradeMenuRenderer
 
         for (int i = 0; i < wrapped.Length; i++)
         {
-            Color color = i == 0 ? Palette.TextBright : Palette.TextMuted;
+            // The super line is the one a player has to be told, so it is drawn in the colour the cards use for
+            // a spiked half — the hand on screen then explains the colour (plans/SUPER_UPGRADES.md D8).
+            Color color = i == 0 ? Palette.TextBright : SuperLine(lines[i]) ? Palette.SuperStep : Palette.TextMuted;
             foreach (string line in wrapped[i])
             {
                 Raylib.DrawText(line, windowWidth / 2 - Raylib.MeasureText(line, font) / 2, y, font, Ui.WithAlpha(color, fade));
@@ -97,6 +99,8 @@ public static class UpgradeMenuRenderer
             }
         }
     }
+
+    static bool SuperLine(string line) => line == MenuCopy.UpgradeSuperLine;
 
     // The salvage panel: how many reroll charges the player holds, and the key that spends one. It rides
     // at the right end of the hint row because the card row owns everything above it — the manage-mounts
@@ -182,13 +186,17 @@ public static class UpgradeMenuRenderer
     }
 
     // One half of a bundle: muted label, accent value, and for a new gun its mount size and two base numbers.
-    // Centred in the band it was given.
+    // Centred in the band it was given. A **super** half — twice the step of the same card — is marked in green
+    // (plans/SUPER_UPGRADES.md D8): a wash over its band, a green edge down its left side, a green value and a
+    // small SUPER tag. The label keeps its shape, so a narrow card still fits its text.
     private static void DrawEntry(int x, int y, int width, int height, UpgradableOption option, float fade, float scale)
     {
         int labelFont = (int)(BundleLabelFontSize * scale);
         int valueFont = (int)(BundleValueFontSize * scale);
         int statFont = (int)(UpgradeCardStatFontSize * scale);
         string[] specs = NewWeaponSpecs(option) ?? [];
+
+        if (option.IsSuper) DrawSuperBand(x, y, width, height, fade, scale);
 
         string[] labelLines = Ui.WrapText(GetUpgradeLabel(option), width - (int)(24 * scale), labelFont);
         int numLines = Math.Min(labelLines.Length, MaxUpgradeLabelLines);
@@ -213,11 +221,27 @@ public static class UpgradeMenuRenderer
         string statValue = GetUpgradeValue(option);
         int valueWidth = Raylib.MeasureText(statValue, valueFont);
         Raylib.DrawText(statValue, x + width / 2 - valueWidth / 2, valueY, valueFont,
-            Ui.WithAlpha(Palette.Accent, fade));
+            Ui.WithAlpha(option.IsSuper ? Palette.SuperStep : Palette.Accent, fade));
 
         for (int i = 0; i < specs.Length; i++)
             Raylib.DrawText(specs[i], x + (int)(16 * scale), valueY + valueFont + specsGap + i * specPitch, statFont,
                 Ui.WithAlpha(Palette.TextMuted, fade));
+
+        if (option.IsSuper) DrawSuperTag(x, y, width, statFont, fade, scale);
+    }
+
+    static void DrawSuperBand(int x, int y, int width, int height, float fade, float scale)
+    {
+        int inset = (int)(2 * scale);
+        Raylib.DrawRectangle(x + inset, y, width - 2 * inset, height, Ui.WithAlpha(Palette.SuperBand, fade));
+        Raylib.DrawRectangle(x + inset, y, (int)(3 * scale) + 1, height, Ui.WithAlpha(Palette.SuperEdge, fade));
+    }
+
+    static void DrawSuperTag(int x, int y, int width, int font, float fade, float scale)
+    {
+        const string tag = "SUPER";
+        Raylib.DrawText(tag, x + width - (int)(16 * scale) - Raylib.MeasureText(tag, font), y + (int)(6 * scale), font,
+            Ui.WithAlpha(Palette.SuperStep, fade));
     }
 
     private static void DrawKeyBadge(int x, int y, string key, float fade, float scale)
@@ -267,7 +291,12 @@ public static class UpgradeMenuRenderer
         {
             UpgradeOption.Range => $"{name} range",
             UpgradeOption.Damage => $"{name} damage",
-            UpgradeOption.FireRate => $"{name} attack speed",
+            // A `FireRate` card is two different cards wearing one stat: on a gun whose volley grows it buys
+            // another shot — so the card says "volley size", the game's own word for what gets bigger — and on
+            // any other gun it really does fire the same shots sooner, so it says "attack speed". The test is the
+            // one `WeaponUpgrade.ApplyStat` applies, per card, so a super two-shot card cannot be labelled a
+            // faster trigger (R10).
+            UpgradeOption.FireRate => GrowsVolley(option) ? $"{name} volley size" : $"{name} attack speed",
             UpgradeOption.ProjectileSpeed => $"{name} projectile speed",
             // plans/ARMOR_AND_PIERCE.md: the gun's line against the one armored hull.
             UpgradeOption.ArmorPierce => $"{name} armor pierce",
@@ -278,33 +307,36 @@ public static class UpgradeMenuRenderer
     }
 
     // For a new weapon the prominent line carries the mount size, which is the thing the player has
-    // to know before picking a hull mount.
+    // to know before picking a hull mount. For every other card it carries the step **this card** grants —
+    // doubled on a super one — read off `option.Step`, the same value `ApplyUpgrade` grants from, so a card is
+    // never a lie (R10).
     private static string GetUpgradeValue(UpgradableOption option)
     {
-        // A defence card prints the step of the tier it was dealt at (+1 or +2 armour, +8 or +16 shield) —
-        // the same field `ApplyUpgrade` grants from, so the card is never a lie (R10).
-        if (option.Stat is UpgradeOption.Armor or UpgradeOption.Shield)
-            return $"+{UpgradeDefinition.DefenceStep(option.Stat, option.Tier)}";
-
         if (WeaponType.FromName(option.WeaponName) is not { } weapon)
-            return UpgradeDefinition.For(option.Stat).DisplayValue;
+            return option.Step.DisplayValue;
 
         if (option.IsNewWeapon)
             return weapon.Size == TurretSize.Large ? "large" : "small";
 
         // R33: the damage card is a percent of the gun's base damage sized by its mount class, so the label
-        // is read off the gun; the card definition carries no single percent.
+        // is read off the gun; the card definition carries no single percent. A `Damage` card is never super
+        // (plans/SUPER_UPGRADES.md D3), so there is no doubled percent to print here.
         if (option.Stat == UpgradeOption.Damage)
             return $"+{UpgradeDefinition.DamagePercentFor(weapon.IsSupport)}%";
 
-        // ApplyUpgrade hands a multi-pellet gun another pellet instead of speeding it up, so the card
-        // must not promise the +15% a single-pellet gun gets. A guided volley that has hit its round
-        // budget (R17) grows no further, and the card is withdrawn rather than relabelled.
-        if (option.Stat == UpgradeOption.FireRate && weapon.Stats.PelletCount > 1 && weapon.Stats.CanGrowSalvo)
-            return "+1 shot";
+        // A card that grows a volley buys shots — two of them on a super card — rather than the +30 % a gun with
+        // a fixed volley gets. A guided volley whose budget cannot take this card's shots takes the card as a
+        // rate instead, which is why the test is per card (R17/R18).
+        if (option.Stat == UpgradeOption.FireRate && GrowsVolley(option))
+            return $"+{option.SalvoShots} shot{(option.SalvoShots > 1 ? "s" : "")}";
 
-        return UpgradeDefinition.For(option.Stat).DisplayValue;
+        return option.Step.DisplayValue;
     }
+
+    // Whether this card buys shots on this gun. One predicate, shared by the label, the value and the grant, so
+    // a card can never be labelled one thing and granted another.
+    static bool GrowsVolley(UpgradableOption option) =>
+        WeaponType.FromName(option.WeaponName)?.Stats.CanGrowSalvoBy(option.SalvoShots) ?? false;
 
     // The numbers of a new gun as it arrives. A gun the hull can still fit arrives plain, so these are the table's
     // own; a gun dealt to a full hull arrives carrying upgrades, and the card must print the upgraded numbers —

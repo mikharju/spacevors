@@ -423,3 +423,11 @@ two gun moves in the one visit the old code refused.
 removes the naked-base-weapon feel and makes cargo rotation worth using. Playtest knobs are listed above:
 the 0.5 multiplier, the least-vs-mean basis, whether `Damage` belongs in the arriving set, and a per-class
 cap on how many builds of one gun may share a hand.
+
+## Follow-up (2026-11-15): the arriving set is graded
+
+plans/SUPER_UPGRADES.md D5 added a grade to upgrade cards, and a new gun is a card: when a hand spikes a new-gun
+bundle half, that gun arrives carrying the **whole** `least` count instead of `⌈least/2⌉`. Everything else here holds
+unchanged — the same `Fits` basis, the same legal-stat cap, and the same "a plain gun while a mount it fits is free",
+because with nothing displaced `least` is 0 and there is no bigger set to offer, so the deal leaves the card unspiked
+rather than inventing upgrades for a pure addition.

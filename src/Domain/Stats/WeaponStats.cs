@@ -79,8 +79,9 @@ public readonly record struct WeaponStats(
     // R19: whether a `MissileHealth` card on this gun still has somewhere to go: only a guided round
     // carries hit points, and the next whole step must land at or under the ceiling — never a card the
     // rules would refuse to honour, the same reason the "+1 shot" card is withdrawn at R18. The step is
-    // the gun's percent-of-base step (`WeaponType.MissileHealthStep`), not a percent of this live copy,
-    // which is what stops the card compounding with itself.
+    // the **card's** percent of this gun's base round health, not a percent of a live copy, which is what
+    // stops the card compounding with itself. A super card asks with its own doubled percent, so it is
+    // withdrawn at the ceiling rather than dealt as two thirds of a step (plans/SUPER_UPGRADES.md D6).
     public bool CanToughenRound(int step) => Homing && step > 0 && MissileHealth + step <= MissileHealthCeiling;
 
     // The most armor-pierce one gun can reach with `ArmorPierce` cards (+4, plans/ARMOR_AND_PIERCE.md).
@@ -93,11 +94,19 @@ public readonly record struct WeaponStats(
     // (UpgradeOffer) and the apply (GameSession), so the card is never a lie.
     public bool CanPierceMore(int step) => step > 0 && Pierce + step <= PierceCeiling;
 
-    // R18: whether a `FireRate` card on this gun still has somewhere to go as "+1 shot". Volley guns
+    // R18: whether a `FireRate` card on this gun reads as a bigger volley at all — a gun that grows its
+    // volley and fires more than one shot per trigger. Such a card is otherwise a plain faster rate.
+    public bool GrowsVolley => SalvoGrows && PelletCount > 1;
+
+    // R18: whether a `FireRate` card on this gun still has somewhere to go as "+n shots". Volley guns
     // grow forever as they always have; a guided volley stops when the next shot would break the
     // guided-round budget, and a gun that never grows its volley takes the card as a rate instead.
-    // Both the offer (LevelUpSystem) and the apply (GameSession) read this, so a card is never a lie.
-    public bool CanGrowSalvo => SalvoGrows && PelletCount > 1 && (!Homing || FireRate * (PelletCount + 1) <= HomingRoundBudget);
+    // The offer, the apply and the card's own label all ask with the shots **this card** grants — two for a
+    // super card (plans/SUPER_UPGRADES.md D2) — so a card never promises a volley the rules refuse to give.
+    public bool CanGrowSalvo => CanGrowSalvoBy(1);
+
+    public bool CanGrowSalvoBy(int shots) => GrowsVolley && shots > 0
+        && (!Homing || FireRate * (PelletCount + shots) <= HomingRoundBudget);
 }
 
 // Static weapon identity: what fits where, and what the weapon is. Everything the turret carries
@@ -133,7 +142,12 @@ public readonly record struct WeaponType(
     // round health, read off the table rather than off a turret that has already bought cards, which is what
     // keeps the card additive (+50% +50% = +100%) instead of compounding. The step grows with the missile: a
     // SeekerPod's 4 hp round buys +2, FarlockSalvo's 8 hp round buys +4.
-    public int MissileHealthStep => UpgradeDefinition.MissileHealth.StepForBase(Stats.MissileHealth);
+    public int MissileHealthStep => MissileHealthStepFor(CardPower.Base);
+
+    // The same step at a card's power: a super card buys the doubled percent of the **base**, recomputed off
+    // the base rather than doubled as an integer — on an odd base those two answers differ, and the card's
+    // printed percent has to be the step the round actually gains (plans/SUPER_UPGRADES.md D2).
+    public int MissileHealthStepFor(CardPower power) => UpgradeDefinition.MissileHealth.ScaledBy(power).StepForBase(Stats.MissileHealth);
 
     // R33: how much per-shot damage one `Damage` card buys this gun — a percent of the gun's **base**
     // damage, sized by mount class (R24/R25: a support chip grows slower than a kill gun), and read off

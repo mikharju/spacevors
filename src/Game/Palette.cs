@@ -94,6 +94,15 @@ internal static class Palette
     public static readonly Color Shadow = new(0, 0, 0, 90);
     public static readonly Color TrackDark = new(10, 12, 20, 140);
 
+    // A **super** upgrade card — the same upgrade at twice the step (plans/SUPER_UPGRADES.md D8). Marked in a
+    // lime no other menu colour uses: the cyan accent means "this is the thing to click", the mount screen's
+    // green means "this gun fits here", so a third green would borrow someone else's meaning. The band wash and
+    // the left edge mark the spiked half of a bundle, the value and the small SUPER tag are drawn in the bright
+    // one, so the spike is readable before the text is.
+    public static readonly Color SuperStep = new(150, 230, 130, 255);
+    public static readonly Color SuperBand = new(150, 230, 130, 26);
+    public static readonly Color SuperEdge = new(150, 230, 130, 170);
+
     // The box a key is written in (`Ui.DrawKeyCap`) and the upgrade-card number badge — one and the
     // same box, so a key reads as a key whether it is in a control list or on a card.
     public static readonly Color KeyCapFill = new(60, 60, 78, 255);

@@ -828,3 +828,14 @@ empty for every non-milestone hand, so a standard hand is dealt no `Damage` card
 (`HandCompositionTest.StandardHand_NeverCarriesADamageCard`). §9's knob of a second `Damage` card per gun
 is still unexercised: the leak's last step can take a second damage card for a gun already named, but only
 after every ordinary card in the hand has run out.
+
+## Follow-up (2026-11-15): the super step is inside R10, and R33's cards stay out of it
+
+plans/SUPER_UPGRADES.md made two halves of every hand grant **twice the step**. It doubles the delta, not the factor:
+×1.15 becomes ×1.30, still the top of R10's +10…+30 % band, and there is no third card size. Shot cards buy two shots
+instead of one, and the percent-of-base round cards double their percent, so the R19 ceilings still bound them.
+
+R17/R18 and R19/R29 are now tested against **the step the card grants**, not the constant: a guided volley with room
+for one more shot is not offered a two-shot card, and a support gun at 1150 range is not offered a super `Range` card
+it would have to round down to honour. R33's `Damage` cards are excluded from the grade by decision — the milestone's
+own step is already its biggest number — so a super `Damage` card, benched or dealt, is refused.

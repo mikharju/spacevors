@@ -88,7 +88,7 @@ public class PreUpgradedNewWeaponTest
                     var offered = Gun(card.WeaponName);
 
                     var arriving = WeaponUpgrade.StatsOf(card.PreApplied);
-                    var legal = WeaponUpgrade.LegalStats(offered, TurretMount.CarriedTurret(offered), UpgradeOffer.PierceUnlockedAt(level));
+                    var legal = WeaponUpgrade.LegalStats(offered, TurretMount.CarriedTurret(offered), UpgradeOffer.PierceUnlockedAt(level), CardPower.Base);
                     if (UpgradeOffer.IsMilestoneLevel(level)) legal.Add(UpgradeOption.Damage);
 
                     foreach (var stat in arriving) Assert.Contains(stat, legal);

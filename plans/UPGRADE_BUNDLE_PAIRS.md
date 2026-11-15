@@ -406,3 +406,17 @@ rewritten:
 - §8's "no pre-upgraded new weapons (§8)" and §10's "deliberately not here" entry is the feature that has since
   landed: a gun dealt to a hull with no free mount of its size arrives carrying upgrades, and that set is part of
   the card.
+
+## Follow-up (2026-11-15): two halves of the hand are spiked to twice the step
+
+plans/SUPER_UPGRADES.md shipped, and §7's pacing question is what it answers: one bundle's **powerful** half and a
+different bundle's **weak** half now grant the same upgrade at twice the step. The pair shape, the pools and the
+promises are untouched — the grade is a field on the card, stamped after the fill pass and before the shuffle, so the
+hand that arrives is the one this plan describes with two of its ten halves printed bigger.
+
+Two things this plan's wording has to be read against now:
+
+- A card's identity includes its grade, so `Range:MachineGun` and its super twin are **different cards**: a hand may
+  offer both, and the pair, distinctness and per-gun-cap rules below compare them as such.
+- `MenuCopy`'s line "the card above is the bigger step, the one below the smaller" is gone — with a spiked weak half
+  it stopped being true. The line names the class split instead, and the green half says what the grade is.

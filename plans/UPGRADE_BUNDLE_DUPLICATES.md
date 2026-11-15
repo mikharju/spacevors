@@ -302,3 +302,14 @@ name, which re-cuts two rules this plan wrote:
   same arriving set twice", so a booked hull may be offered one gun as two or three builds in one hand. The
   per-gun draw caps (`MaxStrongCardsPerGun`, `MaxWeakCardsPerGun`, counted by weapon name) still bound how many
   builds of a single gun a pool can hold.
+
+## Follow-up (2026-11-15): a super half is a different card, and a repeated half is never super
+
+The grade (plans/SUPER_UPGRADES.md) rides on the card, so every comparison in this plan — `strong == weak`, the
+same-pair refusal, `IsDealt`, the distinctness count — now compares graded cards, and a hand holding both
+`ProjectileSpeed:MachineGun` and its super twin is holding two real offers rather than a repeat.
+
+One interaction the grade had to learn to respect: the fill pass repeats a half to reach five bundles, and grading
+that repeat turns it into a **fourth distinct card for one gun on a side capped at three** while also hiding the
+repeat this plan exists to show. So `MarkSuperHalves` skips a half its side already holds twice — the spike goes to a
+card that stands alone, and the repeat stays visible.

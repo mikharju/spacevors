@@ -80,7 +80,7 @@ public static class UpgradeOffer
         if (turrets.Count == 0) return null;
 
         var buckets = SortIntoKinds(view, playerEntity, turrets, level);
-        var bundles = DealBundles(buckets, IsMilestoneLevel(level), view, turrets);
+        var bundles = DealBundles(buckets, IsMilestoneLevel(level), view, playerEntity, turrets, level);
 
         DiagnosticLogger.LogEvent("UPGRADE", $"{why} level={level} bundles: {FormatBundles(bundles)}");
         return [.. bundles];
@@ -121,17 +121,26 @@ public static class UpgradeOffer
         return WeaponType.FromName(card.WeaponName) is { IsSupport: false };
     }
 
-    /// Defence cards carry the step of the level that dealt them (plans/UPGRADE_BUNDLE_PAIRS.md §2): the
-    /// doubled step at a milestone, half of it otherwise. The scripted bench stamps the same way, so a benched
-    /// `Armor:` entry at a milestone grants what it prints, exactly like a dealt card.
-    public static UpgradableOption StampDefenceTier(UpgradableOption card, int level) =>
-        card.Stat is UpgradeOption.Armor or UpgradeOption.Shield
-            ? card with { Tier = IsMilestoneLevel(level) ? DefenceTier.Milestone : DefenceTier.Ordinary }
-            : card;
+    /// Defence cards carry the step of the level that dealt them (plans/UPGRADE_BUNDLE_PAIRS.md §2): the doubled
+    /// step at a milestone, half of it otherwise. A milestone defence card is never also super, because the super
+    /// step and the milestone step are the same number and a card that prints one ladder twice is a lie
+    /// (plans/SUPER_UPGRADES.md D3). The scripted bench stamps the same way, so a benched `Armor:` entry at a
+    /// milestone grants what it prints, exactly like a dealt card.
+    public static UpgradableOption StampDefenceTier(UpgradableOption card, int level)
+    {
+        if (card.Stat is not (UpgradeOption.Armor or UpgradeOption.Shield)) return card;
+
+        bool milestone = IsMilestoneLevel(level);
+        return card with
+        {
+            Tier = milestone ? DefenceTier.Milestone : DefenceTier.Ordinary,
+            Power = milestone ? CardPower.Base : card.Power
+        };
+    }
 
     // The hand: the distinct pairs the two pools allow, topped up from its own halves when a side ran dry,
-    // then shuffled — which is why a promised card is never a promised position.
-    static UpgradeBundle[] DealBundles(Dictionary<CardKind, List<UpgradableOption>> buckets, bool milestone, WorldView view, List<Turret> turrets)
+    // then spiked and shuffled — which is why a promised card is never a promised position.
+    static UpgradeBundle[] DealBundles(Dictionary<CardKind, List<UpgradableOption>> buckets, bool milestone, WorldView view, Entity playerEntity, List<Turret> turrets, int level)
     {
         var powerful = PowerfulPool(buckets, milestone, view, turrets);
         var weak = WeakPool(buckets, milestone, view, turrets);
@@ -142,6 +151,7 @@ public static class UpgradeOffer
         var bundles = powerful.Count == 0 ? FallbackPair(weak).ToList() : DealDistinct(powerful, weak);
 
         TopUp(bundles, powerful, weak);
+        MarkSuperHalves(bundles, view, playerEntity, turrets, level);
         Shuffle(bundles, view.Rng);
         return [.. bundles];
     }
@@ -220,6 +230,101 @@ public static class UpgradeOffer
 
         DiagnosticLogger.LogEvent("UPGRADE", $"nothing powerful to offer: {FormatChoice(weak[0])} + {FormatChoice(weak[1])}");
         return [new UpgradeBundle(weak[0], weak[1])];
+    }
+
+    // Spike the hand (plans/SUPER_UPGRADES.md D1/D7). Two halves of it are super — the same upgrade at twice the
+    // step — one on the powerful side and one on the weak side, and never both in one bundle, which is what
+    // makes the spike a trade instead of a free bigger bundle. The pass runs on the finished hand, walking it in
+    // deal order, so every pool rule above (promises, per-class and per-gun caps, repeats) is untouched and the
+    // pass needs no new pool. It draws no RNG of its own: the shuffle after it is what hides which bundle was
+    // spiked. A side whose halves are all illegal at the doubled step simply gets no spike — never a card dealt
+    // as a fraction of one (D6).
+    static void MarkSuperHalves(List<UpgradeBundle> hand, WorldView view, Entity playerEntity, List<Turret> turrets, int level)
+    {
+        int strong = MarkOneBundleSuper(hand, view, playerEntity, turrets, level, powerful: true, from: 0);
+
+        // A one-bundle hand cannot satisfy "in two different bundles", so it carries its one spike (the fallback
+        // hull is the weakest case in the game and deserves it) and nothing else.
+        if (hand.Count < 2) return;
+
+        // Start past the spiked bundle and wrap, so the two spikes land on different bundles by construction.
+        MarkOneBundleSuper(hand, view, playerEntity, turrets, level, powerful: false, from: strong + 1);
+    }
+
+    static int MarkOneBundleSuper(
+        List<UpgradeBundle> hand, WorldView view, Entity playerEntity, List<Turret> turrets, int level, bool powerful, int from)
+    {
+        for (int step = 0; step < hand.Count; step++)
+        {
+            int at = (from + step) % hand.Count;
+            var bundle = hand[at];
+            var card = powerful ? bundle.Powerful : bundle.Weak;
+
+            // Grading a card makes it a **different** card, so spiking a half the fill pass had already repeated
+            // would give one gun a fourth distinct card on a side capped at three, and would hide the repeat a
+            // thin pool is supposed to show. The spike goes to a half that stands alone on its side.
+            if (CopiesOnSide(hand, card, powerful) > 1) continue;
+            if (AsSuper(card, view, playerEntity, turrets, level) is not { } spiked) continue;
+
+            hand[at] = powerful ? bundle with { Powerful = spiked } : bundle with { Weak = spiked };
+            return at;
+        }
+
+        return -1;
+    }
+
+    static int CopiesOnSide(List<UpgradeBundle> hand, UpgradableOption card, bool powerful) =>
+        hand.Count(bundle => (powerful ? bundle.Powerful : bundle.Weak) == card);
+
+    /// This card at twice the step, or null when the doubled step is not one the rules could honour: no bigger
+    /// arriving set for a new gun, a volley with no room for two more shots, a chip whose doubled range would go
+    /// through its class roof, a round or a hull at its ceiling. Skipping is the shipped rule for a step that
+    /// does not fit — withdraw rather than relabel (plans/UPGRADE_BUNDLE_PAIRS.md Shipped deviation 2).
+    static UpgradableOption? AsSuper(UpgradableOption card, WorldView view, Entity playerEntity, List<Turret> turrets, int level)
+    {
+        // A super never stacks on a card that already carries a milestone-sized step (D3): a `Damage` card, which
+        // R33 keeps milestone-only, and defence at a milestone. An ordinary level's defence card doubles into the
+        // milestone step, so the two step ladders meet at one number and the ceilings (12 / 32) still bound it.
+        if (card.IsSuper || (card.Stat == UpgradeOption.Damage && !card.IsNewWeapon)) return null;
+
+        if (card.Stat is UpgradeOption.Armor or UpgradeOption.Shield)
+        {
+            if (IsMilestoneLevel(level)) return null;
+            var graded = card with { Power = CardPower.Super };
+            return DefenceFitsHeadroom(graded, view, playerEntity) ? graded : null;
+        }
+
+        if (card.IsNewWeapon) return WithBiggerArrivingSet(card, view, playerEntity, level);
+
+        // `Hp` and the engine and vacuum cards have no ceiling to break, so they are always eligible.
+        if (card.WeaponName.Length == 0) return card with { Power = CardPower.Super };
+
+        var live = turrets.Find(t => t.WeaponName == card.WeaponName);
+        if (live.WeaponName != card.WeaponName) return null;     // a card naming a gun that is no longer aboard
+
+        return WeaponUpgrade.LegalStats(WeaponType.FromName(card.WeaponName), live, PierceUnlockedAt(level), CardPower.Super)
+            .Contains(card.Stat)
+                ? card with { Power = CardPower.Super }
+                : null;
+    }
+
+    // The same new gun, arriving with as much as the weakest thing it would displace instead of half of it
+    // (plans/SUPER_UPGRADES.md D5). Only worth marking when that is strictly more upgrades: a gun that already
+    // arrived carrying everything it may carry cannot be spiked, and "super" over the same set would be a lie.
+    static UpgradableOption? WithBiggerArrivingSet(UpgradableOption card, WorldView view, Entity playerEntity, int level)
+    {
+        if (WeaponType.FromName(card.WeaponName) is not { } gun) return null;
+
+        int carried = WeaponUpgrade.StatsOf(card.PreApplied).Length;
+        int room = ArrivingUpgrades(view, playerEntity, gun.Size, CardPower.Super);
+        if (room <= carried) return null;
+
+        // Re-sampled rather than extended: a super gun is a **bigger build** of that gun, and the card prints
+        // its own set and its own numbers, so the two offers of one gun can never be read as the same one.
+        var bigger = ArrivingSet(gun, room, level, view.Rng);
+        return WeaponUpgrade.StatsOf(bigger).Length > carried
+            ? card with { Power = CardPower.Super, PreApplied = bigger }
+            : null;
     }
 
     // The strong half of a milestone hand is the build beat: a new large gun to switch into, the kill gun's
@@ -369,15 +474,28 @@ public static class UpgradeOffer
         var cards = new List<UpgradableOption>();
         var tier = IsMilestoneLevel(level) ? DefenceTier.Milestone : DefenceTier.Ordinary;
 
-        if (level >= ArmorUnlockLevel && CurrentArmor(view, playerEntity) <= ArmorRules.ArmorCeiling - Step(UpgradeOption.Armor, tier))
-            cards.Add(new UpgradableOption("", UpgradeOption.Armor, Tier: tier));
-        if (level >= ShieldUnlockLevel && CurrentShieldMax(view, playerEntity) <= ShieldRules.ShieldCeiling - Step(UpgradeOption.Shield, tier))
-            cards.Add(new UpgradableOption("", UpgradeOption.Shield, Tier: tier));
+        if (level >= ArmorUnlockLevel)
+        {
+            var armor = new UpgradableOption("", UpgradeOption.Armor, Tier: tier);
+            if (DefenceFitsHeadroom(armor, view, playerEntity)) cards.Add(armor);
+        }
+        if (level >= ShieldUnlockLevel)
+        {
+            var shield = new UpgradableOption("", UpgradeOption.Shield, Tier: tier);
+            if (DefenceFitsHeadroom(shield, view, playerEntity)) cards.Add(shield);
+        }
 
         return cards;
     }
 
-    static int Step(UpgradeOption stat, DefenceTier tier) => UpgradeDefinition.DefenceStep(stat, tier);
+    // A defence card is dealt only while its **whole** step fits under its ceiling — at partial headroom it would
+    // deliver less than it prints, which is the lie R10 refuses, and the honest fix is to withdraw it rather than
+    // deal a smaller card (the same rule R19 applies to pierce and round health). The step is read off the card,
+    // so the rule is identical for the tier a level deals and for the super grade (plans/SUPER_UPGRADES.md D3).
+    static bool DefenceFitsHeadroom(UpgradableOption defenceCard, WorldView view, Entity playerEntity) =>
+        defenceCard.Stat == UpgradeOption.Armor
+            ? CurrentArmor(view, playerEntity) <= ArmorRules.ArmorCeiling - defenceCard.Step.Additive
+            : CurrentShieldMax(view, playerEntity) <= ShieldRules.ShieldCeiling - defenceCard.Step.Additive;
 
     static int CurrentArmor(WorldView view, Entity playerEntity) =>
         view.TryGetComponent<Armor>(playerEntity, out var armor) ? armor.Value : 0;
@@ -394,7 +512,7 @@ public static class UpgradeOffer
     {
         var cards = buckets[KindFor(turret)];
 
-        foreach (var stat in WeaponUpgrade.LegalStats(WeaponType.FromName(turret.WeaponName), turret, PierceUnlockedAt(level)))
+        foreach (var stat in WeaponUpgrade.LegalStats(WeaponType.FromName(turret.WeaponName), turret, PierceUnlockedAt(level), CardPower.Base))
             cards.Add(new UpgradableOption(turret.WeaponName, stat));
     }
 
@@ -438,7 +556,7 @@ public static class UpgradeOffer
         var pool = WeaponType.NewWeaponPoolFor(level).Where(w => w.Size == size && !ownedNames.Contains(w.Name)).ToList();
         Shuffle(pool, view.Rng);
 
-        int arriving = ArrivingUpgrades(view, playerEntity, size);
+        int arriving = ArrivingUpgrades(view, playerEntity, size, CardPower.Base);
         var cards = new List<UpgradableOption>();
         for (int round = 0; round < MaxNewWeaponCardsPerClass && cards.Count < MaxNewWeaponCardsPerClass; round++)
         {
@@ -464,7 +582,10 @@ public static class UpgradeOffer
     // case is only the one where it must displace something. Otherwise half, rounded up, of the upgrades on the
     // **least** upgraded gun standing in a mount this gun could take. "Least" is what stops a run of swap-after-
     // swap from compounding, and only mounted guns count: a cargo gun does not fire and is never offered upgrades.
-    static int ArrivingUpgrades(WorldView view, Entity playerEntity, TurretSize size)
+    // A super card's gun arrives with the whole of that number instead of half (plans/SUPER_UPGRADES.md D5) —
+    // which is what makes a spiked new-weapon card "this gun shows up as built as the weakest thing you own",
+    // and the gun's own legal-stat count is still the bound on it.
+    static int ArrivingUpgrades(WorldView view, Entity playerEntity, TurretSize size, CardPower power)
     {
         if (TurretMount.FreeSlots(view, size).Count > 0) return 0;
 
@@ -472,7 +593,8 @@ public static class UpgradeOffer
         var displaceable = TurretMount.MountedSlots(view).Where(slot => TurretMount.Fits(slot.Slot.Size, size)).ToList();
         if (displaceable.Count == 0) return 0;
 
-        return (displaceable.Min(slot => WeaponUpgrade.CountOn(counts, slot.WeaponName)) + 1) / 2;
+        int least = displaceable.Min(slot => WeaponUpgrade.CountOn(counts, slot.WeaponName));
+        return power == CardPower.Super ? least : (least + 1) / 2;
     }
 
     // Which upgrades they are (D3): a random sample, without replacement, of the gun's own legal stat cards at its
@@ -485,7 +607,7 @@ public static class UpgradeOffer
     {
         if (count <= 0) return WeaponPreUpgrade.None;
 
-        var legal = WeaponUpgrade.LegalStats(gun, TurretMount.CarriedTurret(gun), PierceUnlockedAt(level));
+        var legal = WeaponUpgrade.LegalStats(gun, TurretMount.CarriedTurret(gun), PierceUnlockedAt(level), CardPower.Base);
         if (IsMilestoneLevel(level)) legal.Add(UpgradeOption.Damage);
         Shuffle(legal, rng);
 
@@ -518,14 +640,23 @@ public static class UpgradeOffer
     const string ScriptedUpgradesEnvVar = "SPACEVORS_DIAG_UPGRADES";
 
     /// One `SPACEVORS_DIAG_UPGRADES` entry: a gun name (`RailGun`), a gun with the upgrades it arrives with
-    /// (`RailGun+FireRate+Damage`), or a stat card (`FireRate:MachineGun`). Public so a test can pin the syntax the
-    /// bench depends on without setting process-wide environment variables.
+    /// (`RailGun+FireRate+Damage`), or a stat card (`FireRate:MachineGun`). On a stat card a trailing `*` benches
+    /// the **super** grade — twice the step, exactly as a dealt super card grants it (plans/SUPER_UPGRADES.md D9);
+    /// a benched new gun spells its arriving set with `+Stat`, so it needs no grade of its own. Public so a test
+    /// can pin the syntax the bench depends on without setting process-wide environment variables.
     public static UpgradableOption? ParseEntry(string entry)
     {
+        // A trailing `*` asks for the **super** grade of the card after it — the grade a dealt hand stamps on
+        // two of its halves. A `Damage` card is never super (plans/SUPER_UPGRADES.md D3) and a bench that asks
+        // for one is a bench of a card the deal would never show, so it is refused rather than quietly granted
+        // at the base step.
+        bool super = entry.EndsWith('*');
+        string card = (super ? entry[..^1] : entry).Trim();
+
         // A script names a gun directly and ignores its unlock level: the script is a test bench. With `+Stat`
         // after the name it also says what that gun arrives carrying, which is how a scripted hand can put an
         // arriving build in front of the mount screen (plans/PREUPGRADED_NEW_WEAPONS.md).
-        string[] pieces = entry.Split('+', StringSplitOptions.TrimEntries);
+        string[] pieces = card.Split('+', StringSplitOptions.TrimEntries);
         if (pieces[0] != WeaponType.LoadTestWeapon.Name && WeaponType.FromName(pieces[0]) is not null)
         {
             var mask = WeaponPreUpgrade.None;
@@ -539,21 +670,25 @@ public static class UpgradeOffer
             return new UpgradableOption(pieces[0], UpgradeOption.Damage, IsNewWeapon: true, PreApplied: mask);
         }
 
-        var parts = entry.Split(':');
-        if (parts.Length != 2 || !Enum.TryParse<UpgradeOption>(parts[0], ignoreCase: true, out var stat))
+        string[] statAndWeapon = card.Split(':');
+        if (statAndWeapon.Length != 2 || !Enum.TryParse<UpgradeOption>(statAndWeapon[0], ignoreCase: true, out var stat))
             return null;
+        if (super && stat == UpgradeOption.Damage) return null;
 
-        string weaponName = parts[1].Trim();
-        return new UpgradableOption(weaponName, stat);
+        return new UpgradableOption(statAndWeapon[1].Trim(), stat, Power: super ? CardPower.Super : CardPower.Base);
     }
 
     public static string FormatChoice(UpgradableOption option)
     {
-        if (option.IsNewWeapon) return $"new:{option.WeaponName}{FormatArriving(option.PreApplied)}";
+        // The grade is printed first, so a `[UPGRADE]` row shows which halves of the hand were spiked, and a
+        // defence row still prints the step it actually grants — the milestone tier and a super ordinary card
+        // land on the same number, and the row says which one it was (R10).
+        string grade = option.IsSuper ? "super " : "";
+        if (option.IsNewWeapon) return $"{grade}new:{option.WeaponName}{FormatArriving(option.PreApplied)}";
         if (option.Stat is UpgradeOption.Armor or UpgradeOption.Shield)
-            return $"{FormatStat(option)}(+{Step(option.Stat, option.Tier)} {option.Tier.ToString().ToLowerInvariant()})";
+            return $"{grade}{FormatStat(option)}(+{option.Step.Additive} {option.Tier.ToString().ToLowerInvariant()})";
 
-        return FormatStat(option);
+        return grade + FormatStat(option);
     }
 
     // What a new gun arrives with, spelled for the `[UPGRADE]` rows and the mount log: nothing for a plain gun,
