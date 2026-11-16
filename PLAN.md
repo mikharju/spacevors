@@ -143,12 +143,12 @@ below the header is frozen intent and may be stale (see plans/DOC_LAYOUT.md).
   half, in different bundles, marked in lime on the card and printed with their doubled number; the step is resolved
   once on the card, so the ceilings, the label and the grant all read it (a super defence card is the milestone step,
   a spiked new gun arrives with the whole least count instead of half) — shipped 2026-11-15 — plans/SUPER_UPGRADES.md
-- Ceiling test: the largest mixed world that still fits 8.33 ms, probed in sim and in window, recorded in `.tools/run/ceiling.tsv`, never gated — shipped 2026-11-02 — plans/CEILING_TEST.md
+- Ceiling test: the largest mixed world that still fits 8.33 ms, probed in sim and in window, recorded in `.tools/ceiling-history.tsv`, never gated — shipped 2026-11-02 — plans/CEILING_TEST.md
 - Minor shipped features (camera-follows-mouse, rocks-as-cover, aim-line volley, ...) — record — plans/MINOR.md
 - Documentation layout and migration — shipped — plans/DOC_LAYOUT.md
 
 ### Proposed, not implemented
-- Endless difficulty escalation: behaviour first, distance-driven clock, duty cycle, elites — plans/ENDLESS_DIFFICULTY.md
+- Endless difficulty escalation: distance clock (P2), duty cycle (P3), elites (P4), reward decay (P5) — plans/ENDLESS_DIFFICULTY.md (P1 "behaviour first" is spent: plans/ENEMY_BEHAVIORS.md)
 - Parallel sim — plans/PARALLEL_SIM.md
 - Damage affects ship performance — plans/DAMAGE_PERFORMANCE.md
 
@@ -157,7 +157,7 @@ plans/functional-ecs.md.
 
 ## Roadmap — near future (data on existing machinery)
 
-- New enemy archetypes: kamikaze, sniper, minelayer, shielded hull
+- New enemy archetypes: sniper, minelayer, shielded hull (kamikaze spent — the Rammer behaviour, plans/ENEMY_BEHAVIORS.md B6)
 - New mines: turns into a missile on approach; fires one delayed beam after lock-on
 - Weapon identity cells still empty on purpose (aura × fast/medium, close × hitscan, mid × fast,
   long × medium/slow) and the playtest knobs left open — plans/WEAPON_IDENTITY_CELLS.md §8
@@ -176,7 +176,7 @@ plans/functional-ecs.md.
 - Elite enemies: mount/aura/hp modifiers on normal hulls
 - Bosses: one huge hull, many mounts, phases as a small state table
 - Deterministic replays before save/load
-- 100k prep: SoA audit + a 50k scenario, before parallel sim (plans/PARALLEL_SIM.md)
+- 100k prep: the SoA audit, before parallel sim (plans/PARALLEL_SIM.md). The 50k-scale world is spent — the ceiling ladder probes past it (plans/CEILING_TEST.md)
 - Mod-friendly stats: Domain/Stats tables exported to JSON/TOML
 
 ## Roadmap - future (longer ideas)
@@ -190,9 +190,9 @@ powerful shots" shipped as that slug, not as enemy pierce — enemies never pier
 
 ## Roadmap — infrastructure / QA
 
-- Perf gate in CI: `.tools/scenario.sh --check-baseline` on every push
-- Balance fuzzing: random upgrade sequences assert no card is ever a lie
-- Portability: Windows CI leg or a documented cross-platform run matrix
+- Perf gate in CI: spent in substance — `dotnet test` on every push, with `ScenarioPerformanceTest` asserting per-scenario median and per-tick-allocation ceilings (`SPACEVORS_PERF_HOST=ci` selects the CI set); what is left is gating the real-display 8.33 ms budget (`.tools/scenario.sh --check-baseline`) there
+- Balance fuzzing: the honesty sweeps already run in CI (`HandCompositionTest`, `SuperUpgradeTest`, `LevelUpSlotOfferTest` over levels and fixed seeds); what is left is genuinely *random* upgrade sequences
+- Portability: a Windows build leg ships (`build-windows`, README install notes); a Windows test/run matrix does not
 
 ## Done criteria
 
