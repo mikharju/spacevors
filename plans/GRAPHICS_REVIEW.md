@@ -239,3 +239,21 @@ warnings still fire for them.
 Note on internal drift: the fix note at :93 mentions wiring through `Lighting.TryDraw`, an API that no
 longer exists; the batching section at :191 (BeginDraw/Draw/EndDraw) supersedes it in-file, and current
 code matches that later section.
+
+## Follow-up (2026-11-16): the asset nit is still the only open item
+
+Re-read during the PLAN.md sweep, no new investigation beyond re-reading the PNG headers.
+
+- **The open item is still open, and the numbers at :234-236 are still exact.** Measured again from the
+  headers: `small-1` texture 574×524 against 524×478 maps, `interceptor` 945×926 against 926×907, `fighter`
+  851×937 against 930×1024, `heavy` 922×913 against 1024×1014. Nothing else in the lit sets diverges. The
+  fix is the one already decided at :158 — regenerate those four at base dimensions so the load-time
+  warnings stop firing. PLAN.md carries it as a one-line entry under "Roadmap — near future" and points here.
+- **Worth a later look, not verified in this pass:** `enemy-1` and `heavy-cannon` are the two sets whose
+  normal map is spelled `-normal` while every other set uses `-normals`. That is the variant-collision shape
+  the 2026-08-21 minor item at :168 was written about, and the fix note at :171 claims both spellings are
+  consumed; whether those two stems actually pair and light (rather than drawing flat) was not checked here.
+- **The "no regression of any Fixed item" sweep at :223 is now three graphics features out of date.** It
+  predates lit sprite rendering, the ship tint palette, the thruster flame anchors and the start-screen
+  onboarding (all shipped 2026-11-02 → 2026-11-06), so a fresh re-verification is owed before this record is
+  trusted as current on anything it marks Fixed.

@@ -1,6 +1,8 @@
 # ENDLESS_DIFFICULTY.md
 
-Status: proposed (2026-11-01) — planning only, nothing implemented here.
+Status: proposed for **P2-P7 only** (2026-11-01). **P1 "behaviour first" is spent** — it shipped on
+2026-11-08 as plans/ENEMY_BEHAVIORS.md. Item-by-item status in `## Follow-up (2026-11-16)` at the end; the
+body below is frozen intent.
 
 Plan for keeping the difficulty curve climbing past the current wall, and for closing the escape valve
 that lets speed undo everything the ladder does. Ordered by cost, cheapest first; each item states the
@@ -147,3 +149,39 @@ unspent.
 3. One headless play-through per change with the `[THREAT]` row read at the same elapsed times (5, 10,
    15, 20, 30 min) — the `hp` walk is the only survivability instrument that exists.
 4. Append a dated `## Shipped` / `## Follow-up` note here; never rewrite the sections above.
+
+## Follow-up (2026-11-16): what has landed since this was written
+
+Nothing was implemented *as* this plan, but P1 is spent and part of P3's note landed. P2, P4, P5, P6 and P7
+are untouched, each with the proof that they are — so the frozen sections above can be read without being
+rewritten.
+
+- **P1 — spent, and by the cheap route it asked for.** plans/ENEMY_BEHAVIORS.md (shipped 2026-11-08) put the
+  manoeuvres on the **existing** composition draw: `EnemyBehavior { Chase, Spread, Strafe, CutOff, CoverTuck,
+  Rammer, Burst }` (`Stats/EnemyShipStats.cs`), one value per hull written at spawn and never mutated, with
+  behaviour rows splitting a hull's gun budget instead of adding to it — no stat creep anywhere. The flanking
+  half landed too: spreading hulls are born from a wider arc than the wave (`Manoeuvre.SpreadSpawnCone`,
+  ±60° against the wave's ±45°) and whole waves arrive holding lanes (`WaveSchedule.IsFlankerWave`). P1's
+  assertion exists as an instrument rather than a test: `ThreatMeter.Measure` returns `BearingSectors`,
+  printed as `sectors=` on the `[THREAT]` row.
+- **The one P1 item not taken: the weapons-hot delay after spawn.** No spawn-time firing grace exists;
+  `AI/EnemyShipFactory` seeds only a `MissileCooldown`, and a spawned hull's gun cooldown is the ordinary one.
+  If fairness on a longer reach is ever bought, it is still unbought.
+- **P3 — the "known limit" section above is what landed, not the item.** Player speed scales a wave's *quota*
+  (`EnemyShipSpawnSystem.WaveQuota`, 1× → 3×), the density-per-ground answer. The duty cycle itself did not
+  move: `Stats/WaveStats.cs` still holds `QuietGap = 9f` and `FullLull = 15f` in a fixed two-wave pair.
+- **P2 — untouched, so the escape valve is only half closed.** The difficulty clock is still elapsed time:
+  `WaveSchedule.PhaseFor(elapsedTime)`, with the spawner's wave index derived from `view.ElapsedTime`. The
+  quota buys threat density against a fast player; it does not make distance earn progression, and
+  ARCHITECTURE's elapsed-time invariant still stands.
+- **P4 — untouched.** No elite marker component, no elite row on the composition draw; magenta and gold are
+  still deliberately unassigned in `Game/Palette.cs`.
+- **P5 — untouched.** `Stats/LootStats.HealthOrbChance` is a flat `0.05f` with no late-run decay.
+- **P6 — untouched.** `EnemyMine(Size, Speed, Angle)` carries no weapon: no mine→missile conversion and no
+  enemy-fired beam anywhere in `Domain`.
+- **P7 — untouched.** `EnemyShipStats.WeaponPelletCount = 1`, `SpawningStats.EnemyShips.MaxEnemyShips = 100`,
+  `SpawningStats.Mines.MaxMines = 23`.
+
+PLAN.md now matches this: its "Proposed, not implemented" line lists P2-P5 against this file and points P1 at
+plans/ENEMY_BEHAVIORS.md, and the kamikaze half of "new enemy archetypes" is marked spent as the Rammer
+behaviour (B6).
