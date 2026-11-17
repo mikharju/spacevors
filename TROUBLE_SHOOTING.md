@@ -895,6 +895,24 @@ the message at.
   paths (the relative ones resolve against the scratch dir). Delete the scratch dir afterwards and confirm
   `git status` shows no `global.json` change. When reporting a green suite this way, say which SDK it actually
   ran on — and if a pin really blocks the work, say so rather than quietly lowering it.
+
+## 87. A game window started with `nohup` dies with the command, and a paused screen gives byte-identical shots
+
+- **Symptom**: a `.tools/game.sh` started as `nohup … &` (or `( … &)`) inside one tool command is gone a moment
+  later — `shot.sh` answers `no SpaceVors window running`, or the game segfaults (exit 139) because the display
+  went with it. Then, on a **paused** screen (upgrade cards, turret mounts), three consecutive `shot.sh` calls
+  print the **same md5** even after `xdotool mousemove`: it reads as "mouse input is dead".
+- **Cause**: the harness reaps the process tree of a finished command, so a detached window is not a long-lived
+  process. And a paused screen has nothing animating, so an unchanged PNG is the honest answer until the pointer
+  is genuinely over something with a hover state. Two more traps in the same place: `.tools/input.sh move` does
+  **not** focus the window (there is no window manager, so focus is not automatic), and the hover rects are the
+  marker's own centre — the number badge sits beside the ring, not on it.
+- **Fix / Prevention**: start `Xvfb` and the game each as their own managed background job (`exec .tools/game.sh`),
+  never detached. For a hover check: `xdotool windowfocus --sync $wid` then `mousemove`, sleep ≥1 s (llvmpipe
+  renders this game at ~4 fps under load, and raylib only sees input still down at the next poll), then
+  `.tools/shot.sh`. If nothing changes, prove the input path with a **keyboard** action first (a number key
+  selects a mount; that changes the frame) — that separates a dead input path from wrong coordinates.
+
 - **Same pin, quieter symptom in `.tools/`**: `.tools/scenario.sh` runs `dotnet publish` with the **repo** as cwd, so
   it dies before measuring and only prints `publish failed; see .tools/run/publish.log` — the reason is in that log,
   and it is this pin again. Publish once from the scratch dir with an absolute project path, then hand the artifact to

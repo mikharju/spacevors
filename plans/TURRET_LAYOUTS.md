@@ -365,3 +365,14 @@ plans/PREUPGRADED_NEW_WEAPONS.md moved the grant. Taking a bundle that offered a
 for the moment the bundle is taken, so leaving that screen with Esc cannot lose it, and one visit can place both
 guns of a two-new-gun bundle. The R23 refusal (one gun of each type aboard, on the hull or in cargo) is enforced
 inside the grant, `NewWeaponGrant.TryGrant`, rather than in the mount click.
+
+## Follow-up (2026-11-17): mounts have names
+
+plans/CARD_AND_LOADOUT_READABILITY.md shipped the display half of what this plan left open. Every ring on the
+mount screen is labelled with the gun standing in it (`empty` when it is not), the cargo list carries a
+**MOUNTS** legend — `1 ahead · large  Machine Gun`, `2 left flank · small  empty`, one row per mount, the
+number the plan fixed for keyboard use — and hovering a row or a ring lights both and says what a click there
+would do (`swap with Machine Gun`, `needs a large mount`). The held gun says so in words in the cargo row
+(`Rail Gun (in hand)`). The stats screen prints the same mount names instead of the slot ids, and the screen's
+help text no longer needs to explain which mount is which. Mount *rules* are untouched: the slots, their sizes,
+the numbers that never change and free rearranging all stand as this plan set them.

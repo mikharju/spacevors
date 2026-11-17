@@ -431,3 +431,14 @@ bundle half, that gun arrives carrying the **whole** `least` count instead of `�
 unchanged — the same `Fits` basis, the same legal-stat cap, and the same "a plain gun while a mount it fits is free",
 because with nothing displaced `least` is 0 and there is no bigger set to offer, so the deal leaves the card unspiked
 rather than inventing upgrades for a pure addition.
+
+## Follow-up (2026-11-17): the arriving set is a strip, not a label tail
+
+plans/CARD_AND_LOADOUT_READABILITY.md shipped. Its D4 wording in this plan — the card naming the arriving set
+inside its label (`new weapon Rail Gun — with rate, damage`) — is what the display does **no longer**: the label
+is `new weapon · Rail Gun`, the size stays the prominent line, and the arriving set is a row of caps under it in
+the upgrade card's own words (`attack speed +15%  projectile speed +30%`), above a pip row that marks how many
+of the gun's legal stats the build already fills. Two builds of one gun therefore differ in rows, not in a comma
+tail. The *rule* this plan set is untouched: the set is still `StatsOf(PreApplied)`, one ordinary card per stat,
+so on a gun whose volley grows the arriving `FireRate` is written `volley size +1 shot` — the shot, not a
+percentage the gun never grants. `UpgradeOffer.FormatArriving` (bench strings, logs) keeps its old `+Stat` form.
