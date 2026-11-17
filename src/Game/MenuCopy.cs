@@ -119,7 +119,7 @@ public static class MenuCopy
 
     // Where a mount points, in the player's words, read off the slot names the hull declares — so the
     // card cannot drift from the layout.
-    static string MountPosition(string slotName) => slotName switch
+    public static string MountPosition(string slotName) => slotName switch
     {
         TurretSlotName.MainGun => "ahead",
         TurretSlotName.SmallLeft or TurretSlotName.HeavyLeft => "left flank",
@@ -127,5 +127,53 @@ public static class MenuCopy
         TurretSlotName.SmallBack => "aft",
         TurretSlotName.SmallNose => "nose",
         _ => "",
+    };
+
+    public static string SizeWord(TurretSize size) => size == TurretSize.Large ? "large" : "small";
+
+    // A mount as the player refers to it: where it sits and how big it is. Two mounts of one hull can
+    // share a position word (`small_left` and `heavy_left` are both the left flank), so the size is part of
+    // the name — and the same string is read out on the hull, in the mount legend and on the stats screen,
+    // where the slot's internal id (`heavy_left`) used to stand instead.
+    public static string MountLabel(TurretSlotDefinition slot) => $"{MountPosition(slot.Name)} · {SizeWord(slot.Size)}";
+
+    // The stats a hull and its guns are upgraded with, in one vocabulary: the upgrade card's label, the
+    // caps that list what a new gun arrives carrying, and the stats screen's rows all read these words.
+    // A card used to say `rate` where the same card said `attack speed` two lines above and the stats
+    // screen said `Fire rate` — three spellings of one stat is three things to learn.
+    //
+    // `FireRate` is the one stat whose word depends on the gun: a gun whose volley grows buys another shot,
+    // and the game's own word for that is the volley. The caller passes the same predicate the grant
+    // applies, so the word cannot drift from the effect (R10).
+    public static string StatWord(UpgradeOption stat, bool growsVolley = false) => stat switch
+    {
+        UpgradeOption.FireRate => growsVolley ? "volley size" : "attack speed",
+        UpgradeOption.ProjectileSpeed => "projectile speed",
+        UpgradeOption.Range => "range",
+        UpgradeOption.Damage => "damage",
+        UpgradeOption.ArmorPierce => "armor pierce",
+        // R19: the card says whose rounds get tougher; "missile health" read like a stat of the hull.
+        UpgradeOption.MissileHealth => "round hit points",
+        UpgradeOption.Hp => "hit points",
+        UpgradeOption.Armor => "hull armor",
+        UpgradeOption.Shield => "hull shield",
+        UpgradeOption.PickupRadius => "pickup radius",
+        UpgradeOption.ForwardAcceleration => "forward acceleration",
+        UpgradeOption.TurnSpeed => "turn speed",
+        UpgradeOption.SideThrust => "side thrust",
+        UpgradeOption.BackThrust => "back thrust",
+        _ => stat.ToString().ToLowerInvariant(),
+    };
+
+    // The same words for the tight spots — a row of caps on a card that also carries a gun's name. Only the
+    // two-word stats shorten, and no third vocabulary is invented: each abbreviation is the word above with
+    // its qualifier dropped.
+    public static string StatAbbrev(UpgradeOption stat, bool growsVolley = false) => stat switch
+    {
+        UpgradeOption.FireRate => growsVolley ? "volley" : "rate",
+        UpgradeOption.ProjectileSpeed => "proj speed",
+        UpgradeOption.MissileHealth => "round hp",
+        UpgradeOption.ArmorPierce => "pierce",
+        _ => StatWord(stat, growsVolley),
     };
 }

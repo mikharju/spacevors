@@ -79,12 +79,13 @@ public static class Renderer
         bool diagnostics,
         MountMenuRenderer.Prepared mount,
         int hoveredSlot,
-        int hoveredCargo)
+        int hoveredCargo,
+        int hoveredLegend)
     {
         Raylib.BeginDrawing();
         RenderTimings.BeginFrame();
         DrawScene(em, camX, camY, windowWidth, windowHeight, stars, clutter, playerEntity, mount.Ship, diagnostics);
-        MountMenuRenderer.Draw(mount, hoveredSlot, hoveredCargo, windowWidth, windowHeight);
+        MountMenuRenderer.Draw(mount, hoveredSlot, hoveredCargo, hoveredLegend, windowWidth, windowHeight);
         RenderTimings.Pass("ui.hull");
         Raylib.EndDrawing();
         RenderTimings.Pass("present");

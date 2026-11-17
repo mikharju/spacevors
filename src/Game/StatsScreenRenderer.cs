@@ -2,6 +2,7 @@ using Raylib_cs;
 using Spacevors.Domain;
 using Spacevors.Domain.Components;
 using Spacevors.Domain.Stats;
+using Spacevors.Domain.Systems;
 
 namespace Spacevors.Game;
 
@@ -38,13 +39,37 @@ public static class StatsScreenRenderer
     // Stats layout + window scale for one paused frame. Prepared once and used for both hover
     // hit-testing and drawing, so the two can never disagree and the work is not repeated. The reroll
     // charge count rides along for the same reason: the salvage panel's box depends on it.
-    public sealed record Prepared(StatsLayout Layout, float Scale, int RerollCount);
+    public sealed record Prepared(StatsLayout Layout, float Scale, int RerollCount, UpgradeMenuRenderer.CardContext Cards);
 
     public static Prepared Prepare(EntityManager em, Entity playerEntity, int windowWidth, int windowHeight, bool hasCards)
     {
         var layout = BuildStats(em, playerEntity);
         int rerollCount = em.TryGetComponent<RerollStock>(playerEntity, out var stock) ? stock.Count : 0;
-        return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards), rerollCount);
+        return new Prepared(layout, ComputeScale(windowWidth, windowHeight, layout, hasCards), rerollCount, ReadCardContext(em, playerEntity));
+    }
+
+    // The numbers an upgrade card compares against, read once for the frame: the hull's own stats, the turret
+    // each owned gun sits on, and whether pierce cards are dealt yet. The card's text is built from these, so
+    // what a card prints and what the grant changes come from the same components (R10).
+    static UpgradeMenuRenderer.CardContext ReadCardContext(EntityManager em, Entity playerEntity)
+    {
+        var player = em.GetComponent<Player>(playerEntity);
+
+        var guns = new Dictionary<string, Turret>();
+        foreach (var (entity, turret) in em.GetEntitiesWithComponents<Turret>())
+            if (!turret.IsEnemy) guns[turret.WeaponName] = turret;
+
+        var hull = new UpgradeCardCopy.Hull(
+            MaxHp: em.TryGetComponent<Health>(playerEntity, out var health) ? health.Max : player.MaxHealth,
+            Armor: em.TryGetComponent<Armor>(playerEntity, out var armor) ? armor.Value : 0,
+            ShieldMax: em.TryGetComponent<Shield>(playerEntity, out var shield) ? shield.Max : 0f,
+            Thrust: player.Thrust,
+            SideThrust: player.SideThrust,
+            BackThrust: player.BackThrust,
+            RotationSpeed: player.RotationSpeed,
+            PickupRadius: player.PickupRadius);
+
+        return new UpgradeMenuRenderer.CardContext(hull, guns, UpgradeOffer.PierceUnlockedAt(player.Level));
     }
 
     public static void Draw(Prepared prepared, string shipName, int level, int windowWidth, int windowHeight, PendingUpgradeOptions? options, int hoveredIndex, bool canManageMounts, bool hoveredManage, bool hoveredReroll)
@@ -57,7 +82,7 @@ public static class StatsScreenRenderer
 
         if (hasCards)
         {
-            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale, prepared.RerollCount, hoveredReroll, level);
+            UpgradeMenuRenderer.DrawCards(windowWidth, windowHeight, options!.Value, hoveredIndex, prepared.Scale, prepared.RerollCount, hoveredReroll, level, prepared.Cards);
             return;
         }
 
@@ -261,18 +286,27 @@ public static class StatsScreenRenderer
             var rows = new List<StatRow>
             {
                 new("Damage", FormatInt(turret.Weapon.Damage), CountOf(em, playerEntity, UpgradeOption.Damage, weaponName)),
-                new("Fire rate", $"{FormatRate(turret.Weapon.FireRate)}/s{PelletSuffix(turret.Weapon.PelletCount)}", CountOf(em, playerEntity, UpgradeOption.FireRate, weaponName)),
+                // "Fire rate" was this row's word while the card for the same stat said "attack speed" and an
+                // arriving gun's cap said "rate": one stat, three names (plans/CARD_AND_LOADOUT_READABILITY.md D1).
+                new("Attack speed", $"{FormatRate(turret.Weapon.FireRate)}/s{PelletSuffix(turret.Weapon.PelletCount)}", CountOf(em, playerEntity, UpgradeOption.FireRate, weaponName)),
                 new("Projectile speed", FormatInt(turret.Weapon.AmmoSpeed), CountOf(em, playerEntity, UpgradeOption.ProjectileSpeed, weaponName)),
                 new("Range / bullet life", $"{FormatInt(turret.Range)} px · {turret.Weapon.ShotLifetime:0.0}s", CountOf(em, playerEntity, UpgradeOption.Range, weaponName)),
                 // The arc belongs to the hull mount, the slew rate to the weapon: together they say
                 // whether this gun keeps its target while the ship turns.
-                new("Mount / firing arc", mount is { } m ? $"{m.Name} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "-", -1),
+                // The mount in the player's words, not the slot id: `left flank · large · 120°` says where the gun
+                // stands, where `heavy_left · 120°` said nothing until the layout had been read (D8).
+                new("Mount / firing arc", mount is { } m ? $"{MenuCopy.MountLabel(m)} · {(int)MathF.Round(Angle.ToDeg(m.ArcAngle))}°" : "-", -1),
                 new("Turret turn speed", $"{(int)MathF.Round(Angle.ToDeg(turret.Weapon.TurnSpeed))}°/s", -1),
             };
             // Pierce only earns a row once bought — every gun starts at 0 and a wall of zeros would
             // pad the panel (plans/ARMOR_AND_PIERCE.md).
             if (turret.Weapon.Pierce > 0)
                 rows.Add(new("Armor pierce", FormatInt(turret.Weapon.Pierce), CountOf(em, playerEntity, UpgradeOption.ArmorPierce, weaponName)));
+            // R19: the stat a `MissileHealth` card buys, shown on the gun it buys it for. Until now the card's
+            // count was the only trace of it: a player could buy the card and never see what it had done. The
+            // gate is Domain's own — only a guided round has hit points to raise.
+            if (turret.Weapon.Homing)
+                rows.Add(new("Round hit points", FormatInt(turret.Weapon.MissileHealth), CountOf(em, playerEntity, UpgradeOption.MissileHealth, weaponName)));
             // The gun's own id is PascalCase; the panel shows it as two words so it matches the start-screen card.
             weaponSections.Add(new StatsSection(MenuCopy.FriendlyWeaponName(weaponName), [.. rows]));
         }

@@ -20,6 +20,8 @@ public static class MountMenuRenderer
     const float ArcRadiusFactor = 5f;
     const int ArcSegments = 24;
     const int NumberFontSize = 16;
+    const int MountLabelFontSize = 12;
+    const float LabelBelowFactor = 2f;
     const float ClickSlack = 8f; // a click this far outside a marker still hits it
 
     // Cargo list: a column at the left edge, starting well below the top so it never fights the hull.
@@ -29,6 +31,10 @@ public static class MountMenuRenderer
     const int CargoRowPitch = 26;
     const int CargoRowPaddingX = 10;
     const int CargoRowPaddingY = 5;
+
+    // The mount legend, directly under the cargo list: same column, same row rhythm, one more header.
+    const int LegendRowPitch = 24;
+    const int LegendHeaderGap = 8;
 
     // The rules panel, opposite the cargo column. It holds what never changes about this screen, which
     // leaves the line at the bottom free to say only what to do right now.
@@ -44,6 +50,14 @@ public static class MountMenuRenderer
         TurretSlotDefinition Slot,
         bool Occupied,
         string WeaponName,
+        // The mount's own name in the player's words (`left flank · large`), and what sits in it. A ring
+        // that carries only a number says nothing about which gun is where, which is the reason a player
+        // used to take a gun out to find that out (plans/CARD_AND_LOADOUT_READABILITY.md D7).
+        string MountLabel,
+        string WeaponLabel,
+        // What a click on this ring would do, in words, shown while it is hovered: what stops the gun in
+        // hand, or what a swap would move.
+        string HoverNote,
         // Where the gun currently points (absolute), so the triangle matches the in-game marker.
         float AimAngle,
         float ScreenX,
@@ -65,6 +79,18 @@ public static class MountMenuRenderer
         float Height,
         bool Held);
 
+    // One row of the mount legend: a mount, its number, and what sits in it. The legend is the answer to
+    // "which gun is where", and hovering it lights the ring it stands for.
+    public readonly record struct LegendRow(
+        int MarkerIndex,
+        int Number,
+        string MountLabel,
+        string WeaponLabel,
+        float ScreenX,
+        float ScreenY,
+        float Width,
+        float Height);
+
     public sealed record Prepared(
         ShipType Ship,
         float ShipX,
@@ -75,7 +101,9 @@ public static class MountMenuRenderer
         CargoItem[] Cargo,
         float CargoTop,
         string HeldWeapon,
-        string Hint);
+        string Hint,
+        LegendRow[] Legend,
+        float LegendTop);
 
     public static Prepared Prepare(EntityManager em, ShipType ship, int windowWidth, int windowHeight, string heldWeapon, IReadOnlyList<string> cargoNames, string hint)
     {
@@ -100,11 +128,15 @@ public static class MountMenuRenderer
             bool selectable = acceptsHeld || (held is null && occupied);
             number++;
 
+            string gunName = occupied ? em.GetComponent<Turret>(slotEntity).WeaponName : "";
             markers.Add(new SlotMarker(
                 slotEntity,
                 slot.Definition,
                 occupied,
-                occupied ? em.GetComponent<Turret>(slotEntity).WeaponName : "",
+                gunName,
+                MenuCopy.MountLabel(slot.Definition),
+                occupied ? MenuCopy.FriendlyWeaponName(gunName) : "empty",
+                HoverNote(occupied, gunName, held, slot.Definition),
                 occupied ? em.GetComponent<Rotation>(slotEntity).Angle : slot.Definition.ArcCenter,
                 shipX + slot.Definition.Offset.X * zoom,
                 shipY + slot.Definition.Offset.Y * zoom,
@@ -123,14 +155,65 @@ public static class MountMenuRenderer
 
         foreach (string name in cargoNames)
         {
-            // The row is measured against the two-word name it draws, so the box always holds the text.
-            float width = Raylib.MeasureText(MenuCopy.FriendlyWeaponName(name), rowFont) + 2f * CargoRowPaddingX * scale;
-            cargo.Add(new CargoItem(name, cargoX, cargoY, width, rowPitch, name == heldWeapon));
+            // The row is measured against the words it draws — a cargo gun's name, plus the words that say
+            // this is the one being carried — so the box always holds the text (D9: state what is in hand
+            // where the held gun is, not only in the hint line at the bottom).
+            string text = CargoText(name, name == heldWeapon);
+            cargo.Add(new CargoItem(name, cargoX, cargoY, Raylib.MeasureText(text, rowFont) + 2f * CargoRowPaddingX * scale, rowPitch, name == heldWeapon));
             cargoY += rowPitch;
         }
 
-        return new Prepared(ship, shipX, shipY, diameter, scale, [.. markers], [.. cargo], top, heldWeapon, hint);
+        float legendTop = top + rowPitch + cargo.Count * rowPitch + (CargoRowPitch + LegendHeaderGap) * scale;
+        var legend = BuildLegend(markers, scale, cargoX, legendTop + (int)(CargoFontSize * scale) + 4);
+        return new Prepared(ship, shipX, shipY, diameter, scale, [.. markers], [.. cargo], top, heldWeapon, hint, legend, legendTop);
     }
+
+    // Why a ring is or is not a place for the gun in hand. The screen already rings what fits; this says the
+    // reason, in the place the player is looking, instead of leaving "why not" to the rules panel.
+    static string HoverNote(bool occupied, string gunName, WeaponType? held, TurretSlotDefinition slot)
+    {
+        if (held is not { } gun) return occupied ? "take it down to cargo" : "";
+        if (!TurretMount.Fits(slot, gun)) return $"needs a {MenuCopy.SizeWord(slot.Size)} mount";
+        return occupied ? $"swap with {MenuCopy.FriendlyWeaponName(gunName)}" : $"mount {MenuCopy.FriendlyWeaponName(gun.Name)}";
+    }
+
+    // The legend sits in the cargo column, under the guns that are not firing: the two lists together are
+    // everything the ship owns, and the mount list is the one that says where each gun stands.
+    static LegendRow[] BuildLegend(IReadOnlyList<SlotMarker> markers, float scale, float x, float top)
+    {
+        int font = (int)(CargoFontSize * scale);
+        int pitch = (int)(LegendRowPitch * scale);
+        var rows = new List<LegendRow>();
+        for (int i = 0; i < markers.Count; i++)
+        {
+            var marker = markers[i];
+            rows.Add(new LegendRow(
+                i, marker.Number, marker.MountLabel, marker.WeaponLabel, x, top + i * pitch,
+                Raylib.MeasureText(LegendText(marker), font) + 2f * CargoRowPaddingX * scale, pitch));
+        }
+
+        return [.. rows];
+    }
+
+    // The legend row and the ring describe one mount, so the same hover lights both.
+    public static int GetHoveredLegendIndex(Prepared prepared, int mouseX, int mouseY)
+    {
+        for (int i = 0; i < prepared.Legend.Length; i++)
+        {
+            var row = prepared.Legend[i];
+            if (mouseX >= row.ScreenX && mouseX <= row.ScreenX + row.Width &&
+                mouseY >= row.ScreenY && mouseY <= row.ScreenY + row.Height)
+                return i;
+        }
+
+        return -1;
+    }
+
+    static string LegendText(SlotMarker marker) =>
+        marker.Occupied ? $"{marker.Number}  {marker.MountLabel}  {marker.WeaponLabel}" : $"{marker.Number}  {marker.MountLabel}  empty";
+
+    static float CargoBottom(IReadOnlyList<CargoItem> cargo, float top, int rowPitch, float scale) =>
+        top + rowPitch + cargo.Count * rowPitch + (CargoRowPitch + LegendHeaderGap) * scale;
 
     public static int GetHoveredMountIndex(Prepared prepared, int mouseX, int mouseY)
     {
@@ -162,7 +245,7 @@ public static class MountMenuRenderer
         return -1;
     }
 
-    public static void Draw(Prepared prepared, int hoveredMount, int hoveredCargo, int windowWidth, int windowHeight)
+    public static void Draw(Prepared prepared, int hoveredMount, int hoveredCargo, int hoveredLegend, int windowWidth, int windowHeight)
     {
         Raylib.DrawRectangle(0, 0, windowWidth, windowHeight, Palette.ScreenDim);
 
@@ -170,16 +253,20 @@ public static class MountMenuRenderer
 
         Entity? hoveredSlot = hoveredMount >= 0 ? prepared.Markers[hoveredMount].SlotEntity : null;
 
-        foreach (var marker in prepared.Markers)
+        for (int i = 0; i < prepared.Markers.Length; i++)
         {
-            bool hovered = marker.Selectable && marker.SlotEntity == hoveredSlot;
+            var marker = prepared.Markers[i];
+            // The legend row and the ring are the same mount: either one being hovered lights both.
+            bool hovered = (marker.Selectable && marker.SlotEntity == hoveredSlot) || i == hoveredLegend;
             DrawArc(marker, hovered);
             if (marker.AcceptsHeld) DrawFitRing(marker, hovered, prepared.Scale);
             DrawMarker(marker, hovered);
             DrawNumberBadge(marker, prepared.Scale);
+            DrawMountLabel(marker, hovered, prepared.Scale);
         }
 
         DrawCargo(prepared, hoveredCargo);
+        DrawLegend(prepared, hoveredLegend);
         DrawHelpPanel(prepared, windowWidth, windowHeight);
 
         int font = (int)(UpgradeMenuRenderer.HintFontSize * prepared.Scale);
@@ -224,8 +311,51 @@ public static class MountMenuRenderer
             }
 
             Color text = item.Held ? Palette.Accent : i == hoveredCargo ? Palette.TextBright : Palette.TextMuted;
-            Raylib.DrawText(MenuCopy.FriendlyWeaponName(item.WeaponName), (int)(item.ScreenX + CargoRowPaddingX * prepared.Scale), (int)item.ScreenY, headerFont, text);
+            Raylib.DrawText(CargoText(item.WeaponName, item.Held), (int)(item.ScreenX + CargoRowPaddingX * prepared.Scale), (int)item.ScreenY, headerFont, text);
         }
+    }
+
+    // A cargo gun's row says in words which one the player is carrying, so the state is not carried by
+    // colour alone.
+    static string CargoText(string weaponName, bool held) =>
+        MenuCopy.FriendlyWeaponName(weaponName) + (held ? "  (in hand)" : "");
+
+    // The mount list: number, where the mount sits and what stands in it. Read top to bottom it answers
+    // "which gun is in what position" without taking a single gun down.
+    static void DrawLegend(Prepared prepared, int hoveredLegend)
+    {
+        int font = (int)(CargoFontSize * prepared.Scale);
+        float x = prepared.Legend.Length > 0 ? prepared.Legend[0].ScreenX : (int)(CargoMarginX * prepared.Scale);
+
+        Raylib.DrawText("MOUNTS", (int)x, (int)prepared.LegendTop, font, Palette.Accent);
+
+        for (int i = 0; i < prepared.Legend.Length; i++)
+        {
+            var row = prepared.Legend[i];
+            var marker = prepared.Markers[row.MarkerIndex];
+
+            if (i == hoveredLegend)
+                Ui.DrawRoundedRect((int)row.ScreenX, (int)row.ScreenY, (int)row.Width, (int)(row.Height - 3), 3, Palette.RowHover);
+
+            Color text = i == hoveredLegend ? Palette.Accent : marker.Occupied ? Palette.TextBright : Palette.TextMuted;
+            Raylib.DrawText(LegendText(marker), (int)(row.ScreenX + CargoRowPaddingX * prepared.Scale), (int)row.ScreenY, font, text);
+        }
+    }
+
+    // One word under the ring for the gun standing in it, and `empty` for a mount that is not. The legend
+    // holds the full list; this is the answer at the ring itself.
+    static void DrawMountLabel(SlotMarker marker, bool hovered, float scale)
+    {
+        int font = (int)(MountLabelFontSize * scale);
+        string text = marker.WeaponLabel;
+        Color color = hovered ? Palette.Accent : marker.Occupied ? Palette.TextBright : Palette.TextMuted;
+        // Below the marker's aiming tip, which reaches 1.9 radii out from the ring.
+        int y = (int)(marker.ScreenY + marker.MarkerRadius * LabelBelowFactor + 2f);
+        Raylib.DrawText(text, (int)(marker.ScreenX - Raylib.MeasureText(text, font) / 2f), y, font, color);
+
+        if (!hovered || marker.HoverNote.Length == 0) return;
+        string note = marker.HoverNote;
+        Raylib.DrawText(note, (int)(marker.ScreenX - Raylib.MeasureText(note, font) / 2f), y + font + 2, font, Palette.Accent);
     }
 
     // Green ring around a mount that can take the weapon in hand. Hovering doubles the ring, so the

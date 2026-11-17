@@ -990,6 +990,7 @@ public sealed class GameSession
         var mounts = MountMenuRenderer.Prepare(_em, _ship, windowWidth, windowHeight, _heldWeapon, cargoNames, MountsHint(cargo));
         int hoveredMount = MountMenuRenderer.GetHoveredMountIndex(mounts, mouseX, mouseY);
         int hoveredCargo = MountMenuRenderer.GetHoveredCargoIndex(mounts, mouseX, mouseY);
+        int hoveredLegend = MountMenuRenderer.GetHoveredLegendIndex(mounts, mouseX, mouseY);
 
         int picked = ReadMountSelection(hoveredMount, mounts.Markers);
         if (picked >= 0) ApplyMountClick(mounts.Markers[picked]);
@@ -1000,7 +1001,7 @@ public sealed class GameSession
 
         _renderSw.Restart();
         var mountCam = _em.GetComponent<Camera>(_cameraEntity);
-        Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mounts, hoveredMount, hoveredCargo);
+        Renderer.RenderMount(_em, mountCam.Target.X, mountCam.Target.Y, windowWidth, windowHeight, _stars, _clutter, _playerEntity, _diagnostics, mounts, hoveredMount, hoveredCargo, hoveredLegend);
         EndRenderTiming();
     }
 
